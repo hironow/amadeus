@@ -154,6 +154,46 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
 	}
 }
 
+// RunDoctor executes all health checks and returns the results.
+// Uses "claude" as the default Claude CLI command name.
+func RunDoctor(ctx context.Context, configPath string, repoRoot string) []DoctorCheckResult {
+	return RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude")
+}
+
+// RunDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
+func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
+	var results []DoctorCheckResult
+
+	// 1. git binary
+	results = append(results, checkTool(ctx, "git"))
+
+	// 2. git repository
+	results = append(results, checkGitRepo(repoRoot))
+
+	// 3. claude CLI
+	claudeResult := checkTool(ctx, claudeCmd)
+	results = append(results, claudeResult)
+
+	// 4. .divergence/ directory
+	results = append(results, checkDivergenceDir(repoRoot))
+
+	// 5. config.yaml
+	results = append(results, checkConfig(configPath))
+
+	// 6. Linear MCP (skip if claude unavailable)
+	if claudeResult.Status != CheckOK {
+		results = append(results, DoctorCheckResult{
+			Name:    "Linear MCP",
+			Status:  CheckSkip,
+			Message: "skipped (claude not available)",
+		})
+	} else {
+		results = append(results, checkLinearMCP(ctx, claudeCmd))
+	}
+
+	return results
+}
+
 // checkConfig validates that config.yaml exists and can be loaded.
 func checkConfig(path string) DoctorCheckResult {
 	if _, err := os.Stat(path); err != nil {

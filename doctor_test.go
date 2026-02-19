@@ -169,3 +169,72 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
+
+func TestRunDoctor_ReturnsAllResults(t *testing.T) {
+	// given: mock commands succeed
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	dir := t.TempDir()
+	// Create .divergence/ with config
+	divRoot := filepath.Join(dir, ".divergence")
+	os.MkdirAll(divRoot, 0o755)
+	cfg := DefaultConfig()
+	data, _ := yaml.Marshal(cfg)
+	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
+
+	// Init git repo
+	exec.Command("git", "init", dir).Run()
+
+	ctx := context.Background()
+	configPath := filepath.Join(divRoot, "config.yaml")
+
+	// when
+	results := RunDoctor(ctx, configPath, dir)
+
+	// then: should have 6 results
+	if len(results) != 6 {
+		t.Fatalf("expected 6 results, got %d", len(results))
+	}
+	// Verify names in order
+	expectedNames := []string{"git", "Git Repository", "claude", ".divergence/", "Config", "Linear MCP"}
+	for i, name := range expectedNames {
+		if results[i].Name != name {
+			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
+		}
+	}
+}
+
+func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
+	// given: no need to mock execCommand for this test
+	dir := t.TempDir()
+	divRoot := filepath.Join(dir, ".divergence")
+	os.MkdirAll(divRoot, 0o755)
+	cfg := DefaultConfig()
+	data, _ := yaml.Marshal(cfg)
+	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
+	exec.Command("git", "init", dir).Run()
+
+	ctx := context.Background()
+	configPath := filepath.Join(divRoot, "config.yaml")
+
+	// when: pass a nonexistent claude command
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz")
+
+	// then
+	var mcpResult DoctorCheckResult
+	for _, r := range results {
+		if r.Name == "Linear MCP" {
+			mcpResult = r
+			break
+		}
+	}
+	if mcpResult.Status != CheckSkip {
+		t.Errorf("expected Linear MCP SKIP when claude unavailable, got %v: %s", mcpResult.Status, mcpResult.Message)
+	}
+	if !strings.Contains(mcpResult.Message, "claude not available") {
+		t.Errorf("expected 'claude not available' in message, got: %s", mcpResult.Message)
+	}
+}
