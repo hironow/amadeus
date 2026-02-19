@@ -577,6 +577,79 @@ func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
 	}
 }
 
+func TestLinkDMail_Success(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Summary: "test"}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.LinkDMail("d-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	loaded, _ := store.LoadDMail("d-001")
+	if loaded.LinearIssueID == nil || *loaded.LinearIssueID != "MY-250" {
+		t.Errorf("expected LinearIssueID MY-250, got %v", loaded.LinearIssueID)
+	}
+}
+
+func TestLinkDMail_AlreadyLinked(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	issueID := "MY-100"
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.LinkDMail("d-001", "MY-250")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for already-linked D-Mail")
+	}
+	if !strings.Contains(err.Error(), "already linked") {
+		t.Errorf("expected 'already linked' error, got: %v", err)
+	}
+}
+
+func TestLinkDMail_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.LinkDMail("d-999", "MY-250")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for non-existent D-Mail")
+	}
+}
+
 func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")

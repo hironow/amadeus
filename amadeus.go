@@ -456,6 +456,24 @@ func (a *Amadeus) PrintLog() error {
 	return nil
 }
 
+// LinkDMail associates a D-Mail with a Linear issue ID.
+// Returns an error if the D-Mail is already linked.
+func (a *Amadeus) LinkDMail(dmailID string, linearIssueID string) error {
+	dmail, err := a.Store.LoadDMail(dmailID)
+	if err != nil {
+		return err
+	}
+	if dmail.LinearIssueID != nil {
+		return fmt.Errorf("D-Mail %s is already linked to %s", dmailID, *dmail.LinearIssueID)
+	}
+	dmail.LinearIssueID = &linearIssueID
+	if err := a.Store.SaveDMail(dmail); err != nil {
+		return fmt.Errorf("save linked dmail: %w", err)
+	}
+	a.Logger.Info("D-Mail %s linked to %s", dmailID, linearIssueID)
+	return nil
+}
+
 // weightForAxis returns the configured weight for a given axis.
 func weightForAxis(axis Axis, w Weights) float64 {
 	switch axis {
