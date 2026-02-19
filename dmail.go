@@ -47,6 +47,7 @@ type DMail struct {
 	ResolvedAt     *time.Time  `json:"resolved_at,omitempty"`
 	ResolvedAction *string     `json:"resolved_action,omitempty"`
 	RejectReason   *string     `json:"reject_reason,omitempty"`
+	LinearIssueID  *string     `json:"linear_issue_id,omitempty"`
 }
 
 // RouteDMail applies severity-based status mapping.

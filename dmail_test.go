@@ -151,6 +151,66 @@ func TestLoadAllDMails_EmptyDir(t *testing.T) {
 	}
 }
 
+func TestDMail_LinearIssueID_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: a D-Mail with LinearIssueID set
+	issueID := "MY-250"
+	dmail := DMail{
+		ID:            "d-001",
+		Severity:      SeverityHigh,
+		Status:        DMailPending,
+		Target:        TargetSightjack,
+		Summary:       "test",
+		LinearIssueID: &issueID,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	loaded, err := store.LoadDMail("d-001")
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadDMail failed: %v", err)
+	}
+	if loaded.LinearIssueID == nil || *loaded.LinearIssueID != "MY-250" {
+		t.Errorf("expected LinearIssueID MY-250, got %v", loaded.LinearIssueID)
+	}
+}
+
+func TestDMail_LinearIssueID_OmittedWhenNil(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: a D-Mail without LinearIssueID
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	loaded, err := store.LoadDMail("d-001")
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadDMail failed: %v", err)
+	}
+	if loaded.LinearIssueID != nil {
+		t.Errorf("expected LinearIssueID nil, got %v", *loaded.LinearIssueID)
+	}
+}
+
 func TestRouteDMails_SeverityMapping(t *testing.T) {
 	tests := []struct {
 		name     string
