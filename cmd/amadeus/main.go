@@ -22,7 +22,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <check|resolve|log|sync|link> [flags]")
+		return fmt.Errorf("usage: amadeus <init|check|resolve|log|sync|link|doctor> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -65,8 +65,12 @@ func run() error {
 		return runSync(configPath, verbose)
 	case "link":
 		return runLink(configPath, verbose, fs.Args())
+	case "init":
+		return runInit()
+	case "doctor":
+		return runDoctor(configPath, verbose)
 	default:
-		return fmt.Errorf("unknown command: %s (available: check, resolve, log, sync, link)", cmd)
+		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, sync, link, doctor)", cmd)
 	}
 }
 
@@ -252,4 +256,44 @@ func runLink(configPath string, verbose bool, args []string) error {
 		Logger: logger,
 	}
 	return a.LinkDMail(dmailID, linearIssueID)
+}
+
+func runInit() error {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+	if err := amadeus.InitDivergenceDir(divRoot); err != nil {
+		return fmt.Errorf("init .divergence: %w", err)
+	}
+	fmt.Printf("  Initialized %s\n", divRoot)
+	return nil
+}
+
+func runDoctor(configPath string, verbose bool) error {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+	if configPath == "" {
+		configPath = filepath.Join(divRoot, "config.yaml")
+	}
+
+	ctx := context.Background()
+	results := amadeus.RunDoctor(ctx, configPath, repoRoot)
+
+	hasFail := false
+	for _, r := range results {
+		fmt.Printf("  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		if r.Status == amadeus.CheckFail {
+			hasFail = true
+		}
+	}
+
+	if hasFail {
+		return fmt.Errorf("some checks failed")
+	}
+	return nil
 }
