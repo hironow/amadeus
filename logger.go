@@ -35,3 +35,8 @@ func (l *Logger) Debug(format string, args ...any) {
 func (l *Logger) OK(format string, args ...any) {
 	fmt.Fprintf(l.out, "  [OK] "+format+"\n", args...)
 }
+
+// Writer returns the underlying io.Writer.
+func (l *Logger) Writer() io.Writer {
+	return l.out
+}
