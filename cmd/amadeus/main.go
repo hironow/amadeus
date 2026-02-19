@@ -22,7 +22,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <check|resolve|log> [flags]")
+		return fmt.Errorf("usage: amadeus <check|resolve|log|sync|link> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -61,8 +61,12 @@ func run() error {
 		return runResolve(configPath, verbose, fs.Args())
 	case "log":
 		return runLog(configPath, verbose)
+	case "sync":
+		return runSync(configPath, verbose)
+	case "link":
+		return runLink(configPath, verbose, fs.Args())
 	default:
-		return fmt.Errorf("unknown command: %s (available: check, resolve, log)", cmd)
+		return fmt.Errorf("unknown command: %s (available: check, resolve, log, sync, link)", cmd)
 	}
 }
 
@@ -186,4 +190,66 @@ func runResolve(configPath string, verbose bool, args []string) error {
 		action = "reject"
 	}
 	return a.ResolveDMail(id, action, reason)
+}
+
+func runSync(configPath string, verbose bool) error {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+
+	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+	}
+
+	if configPath == "" {
+		configPath = filepath.Join(divRoot, "config.yaml")
+	}
+	cfg, err := amadeus.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := amadeus.NewLogger(os.Stdout, verbose)
+	a := &amadeus.Amadeus{
+		Config: cfg,
+		Store:  amadeus.NewStateStore(divRoot),
+		Logger: logger,
+	}
+	return a.PrintSync()
+}
+
+func runLink(configPath string, verbose bool, args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: amadeus link <dmail-id> <linear-issue-id>")
+	}
+	dmailID := args[0]
+	linearIssueID := args[1]
+
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+
+	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+	}
+
+	if configPath == "" {
+		configPath = filepath.Join(divRoot, "config.yaml")
+	}
+	cfg, err := amadeus.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := amadeus.NewLogger(os.Stdout, verbose)
+	a := &amadeus.Amadeus{
+		Config: cfg,
+		Store:  amadeus.NewStateStore(divRoot),
+		Logger: logger,
+	}
+	return a.LinkDMail(dmailID, linearIssueID)
 }
