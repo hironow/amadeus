@@ -103,6 +103,21 @@ func (s *StateStore) SaveDMail(dmail DMail) error {
 	return s.writeJSON(path, dmail)
 }
 
+// LoadUnsyncedDMails returns D-Mails that have no LinearIssueID, sorted by ID ascending.
+func (s *StateStore) LoadUnsyncedDMails() ([]DMail, error) {
+	all, err := s.LoadAllDMails()
+	if err != nil {
+		return nil, err
+	}
+	var unsynced []DMail
+	for _, d := range all {
+		if d.LinearIssueID == nil {
+			unsynced = append(unsynced, d)
+		}
+	}
+	return unsynced, nil
+}
+
 // LoadAllDMails reads all D-Mails from the dmails/ directory, sorted by ID ascending.
 func (s *StateStore) LoadAllDMails() ([]DMail, error) {
 	dmailDir := filepath.Join(s.Root, "dmails")
