@@ -123,6 +123,37 @@ func checkDivergenceDir(repoRoot string) DoctorCheckResult {
 	}
 }
 
+// checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
+// Looks for a line containing "linear" (case-insensitive) and "Connected".
+func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
+	cmd := execCommand(ctx, claudeCmd, "mcp", "list")
+	out, err := cmd.Output()
+	if err != nil {
+		return DoctorCheckResult{
+			Name:    "Linear MCP",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("claude mcp list failed: %v", err),
+		}
+	}
+
+	output := strings.ToLower(string(out))
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "linear") && strings.Contains(line, "connected") {
+			return DoctorCheckResult{
+				Name:    "Linear MCP",
+				Status:  CheckOK,
+				Message: "Linear MCP connected",
+			}
+		}
+	}
+
+	return DoctorCheckResult{
+		Name:    "Linear MCP",
+		Status:  CheckFail,
+		Message: "Linear MCP not found or not connected in claude mcp list output",
+	}
+}
+
 // checkConfig validates that config.yaml exists and can be loaded.
 func checkConfig(path string) DoctorCheckResult {
 	if _, err := os.Stat(path); err != nil {

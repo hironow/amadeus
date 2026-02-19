@@ -87,6 +87,60 @@ func TestCheckDivergenceDir_NotExist(t *testing.T) {
 	}
 }
 
+func TestCheckLinearMCP_Connected(t *testing.T) {
+	// given: mock claude mcp list output showing linear connected
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	ctx := context.Background()
+
+	// when
+	result := checkLinearMCP(ctx, "claude")
+
+	// then
+	if result.Status != CheckOK {
+		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckLinearMCP_NotConnected(t *testing.T) {
+	// given: mock output without linear
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "some-other-mcp: https://example.com - ✓ Connected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	ctx := context.Background()
+
+	// when
+	result := checkLinearMCP(ctx, "claude")
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckLinearMCP_CommandFails(t *testing.T) {
+	// given: claude mcp list fails
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("false")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	ctx := context.Background()
+
+	// when
+	result := checkLinearMCP(ctx, "claude")
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestCheckConfig_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
