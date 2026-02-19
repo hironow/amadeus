@@ -3,7 +3,9 @@ package amadeus
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -66,5 +68,81 @@ func checkTool(ctx context.Context, name string) DoctorCheckResult {
 		Name:    name,
 		Status:  CheckOK,
 		Message: fmt.Sprintf("%s (%s)", path, version),
+	}
+}
+
+// checkGitRepo verifies the given directory is inside a git repository.
+func checkGitRepo(dir string) DoctorCheckResult {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = dir
+	if err := cmd.Run(); err != nil {
+		return DoctorCheckResult{
+			Name:    "Git Repository",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s is not a git repository", dir),
+		}
+	}
+	return DoctorCheckResult{
+		Name:    "Git Repository",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%s is a git repository", dir),
+	}
+}
+
+// checkDivergenceDir verifies .divergence/ directory exists and is writable.
+func checkDivergenceDir(repoRoot string) DoctorCheckResult {
+	dir := filepath.Join(repoRoot, ".divergence")
+	info, err := os.Stat(dir)
+	if err != nil {
+		return DoctorCheckResult{
+			Name:    ".divergence/",
+			Status:  CheckFail,
+			Message: "not found — run 'amadeus init' first",
+		}
+	}
+	if !info.IsDir() {
+		return DoctorCheckResult{
+			Name:    ".divergence/",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s exists but is not a directory", dir),
+		}
+	}
+	probe := filepath.Join(dir, ".doctor_probe")
+	if err := os.WriteFile(probe, []byte("ok"), 0o644); err != nil {
+		return DoctorCheckResult{
+			Name:    ".divergence/",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("not writable: %v", err),
+		}
+	}
+	os.Remove(probe)
+	return DoctorCheckResult{
+		Name:    ".divergence/",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%s writable", dir),
+	}
+}
+
+// checkConfig validates that config.yaml exists and can be loaded.
+func checkConfig(path string) DoctorCheckResult {
+	if _, err := os.Stat(path); err != nil {
+		return DoctorCheckResult{
+			Name:    "Config",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s: %v", path, err),
+		}
+	}
+	_, err := LoadConfig(path)
+	if err != nil {
+		return DoctorCheckResult{
+			Name:    "Config",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s: %v", path, err),
+		}
+	}
+	return DoctorCheckResult{
+		Name:    "Config",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%s loaded successfully", path),
 	}
 }
