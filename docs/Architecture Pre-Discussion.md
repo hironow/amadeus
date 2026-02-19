@@ -357,10 +357,10 @@ Steins;Gate alignment: Reading Steiner is an ability Okabe always possesses, not
 Three commands only:
 
 ```
-$ tool check                          # Inspect + auto-send D-Mails
-$ tool resolve <id> --approve         # Approve High Divergence D-Mail
-$ tool resolve <id> --reject          # Reject D-Mail (records reason)
-$ tool log                            # View all past checks and D-Mails
+tool check                          # Inspect + auto-send D-Mails
+tool resolve <id> --approve         # Approve High Divergence D-Mail
+tool resolve <id> --reject          # Reject D-Mail (records reason)
+tool log                            # View all past checks and D-Mails
 ```
 
 `check` runs Phase 1 through Phase 4 in a single pass. Internal phase separation does not leak into the CLI surface.
@@ -437,16 +437,21 @@ Merge hook output is written to stdout/stderr of the CI/CD pipeline. Manual `too
 ## 12. Appendix: Why Not the Alternatives
 
 ### Why not Chronos (Katana ZERO)?
+
 SRE/DevOps concepts and AI elements were not cleanly abstracted. The "precognitive simulation" metaphor conflated too many concerns.
 
 ### Why not MAGI (Evangelion)?
+
 Passive consensus system. Does not address the core need: identifying divergence points in the timeline and routing corrections to the past.
 
 ### Why not Sibyl (PSYCHO-PASS)?
+
 Correct intuition (continuous observation, autonomous response) but scope was too broad for an initial implementation. Sibyl-like capabilities are the Phase 2 evolution path, not the starting point.
 
 ### Why not Obra Dinn / Danganronpa / Papers, Please?
+
 These are "investigate the present" tools. The core requirement is "identify where the timeline diverged and send corrections to the past" — a fundamentally different operation.
 
 ### Why not Radiant Historia / Ghost Trick / Zero Escape?
+
 Closer to the correct frame (timeline manipulation), but evaluated after the core insight crystallized: the tool's job is not just "go back in time" but specifically "identify the divergence point and route corrections to the responsible agent (Sightjack or Paintress)." Steins;Gate's D-Mail mechanic maps to this routing function more precisely than any alternative.

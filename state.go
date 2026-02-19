@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -120,6 +122,35 @@ func (s *StateStore) LoadLatest() (CheckResult, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+// LoadHistory reads all check results from the history/ directory,
+// sorted by CheckedAt descending (newest first).
+func (s *StateStore) LoadHistory() ([]CheckResult, error) {
+	histDir := filepath.Join(s.Root, "history")
+	entries, err := os.ReadDir(histDir)
+	if err != nil {
+		return nil, err
+	}
+	var results []CheckResult
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(histDir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		var r CheckResult
+		if err := json.Unmarshal(data, &r); err != nil {
+			return nil, fmt.Errorf("parse history %s: %w", e.Name(), err)
+		}
+		results = append(results, r)
+	}
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].CheckedAt.After(results[j].CheckedAt)
+	})
+	return results, nil
 }
 
 func (s *StateStore) writeJSON(path string, v any) error {

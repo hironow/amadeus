@@ -275,6 +275,172 @@ func TestAmadeus_ShouldPromoteToFull_ExactThreshold(t *testing.T) {
 	}
 }
 
+func TestResolveDMail_Approve(t *testing.T) {
+	// given: a pending HIGH D-Mail
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		ID:       "d-001",
+		Severity: SeverityHigh,
+		Status:   DMailPending,
+		Target:   TargetSightjack,
+		Summary:  "ADR violation",
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.ResolveDMail("d-001", "approve", "")
+
+	// then
+	if err != nil {
+		t.Fatalf("ResolveDMail failed: %v", err)
+	}
+	loaded, _ := store.LoadDMail("d-001")
+	if loaded.Status != DMailApproved {
+		t.Errorf("expected status approved, got %s", loaded.Status)
+	}
+	if loaded.ResolvedAt == nil {
+		t.Error("expected ResolvedAt to be set")
+	}
+	if loaded.ResolvedAction == nil || *loaded.ResolvedAction != "approve" {
+		t.Errorf("expected ResolvedAction approve, got %v", loaded.ResolvedAction)
+	}
+}
+
+func TestResolveDMail_Reject(t *testing.T) {
+	// given: a pending HIGH D-Mail
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		ID:       "d-001",
+		Severity: SeverityHigh,
+		Status:   DMailPending,
+		Target:   TargetSightjack,
+		Summary:  "ADR violation",
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.ResolveDMail("d-001", "reject", "false positive")
+
+	// then
+	if err != nil {
+		t.Fatalf("ResolveDMail failed: %v", err)
+	}
+	loaded, _ := store.LoadDMail("d-001")
+	if loaded.Status != DMailRejected {
+		t.Errorf("expected status rejected, got %s", loaded.Status)
+	}
+	if loaded.RejectReason == nil || *loaded.RejectReason != "false positive" {
+		t.Errorf("expected reject reason 'false positive', got %v", loaded.RejectReason)
+	}
+}
+
+func TestResolveDMail_AlreadyResolved(t *testing.T) {
+	// given: an already approved D-Mail
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	now := time.Now().UTC()
+	action := "approve"
+	dmail := DMail{
+		ID:             "d-001",
+		Severity:       SeverityHigh,
+		Status:         DMailApproved,
+		ResolvedAt:     &now,
+		ResolvedAction: &action,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.ResolveDMail("d-001", "reject", "oops")
+
+	// then: should error
+	if err == nil {
+		t.Error("expected error when resolving already-resolved D-Mail")
+	}
+}
+
+func TestResolveDMail_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.ResolveDMail("d-999", "approve", "")
+
+	// then
+	if err == nil {
+		t.Error("expected error for non-existent D-Mail")
+	}
+}
+
+func TestResolveDMail_RejectEmptyReason(t *testing.T) {
+	// given: a pending HIGH D-Mail
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		ID:       "d-001",
+		Severity: SeverityHigh,
+		Status:   DMailPending,
+		Target:   TargetSightjack,
+		Summary:  "ADR violation",
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.ResolveDMail("d-001", "reject", "")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for reject with empty reason")
+	}
+	if !strings.Contains(err.Error(), "reason") {
+		t.Errorf("expected error to mention 'reason', got: %v", err)
+	}
+	// D-Mail should remain pending (not persisted)
+	loaded, _ := store.LoadDMail("d-001")
+	if loaded.Status != DMailPending {
+		t.Errorf("expected status to remain pending, got %s", loaded.Status)
+	}
+}
+
 func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	var buf bytes.Buffer
 	a := &Amadeus{
@@ -304,5 +470,133 @@ func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	}
 	if !strings.Contains(output, "ADR Integrity") {
 		t.Errorf("expected 'ADR Integrity' in output, got:\n%s", output)
+	}
+}
+
+func TestAmadeus_PrintLog(t *testing.T) {
+	// given: history and D-Mails
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	r1 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
+		Commit:     "aaa",
+		Type:       CheckTypeFull,
+		Divergence: 0.10,
+	}
+	r2 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 20, 14, 30, 0, 0, time.UTC),
+		Commit:     "bbb",
+		Type:       CheckTypeDiff,
+		Divergence: 0.15,
+		DMails:     []string{"d-001"},
+	}
+	for _, r := range []CheckResult{r1, r2} {
+		if err := store.SaveHistory(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dmail := DMail{
+		ID:       "d-001",
+		Severity: SeverityHigh,
+		Status:   DMailPending,
+		Target:   TargetSightjack,
+		Summary:  "ADR-003 violation",
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.PrintLog()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLog failed: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "History:") {
+		t.Errorf("expected 'History:' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "bbb") {
+		t.Errorf("expected commit 'bbb' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "d-001") {
+		t.Errorf("expected 'd-001' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "pending") {
+		t.Errorf("expected 'pending' in output, got:\n%s", output)
+	}
+}
+
+func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
+	var buf bytes.Buffer
+	a := &Amadeus{
+		Config: DefaultConfig(),
+		Logger: NewLogger(&buf, false),
+	}
+	result := CheckResult{
+		Divergence: 0.145,
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 15, Details: "ADR-003"},
+			AxisDoD:        {Score: 20, Details: "edge case"},
+			AxisDependency: {Score: 10, Details: "clean"},
+			AxisImplicit:   {Score: 5, Details: "naming"},
+		},
+	}
+	dmails := []DMail{
+		{ID: "d-001", Severity: SeverityLow, Status: DMailSent},
+		{ID: "d-002", Severity: SeverityHigh, Status: DMailPending},
+	}
+
+	// when: quiet mode
+	a.PrintCheckOutputQuiet(result, dmails, 0.133)
+
+	// then: single line with divergence, delta, dmail count, pending count
+	output := strings.TrimSpace(buf.String())
+	lines := strings.Split(output, "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 line in quiet mode, got %d:\n%s", len(lines), output)
+	}
+	if !strings.Contains(output, "0.145000") {
+		t.Errorf("expected divergence value in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "2 D-Mails") {
+		t.Errorf("expected '2 D-Mails' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "1 pending") {
+		t.Errorf("expected '1 pending' in output, got:\n%s", output)
+	}
+}
+
+func TestAmadeus_PrintLog_Empty(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.PrintLog()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLog failed: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "No history") {
+		t.Errorf("expected 'No history' in output, got:\n%s", output)
 	}
 }

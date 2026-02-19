@@ -23,6 +23,7 @@ type Amadeus struct {
 type CheckOptions struct {
 	Full   bool
 	DryRun bool
+	Quiet  bool
 }
 
 // ShouldFullCheck determines whether the next check should be a full scan.
@@ -51,7 +52,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	fullCheck := a.ShouldFullCheck(opts.Full)
 	if a.ForceFullNext {
-		a.Logger.Info("Full scan triggered by previous divergence jump")
+		if !opts.Quiet {
+			a.Logger.Info("Full scan triggered by previous divergence jump")
+		}
 		a.ForceFullNext = false // consumed
 	}
 
@@ -80,7 +83,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 
 	if !report.Significant {
-		a.Logger.Info("Reading Steiner: no significant shift detected")
+		if !opts.Quiet {
+			a.Logger.Info("Reading Steiner: no significant shift detected")
+		}
 		currentCommit, err := a.Git.CurrentCommit()
 		if err != nil {
 			return fmt.Errorf("get current commit: %w", err)
@@ -89,12 +94,19 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		if err := a.SaveCheckState(currentCommit, previous, time.Now().UTC()); err != nil {
 			return fmt.Errorf("save check state: %w", err)
 		}
+		if opts.Quiet {
+			a.Logger.Info("%s (%s) 0 D-Mails",
+				FormatDivergence(previous.Divergence*100),
+				FormatDelta(previous.Divergence, previous.Divergence))
+		}
 		return nil
 	}
 
-	a.Logger.Info("Reading Steiner: %d PRs merged since last check", len(report.MergedPRs))
-	for _, pr := range report.MergedPRs {
-		a.Logger.Info("  %s %s", pr.Number, pr.Title)
+	if !opts.Quiet {
+		a.Logger.Info("Reading Steiner: %d PRs merged since last check", len(report.MergedPRs))
+		for _, pr := range report.MergedPRs {
+			a.Logger.Info("  %s %s", pr.Number, pr.Title)
+		}
 	}
 
 	var prompt string
@@ -133,8 +145,10 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	// Defer full scan to next run on large divergence jump
 	if !fullCheck && a.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
-		a.Logger.Info("Divergence jump detected (%.2f → %.2f), next run will trigger full calibration",
-			previous.Divergence, meterResult.Divergence.Value)
+		if !opts.Quiet {
+			a.Logger.Info("Divergence jump detected (%.2f → %.2f), next run will trigger full calibration",
+				previous.Divergence, meterResult.Divergence.Value)
+		}
 		a.FlagForceFullNext()
 	}
 
@@ -205,7 +219,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		return fmt.Errorf("save history: %w", err)
 	}
 
-	a.PrintCheckOutput(result, dmails, previous.Divergence)
+	if opts.Quiet {
+		a.PrintCheckOutputQuiet(result, dmails, previous.Divergence)
+	} else {
+		a.PrintCheckOutput(result, dmails, previous.Divergence)
+	}
 
 	return nil
 }
@@ -265,6 +283,32 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 	}
 }
 
+// PrintCheckOutputQuiet renders a single-line summary for --quiet mode.
+func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, previousDivergence float64) {
+	pending := 0
+	for _, d := range dmails {
+		if d.Status == DMailPending {
+			pending++
+		}
+	}
+	dmailLabel := "D-Mails"
+	if len(dmails) == 1 {
+		dmailLabel = "D-Mail"
+	}
+
+	pendingStr := ""
+	if pending > 0 {
+		pendingStr = fmt.Sprintf(" (%d pending)", pending)
+	}
+
+	a.Logger.Info("%s (%s) %d %s%s",
+		FormatDivergence(result.Divergence*100),
+		FormatDelta(result.Divergence, previousDivergence),
+		len(dmails),
+		dmailLabel,
+		pendingStr)
+}
+
 // ShouldPromoteToFull returns true when the divergence jump between the
 // previous and current values exceeds the configured on_divergence_jump threshold.
 // This triggers an automatic recalibration (baseline reset).
@@ -305,6 +349,111 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 		return err
 	}
 	return a.Store.SaveHistory(previous)
+}
+
+// ResolveDMail updates a pending D-Mail to approved or rejected status.
+// action must be "approve" or "reject". reason is required for reject.
+func (a *Amadeus) ResolveDMail(id string, action string, reason string) error {
+	dmail, err := a.Store.LoadDMail(id)
+	if err != nil {
+		return err
+	}
+	if dmail.Status != DMailPending {
+		return fmt.Errorf("D-Mail %s is already %s", id, dmail.Status)
+	}
+
+	now := time.Now().UTC()
+	dmail.ResolvedAt = &now
+	dmail.ResolvedAction = &action
+
+	switch action {
+	case "approve":
+		dmail.Status = DMailApproved
+	case "reject":
+		if reason == "" {
+			return fmt.Errorf("reject reason is required")
+		}
+		dmail.Status = DMailRejected
+		dmail.RejectReason = &reason
+	default:
+		return fmt.Errorf("unknown action: %s (use --approve or --reject)", action)
+	}
+
+	if err := a.Store.SaveDMail(dmail); err != nil {
+		return fmt.Errorf("save resolved dmail: %w", err)
+	}
+
+	a.Logger.Info("D-Mail %s %s.", id, action+"d")
+	a.Logger.Info("%s → %sd at %s", dmail.Summary, action, now.Format(time.RFC3339))
+	return nil
+}
+
+// PrintLog renders the history and D-Mail log to the logger.
+func (a *Amadeus) PrintLog() error {
+	history, err := a.Store.LoadHistory()
+	if err != nil {
+		return fmt.Errorf("load history: %w", err)
+	}
+
+	a.Logger.Info("")
+	if len(history) == 0 {
+		a.Logger.Info("No history yet. Run `amadeus check` first.")
+		return nil
+	}
+
+	a.Logger.Info("History:")
+	for i, h := range history {
+		var delta string
+		if h.Type == CheckTypeFull {
+			delta = "(baseline)"
+		} else if i+1 < len(history) {
+			delta = "(" + FormatDelta(h.Divergence, history[i+1].Divergence) + ")"
+		} else {
+			delta = "(first)"
+		}
+		dmailCount := len(h.DMails)
+		dmailLabel := "D-Mails"
+		if dmailCount == 1 {
+			dmailLabel = "D-Mail"
+		}
+		a.Logger.Info("  %s  %s  %-4s  %s %s  %d %s",
+			h.CheckedAt.Format("2006-01-02T15:04"),
+			h.Commit,
+			string(h.Type),
+			FormatDivergence(h.Divergence*100),
+			delta,
+			dmailCount,
+			dmailLabel)
+	}
+
+	dmails, err := a.Store.LoadAllDMails()
+	if err != nil {
+		return fmt.Errorf("load dmails: %w", err)
+	}
+
+	if len(dmails) > 0 {
+		a.Logger.Info("")
+		a.Logger.Info("D-Mails:")
+		for _, d := range dmails {
+			var severityTag string
+			switch d.Severity {
+			case SeverityHigh:
+				severityTag = "[HIGH]"
+			case SeverityMedium:
+				severityTag = "[MED] "
+			default:
+				severityTag = "[LOW] "
+			}
+			a.Logger.Info("  %s  %s %-10s %s → %s",
+				d.ID,
+				severityTag,
+				string(d.Status),
+				d.Summary,
+				string(d.Target))
+		}
+	}
+
+	return nil
 }
 
 // weightForAxis returns the configured weight for a given axis.

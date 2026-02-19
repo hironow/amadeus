@@ -41,6 +41,116 @@ func TestNextDMailID_Sequential(t *testing.T) {
 	}
 }
 
+func TestLoadDMail_Exists(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: a saved D-Mail
+	dmail := DMail{
+		ID:       "d-001",
+		Severity: SeverityHigh,
+		Status:   DMailPending,
+		Target:   TargetSightjack,
+		Summary:  "ADR violation",
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	loaded, err := store.LoadDMail("d-001")
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadDMail failed: %v", err)
+	}
+	if loaded.ID != "d-001" {
+		t.Errorf("expected ID d-001, got %s", loaded.ID)
+	}
+	if loaded.Status != DMailPending {
+		t.Errorf("expected status pending, got %s", loaded.Status)
+	}
+}
+
+func TestLoadDMail_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	_, err := store.LoadDMail("d-999")
+
+	// then
+	if err == nil {
+		t.Error("expected error for non-existent D-Mail")
+	}
+}
+
+func TestLoadAllDMails_Multiple(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: three D-Mails saved
+	for _, d := range []DMail{
+		{ID: "d-002", Severity: SeverityMedium, Status: DMailSent, Summary: "second"},
+		{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Summary: "first"},
+		{ID: "d-003", Severity: SeverityHigh, Status: DMailPending, Summary: "third"},
+	} {
+		if err := store.SaveDMail(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// when
+	dmails, err := store.LoadAllDMails()
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadAllDMails failed: %v", err)
+	}
+	if len(dmails) != 3 {
+		t.Fatalf("expected 3 D-Mails, got %d", len(dmails))
+	}
+	// sorted by ID ascending
+	if dmails[0].ID != "d-001" {
+		t.Errorf("expected first D-Mail d-001, got %s", dmails[0].ID)
+	}
+	if dmails[2].ID != "d-003" {
+		t.Errorf("expected last D-Mail d-003, got %s", dmails[2].ID)
+	}
+}
+
+func TestLoadAllDMails_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	dmails, err := store.LoadAllDMails()
+
+	// then
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if len(dmails) != 0 {
+		t.Errorf("expected 0 D-Mails, got %d", len(dmails))
+	}
+}
+
 func TestRouteDMails_SeverityMapping(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -1,9 +1,11 @@
 package amadeus
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -80,8 +82,47 @@ func (s *StateStore) NextDMailID() (string, error) {
 	return fmt.Sprintf("d-%03d", maxNum+1), nil
 }
 
+// LoadDMail reads a single D-Mail by ID from the dmails/ directory.
+func (s *StateStore) LoadDMail(id string) (DMail, error) {
+	path := filepath.Join(s.Root, "dmails", id+".json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return DMail{}, fmt.Errorf("load dmail %s: %w", id, err)
+	}
+	var dmail DMail
+	if err := json.Unmarshal(data, &dmail); err != nil {
+		return DMail{}, fmt.Errorf("parse dmail %s: %w", id, err)
+	}
+	return dmail, nil
+}
+
 // SaveDMail writes a D-Mail to the dmails/ directory as JSON.
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	path := filepath.Join(s.Root, "dmails", dmail.ID+".json")
 	return s.writeJSON(path, dmail)
+}
+
+// LoadAllDMails reads all D-Mails from the dmails/ directory, sorted by ID ascending.
+func (s *StateStore) LoadAllDMails() ([]DMail, error) {
+	dmailDir := filepath.Join(s.Root, "dmails")
+	entries, err := os.ReadDir(dmailDir)
+	if err != nil {
+		return nil, err
+	}
+	var dmails []DMail
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		id := strings.TrimSuffix(e.Name(), ".json")
+		dmail, err := s.LoadDMail(id)
+		if err != nil {
+			return nil, err
+		}
+		dmails = append(dmails, dmail)
+	}
+	sort.Slice(dmails, func(i, j int) bool {
+		return dmails[i].ID < dmails[j].ID
+	})
+	return dmails, nil
 }

@@ -173,6 +173,78 @@ func TestSaveHistory_UnreadableDir_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestLoadHistory_MultipleEntries(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: three history entries at different times
+	r1 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
+		Commit:     "aaa",
+		Type:       CheckTypeFull,
+		Divergence: 0.10,
+	}
+	r2 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 20, 12, 0, 0, 0, time.UTC),
+		Commit:     "bbb",
+		Type:       CheckTypeDiff,
+		Divergence: 0.13,
+	}
+	r3 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 20, 14, 30, 0, 0, time.UTC),
+		Commit:     "ccc",
+		Type:       CheckTypeDiff,
+		Divergence: 0.15,
+	}
+	for _, r := range []CheckResult{r1, r2, r3} {
+		if err := store.SaveHistory(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// when
+	history, err := store.LoadHistory()
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadHistory failed: %v", err)
+	}
+	if len(history) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(history))
+	}
+	// sorted newest first (descending)
+	if history[0].Commit != "ccc" {
+		t.Errorf("expected newest first (ccc), got %s", history[0].Commit)
+	}
+	if history[2].Commit != "aaa" {
+		t.Errorf("expected oldest last (aaa), got %s", history[2].Commit)
+	}
+}
+
+func TestLoadHistory_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	history, err := store.LoadHistory()
+
+	// then
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if len(history) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(history))
+	}
+}
+
 func TestLoadLatest_NoFile_ReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
