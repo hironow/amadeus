@@ -1,0 +1,12 @@
+# build files
+/amadeus
+# test
+coverage.out
+# amadeus runtime state on target repository
+.divergence/
+# claude local settings
+.claude/*.local.*
+# git worktrees
+.worktrees/
+# golang
+.gocache/

@@ -1,0 +1,131 @@
+package amadeus
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"time"
+
+	"gopkg.in/yaml.v3"
+)
+
+// CheckType represents the type of divergence check performed.
+type CheckType string
+
+const (
+	// CheckTypeDiff indicates a diff-based incremental check.
+	CheckTypeDiff CheckType = "diff"
+	// CheckTypeFull indicates a full repository scan.
+	CheckTypeFull CheckType = "full"
+)
+
+// CheckResult holds the outcome of a single divergence check.
+type CheckResult struct {
+	CheckedAt           time.Time          `json:"checked_at"`
+	Commit              string             `json:"commit"`
+	Type                CheckType          `json:"type"`
+	Divergence          float64            `json:"divergence"`
+	Axes                map[Axis]AxisScore `json:"axes"`
+	PRsEvaluated        []string           `json:"prs_evaluated"`
+	DMails              []string           `json:"dmails"`
+	CheckCountSinceFull int                `json:"check_count_since_full"`
+	ForceFullNext       bool               `json:"force_full_next,omitempty"`
+}
+
+// StateStore manages reading and writing state files within the .divergence/ directory.
+type StateStore struct {
+	Root string
+}
+
+// NewStateStore creates a StateStore rooted at the given directory path.
+func NewStateStore(root string) *StateStore {
+	return &StateStore{Root: root}
+}
+
+// InitDivergenceDir creates the .divergence/ directory structure and writes
+// a default config.yaml if one does not already exist.
+func InitDivergenceDir(root string) error {
+	dirs := []string{
+		filepath.Join(root, "state"),
+		filepath.Join(root, "history"),
+		filepath.Join(root, "dmails"),
+	}
+	for _, d := range dirs {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			return err
+		}
+	}
+	configPath := filepath.Join(root, "config.yaml")
+	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
+		cfg := DefaultConfig()
+		data, err := yaml.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(configPath, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SaveLatest writes the check result as the latest state.
+func (s *StateStore) SaveLatest(result CheckResult) error {
+	return s.writeJSON(filepath.Join(s.Root, "state", "latest.json"), result)
+}
+
+// SaveBaseline writes the check result as the baseline state.
+func (s *StateStore) SaveBaseline(result CheckResult) error {
+	return s.writeJSON(filepath.Join(s.Root, "state", "baseline.json"), result)
+}
+
+// SaveHistory writes the check result to the history directory with a timestamped filename.
+// If a file for the same second already exists, a sequential suffix is appended to avoid clobbering.
+func (s *StateStore) SaveHistory(result CheckResult) error {
+	base := result.CheckedAt.Format("2006-01-02T150405")
+	dir := filepath.Join(s.Root, "history")
+	path := filepath.Join(dir, base+".json")
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return s.writeJSON(path, result)
+		}
+		return err
+	}
+	for i := 1; ; i++ {
+		path = filepath.Join(dir, fmt.Sprintf("%s_%d.json", base, i))
+		if _, err := os.Stat(path); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return s.writeJSON(path, result)
+			}
+			return err
+		}
+	}
+}
+
+// LoadLatest reads the latest check result from state/latest.json.
+// If the file does not exist, it returns an empty CheckResult with no error.
+func (s *StateStore) LoadLatest() (CheckResult, error) {
+	var result CheckResult
+	data, err := os.ReadFile(filepath.Join(s.Root, "state", "latest.json"))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return result, nil
+		}
+		return result, err
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+func (s *StateStore) writeJSON(path string, v any) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
