@@ -474,6 +474,28 @@ func (a *Amadeus) LinkDMail(dmailID string, linearIssueID string) error {
 	return nil
 }
 
+// PrintSync outputs unsynced D-Mails as JSON to the logger's writer.
+func (a *Amadeus) PrintSync() error {
+	unsynced, err := a.Store.LoadUnsyncedDMails()
+	if err != nil {
+		return fmt.Errorf("load unsynced dmails: %w", err)
+	}
+	output := struct {
+		Unsynced []DMail `json:"unsynced"`
+	}{
+		Unsynced: unsynced,
+	}
+	if output.Unsynced == nil {
+		output.Unsynced = []DMail{}
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal sync output: %w", err)
+	}
+	fmt.Fprintln(a.Logger.Writer(), string(data))
+	return nil
+}
+
 // weightForAxis returns the configured weight for a given axis.
 func weightForAxis(axis Axis, w Weights) float64 {
 	switch axis {

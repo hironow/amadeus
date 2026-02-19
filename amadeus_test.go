@@ -2,6 +2,7 @@ package amadeus
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -671,5 +672,82 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "No history") {
 		t.Errorf("expected 'No history' in output, got:\n%s", output)
+	}
+}
+
+func TestPrintSync_UnsyncedDMails(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: 2 unsynced D-Mails
+	for _, d := range []DMail{
+		{ID: "d-001", Severity: SeverityHigh, Status: DMailPending, Target: TargetSightjack, Summary: "ADR violation"},
+		{ID: "d-002", Severity: SeverityLow, Status: DMailSent, Target: TargetPaintress, Summary: "naming issue"},
+	} {
+		if err := store.SaveDMail(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.PrintSync()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintSync failed: %v", err)
+	}
+	output := buf.String()
+	var result struct {
+		Unsynced []DMail `json:"unsynced"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+	}
+	if len(result.Unsynced) != 2 {
+		t.Errorf("expected 2 unsynced, got %d", len(result.Unsynced))
+	}
+}
+
+func TestPrintSync_NoneUnsynced(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: all linked
+	issueID := "MY-100"
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.PrintSync()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintSync failed: %v", err)
+	}
+	output := buf.String()
+	var result struct {
+		Unsynced []DMail `json:"unsynced"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if len(result.Unsynced) != 0 {
+		t.Errorf("expected 0 unsynced, got %d", len(result.Unsynced))
 	}
 }
