@@ -3,6 +3,7 @@ package amadeus
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -10,6 +11,33 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// DriftError is returned by RunCheck when drift is detected (D-Mails generated).
+// Callers can use errors.As to distinguish drift from runtime errors.
+type DriftError struct {
+	Divergence float64
+	DMails     int
+}
+
+func (e *DriftError) Error() string {
+	return fmt.Sprintf("drift detected: divergence=%f, %d D-Mail(s)", e.Divergence, e.DMails)
+}
+
+// ExitCode maps an error to a process exit code.
+//
+//	nil        → 0 (success)
+//	DriftError → 2 (drift detected)
+//	other      → 1 (runtime error)
+func ExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var de *DriftError
+	if errors.As(err, &de) {
+		return 2
+	}
+	return 1
+}
 
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
@@ -271,6 +299,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		a.PrintCheckOutput(result, dmails, previous.Divergence)
 	}
 
+	if len(dmails) > 0 {
+		return &DriftError{Divergence: result.Divergence, DMails: len(dmails)}
+	}
 	return nil
 }
 
