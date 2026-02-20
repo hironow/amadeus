@@ -51,7 +51,7 @@ func NewStateStore(root string) *StateStore {
 // a default config.yaml if one does not already exist.
 func InitDivergenceDir(root string) error {
 	dirs := []string{
-		filepath.Join(root, "state"),
+		filepath.Join(root, ".run"),
 		filepath.Join(root, "history"),
 		filepath.Join(root, "dmails"),
 	}
@@ -71,17 +71,23 @@ func InitDivergenceDir(root string) error {
 			return err
 		}
 	}
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
+		if err := os.WriteFile(gitignorePath, []byte(".run/\n"), 0o644); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 // SaveLatest writes the check result as the latest state.
 func (s *StateStore) SaveLatest(result CheckResult) error {
-	return s.writeJSON(filepath.Join(s.Root, "state", "latest.json"), result)
+	return s.writeJSON(filepath.Join(s.Root, ".run", "latest.json"), result)
 }
 
 // SaveBaseline writes the check result as the baseline state.
 func (s *StateStore) SaveBaseline(result CheckResult) error {
-	return s.writeJSON(filepath.Join(s.Root, "state", "baseline.json"), result)
+	return s.writeJSON(filepath.Join(s.Root, ".run", "baseline.json"), result)
 }
 
 // SaveHistory writes the check result to the history directory with a timestamped filename.
@@ -111,7 +117,7 @@ func (s *StateStore) SaveHistory(result CheckResult) error {
 // If the file does not exist, it returns an empty CheckResult with no error.
 func (s *StateStore) LoadLatest() (CheckResult, error) {
 	var result CheckResult
-	data, err := os.ReadFile(filepath.Join(s.Root, "state", "latest.json"))
+	data, err := os.ReadFile(filepath.Join(s.Root, ".run", "latest.json"))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return result, nil

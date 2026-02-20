@@ -3,6 +3,7 @@ package amadeus
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -14,11 +15,12 @@ func TestInitDivergenceDir_CreatesStructure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDivergenceDir failed: %v", err)
 	}
-	for _, sub := range []string{"state", "history", "dmails"} {
+	for _, sub := range []string{".run", "history", "dmails"} {
 		path := filepath.Join(root, sub)
 		info, err := os.Stat(path)
 		if err != nil {
 			t.Errorf("expected %s to exist: %v", sub, err)
+			continue
 		}
 		if !info.IsDir() {
 			t.Errorf("expected %s to be a directory", sub)
@@ -27,6 +29,15 @@ func TestInitDivergenceDir_CreatesStructure(t *testing.T) {
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); err != nil {
 		t.Errorf("expected config.yaml to exist: %v", err)
+	}
+	// .gitignore must exist and contain .run/
+	gitignorePath := filepath.Join(root, ".gitignore")
+	data, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatalf("expected .gitignore to exist: %v", err)
+	}
+	if !strings.Contains(string(data), ".run/") {
+		t.Errorf("expected .gitignore to contain '.run/', got: %s", string(data))
 	}
 }
 
