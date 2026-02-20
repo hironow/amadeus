@@ -15,12 +15,14 @@ var version = "dev"
 
 func main() {
 	shutdown := amadeus.InitTracer("amadeus", version)
-	defer shutdown(context.Background())
 
+	code := 0
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		code = 1
 	}
+	shutdown(context.Background())
+	os.Exit(code)
 }
 
 func run() error {
