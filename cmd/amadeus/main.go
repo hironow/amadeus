@@ -30,7 +30,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor> [flags]")
+		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor|install-hook|uninstall-hook> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -75,8 +75,12 @@ func run() error {
 		return runInit()
 	case "doctor":
 		return runDoctor(configPath, jsonOut)
+	case "install-hook":
+		return runInstallHook()
+	case "uninstall-hook":
+		return runUninstallHook()
 	default:
-		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor)", cmd)
+		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor, install-hook, uninstall-hook)", cmd)
 	}
 }
 
@@ -220,6 +224,42 @@ func runInit() error {
 	}
 	fmt.Printf("  Initialized %s\n", divRoot)
 	return nil
+}
+
+func runInstallHook() error {
+	gitDir, err := findGitDir()
+	if err != nil {
+		return err
+	}
+	if err := amadeus.InstallHook(gitDir); err != nil {
+		return err
+	}
+	fmt.Printf("  Installed post-merge hook in %s\n", filepath.Join(gitDir, "hooks", "post-merge"))
+	return nil
+}
+
+func runUninstallHook() error {
+	gitDir, err := findGitDir()
+	if err != nil {
+		return err
+	}
+	if err := amadeus.UninstallHook(gitDir); err != nil {
+		return err
+	}
+	fmt.Println("  Removed amadeus post-merge hook")
+	return nil
+}
+
+func findGitDir() (string, error) {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get working directory: %w", err)
+	}
+	gitDir := filepath.Join(repoRoot, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return "", fmt.Errorf("not a git repository (no .git directory)")
+	}
+	return gitDir, nil
 }
 
 func runDoctor(configPath string, jsonOut bool) error {
