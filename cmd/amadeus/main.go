@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -43,6 +44,7 @@ func run() error {
 		dryRun     bool
 		full       bool
 		quiet      bool
+		jsonOut    bool
 	)
 
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -54,6 +56,7 @@ func run() error {
 	fs.BoolVar(&full, "full", false, "force full calibration check")
 	fs.BoolVar(&quiet, "quiet", false, "summary-only output")
 	fs.BoolVar(&quiet, "q", false, "summary-only output")
+	fs.BoolVar(&jsonOut, "json", false, "output as JSON")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		return err
@@ -61,25 +64,25 @@ func run() error {
 
 	switch cmd {
 	case "check":
-		return runCheck(configPath, verbose, dryRun, full, quiet)
+		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut)
 	case "resolve":
-		return runResolve(configPath, verbose, fs.Args())
+		return runResolve(configPath, verbose, jsonOut, fs.Args())
 	case "log":
-		return runLog(configPath, verbose)
+		return runLog(configPath, verbose, jsonOut)
 	case "sync":
 		return runSync(configPath, verbose)
 	case "link":
-		return runLink(configPath, verbose, fs.Args())
+		return runLink(configPath, verbose, jsonOut, fs.Args())
 	case "init":
 		return runInit()
 	case "doctor":
-		return runDoctor(configPath)
+		return runDoctor(configPath, jsonOut)
 	default:
 		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, sync, link, doctor)", cmd)
 	}
 }
 
-func runCheck(configPath string, verbose, dryRun, full, quiet bool) error {
+func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool) error {
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -113,10 +116,11 @@ func runCheck(configPath string, verbose, dryRun, full, quiet bool) error {
 		Full:   full,
 		DryRun: dryRun,
 		Quiet:  quiet,
+		JSON:   jsonOut,
 	})
 }
 
-func runLog(configPath string, verbose bool) error {
+func runLog(configPath string, verbose, jsonOut bool) error {
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return err
@@ -142,10 +146,13 @@ func runLog(configPath string, verbose bool) error {
 		Logger:  logger,
 		DataOut: os.Stdout,
 	}
+	if jsonOut {
+		return a.PrintLogJSON()
+	}
 	return a.PrintLog()
 }
 
-func runResolve(configPath string, verbose bool, args []string) error {
+func runResolve(configPath string, verbose, jsonOut bool, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: amadeus resolve <id> --approve or --reject --reason \"...\"")
 	}
@@ -198,6 +205,9 @@ func runResolve(configPath string, verbose bool, args []string) error {
 	if reject {
 		action = "reject"
 	}
+	if jsonOut {
+		return a.ResolveDMailJSON(context.Background(), id, action, reason)
+	}
 	return a.ResolveDMail(context.Background(), id, action, reason)
 }
 
@@ -230,7 +240,7 @@ func runSync(configPath string, verbose bool) error {
 	return a.PrintSync()
 }
 
-func runLink(configPath string, verbose bool, args []string) error {
+func runLink(configPath string, verbose, jsonOut bool, args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("usage: amadeus link <dmail-id> <linear-issue-id>")
 	}
@@ -262,6 +272,9 @@ func runLink(configPath string, verbose bool, args []string) error {
 		Logger:  logger,
 		DataOut: os.Stdout,
 	}
+	if jsonOut {
+		return a.LinkDMailJSON(dmailID, linearIssueID)
+	}
 	return a.LinkDMail(dmailID, linearIssueID)
 }
 
@@ -278,7 +291,7 @@ func runInit() error {
 	return nil
 }
 
-func runDoctor(configPath string) error {
+func runDoctor(configPath string, jsonOut bool) error {
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -290,6 +303,30 @@ func runDoctor(configPath string) error {
 
 	ctx := context.Background()
 	results := amadeus.RunDoctor(ctx, configPath, repoRoot)
+
+	if jsonOut {
+		type jsonCheck struct {
+			Name    string `json:"name"`
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		}
+		checks := make([]jsonCheck, len(results))
+		hasFail := false
+		for i, r := range results {
+			checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message}
+			if r.Status == amadeus.CheckFail {
+				hasFail = true
+			}
+		}
+		data, _ := json.MarshalIndent(struct {
+			Checks []jsonCheck `json:"checks"`
+		}{Checks: checks}, "", "  ")
+		fmt.Fprintln(os.Stdout, string(data))
+		if hasFail {
+			return fmt.Errorf("some checks failed")
+		}
+		return nil
+	}
 
 	hasFail := false
 	for _, r := range results {

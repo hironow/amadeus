@@ -848,3 +848,163 @@ func TestExitCode_WrappedDriftError(t *testing.T) {
 		t.Errorf("expected 2 for wrapped DriftError, got %d", code)
 	}
 }
+
+func TestPrintCheckOutput_JSON(t *testing.T) {
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.145,
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 15, Details: "ADR-003"},
+			AxisDoD:        {Score: 20, Details: "edge case"},
+			AxisDependency: {Score: 10, Details: "clean"},
+			AxisImplicit:   {Score: 5, Details: "naming"},
+		},
+	}
+	dmails := []DMail{
+		{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Target: TargetPaintress, Summary: "naming issue"},
+	}
+
+	// when
+	a.PrintCheckOutputJSON(result, dmails, 0.133)
+
+	// then: DataOut should be valid JSON
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.Bytes()
+	var parsed map[string]any
+	if err := json.Unmarshal(output, &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+	}
+	// should contain divergence
+	if _, ok := parsed["divergence"]; !ok {
+		t.Error("expected 'divergence' key in JSON output")
+	}
+	// should contain axes
+	if _, ok := parsed["axes"]; !ok {
+		t.Error("expected 'axes' key in JSON output")
+	}
+	// should contain dmails
+	if _, ok := parsed["dmails"]; !ok {
+		t.Error("expected 'dmails' key in JSON output")
+	}
+}
+
+func TestPrintLogJSON(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	r1 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
+		Commit:     "aaa",
+		Type:       CheckTypeFull,
+		Divergence: 0.10,
+	}
+	if err := store.SaveHistory(r1); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintLogJSON()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLogJSON failed: %v", err)
+	}
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if _, ok := parsed["history"]; !ok {
+		t.Error("expected 'history' key in JSON output")
+	}
+	if _, ok := parsed["dmails"]; !ok {
+		t.Error("expected 'dmails' key in JSON output")
+	}
+}
+
+func TestResolveDMail_JSON(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		ID: "d-001", Severity: SeverityHigh, Status: DMailPending,
+		Target: TargetSightjack, Summary: "ADR violation",
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.ResolveDMailJSON(context.Background(), "d-001", "approve", "")
+
+	// then
+	if err != nil {
+		t.Fatalf("ResolveDMailJSON failed: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if parsed["id"] != "d-001" {
+		t.Errorf("expected id 'd-001', got %v", parsed["id"])
+	}
+	if parsed["status"] != "approved" {
+		t.Errorf("expected status 'approved', got %v", parsed["status"])
+	}
+}
+
+func TestLinkDMail_JSON(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Summary: "test"}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMailJSON("d-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMailJSON failed: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if parsed["dmail_id"] != "d-001" {
+		t.Errorf("expected dmail_id 'd-001', got %v", parsed["dmail_id"])
+	}
+	if parsed["linear_issue_id"] != "MY-250" {
+		t.Errorf("expected linear_issue_id 'MY-250', got %v", parsed["linear_issue_id"])
+	}
+}

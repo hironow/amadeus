@@ -56,6 +56,7 @@ type CheckOptions struct {
 	Full   bool
 	DryRun bool
 	Quiet  bool
+	JSON   bool
 }
 
 // ShouldFullCheck determines whether the next check should be a full scan.
@@ -143,7 +144,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		if err := a.SaveCheckState(currentCommit, previous, time.Now().UTC()); err != nil {
 			return fmt.Errorf("save check state: %w", err)
 		}
-		if opts.Quiet {
+		if opts.JSON {
+			a.PrintCheckOutputJSON(previous, nil, previous.Divergence)
+		} else if opts.Quiet {
 			a.dataOut("%s (%s) 0 D-Mails",
 				FormatDivergence(previous.Divergence*100),
 				FormatDelta(previous.Divergence, previous.Divergence))
@@ -293,7 +296,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		return fmt.Errorf("save history: %w", err)
 	}
 
-	if opts.Quiet {
+	if opts.JSON {
+		a.PrintCheckOutputJSON(result, dmails, previous.Divergence)
+	} else if opts.Quiet {
 		a.PrintCheckOutputQuiet(result, dmails, previous.Divergence)
 	} else {
 		a.PrintCheckOutput(result, dmails, previous.Divergence)
@@ -312,6 +317,20 @@ func (a *Amadeus) dataOut(format string, args ...any) {
 		w = io.Discard
 	}
 	fmt.Fprintf(w, "  "+format+"\n", args...)
+}
+
+// writeDataJSON marshals v as indented JSON and writes it to DataOut.
+func (a *Amadeus) writeDataJSON(v any) error {
+	w := a.DataOut
+	if w == nil {
+		w = io.Discard
+	}
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal JSON: %w", err)
+	}
+	fmt.Fprintln(w, string(data))
+	return nil
 }
 
 // PrintCheckOutput renders the CLI display for a completed check.
@@ -367,6 +386,25 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 			a.dataOut("%d pending. Run `amadeus resolve <id> --approve` or `--reject`", pending)
 		}
 	}
+}
+
+// PrintCheckOutputJSON writes the check result as JSON to DataOut.
+func (a *Amadeus) PrintCheckOutputJSON(result CheckResult, dmails []DMail, previousDivergence float64) {
+	output := struct {
+		Divergence float64            `json:"divergence"`
+		Delta      float64            `json:"delta"`
+		Axes       map[Axis]AxisScore `json:"axes"`
+		DMails     []DMail            `json:"dmails"`
+	}{
+		Divergence: result.Divergence,
+		Delta:      result.Divergence - previousDivergence,
+		Axes:       result.Axes,
+		DMails:     dmails,
+	}
+	if output.DMails == nil {
+		output.DMails = []DMail{}
+	}
+	a.writeDataJSON(output)
 }
 
 // PrintCheckOutputQuiet renders a single-line summary for --quiet mode.
@@ -489,6 +527,63 @@ func (a *Amadeus) ResolveDMail(ctx context.Context, id string, action string, re
 	return nil
 }
 
+// ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
+func (a *Amadeus) ResolveDMailJSON(ctx context.Context, id string, action string, reason string) error {
+	_, span := tracer.Start(ctx, "amadeus.resolve",
+		trace.WithAttributes(
+			attribute.String("dmail.id", id),
+			attribute.String("resolve.action", action),
+		))
+	defer span.End()
+
+	dmail, err := a.Store.LoadDMail(id)
+	if err != nil {
+		return err
+	}
+	if dmail.Status != DMailPending {
+		return fmt.Errorf("D-Mail %s is already %s", id, dmail.Status)
+	}
+
+	now := time.Now().UTC()
+	dmail.ResolvedAt = &now
+	dmail.ResolvedAction = &action
+
+	switch action {
+	case "approve":
+		dmail.Status = DMailApproved
+	case "reject":
+		if reason == "" {
+			return fmt.Errorf("reject reason is required")
+		}
+		dmail.Status = DMailRejected
+		dmail.RejectReason = &reason
+	default:
+		return fmt.Errorf("unknown action: %s (use --approve or --reject)", action)
+	}
+
+	if err := a.Store.SaveDMail(dmail); err != nil {
+		return fmt.Errorf("save resolved dmail: %w", err)
+	}
+
+	span.AddEvent("dmail.resolved", trace.WithAttributes(
+		attribute.String("dmail.id", id),
+		attribute.String("dmail.status", string(dmail.Status)),
+	))
+
+	output := struct {
+		ID       string `json:"id"`
+		Status   string `json:"status"`
+		Action   string `json:"action"`
+		Resolved string `json:"resolved_at"`
+	}{
+		ID:       id,
+		Status:   string(dmail.Status),
+		Action:   action,
+		Resolved: now.Format(time.RFC3339),
+	}
+	return a.writeDataJSON(output)
+}
+
 // PrintLog renders the history and D-Mail log to DataOut.
 func (a *Amadeus) PrintLog() error {
 	history, err := a.Store.LoadHistory()
@@ -557,6 +652,32 @@ func (a *Amadeus) PrintLog() error {
 	return nil
 }
 
+// PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
+func (a *Amadeus) PrintLogJSON() error {
+	history, err := a.Store.LoadHistory()
+	if err != nil {
+		return fmt.Errorf("load history: %w", err)
+	}
+	dmails, err := a.Store.LoadAllDMails()
+	if err != nil {
+		return fmt.Errorf("load dmails: %w", err)
+	}
+	if history == nil {
+		history = []CheckResult{}
+	}
+	if dmails == nil {
+		dmails = []DMail{}
+	}
+	output := struct {
+		History []CheckResult `json:"history"`
+		DMails  []DMail       `json:"dmails"`
+	}{
+		History: history,
+		DMails:  dmails,
+	}
+	return a.writeDataJSON(output)
+}
+
 // LinkDMail associates a D-Mail with a Linear issue ID.
 // Returns an error if the D-Mail is already linked.
 func (a *Amadeus) LinkDMail(dmailID string, linearIssueID string) error {
@@ -575,7 +696,30 @@ func (a *Amadeus) LinkDMail(dmailID string, linearIssueID string) error {
 	return nil
 }
 
-// PrintSync outputs unsynced D-Mails as JSON to the logger's writer.
+// LinkDMailJSON links a D-Mail and writes the result as JSON to DataOut.
+func (a *Amadeus) LinkDMailJSON(dmailID string, linearIssueID string) error {
+	dmail, err := a.Store.LoadDMail(dmailID)
+	if err != nil {
+		return err
+	}
+	if dmail.LinearIssueID != nil {
+		return fmt.Errorf("D-Mail %s is already linked to %s", dmailID, *dmail.LinearIssueID)
+	}
+	dmail.LinearIssueID = &linearIssueID
+	if err := a.Store.SaveDMail(dmail); err != nil {
+		return fmt.Errorf("save linked dmail: %w", err)
+	}
+	output := struct {
+		DMailID       string `json:"dmail_id"`
+		LinearIssueID string `json:"linear_issue_id"`
+	}{
+		DMailID:       dmailID,
+		LinearIssueID: linearIssueID,
+	}
+	return a.writeDataJSON(output)
+}
+
+// PrintSync outputs unsynced D-Mails as JSON to DataOut.
 func (a *Amadeus) PrintSync() error {
 	unsynced, err := a.Store.LoadUnsyncedDMails()
 	if err != nil {
