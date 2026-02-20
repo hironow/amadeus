@@ -819,6 +819,83 @@ func TestPrintLogJSON(t *testing.T) {
 	}
 }
 
+func TestPrintLogJSON_IncludesResolutionStatus(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: two D-Mails — one pending (high severity, no resolution), one approved
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback,
+		Description: "pending dmail", Severity: SeverityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-002", Kind: KindFeedback,
+		Description: "approved dmail", Severity: SeverityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := store.SaveResolution(Resolution{
+		Name: "feedback-002", Status: "approved", Action: "approve", ResolvedAt: &now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A low-severity D-Mail (auto-sent, no resolution)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-003", Kind: KindFeedback,
+		Description: "low sev dmail", Severity: SeverityLow,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintLogJSON()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLogJSON failed: %v", err)
+	}
+
+	var parsed struct {
+		DMails []struct {
+			Name       string  `json:"name"`
+			Status     string  `json:"status"`
+			ResolvedAt *string `json:"resolved_at,omitempty"`
+		} `json:"dmails"`
+	}
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if len(parsed.DMails) != 3 {
+		t.Fatalf("expected 3 dmails, got %d", len(parsed.DMails))
+	}
+
+	// feedback-001: high severity, no resolution → pending
+	if parsed.DMails[0].Status != "pending" {
+		t.Errorf("feedback-001: expected status 'pending', got %q", parsed.DMails[0].Status)
+	}
+	// feedback-002: high severity, approved resolution
+	if parsed.DMails[1].Status != "approved" {
+		t.Errorf("feedback-002: expected status 'approved', got %q", parsed.DMails[1].Status)
+	}
+	if parsed.DMails[1].ResolvedAt == nil {
+		t.Error("feedback-002: expected resolved_at to be set")
+	}
+	// feedback-003: low severity, no resolution → sent
+	if parsed.DMails[2].Status != "sent" {
+		t.Errorf("feedback-003: expected status 'sent', got %q", parsed.DMails[2].Status)
+	}
+}
+
 func TestResolveDMail_JSON(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")

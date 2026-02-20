@@ -666,6 +666,19 @@ func (a *Amadeus) PrintLog() error {
 	return nil
 }
 
+// dmailJSONView is a JSON-specific view that merges a DMail with its Resolution status.
+type dmailJSONView struct {
+	Name        string            `json:"name"`
+	Kind        DMailKind         `json:"kind"`
+	Description string            `json:"description"`
+	Issues      []string          `json:"issues,omitempty"`
+	Severity    Severity          `json:"severity,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	Status      string            `json:"status"`
+	ResolvedAt  *time.Time        `json:"resolved_at,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+}
+
 // PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
 func (a *Amadeus) PrintLogJSON() error {
 	history, err := a.Store.LoadHistory()
@@ -676,18 +689,43 @@ func (a *Amadeus) PrintLogJSON() error {
 	if err != nil {
 		return fmt.Errorf("load dmails: %w", err)
 	}
+	resolutions, err := a.Store.LoadResolutions()
+	if err != nil {
+		return fmt.Errorf("load resolutions: %w", err)
+	}
 	if history == nil {
 		history = []CheckResult{}
 	}
-	if dmails == nil {
-		dmails = []DMail{}
+
+	views := make([]dmailJSONView, len(dmails))
+	for i, d := range dmails {
+		status := string(RouteDMail(d.Severity))
+		var resolvedAt *time.Time
+		var reason string
+		if res, ok := resolutions[d.Name]; ok {
+			status = res.Status
+			resolvedAt = res.ResolvedAt
+			reason = res.Reason
+		}
+		views[i] = dmailJSONView{
+			Name:        d.Name,
+			Kind:        d.Kind,
+			Description: d.Description,
+			Issues:      d.Issues,
+			Severity:    d.Severity,
+			Metadata:    d.Metadata,
+			Status:      status,
+			ResolvedAt:  resolvedAt,
+			Reason:      reason,
+		}
 	}
+
 	output := struct {
-		History []CheckResult `json:"history"`
-		DMails  []DMail       `json:"dmails"`
+		History []CheckResult   `json:"history"`
+		DMails  []dmailJSONView `json:"dmails"`
 	}{
 		History: history,
-		DMails:  dmails,
+		DMails:  views,
 	}
 	return a.writeDataJSON(output)
 }
