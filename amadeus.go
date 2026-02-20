@@ -16,7 +16,6 @@ type Amadeus struct {
 	Config        Config
 	Store         *StateStore
 	Git           *GitClient
-	Claude        *ClaudeClient
 	Logger        *Logger
 	CheckCount    int  // number of diff checks since last full check
 	ForceFullNext bool // set when a divergence jump defers a full scan to the next run
@@ -154,7 +153,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		return nil
 	}
 
-	rawResp, err := a.Claude.Run(ctx, prompt)
+	rawResp, err := runClaude(ctx, prompt)
 	if err != nil {
 		span2.End()
 		return fmt.Errorf("phase 2 (claude): %w", err)

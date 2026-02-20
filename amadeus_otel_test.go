@@ -30,7 +30,6 @@ func containsSpan(spans tracetest.SpanStubs, name string) bool {
 }
 
 // newTestAmadeus creates an Amadeus instance wired for testing.
-// It uses the given repo dir for git operations and sets Claude to dry-run mode.
 func newTestAmadeus(t *testing.T, repoRoot string) *Amadeus {
 	t.Helper()
 	divRoot := filepath.Join(repoRoot, ".divergence")
@@ -44,9 +43,7 @@ func newTestAmadeus(t *testing.T, repoRoot string) *Amadeus {
 	store := NewStateStore(divRoot)
 	logger := NewLogger(&bytes.Buffer{}, false)
 	git := NewGitClient(repoRoot)
-	claude := NewClaudeClient()
-	claude.DryRun = true
-	return &Amadeus{Config: cfg, Store: store, Git: git, Claude: claude, Logger: logger}
+	return &Amadeus{Config: cfg, Store: store, Git: git, Logger: logger}
 }
 
 func TestRunCheck_CreatesRootSpan(t *testing.T) {

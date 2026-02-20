@@ -98,14 +98,11 @@ func runCheck(configPath string, verbose, dryRun, full, quiet bool) error {
 	}
 
 	logger := amadeus.NewLogger(os.Stdout, verbose)
-	claude := amadeus.NewClaudeClient()
-	claude.DryRun = dryRun
 
 	a := &amadeus.Amadeus{
 		Config: cfg,
 		Store:  amadeus.NewStateStore(divRoot),
 		Git:    amadeus.NewGitClient(repoRoot),
-		Claude: claude,
 		Logger: logger,
 	}
 
