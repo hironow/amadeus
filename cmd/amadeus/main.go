@@ -2,12 +2,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hironow/amadeus"
 )
@@ -47,6 +49,9 @@ func run() error {
 		full       bool
 		quiet      bool
 		jsonOut    bool
+		approve    bool
+		reject     bool
+		reason     string
 	)
 
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -59,6 +64,9 @@ func run() error {
 	fs.BoolVar(&quiet, "quiet", false, "summary-only output")
 	fs.BoolVar(&quiet, "q", false, "summary-only output")
 	fs.BoolVar(&jsonOut, "json", false, "output as JSON")
+	fs.BoolVar(&approve, "approve", false, "approve D-Mail")
+	fs.BoolVar(&reject, "reject", false, "reject D-Mail")
+	fs.StringVar(&reason, "reason", "", "rejection reason (required with --reject)")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		return err
@@ -68,7 +76,7 @@ func run() error {
 	case "check":
 		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut)
 	case "resolve":
-		return runResolve(configPath, verbose, jsonOut, fs.Args())
+		return runResolve(configPath, verbose, jsonOut, approve, reject, reason, fs.Args())
 	case "log":
 		return runLog(configPath, verbose, jsonOut)
 	case "init":
@@ -154,27 +162,25 @@ func runLog(configPath string, verbose, jsonOut bool) error {
 	return a.PrintLog()
 }
 
-func runResolve(configPath string, verbose, jsonOut bool, args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("usage: amadeus resolve <name> --approve or --reject --reason \"...\"")
-	}
-	id := args[0]
-
-	fs := flag.NewFlagSet("resolve-action", flag.ContinueOnError)
-	var approve, reject bool
-	var reason string
-	fs.BoolVar(&approve, "approve", false, "approve D-Mail")
-	fs.BoolVar(&reject, "reject", false, "reject D-Mail")
-	fs.StringVar(&reason, "reason", "", "rejection reason (required with --reject)")
-	if err := fs.Parse(args[1:]); err != nil {
-		return err
-	}
-
+func runResolve(configPath string, verbose, jsonOut, approve, reject bool, reason string, args []string) error {
 	if approve == reject {
 		return fmt.Errorf("specify exactly one of --approve or --reject")
 	}
 	if reject && reason == "" {
 		return fmt.Errorf("--reason is required with --reject")
+	}
+
+	// Collect names from positional args or stdin
+	names := args
+	if len(names) == 0 {
+		stdinNames, err := readNamesFromStdin()
+		if err != nil {
+			return err
+		}
+		names = stdinNames
+	}
+	if len(names) == 0 {
+		return fmt.Errorf("usage: amadeus resolve <name> --approve or --reject --reason \"...\"")
 	}
 
 	repoRoot, err := os.Getwd()
@@ -207,10 +213,48 @@ func runResolve(configPath string, verbose, jsonOut bool, args []string) error {
 	if reject {
 		action = "reject"
 	}
-	if jsonOut {
-		return a.ResolveDMailJSON(context.Background(), id, action, reason)
+
+	ctx := context.Background()
+	var firstErr error
+	for _, name := range names {
+		var resolveErr error
+		if jsonOut {
+			resolveErr = a.ResolveDMailJSON(ctx, name, action, reason)
+		} else {
+			resolveErr = a.ResolveDMail(ctx, name, action, reason)
+		}
+		if resolveErr != nil {
+			fmt.Fprintf(os.Stderr, "error: %s: %v\n", name, resolveErr)
+			if firstErr == nil {
+				firstErr = resolveErr
+			}
+		}
 	}
-	return a.ResolveDMail(context.Background(), id, action, reason)
+	return firstErr
+}
+
+// readNamesFromStdin reads D-Mail names from stdin when piped (non-TTY).
+// Returns nil if stdin is a terminal.
+func readNamesFromStdin() ([]string, error) {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return nil, nil
+	}
+	if info.Mode()&os.ModeCharDevice != 0 {
+		return nil, nil // stdin is a terminal, not a pipe
+	}
+	var names []string
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		name := strings.TrimSpace(scanner.Text())
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read stdin: %w", err)
+	}
+	return names, nil
 }
 
 func runInit() error {
