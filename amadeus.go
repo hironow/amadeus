@@ -45,7 +45,6 @@ func (a *Amadeus) ShouldFullCheck(forceFlag bool) bool {
 func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	ctx, span := tracer.Start(ctx, "amadeus.check",
 		trace.WithAttributes(
-			attribute.Bool("check.full", opts.Full),
 			attribute.Bool("check.dry_run", opts.DryRun),
 		))
 	defer span.End()
@@ -60,6 +59,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	a.ForceFullNext = previous.ForceFullNext
 
 	fullCheck := a.ShouldFullCheck(opts.Full)
+	span.SetAttributes(attribute.Bool("check.full", fullCheck))
 	if a.ForceFullNext {
 		if !opts.Quiet {
 			a.Logger.Info("Full scan triggered by previous divergence jump")
