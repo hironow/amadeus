@@ -830,6 +830,44 @@ func TestRunCheck_DryRun_NilDataOut_NoPanic(t *testing.T) {
 	}
 }
 
+func TestRunCheck_DryRun_DoesNotConsumeInbox(t *testing.T) {
+	// given: inbox has a report d-mail
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	inboxDir := filepath.Join(divRoot, "inbox")
+	reportContent := "---\nname: report-001\nkind: report\ndescription: test\n---\nBody\n"
+	if err := os.WriteFile(filepath.Join(inboxDir, "report-001.md"), []byte(reportContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &bytes.Buffer{},
+	}
+
+	// when: dry-run check
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: inbox file should still exist (not consumed)
+	if _, err := os.Stat(filepath.Join(inboxDir, "report-001.md")); err != nil {
+		t.Errorf("inbox file should not be consumed in dry-run mode: %v", err)
+	}
+
+	// then: consumed.json should not exist
+	if _, err := os.Stat(filepath.Join(divRoot, ".run", "consumed.json")); err == nil {
+		t.Error("consumed.json should not be created in dry-run mode")
+	}
+}
+
 func TestPrintCheckOutput_JSON(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
