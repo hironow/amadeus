@@ -702,6 +702,21 @@ func (a *Amadeus) PrintLog() error {
 		}
 	}
 
+	consumed, err := a.Store.LoadConsumed()
+	if err != nil {
+		return fmt.Errorf("load consumed: %w", err)
+	}
+	if len(consumed) > 0 {
+		a.dataOut("")
+		a.dataOut("Consumed:")
+		for _, c := range consumed {
+			a.dataOut("  %s  [%s]  %s",
+				c.Name,
+				string(c.Kind),
+				c.ConsumedAt.Format("2006-01-02T15:04"))
+		}
+	}
+
 	return nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1014,5 +1015,52 @@ func TestResolveDMail_JSON(t *testing.T) {
 	}
 	if parsed["status"] != "approved" {
 		t.Errorf("expected status 'approved', got %v", parsed["status"])
+	}
+}
+
+func TestPrintLog_ShowsConsumed(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	if err := store.SaveConsumed([]ConsumedRecord{
+		{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save a history entry so PrintLog doesn't bail early
+	store.SaveHistory(CheckResult{
+		CheckedAt:  now,
+		Commit:     "abc1234",
+		Type:       CheckTypeFull,
+		Divergence: 0.1,
+	})
+
+	var buf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Logger:  NewLogger(io.Discard, false),
+		DataOut: &buf,
+	}
+
+	// when
+	if err := a.PrintLog(); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "Consumed") {
+		t.Errorf("expected 'Consumed' section in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "report-001") {
+		t.Errorf("expected 'report-001' in output, got:\n%s", output)
 	}
 }
