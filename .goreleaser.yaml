@@ -30,6 +30,19 @@ archives:
 checksum:
   name_template: checksums.txt
 
+brews:
+  - repository:
+      owner: hironow
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/hironow/amadeus
+    description: "Divergence meter for your codebase"
+    license: MIT
+    install: |
+      bin.install "amadeus"
+    test: |
+      system bin/"amadeus", "version"
+
 release:
   github:
     owner: hironow
