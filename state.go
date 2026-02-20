@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -81,7 +82,7 @@ func InitGateDir(root string) error {
 		}
 		skillPath := filepath.Join(destDir, "SKILL.md")
 		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
-			tmplPath := filepath.Join("templates", "skills", name, "SKILL.md")
+			tmplPath := path.Join("templates", "skills", name, "SKILL.md")
 			content, readErr := skillTemplateFS.ReadFile(tmplPath)
 			if readErr != nil {
 				return fmt.Errorf("read skill template %s: %w", name, readErr)
