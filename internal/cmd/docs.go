@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -17,6 +18,10 @@ func newDocsCommand() *cobra.Command {
 			output, _ := cmd.Flags().GetString("output")
 			if output == "" {
 				return fmt.Errorf("--output is required")
+			}
+
+			if err := os.MkdirAll(output, 0o755); err != nil {
+				return fmt.Errorf("create output directory: %w", err)
 			}
 
 			root := cmd.Root()

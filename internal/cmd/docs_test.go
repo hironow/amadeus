@@ -34,6 +34,26 @@ func TestDocs_GeneratesMarkdown(t *testing.T) {
 	}
 }
 
+func TestDocs_CreatesOutputDirectory(t *testing.T) {
+	// given — output directory does not exist yet
+	info := BuildInfo{Version: "test", Commit: "none", Date: "unknown"}
+	root := NewRootCommand(info)
+	outDir := filepath.Join(t.TempDir(), "nested", "cli-docs")
+	root.SetArgs([]string{"docs", "--output", outDir})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rootDoc := filepath.Join(outDir, "amadeus.md")
+	if _, err := os.Stat(rootDoc); os.IsNotExist(err) {
+		t.Error("expected amadeus.md to be generated in auto-created directory")
+	}
+}
+
 func TestDocs_OutputFlagRequired(t *testing.T) {
 	// given
 	info := BuildInfo{Version: "test"}
