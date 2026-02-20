@@ -411,6 +411,107 @@ func TestInitDivergenceDir_SkipsGitignoreAppendIfAlreadyPresent(t *testing.T) {
 	}
 }
 
+func TestInitDivergenceDir_CreatesSkillDirectories(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// when
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: skills directories should exist
+	for _, sub := range []string{
+		filepath.Join("skills", "dmail-sendable"),
+		filepath.Join("skills", "dmail-readable"),
+	} {
+		path := filepath.Join(root, sub)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("expected %s to exist: %v", sub, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("expected %s to be a directory", sub)
+		}
+	}
+}
+
+func TestInitDivergenceDir_CreatesSkillMDFiles(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// when
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: dmail-sendable/SKILL.md should exist with produces: [feedback]
+	sendablePath := filepath.Join(root, "skills", "dmail-sendable", "SKILL.md")
+	sendableData, err := os.ReadFile(sendablePath)
+	if err != nil {
+		t.Fatalf("expected dmail-sendable/SKILL.md to exist: %v", err)
+	}
+	sendableContent := string(sendableData)
+	if !strings.Contains(sendableContent, "name: dmail-sendable") {
+		t.Errorf("expected SKILL.md to contain 'name: dmail-sendable', got:\n%s", sendableContent)
+	}
+	if !strings.Contains(sendableContent, "produces:") {
+		t.Errorf("expected SKILL.md to contain 'produces:', got:\n%s", sendableContent)
+	}
+	if !strings.Contains(sendableContent, "- feedback") {
+		t.Errorf("expected SKILL.md to contain '- feedback', got:\n%s", sendableContent)
+	}
+
+	// then: dmail-readable/SKILL.md should exist with consumes: [report]
+	readablePath := filepath.Join(root, "skills", "dmail-readable", "SKILL.md")
+	readableData, err := os.ReadFile(readablePath)
+	if err != nil {
+		t.Fatalf("expected dmail-readable/SKILL.md to exist: %v", err)
+	}
+	readableContent := string(readableData)
+	if !strings.Contains(readableContent, "name: dmail-readable") {
+		t.Errorf("expected SKILL.md to contain 'name: dmail-readable', got:\n%s", readableContent)
+	}
+	if !strings.Contains(readableContent, "consumes:") {
+		t.Errorf("expected SKILL.md to contain 'consumes:', got:\n%s", readableContent)
+	}
+	if !strings.Contains(readableContent, "- report") {
+		t.Errorf("expected SKILL.md to contain '- report', got:\n%s", readableContent)
+	}
+}
+
+func TestInitDivergenceDir_DoesNotOverwriteExistingSkillMD(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: first init creates SKILL.md files
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// given: modify the SKILL.md to simulate user customization
+	customPath := filepath.Join(root, "skills", "dmail-sendable", "SKILL.md")
+	customContent := []byte("---\nname: dmail-sendable\ndescription: custom\n---\n")
+	if err := os.WriteFile(customPath, customContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: re-init
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("second InitDivergenceDir failed: %v", err)
+	}
+
+	// then: custom content should be preserved
+	data, err := os.ReadFile(customPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(customContent) {
+		t.Errorf("expected custom SKILL.md to be preserved, got:\n%s", string(data))
+	}
+}
+
 func TestLoadLatest_NoFile_ReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")

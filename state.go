@@ -66,6 +66,48 @@ func InitDivergenceDir(root string) error {
 	if err := migrateLegacyState(root); err != nil {
 		return fmt.Errorf("migrate legacy state: %w", err)
 	}
+	// Create skills directories and default SKILL.md files
+	skills := []struct {
+		dir     string
+		content string
+	}{
+		{
+			dir: filepath.Join(root, "skills", "dmail-sendable"),
+			content: `---
+name: dmail-sendable
+description: Declares outbound D-Mail kinds for phonewave routing discovery.
+produces:
+  - feedback
+---
+
+Amadeus D-Mail sendable skill.
+`,
+		},
+		{
+			dir: filepath.Join(root, "skills", "dmail-readable"),
+			content: `---
+name: dmail-readable
+description: Declares inbound D-Mail kinds for phonewave routing discovery.
+consumes:
+  - report
+---
+
+Amadeus D-Mail readable skill.
+`,
+		},
+	}
+	for _, s := range skills {
+		if err := os.MkdirAll(s.dir, 0o755); err != nil {
+			return err
+		}
+		skillPath := filepath.Join(s.dir, "SKILL.md")
+		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
+			if err := os.WriteFile(skillPath, []byte(s.content), 0o644); err != nil {
+				return err
+			}
+		}
+	}
+
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		cfg := DefaultConfig()

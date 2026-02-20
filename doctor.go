@@ -166,6 +166,31 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
 	}
 }
 
+// checkSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
+func checkSkillMD(repoRoot string) DoctorCheckResult {
+	skillsDir := filepath.Join(repoRoot, ".divergence", "skills")
+	required := []string{"dmail-sendable", "dmail-readable"}
+	var missing []string
+	for _, name := range required {
+		path := filepath.Join(skillsDir, name, "SKILL.md")
+		if _, err := os.Stat(path); err != nil {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return DoctorCheckResult{
+			Name:    "SKILL.md",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("missing: %s — run 'amadeus init'", strings.Join(missing, ", ")),
+		}
+	}
+	return DoctorCheckResult{
+		Name:    "SKILL.md",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%s (dmail-sendable, dmail-readable)", skillsDir),
+	}
+}
+
 // RunDoctor executes all health checks and returns the results.
 // Uses "claude" as the default Claude CLI command name.
 func RunDoctor(ctx context.Context, configPath string, repoRoot string) []DoctorCheckResult {
@@ -195,7 +220,10 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	// 5. config.yaml
 	results = append(results, checkConfig(configPath))
 
-	// 6. Linear MCP (skip if claude unavailable)
+	// 6. SKILL.md files
+	results = append(results, checkSkillMD(repoRoot))
+
+	// 7. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != CheckOK {
 		results = append(results, DoctorCheckResult{
 			Name:    "Linear MCP",
