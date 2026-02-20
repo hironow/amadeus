@@ -257,3 +257,38 @@ func (s *StateStore) SaveResolution(res Resolution) error {
 	resolutions[res.Name] = res
 	return s.writeJSON(filepath.Join(s.Root, ".run", "resolutions.json"), resolutions)
 }
+
+// ConsumedRecord tracks a processed inbox D-Mail.
+type ConsumedRecord struct {
+	Name       string    `json:"name"`
+	Kind       DMailKind `json:"kind"`
+	ConsumedAt time.Time `json:"consumed_at"`
+	Source     string    `json:"source"`
+}
+
+// LoadConsumed reads all consumed records from .run/consumed.json.
+func (s *StateStore) LoadConsumed() ([]ConsumedRecord, error) {
+	path := filepath.Join(s.Root, ".run", "consumed.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return []ConsumedRecord{}, nil
+		}
+		return nil, err
+	}
+	var records []ConsumedRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+// SaveConsumed appends consumed records to .run/consumed.json.
+func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
+	existing, err := s.LoadConsumed()
+	if err != nil {
+		return err
+	}
+	existing = append(existing, records...)
+	return s.writeJSON(filepath.Join(s.Root, ".run", "consumed.json"), existing)
+}

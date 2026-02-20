@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseDMail_Valid(t *testing.T) {
@@ -502,6 +503,94 @@ func TestSaveResolution_RoundTrip(t *testing.T) {
 	}
 	if loaded.Action != "approve" {
 		t.Errorf("expected action approve, got %s", loaded.Action)
+	}
+}
+
+func TestSaveConsumed_RoundTrip(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	records := []ConsumedRecord{
+		{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"},
+		{Name: "report-002", Kind: KindReport, ConsumedAt: now, Source: "report-002.md"},
+	}
+
+	// when
+	if err := store.SaveConsumed(records); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.LoadConsumed()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	if len(loaded) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(loaded))
+	}
+	if loaded[0].Name != "report-001" {
+		t.Errorf("expected report-001, got %s", loaded[0].Name)
+	}
+	if loaded[1].Kind != KindReport {
+		t.Errorf("expected report kind, got %s", loaded[1].Kind)
+	}
+}
+
+func TestLoadConsumed_Empty(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	loaded, err := store.LoadConsumed()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 0 {
+		t.Fatalf("expected empty slice, got %d", len(loaded))
+	}
+}
+
+func TestSaveConsumed_Appends(t *testing.T) {
+	// given: save first batch
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	first := []ConsumedRecord{{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"}}
+	if err := store.SaveConsumed(first); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: save second batch
+	second := []ConsumedRecord{{Name: "report-002", Kind: KindReport, ConsumedAt: now, Source: "report-002.md"}}
+	if err := store.SaveConsumed(second); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	loaded, err := store.LoadConsumed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 2 {
+		t.Fatalf("expected 2 records after two saves, got %d", len(loaded))
 	}
 }
 
