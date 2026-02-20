@@ -93,50 +93,6 @@ jaeger:
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
-# Prune archived D-Mails older than N days (default: 30)
-archive-prune days="30":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    archive=".gate/archive"
-    if [ ! -d "$archive" ]; then
-        echo "No archive directory found at $archive"
-        exit 0
-    fi
-    files=$(find "$archive" -name "*.md" -mtime +{{days}} 2>/dev/null || true)
-    if [ -z "$files" ]; then
-        echo "No files older than {{days}} days in $archive"
-        exit 0
-    fi
-    echo "Files to prune in $archive (older than {{days}} days):"
-    echo "$files"
-    echo ""
-    read -p "Delete these files? [y/N] " confirm
-    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-        echo "$files" | xargs rm -f
-        echo "Pruned."
-    else
-        echo "Cancelled."
-    fi
-
-# Dry-run: show what would be pruned (no deletion)
-archive-prune-dry days="30":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    archive=".gate/archive"
-    if [ ! -d "$archive" ]; then
-        echo "No archive directory found at $archive"
-        exit 0
-    fi
-    files=$(find "$archive" -name "*.md" -mtime +{{days}} 2>/dev/null || true)
-    if [ -z "$files" ]; then
-        echo "No files older than {{days}} days in $archive"
-    else
-        echo "Dry-run: files older than {{days}} days in $archive:"
-        echo "$files"
-        echo ""
-        echo "(dry-run — no files deleted)"
-    fi
-
 # Clean build artifacts
 clean:
     rm -f amadeus coverage.out
