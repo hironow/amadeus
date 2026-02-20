@@ -184,7 +184,7 @@ func TestInitDivergenceDir_CreatesNewStructure(t *testing.T) {
 	if err := InitDivergenceDir(root); err != nil {
 		t.Fatal(err)
 	}
-	for _, sub := range []string{"outbox", "inbox", "archive"} {
+	for _, sub := range []string{"outbox", "inbox", "archive", "pending", "rejected"} {
 		path := filepath.Join(root, sub)
 		info, err := statDir(path)
 		if err != nil {
@@ -213,6 +213,9 @@ func TestInitDivergenceDir_GitignoreContainsOutboxInbox(t *testing.T) {
 	}
 	if !strings.Contains(content, "inbox/") {
 		t.Errorf("expected .gitignore to contain 'inbox/', got: %s", content)
+	}
+	if !strings.Contains(content, "pending/") {
+		t.Errorf("expected .gitignore to contain 'pending/', got: %s", content)
 	}
 }
 

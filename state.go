@@ -60,6 +60,8 @@ func InitDivergenceDir(root string) error {
 		filepath.Join(root, "outbox"),
 		filepath.Join(root, "inbox"),
 		filepath.Join(root, "archive"),
+		filepath.Join(root, "pending"),
+		filepath.Join(root, "rejected"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -102,7 +104,7 @@ func InitDivergenceDir(root string) error {
 		}
 	}
 	gitignorePath := filepath.Join(root, ".gitignore")
-	requiredEntries := []string{".run/", "outbox/", "inbox/"}
+	requiredEntries := []string{".run/", "outbox/", "inbox/", "pending/"}
 	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
 		content := strings.Join(requiredEntries, "\n") + "\n"
 		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {
