@@ -488,6 +488,10 @@ func runArchivePrune(args []string) error {
 		return err
 	}
 
+	if days < 1 {
+		return fmt.Errorf("--days must be >= 1 (got %d)", days)
+	}
+
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)

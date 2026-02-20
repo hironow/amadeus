@@ -196,9 +196,18 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	_, span2 := tracer.Start(ctx, "divergence_meter")
 
 	repoRoot := a.Git.Dir
-	allADRs, _ := CollectADRs(repoRoot)
-	allDoDs, _ := CollectDoDs(repoRoot)
-	depMap, _ := CollectDependencyMap(repoRoot)
+	allADRs, adrErr := CollectADRs(repoRoot)
+	if adrErr != nil && !opts.Quiet {
+		a.Logger.Info("Warning: failed to collect ADRs: %v", adrErr)
+	}
+	allDoDs, dodErr := CollectDoDs(repoRoot)
+	if dodErr != nil && !opts.Quiet {
+		a.Logger.Info("Warning: failed to collect DoDs: %v", dodErr)
+	}
+	depMap, depErr := CollectDependencyMap(repoRoot)
+	if depErr != nil && !opts.Quiet {
+		a.Logger.Info("Warning: failed to collect dependency map: %v", depErr)
+	}
 
 	var prompt string
 	if fullCheck {
