@@ -5,9 +5,9 @@ import (
 	"sort"
 )
 
-var issueIDPattern = regexp.MustCompile(`MY-\d+`)
+var issueIDPattern = regexp.MustCompile(`[A-Z]+-\d+`)
 
-// ExtractIssueIDs scans texts for Linear Issue IDs (e.g. "MY-302")
+// ExtractIssueIDs scans texts for Linear Issue IDs (e.g. "MY-302", "AM-123")
 // and returns a unique, sorted list.
 func ExtractIssueIDs(texts ...string) []string {
 	seen := make(map[string]bool)

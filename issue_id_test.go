@@ -113,3 +113,38 @@ func TestExtractIssueIDs_MultipleTexts(t *testing.T) {
 		t.Errorf("expected [MY-241 MY-302], got %v", ids)
 	}
 }
+
+func TestExtractIssueIDs_NonMyPrefix(t *testing.T) {
+	// given: other Linear project keys
+	text := "fix: resolve AM-123 and OPS-45 issues"
+
+	// when
+	ids := ExtractIssueIDs(text)
+
+	// then
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "AM-123" || ids[1] != "OPS-45" {
+		t.Errorf("expected [AM-123 OPS-45], got %v", ids)
+	}
+}
+
+func TestExtractIssueIDs_MixedPrefixes(t *testing.T) {
+	// given
+	titles := []string{
+		"feat: implement MY-302",
+		"fix: resolve AM-99 conflict",
+	}
+
+	// when
+	ids := ExtractIssueIDs(titles...)
+
+	// then
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "AM-99" || ids[1] != "MY-302" {
+		t.Errorf("expected [AM-99 MY-302], got %v", ids)
+	}
+}
