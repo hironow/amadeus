@@ -141,6 +141,24 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 	}
 }
 
+func TestCheckLinearMCP_Disconnected(t *testing.T) {
+	// given: mock output showing linear as disconnected
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	ctx := context.Background()
+
+	// when
+	result := checkLinearMCP(ctx, "claude")
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail for disconnected, got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestCheckConfig_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
