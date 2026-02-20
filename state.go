@@ -80,6 +80,18 @@ func InitDivergenceDir(root string) error {
 		if err := os.WriteFile(gitignorePath, []byte(".run/\n"), 0o644); err != nil {
 			return err
 		}
+	} else if err == nil {
+		existing, readErr := os.ReadFile(gitignorePath)
+		if readErr == nil && !strings.Contains(string(existing), ".run/") {
+			f, openErr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0o644)
+			if openErr == nil {
+				defer f.Close()
+				if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
+					f.Write([]byte("\n"))
+				}
+				f.Write([]byte(".run/\n"))
+			}
+		}
 	}
 	return nil
 }

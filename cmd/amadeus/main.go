@@ -21,6 +21,8 @@ func main() {
 	code := amadeus.ExitCode(err)
 	if code == 1 {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	} else if code == 2 {
+		fmt.Fprintf(os.Stderr, "drift detected: %v\n", err)
 	}
 	shutdown(context.Background())
 	os.Exit(code)
@@ -318,9 +320,12 @@ func runDoctor(configPath string, jsonOut bool) error {
 				hasFail = true
 			}
 		}
-		data, _ := json.MarshalIndent(struct {
+		data, err := json.MarshalIndent(struct {
 			Checks []jsonCheck `json:"checks"`
 		}{Checks: checks}, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshal doctor checks: %w", err)
+		}
 		fmt.Fprintln(os.Stdout, string(data))
 		if hasFail {
 			return fmt.Errorf("some checks failed")
