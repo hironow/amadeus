@@ -49,9 +49,6 @@ func run() error {
 		full       bool
 		quiet      bool
 		jsonOut    bool
-		approve    bool
-		reject     bool
-		reason     string
 	)
 
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -64,9 +61,6 @@ func run() error {
 	fs.BoolVar(&quiet, "quiet", false, "summary-only output")
 	fs.BoolVar(&quiet, "q", false, "summary-only output")
 	fs.BoolVar(&jsonOut, "json", false, "output as JSON")
-	fs.BoolVar(&approve, "approve", false, "approve D-Mail")
-	fs.BoolVar(&reject, "reject", false, "reject D-Mail")
-	fs.StringVar(&reason, "reason", "", "rejection reason (required with --reject)")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		return err
@@ -76,7 +70,7 @@ func run() error {
 	case "check":
 		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut)
 	case "resolve":
-		return runResolve(configPath, verbose, jsonOut, approve, reject, reason, fs.Args())
+		return runResolve(configPath, verbose, jsonOut, fs.Args())
 	case "log":
 		return runLog(configPath, verbose, jsonOut)
 	case "init":
@@ -164,24 +158,58 @@ func runLog(configPath string, verbose, jsonOut bool) error {
 	return a.PrintLog()
 }
 
-func runResolve(configPath string, verbose, jsonOut, approve, reject bool, reason string, args []string) error {
-	if approve == reject {
-		return fmt.Errorf("specify exactly one of --approve or --reject")
-	}
-	if reject && reason == "" {
-		return fmt.Errorf("--reason is required with --reject")
-	}
+// resolveArgs holds the parsed arguments for the resolve command.
+type resolveArgs struct {
+	approve bool
+	reject  bool
+	reason  string
+	names   []string
+}
 
-	// Collect names from positional args or stdin
-	names := args
-	if len(names) == 0 {
+// parseResolveArgs extracts resolve-specific flags (--approve, --reject, --reason)
+// from a mixed list of flags and positional names.
+// Go's flag parser stops at the first non-flag argument, so flags appearing
+// after a name (e.g. "feedback-001 --approve") would be left unparsed.
+// This manual scan handles interspersed flags and names in any order.
+func parseResolveArgs(args []string) resolveArgs {
+	var ra resolveArgs
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--approve":
+			ra.approve = true
+		case args[i] == "--reject":
+			ra.reject = true
+		case args[i] == "--reason" && i+1 < len(args):
+			ra.reason = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--reason="):
+			ra.reason = strings.TrimPrefix(args[i], "--reason=")
+		default:
+			ra.names = append(ra.names, args[i])
+		}
+	}
+	return ra
+}
+
+func runResolve(configPath string, verbose, jsonOut bool, rawArgs []string) error {
+	ra := parseResolveArgs(rawArgs)
+
+	// Also collect names from stdin if none provided as args
+	if len(ra.names) == 0 {
 		stdinNames, err := readNamesFromStdin()
 		if err != nil {
 			return err
 		}
-		names = stdinNames
+		ra.names = stdinNames
 	}
-	if len(names) == 0 {
+
+	if ra.approve == ra.reject {
+		return fmt.Errorf("specify exactly one of --approve or --reject")
+	}
+	if ra.reject && ra.reason == "" {
+		return fmt.Errorf("--reason is required with --reject")
+	}
+	if len(ra.names) == 0 {
 		return fmt.Errorf("usage: amadeus resolve <name> --approve or --reject --reason \"...\"")
 	}
 
@@ -212,20 +240,42 @@ func runResolve(configPath string, verbose, jsonOut, approve, reject bool, reaso
 	}
 
 	action := "approve"
-	if reject {
+	if ra.reject {
 		action = "reject"
 	}
 
 	ctx := context.Background()
-	var firstErr error
-	for _, name := range names {
-		var resolveErr error
-		if jsonOut {
-			resolveErr = a.ResolveDMailJSON(ctx, name, action, reason)
-		} else {
-			resolveErr = a.ResolveDMail(ctx, name, action, reason)
+
+	if jsonOut {
+		// Batch mode: collect all results and write as a JSON array.
+		var results []amadeus.ResolveOutput
+		var firstErr error
+		for _, name := range ra.names {
+			result, resolveErr := a.ResolveDMailResult(ctx, name, action, ra.reason)
+			if resolveErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %s: %v\n", name, resolveErr)
+				if firstErr == nil {
+					firstErr = resolveErr
+				}
+				continue
+			}
+			results = append(results, result)
 		}
-		if resolveErr != nil {
+		if results == nil {
+			results = []amadeus.ResolveOutput{}
+		}
+		data, err := json.MarshalIndent(results, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshal resolve results: %w", err)
+		}
+		fmt.Fprintln(os.Stdout, string(data))
+		return firstErr
+	}
+
+	// Text mode: print each result individually.
+	var firstErr error
+	for _, name := range ra.names {
+		if resolveErr := a.ResolveDMail(ctx, name, action, ra.reason); resolveErr != nil {
 			fmt.Fprintf(os.Stderr, "error: %s: %v\n", name, resolveErr)
 			if firstErr == nil {
 				firstErr = resolveErr

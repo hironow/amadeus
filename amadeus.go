@@ -570,25 +570,37 @@ func (a *Amadeus) ResolveDMail(ctx context.Context, name string, action string, 
 	return nil
 }
 
-// ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
-func (a *Amadeus) ResolveDMailJSON(ctx context.Context, name string, action string, reason string) error {
+// ResolveOutput is the JSON-serializable result of resolving a D-Mail.
+type ResolveOutput struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Action     string `json:"action"`
+	ResolvedAt string `json:"resolved_at"`
+}
+
+// ResolveDMailResult resolves a D-Mail and returns the result as a struct.
+// Use this for batch operations where the caller aggregates results.
+func (a *Amadeus) ResolveDMailResult(ctx context.Context, name string, action string, reason string) (ResolveOutput, error) {
 	_, resolution, span, err := a.resolveDMailCore(ctx, name, action, reason)
 	defer span.End()
 	if err != nil {
+		return ResolveOutput{}, err
+	}
+	return ResolveOutput{
+		Name:       name,
+		Status:     resolution.Status,
+		Action:     action,
+		ResolvedAt: resolution.ResolvedAt.Format(time.RFC3339),
+	}, nil
+}
+
+// ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
+func (a *Amadeus) ResolveDMailJSON(ctx context.Context, name string, action string, reason string) error {
+	result, err := a.ResolveDMailResult(ctx, name, action, reason)
+	if err != nil {
 		return err
 	}
-	output := struct {
-		Name     string `json:"name"`
-		Status   string `json:"status"`
-		Action   string `json:"action"`
-		Resolved string `json:"resolved_at"`
-	}{
-		Name:     name,
-		Status:   resolution.Status,
-		Action:   action,
-		Resolved: resolution.ResolvedAt.Format(time.RFC3339),
-	}
-	return a.writeDataJSON(output)
+	return a.writeDataJSON(result)
 }
 
 // PrintLog renders the history and D-Mail log to DataOut.
