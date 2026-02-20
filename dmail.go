@@ -152,20 +152,22 @@ func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
 	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// SaveDMail writes a D-Mail to both outbox/ and archive/ (dual-write pattern).
+// SaveDMail writes a D-Mail to both archive/ and outbox/ (dual-write pattern).
+// Archive is written first so the permanent record exists even if the outbox
+// write fails; outbox is the ephemeral copy consumed by the courier.
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	data, err := MarshalDMail(dmail)
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
 	filename := dmail.Name + ".md"
-	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	archivePath := filepath.Join(s.Root, "archive", filename)
-	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
-		return fmt.Errorf("write outbox: %w", err)
-	}
+	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
 		return fmt.Errorf("write archive: %w", err)
+	}
+	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
+		return fmt.Errorf("write outbox: %w", err)
 	}
 	return nil
 }
