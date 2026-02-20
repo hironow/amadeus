@@ -2,6 +2,7 @@ package amadeus
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -298,7 +299,7 @@ func TestResolveDMail_Approve(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "approve", "")
+	err := a.ResolveDMail(context.Background(), "d-001", "approve", "")
 
 	// then
 	if err != nil {
@@ -338,7 +339,7 @@ func TestResolveDMail_Reject(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "reject", "false positive")
+	err := a.ResolveDMail(context.Background(), "d-001", "reject", "false positive")
 
 	// then
 	if err != nil {
@@ -377,7 +378,7 @@ func TestResolveDMail_AlreadyResolved(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "reject", "oops")
+	err := a.ResolveDMail(context.Background(), "d-001", "reject", "oops")
 
 	// then: should error
 	if err == nil {
@@ -396,7 +397,7 @@ func TestResolveDMail_NotFound(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-999", "approve", "")
+	err := a.ResolveDMail(context.Background(), "d-999", "approve", "")
 
 	// then
 	if err == nil {
@@ -426,7 +427,7 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "reject", "")
+	err := a.ResolveDMail(context.Background(), "d-001", "reject", "")
 
 	// then
 	if err == nil {

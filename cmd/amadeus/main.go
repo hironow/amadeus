@@ -121,7 +121,7 @@ func runLog(configPath string, verbose bool) error {
 	divRoot := filepath.Join(repoRoot, ".divergence")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -171,7 +171,7 @@ func runResolve(configPath string, verbose bool, args []string) error {
 	divRoot := filepath.Join(repoRoot, ".divergence")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -193,7 +193,7 @@ func runResolve(configPath string, verbose bool, args []string) error {
 	if reject {
 		action = "reject"
 	}
-	return a.ResolveDMail(id, action, reason)
+	return a.ResolveDMail(context.Background(), id, action, reason)
 }
 
 func runSync(configPath string, verbose bool) error {
@@ -204,7 +204,7 @@ func runSync(configPath string, verbose bool) error {
 	divRoot := filepath.Join(repoRoot, ".divergence")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -238,7 +238,7 @@ func runLink(configPath string, verbose bool, args []string) error {
 	divRoot := filepath.Join(repoRoot, ".divergence")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {

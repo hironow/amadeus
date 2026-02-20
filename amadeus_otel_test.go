@@ -226,7 +226,7 @@ func TestResolveDMail_CreatesSpan(t *testing.T) {
 	}
 
 	// when
-	err := a.ResolveDMail("DM-001", "approve", "")
+	err := a.ResolveDMail(context.Background(), "DM-001", "approve", "")
 	if err != nil {
 		t.Fatalf("ResolveDMail: %v", err)
 	}

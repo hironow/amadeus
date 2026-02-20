@@ -29,7 +29,7 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 		return func(context.Context) error { return nil }
 	}
 
-	res, _ := resource.Merge(
+	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -37,6 +37,9 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 			semconv.ServiceVersion(ver),
 		),
 	)
+	if err != nil {
+		res = resource.Default()
+	}
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),

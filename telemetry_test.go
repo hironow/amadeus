@@ -38,7 +38,7 @@ func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	}
 }
 
-func TestInitTracer_CreatesRecordingSpanWithEndpoint(t *testing.T) {
+func TestSetupTestTracer_RecordsSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
 	_, span := tracer.Start(context.Background(), "recording-span")

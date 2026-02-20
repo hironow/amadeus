@@ -63,15 +63,16 @@ func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
 	return resp, nil
 }
 
-// runClaude executes the Claude CLI with the given prompt and returns raw output.
+// runClaude executes the Claude CLI with the given prompt via stdin and returns raw output.
+// Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
 func runClaude(ctx context.Context, prompt string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "claude",
 		"--model", "opus",
 		"--output-format", "json",
 		"--dangerously-skip-permissions",
 		"--print",
-		"-p", prompt,
 	)
+	cmd.Stdin = bytes.NewBufferString(prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

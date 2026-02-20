@@ -120,7 +120,13 @@ func checkDivergenceDir(repoRoot string) DoctorCheckResult {
 			Message: fmt.Sprintf("not writable: %v", err),
 		}
 	}
-	os.Remove(probe)
+	if err := os.Remove(probe); err != nil {
+		return DoctorCheckResult{
+			Name:    ".divergence/",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("probe cleanup failed: %v", err),
+		}
+	}
 	return DoctorCheckResult{
 		Name:    ".divergence/",
 		Status:  CheckOK,

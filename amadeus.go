@@ -353,11 +353,14 @@ func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, prev
 		pendingStr)
 }
 
-// ShouldPromoteToFull returns true when the divergence jump between the
-// previous and current values exceeds the configured on_divergence_jump threshold.
-// This triggers an automatic recalibration (baseline reset).
+// ShouldPromoteToFull returns true when the absolute divergence change between
+// the previous and current values exceeds the configured on_divergence_jump threshold.
+// Both increases and decreases trigger recalibration.
 func (a *Amadeus) ShouldPromoteToFull(previousDivergence, currentDivergence float64) bool {
 	delta := currentDivergence - previousDivergence
+	if delta < 0 {
+		delta = -delta
+	}
 	return delta >= a.Config.FullCheck.OnDivergenceJump
 }
 
@@ -397,8 +400,8 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 
 // ResolveDMail updates a pending D-Mail to approved or rejected status.
 // action must be "approve" or "reject". reason is required for reject.
-func (a *Amadeus) ResolveDMail(id string, action string, reason string) error {
-	_, span := tracer.Start(context.Background(), "amadeus.resolve",
+func (a *Amadeus) ResolveDMail(ctx context.Context, id string, action string, reason string) error {
+	_, span := tracer.Start(ctx, "amadeus.resolve",
 		trace.WithAttributes(
 			attribute.String("dmail.id", id),
 			attribute.String("resolve.action", action),
