@@ -1,8 +1,10 @@
 services:
   jaeger:
-    image: jaegertracing/all-in-one:1.76.0
+    image: jaegertracing/jaeger:2.15.1
     ports:
       - "16686:16686" # Jaeger UI
+      - "16687:16687" # MCP (Model Context Protocol)
       - "4318:4318"   # OTLP HTTP receiver
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
+    volumes:
+      - ./jaeger-v2-config.yaml:/etc/jaeger/config.yaml:ro
+    command: ["--config", "/etc/jaeger/config.yaml"]

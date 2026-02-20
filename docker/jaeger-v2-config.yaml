@@ -1,0 +1,47 @@
+# Jaeger v2 config — development (in-memory storage + MCP)
+# Docs: https://github.com/jaegertracing/jaeger/blob/main/cmd/jaeger/config.yaml
+
+service:
+  extensions: [jaeger_storage, jaeger_query, jaeger_mcp, healthcheckv2]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+  telemetry:
+    resource:
+      service.name: jaeger
+    logs:
+      level: info
+
+extensions:
+  healthcheckv2:
+    use_v2: true
+    http:
+
+  jaeger_storage:
+    backends:
+      memstore:
+        memory:
+          max_traces: 100000
+
+  jaeger_query:
+    storage:
+      traces: memstore
+    ui:
+
+  jaeger_mcp:
+    http:
+      endpoint: 0.0.0.0:16687
+
+receivers:
+  otlp:
+    protocols:
+      http:
+
+processors:
+  batch:
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: memstore

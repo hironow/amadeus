@@ -235,13 +235,14 @@ full_check:
 Amadeus instruments key operations with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
 
 ```bash
-# Start Jaeger (all-in-one trace viewer)
+# Start Jaeger v2 (trace viewer + MCP)
 just jaeger
 
 # Run amadeus with tracing enabled
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
 
 # View traces at http://localhost:16686
+# MCP endpoint at http://localhost:16687
 
 # Stop Jaeger
 just jaeger-down
