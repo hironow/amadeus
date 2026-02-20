@@ -2,6 +2,7 @@ package amadeus
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -658,6 +659,133 @@ func TestScanInbox_SingleReport(t *testing.T) {
 	// then: removed from inbox/
 	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected file removed from inbox")
+	}
+}
+
+func TestScanInbox_MultipleReports(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	for _, name := range []string{"report-001", "report-002", "report-003"} {
+		content := fmt.Sprintf("---\nname: %s\nkind: report\ndescription: test\n---\n\nbody\n", name)
+		os.WriteFile(filepath.Join(root, "inbox", name+".md"), []byte(content), 0o644)
+	}
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 3 {
+		t.Fatalf("expected 3, got %d", len(dmails))
+	}
+	// Sorted by name
+	if dmails[0].Name != "report-001" || dmails[2].Name != "report-003" {
+		t.Errorf("expected sorted order, got %s, %s, %s", dmails[0].Name, dmails[1].Name, dmails[2].Name)
+	}
+	// inbox/ should be empty of .md files
+	entries, _ := os.ReadDir(filepath.Join(root, "inbox"))
+	mdCount := 0
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdCount++
+		}
+	}
+	if mdCount != 0 {
+		t.Errorf("expected inbox empty, got %d .md files", mdCount)
+	}
+}
+
+func TestScanInbox_InvalidFile(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	os.WriteFile(filepath.Join(root, "inbox", "bad.md"), []byte("not valid frontmatter"), 0o644)
+
+	// when
+	_, err := store.ScanInbox()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid file")
+	}
+	if !strings.Contains(err.Error(), "parse inbox file") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
+func TestScanInbox_AlreadyInArchive(t *testing.T) {
+	// given: file already exists in archive
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	content := []byte("---\nname: report-001\nkind: report\ndescription: original\n---\n\nOriginal body.\n")
+	os.WriteFile(filepath.Join(root, "archive", "report-001.md"), content, 0o644)
+
+	// Drop a different version into inbox
+	inboxContent := []byte("---\nname: report-001\nkind: report\ndescription: duplicate\n---\n\nDuplicate body.\n")
+	os.WriteFile(filepath.Join(root, "inbox", "report-001.md"), inboxContent, 0o644)
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then: no error
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1, got %d", len(dmails))
+	}
+
+	// then: archive file NOT overwritten
+	archiveData, _ := os.ReadFile(filepath.Join(root, "archive", "report-001.md"))
+	parsed, _ := ParseDMail(archiveData)
+	if parsed.Description != "original" {
+		t.Errorf("expected archive to keep 'original', got %q", parsed.Description)
+	}
+
+	// then: inbox file still removed
+	if _, err := os.Stat(filepath.Join(root, "inbox", "report-001.md")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected inbox file removed")
+	}
+}
+
+func TestScanInbox_SkipsNonMD(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	os.WriteFile(filepath.Join(root, "inbox", "readme.txt"), []byte("ignore me"), 0o644)
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 0 {
+		t.Fatalf("expected 0, got %d", len(dmails))
 	}
 }
 
