@@ -733,12 +733,7 @@ func (a *Amadeus) PrintSync() error {
 	if output.Unsynced == nil {
 		output.Unsynced = []DMail{}
 	}
-	data, err := json.MarshalIndent(output, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal sync output: %w", err)
-	}
-	fmt.Fprintln(a.DataOut, string(data))
-	return nil
+	return a.writeDataJSON(output)
 }
 
 // weightForAxis returns the configured weight for a given axis.

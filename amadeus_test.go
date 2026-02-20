@@ -782,6 +782,28 @@ func TestPrintSync_NoneUnsynced(t *testing.T) {
 	}
 }
 
+func TestPrintSync_NilDataOut_NoPanic(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: Amadeus with DataOut == nil (legacy construction)
+	var logBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false)}
+	// DataOut intentionally not set
+
+	// when: PrintSync is called — should not panic
+	err := a.PrintSync()
+
+	// then: no error, no panic
+	if err != nil {
+		t.Fatalf("PrintSync with nil DataOut should not error, got: %v", err)
+	}
+}
+
 func TestDriftError_IsDrift(t *testing.T) {
 	// given: a DriftError
 	err := &DriftError{Divergence: 0.35, DMails: 2}

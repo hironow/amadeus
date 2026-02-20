@@ -256,6 +256,103 @@ func TestLoadHistory_EmptyDir(t *testing.T) {
 	}
 }
 
+func TestInitDivergenceDir_MigratesLegacyState(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: legacy state/ directory with latest.json and baseline.json
+	legacyDir := filepath.Join(root, "state")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	latestData := []byte(`{"commit":"legacy-abc","divergence":0.123}`)
+	baselineData := []byte(`{"commit":"legacy-base","divergence":0.050}`)
+	if err := os.WriteFile(filepath.Join(legacyDir, "latest.json"), latestData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyDir, "baseline.json"), baselineData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: InitDivergenceDir is called
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: files should be migrated to .run/
+	newLatest, err := os.ReadFile(filepath.Join(root, ".run", "latest.json"))
+	if err != nil {
+		t.Fatalf("expected .run/latest.json to exist: %v", err)
+	}
+	if string(newLatest) != string(latestData) {
+		t.Errorf("expected migrated latest data to match, got: %s", string(newLatest))
+	}
+	newBaseline, err := os.ReadFile(filepath.Join(root, ".run", "baseline.json"))
+	if err != nil {
+		t.Fatalf("expected .run/baseline.json to exist: %v", err)
+	}
+	if string(newBaseline) != string(baselineData) {
+		t.Errorf("expected migrated baseline data to match, got: %s", string(newBaseline))
+	}
+
+	// then: legacy state/ directory should be removed
+	if _, err := os.Stat(legacyDir); !os.IsNotExist(err) {
+		t.Errorf("expected legacy state/ directory to be removed, but it still exists")
+	}
+}
+
+func TestInitDivergenceDir_SkipsMigrationWhenNoLegacy(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: no legacy state/ directory
+	// when: InitDivergenceDir is called
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: .run/ should exist but be empty (no migrated files)
+	entries, err := os.ReadDir(filepath.Join(root, ".run"))
+	if err != nil {
+		t.Fatalf("expected .run/ to exist: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty .run/, got %d entries", len(entries))
+	}
+}
+
+func TestInitDivergenceDir_DoesNotOverwriteExistingRun(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: .run/ already has latest.json AND state/ also exists (edge case)
+	runDir := filepath.Join(root, ".run")
+	stateDir := filepath.Join(root, "state")
+	os.MkdirAll(runDir, 0o755)
+	os.MkdirAll(stateDir, 0o755)
+	os.MkdirAll(filepath.Join(root, "history"), 0o755)
+	os.MkdirAll(filepath.Join(root, "dmails"), 0o755)
+
+	existingData := []byte(`{"commit":"existing","divergence":0.999}`)
+	legacyData := []byte(`{"commit":"legacy","divergence":0.001}`)
+	os.WriteFile(filepath.Join(runDir, "latest.json"), existingData, 0o644)
+	os.WriteFile(filepath.Join(stateDir, "latest.json"), legacyData, 0o644)
+
+	// when: InitDivergenceDir is called
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: .run/latest.json should NOT be overwritten by legacy data
+	data, err := os.ReadFile(filepath.Join(runDir, "latest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(existingData) {
+		t.Errorf("expected existing .run/latest.json to be preserved, got: %s", string(data))
+	}
+}
+
 func TestLoadLatest_NoFile_ReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")

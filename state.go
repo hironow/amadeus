@@ -60,6 +60,10 @@ func InitDivergenceDir(root string) error {
 			return err
 		}
 	}
+	// Migrate legacy state/ → .run/ (v0.0.11 → v0.0.12)
+	if err := migrateLegacyState(root); err != nil {
+		return fmt.Errorf("migrate legacy state: %w", err)
+	}
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		cfg := DefaultConfig()
@@ -76,6 +80,41 @@ func InitDivergenceDir(root string) error {
 		if err := os.WriteFile(gitignorePath, []byte(".run/\n"), 0o644); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// migrateLegacyState moves files from the legacy state/ directory to .run/.
+// Files are only moved if the destination does not already exist, preventing
+// accidental overwrites. After migration, the empty state/ directory is removed.
+func migrateLegacyState(root string) error {
+	legacyDir := filepath.Join(root, "state")
+	if _, err := os.Stat(legacyDir); errors.Is(err, fs.ErrNotExist) {
+		return nil // no legacy directory, nothing to do
+	}
+
+	runDir := filepath.Join(root, ".run")
+	for _, name := range []string{"latest.json", "baseline.json"} {
+		src := filepath.Join(legacyDir, name)
+		dst := filepath.Join(runDir, name)
+		if _, err := os.Stat(src); errors.Is(err, fs.ErrNotExist) {
+			continue // file doesn't exist in legacy dir
+		}
+		if _, err := os.Stat(dst); err == nil {
+			continue // destination already exists, don't overwrite
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return fmt.Errorf("migrate %s: %w", name, err)
+		}
+	}
+
+	// Remove legacy directory if empty
+	entries, err := os.ReadDir(legacyDir)
+	if err != nil {
+		return nil // non-critical, ignore
+	}
+	if len(entries) == 0 {
+		os.Remove(legacyDir)
 	}
 	return nil
 }
