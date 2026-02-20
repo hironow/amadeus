@@ -7,7 +7,7 @@ import (
 
 func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 	// given
-	cmd := NewRootCommand("test")
+	cmd := NewRootCommand(BuildInfo{Version: "test"})
 
 	// then
 	for _, name := range []string{"config", "verbose", "lang"} {
@@ -29,7 +29,7 @@ func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 
 func TestNewRootCommand_VersionOutput(t *testing.T) {
 	// given
-	cmd := NewRootCommand("1.2.3")
+	cmd := NewRootCommand(BuildInfo{Version: "1.2.3"})
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
 	cmd.SetArgs([]string{"--version"})

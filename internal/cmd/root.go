@@ -4,18 +4,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// BuildInfo holds version metadata injected at build time via ldflags.
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
 func init() {
 	cobra.EnableTraverseRunHooks = true
 }
 
 // NewRootCommand creates the root cobra command for amadeus.
-func NewRootCommand(version string) *cobra.Command {
+func NewRootCommand(info BuildInfo) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "amadeus",
 		Short:         "Divergence meter for your codebase",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		Version:       version,
+		Version:       info.Version,
 	}
 
 	cmd.PersistentFlags().StringP("config", "c", "", "config file path")
@@ -32,6 +39,9 @@ func NewRootCommand(version string) *cobra.Command {
 		newCheckCommand(),
 		newResolveCommand(),
 		newArchivePruneCommand(),
+		newVersionCommand(info),
+		newUpdateCommand(info),
+		newDocsCommand(),
 	)
 
 	return cmd

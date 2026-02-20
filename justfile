@@ -30,10 +30,12 @@ lint-md:
 
 # Version from git tags
 VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "none"`
+DATE := `date -u +"%Y-%m-%dT%H:%M:%SZ"`
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X main.version={{VERSION}}" -o amadeus ./cmd/amadeus
+    go build -ldflags "-X main.version={{VERSION}} -X main.commit={{COMMIT}} -X main.date={{DATE}}" -o amadeus ./cmd/amadeus
 
 # Build and install to /usr/local/bin
 install: build
@@ -93,7 +95,20 @@ jaeger:
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
+# Generate CLI documentation in Markdown
+docs-cli:
+    go run ./cmd/amadeus/ docs --output docs/cli/
+
+# Validate goreleaser config
+release-check:
+    goreleaser check
+
+# Test release locally (snapshot, no upload)
+release-snapshot:
+    goreleaser release --snapshot --clean
+
 # Clean build artifacts
 clean:
     rm -f amadeus coverage.out
+    rm -rf dist/
     go clean

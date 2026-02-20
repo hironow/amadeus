@@ -9,12 +9,21 @@ import (
 	cmd "github.com/hironow/amadeus/internal/cmd"
 )
 
-var version = "dev"
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
 	shutdown := amadeus.InitTracer("amadeus", version)
 
-	root := cmd.NewRootCommand(version)
+	info := cmd.BuildInfo{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	}
+	root := cmd.NewRootCommand(info)
 	err := root.ExecuteContext(context.Background())
 	code := amadeus.ExitCode(err)
 	if code == 1 {

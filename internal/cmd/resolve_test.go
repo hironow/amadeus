@@ -35,7 +35,7 @@ type testResolveResult struct {
 
 func newTestResolveCmd() *testResolveResult {
 	r := &testResolveResult{}
-	root := NewRootCommand("test")
+	root := NewRootCommand(BuildInfo{Version: "test"})
 	for _, sub := range root.Commands() {
 		if sub.Name() == "resolve" {
 			sub.RunE = func(cmd *cobra.Command, args []string) error {
