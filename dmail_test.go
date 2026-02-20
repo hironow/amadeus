@@ -178,10 +178,10 @@ func TestMarshalDMail_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_CreatesNewStructure(t *testing.T) {
+func TestInitGateDir_CreatesNewStructure(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	for _, sub := range []string{"outbox", "inbox", "archive", "pending", "rejected"} {
@@ -197,10 +197,10 @@ func TestInitDivergenceDir_CreatesNewStructure(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_GitignoreContainsOutboxInbox(t *testing.T) {
+func TestInitGateDir_GitignoreContainsOutboxInbox(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	data, err := readGitignore(root)
@@ -225,8 +225,8 @@ func TestInitDivergenceDir_GitignoreContainsOutboxInbox(t *testing.T) {
 func TestMovePendingToRejected_CreatesDirectoryOnDemand(t *testing.T) {
 	// given: a repo where rejected/ does not exist (pre-update installation)
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -258,8 +258,8 @@ func TestMovePendingToRejected_CreatesDirectoryOnDemand(t *testing.T) {
 
 func TestNextDMailName_EmptyArchive(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -274,8 +274,8 @@ func TestNextDMailName_EmptyArchive(t *testing.T) {
 
 func TestNextDMailName_Sequential(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -300,8 +300,8 @@ func TestNextDMailName_Sequential(t *testing.T) {
 
 func TestSaveDMail_DualWrite(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -328,8 +328,8 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 
 func TestSaveDMail_HighSeverity_WritesToPending(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -361,8 +361,8 @@ func TestSaveDMail_HighSeverity_WritesToPending(t *testing.T) {
 
 func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -394,8 +394,8 @@ func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
 
 func TestSaveDMail_Format(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -422,8 +422,8 @@ func TestSaveDMail_Format(t *testing.T) {
 
 func TestLoadDMail_Exists(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -459,8 +459,8 @@ func TestLoadDMail_Exists(t *testing.T) {
 
 func TestLoadDMail_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -473,8 +473,8 @@ func TestLoadDMail_NotFound(t *testing.T) {
 
 func TestLoadAllDMails_Multiple(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -506,8 +506,8 @@ func TestLoadAllDMails_Multiple(t *testing.T) {
 
 func TestLoadAllDMails_Empty(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -543,8 +543,8 @@ func TestRouteDMail_SeverityMapping(t *testing.T) {
 
 func TestLoadResolution_NotFound_ReturnsSentinelError(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -560,8 +560,8 @@ func TestLoadResolution_NotFound_ReturnsSentinelError(t *testing.T) {
 
 func TestLoadResolutions_CorruptedJSON_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 
@@ -587,8 +587,8 @@ func TestLoadResolutions_CorruptedJSON_ReturnsError(t *testing.T) {
 
 func TestSaveResolution_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -617,8 +617,8 @@ func TestSaveResolution_RoundTrip(t *testing.T) {
 func TestSaveConsumed_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -653,8 +653,8 @@ func TestSaveConsumed_RoundTrip(t *testing.T) {
 func TestLoadConsumed_Empty(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -674,8 +674,8 @@ func TestLoadConsumed_Empty(t *testing.T) {
 func TestSaveConsumed_Appends(t *testing.T) {
 	// given: save first batch
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -705,8 +705,8 @@ func TestSaveConsumed_Appends(t *testing.T) {
 func TestScanInbox_Empty(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -726,8 +726,8 @@ func TestScanInbox_Empty(t *testing.T) {
 func TestScanInbox_SingleReport(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -771,8 +771,8 @@ func TestScanInbox_SingleReport(t *testing.T) {
 func TestScanInbox_MultipleReports(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -812,8 +812,8 @@ func TestScanInbox_MultipleReports(t *testing.T) {
 func TestScanInbox_InvalidFile(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -835,8 +835,8 @@ func TestScanInbox_InvalidFile(t *testing.T) {
 func TestScanInbox_AlreadyInArchive(t *testing.T) {
 	// given: file already exists in archive
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -875,8 +875,8 @@ func TestScanInbox_AlreadyInArchive(t *testing.T) {
 func TestScanInbox_SkipsNonMD(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)

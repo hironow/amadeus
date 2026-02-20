@@ -1,13 +1,13 @@
-# `.divergence/` Directory Structure
+# `.gate/` Directory Structure
 
-Amadeus manages all state under `<repo-root>/.divergence/`.
+Amadeus manages all state under `<repo-root>/.gate/`.
 This document describes what each directory/file does, who creates it, and how it flows into the check pipeline.
 
 ## Directory Tree
 
 ```
-.divergence/
-  .gitignore            # auto-managed by InitDivergenceDir
+.gate/
+  .gitignore            # auto-managed by InitGateDir
   config.yaml           # weights, thresholds, full check interval
   history/
     2026-02-20T143005.json    # timestamped check result
@@ -39,7 +39,7 @@ This document describes what each directory/file does, who creates it, and how i
 
 ## Git Tracking Rules
 
-`.divergence/.gitignore` (auto-managed by `InitDivergenceDir`):
+`.gate/.gitignore` (auto-managed by `InitGateDir`):
 
 ```
 .run/
@@ -151,10 +151,10 @@ service, violating the dependency direction defined in ADR-003.
 
 | File | Created By | When |
 |------|-----------|------|
-| `.divergence/` dirs | `InitDivergenceDir` | `amadeus init` or first `amadeus check` |
-| `.gitignore` | `InitDivergenceDir` | Init (appends missing entries on upgrade) |
-| `config.yaml` | `InitDivergenceDir` | Init (only if absent) |
-| `skills/*/SKILL.md` | `InitDivergenceDir` | Init (from `embed.FS` templates, only if absent) |
+| `.gate/` dirs | `InitGateDir` | `amadeus init` or first `amadeus check` |
+| `.gitignore` | `InitGateDir` | Init (appends missing entries on upgrade) |
+| `config.yaml` | `InitGateDir` | Init (only if absent) |
+| `skills/*/SKILL.md` | `InitGateDir` | Init (from `embed.FS` templates, only if absent) |
 | `history/{ts}.json` | `StateStore.SaveHistory` | After each check |
 | `.run/latest.json` | `StateStore.SaveLatest` | After each check |
 | `.run/baseline.json` | `StateStore.SaveBaseline` | After each full check |
@@ -193,11 +193,11 @@ amadeus check --quiet 2>/dev/null || true
 
 ## Legacy Migration
 
-On first run, `InitDivergenceDir` migrates the old `state/` directory:
+On first run, `InitGateDir` migrates the old `state/` directory:
 
 | Legacy Path | New Path |
 |-------------|----------|
-| `.divergence/state/latest.json` | `.divergence/.run/latest.json` |
-| `.divergence/state/baseline.json` | `.divergence/.run/baseline.json` |
+| `.gate/state/latest.json` | `.gate/.run/latest.json` |
+| `.gate/state/baseline.json` | `.gate/.run/baseline.json` |
 
 Migration is safe: files are only moved if the destination does not exist. Empty `state/` directory is removed after migration.

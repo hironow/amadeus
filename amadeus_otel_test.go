@@ -32,11 +32,11 @@ func containsSpan(spans tracetest.SpanStubs, name string) bool {
 // newTestAmadeus creates an Amadeus instance wired for testing.
 func newTestAmadeus(t *testing.T, repoRoot string) *Amadeus {
 	t.Helper()
-	divRoot := filepath.Join(repoRoot, ".divergence")
+	divRoot := filepath.Join(repoRoot, ".gate")
 	if err := os.MkdirAll(divRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := InitDivergenceDir(divRoot); err != nil {
+	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
 	cfg := DefaultConfig()
@@ -203,9 +203,9 @@ func TestResolveDMail_CreatesSpan(t *testing.T) {
 	// given: a test tracer and an Amadeus with a pending D-Mail
 	exp := setupTestTracer(t)
 	dir := t.TempDir()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	InitDivergenceDir(divRoot)
+	InitGateDir(divRoot)
 	store := NewStateStore(divRoot)
 
 	dmail := DMail{

@@ -5,7 +5,7 @@ minimum_prek_version: "0.3.0"
 
 exclude: |
   (?x)^(
-    \.divergence/|
+    \.gate/|
     node_modules/
   )
 

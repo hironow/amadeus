@@ -94,20 +94,20 @@ func checkGitRepo(dir string) DoctorCheckResult {
 	}
 }
 
-// checkDivergenceDir verifies .divergence/ directory exists and is writable.
-func checkDivergenceDir(repoRoot string) DoctorCheckResult {
-	dir := filepath.Join(repoRoot, ".divergence")
+// checkGateDir verifies .gate/ directory exists and is writable.
+func checkGateDir(repoRoot string) DoctorCheckResult {
+	dir := filepath.Join(repoRoot, ".gate")
 	info, err := os.Stat(dir)
 	if err != nil {
 		return DoctorCheckResult{
-			Name:    ".divergence/",
+			Name:    ".gate/",
 			Status:  CheckFail,
 			Message: "not found — run 'amadeus init' first",
 		}
 	}
 	if !info.IsDir() {
 		return DoctorCheckResult{
-			Name:    ".divergence/",
+			Name:    ".gate/",
 			Status:  CheckFail,
 			Message: fmt.Sprintf("%s exists but is not a directory", dir),
 		}
@@ -115,20 +115,20 @@ func checkDivergenceDir(repoRoot string) DoctorCheckResult {
 	probe := filepath.Join(dir, ".doctor_probe")
 	if err := os.WriteFile(probe, []byte("ok"), 0o644); err != nil {
 		return DoctorCheckResult{
-			Name:    ".divergence/",
+			Name:    ".gate/",
 			Status:  CheckFail,
 			Message: fmt.Sprintf("not writable: %v", err),
 		}
 	}
 	if err := os.Remove(probe); err != nil {
 		return DoctorCheckResult{
-			Name:    ".divergence/",
+			Name:    ".gate/",
 			Status:  CheckFail,
 			Message: fmt.Sprintf("probe cleanup failed: %v", err),
 		}
 	}
 	return DoctorCheckResult{
-		Name:    ".divergence/",
+		Name:    ".gate/",
 		Status:  CheckOK,
 		Message: fmt.Sprintf("%s writable", dir),
 	}
@@ -168,7 +168,7 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
 
 // checkSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
 func checkSkillMD(repoRoot string) DoctorCheckResult {
-	skillsDir := filepath.Join(repoRoot, ".divergence", "skills")
+	skillsDir := filepath.Join(repoRoot, ".gate", "skills")
 	required := []string{"dmail-sendable", "dmail-readable"}
 	var missing []string
 	for _, name := range required {
@@ -214,8 +214,8 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	claudeResult := checkTool(ctx, claudeCmd)
 	results = append(results, claudeResult)
 
-	// 4. .divergence/ directory
-	results = append(results, checkDivergenceDir(repoRoot))
+	// 4. .gate/ directory
+	results = append(results, checkGateDir(repoRoot))
 
 	// 5. config.yaml
 	results = append(results, checkConfig(configPath))

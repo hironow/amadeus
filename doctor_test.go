@@ -69,19 +69,19 @@ func TestCheckGitRepo_NotRepo(t *testing.T) {
 	}
 }
 
-func TestCheckDivergenceDir_Exists(t *testing.T) {
+func TestCheckGateDir_Exists(t *testing.T) {
 	dir := t.TempDir()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	result := checkDivergenceDir(dir)
+	result := checkGateDir(dir)
 	if result.Status != CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
-func TestCheckDivergenceDir_NotExist(t *testing.T) {
+func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
-	result := checkDivergenceDir(dir)
+	result := checkGateDir(dir)
 	if result.Status != CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -196,8 +196,8 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	defer func() { execCommand = exec.CommandContext }()
 
 	dir := t.TempDir()
-	// Create .divergence/ with config
-	divRoot := filepath.Join(dir, ".divergence")
+	// Create .gate/ with config
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	cfg := DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
@@ -217,7 +217,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 		t.Fatalf("expected 7 results, got %d", len(results))
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "claude", ".divergence/", "Config", "SKILL.md", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -235,7 +235,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 
 	dir := t.TempDir()
 	exec.Command("git", "init", dir).Run()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	cfg := DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
@@ -270,10 +270,10 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 }
 
 func TestCheckSkillMD_BothExist(t *testing.T) {
-	// given: properly initialized .divergence/ with skills
+	// given: properly initialized .gate/ with skills
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 
@@ -287,10 +287,10 @@ func TestCheckSkillMD_BothExist(t *testing.T) {
 }
 
 func TestCheckSkillMD_MissingSendable(t *testing.T) {
-	// given: .divergence/ with only dmail-readable
+	// given: .gate/ with only dmail-readable
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	os.Remove(filepath.Join(root, "skills", "dmail-sendable", "SKILL.md"))
@@ -307,8 +307,8 @@ func TestCheckSkillMD_MissingSendable(t *testing.T) {
 	}
 }
 
-func TestCheckSkillMD_NoDivergenceDir(t *testing.T) {
-	// given: no .divergence/ at all
+func TestCheckSkillMD_NoGateDir(t *testing.T) {
+	// given: no .gate/ at all
 	dir := t.TempDir()
 
 	// when
@@ -328,8 +328,8 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	defer func() { execCommand = exec.CommandContext }()
 
 	dir := t.TempDir()
-	divRoot := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(divRoot); err != nil {
+	divRoot := filepath.Join(dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
 	exec.Command("git", "init", dir).Run()
@@ -370,7 +370,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	// given: no need to mock execCommand for this test
 	dir := t.TempDir()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	cfg := DefaultConfig()
 	data, _ := yaml.Marshal(cfg)

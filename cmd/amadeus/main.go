@@ -94,10 +94,10 @@ func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool) err
 		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	divRoot := filepath.Join(repoRoot, ".divergence")
+	divRoot := filepath.Join(repoRoot, ".gate")
 
-	if err := amadeus.InitDivergenceDir(divRoot); err != nil {
-		return fmt.Errorf("init .divergence: %w", err)
+	if err := amadeus.InitGateDir(divRoot); err != nil {
+		return fmt.Errorf("init .gate: %w", err)
 	}
 
 	if configPath == "" {
@@ -131,10 +131,10 @@ func runLog(configPath string, verbose, jsonOut bool) error {
 	if err != nil {
 		return err
 	}
-	divRoot := filepath.Join(repoRoot, ".divergence")
+	divRoot := filepath.Join(repoRoot, ".gate")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
+		return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -217,10 +217,10 @@ func runResolve(configPath string, verbose, jsonOut bool, rawArgs []string) erro
 	if err != nil {
 		return err
 	}
-	divRoot := filepath.Join(repoRoot, ".divergence")
+	divRoot := filepath.Join(repoRoot, ".gate")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
+		return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -314,9 +314,9 @@ func runInit() error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	divRoot := filepath.Join(repoRoot, ".divergence")
-	if err := amadeus.InitDivergenceDir(divRoot); err != nil {
-		return fmt.Errorf("init .divergence: %w", err)
+	divRoot := filepath.Join(repoRoot, ".gate")
+	if err := amadeus.InitGateDir(divRoot); err != nil {
+		return fmt.Errorf("init .gate: %w", err)
 	}
 	fmt.Printf("  Initialized %s\n", divRoot)
 	return nil
@@ -328,7 +328,7 @@ func runValidate(configPath string) error {
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
-		configPath = filepath.Join(repoRoot, ".divergence", "config.yaml")
+		configPath = filepath.Join(repoRoot, ".gate", "config.yaml")
 	}
 	cfg, err := amadeus.LoadConfig(configPath)
 	if err != nil {
@@ -386,7 +386,7 @@ func runDoctor(configPath string, jsonOut bool) error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	divRoot := filepath.Join(repoRoot, ".divergence")
+	divRoot := filepath.Join(repoRoot, ".gate")
 	if configPath == "" {
 		configPath = filepath.Join(divRoot, "config.yaml")
 	}

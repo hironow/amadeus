@@ -3,7 +3,7 @@
 # test
 coverage.out
 # amadeus runtime state on target repository
-.divergence/
+.gate/
 # claude local settings
 .claude/*.local.*
 # git worktrees

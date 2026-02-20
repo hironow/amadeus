@@ -41,7 +41,7 @@ type CheckResult struct {
 	ForceFullNext       bool               `json:"force_full_next,omitempty"`
 }
 
-// StateStore manages reading and writing state files within the .divergence/ directory.
+// StateStore manages reading and writing state files within the .gate/ directory.
 type StateStore struct {
 	Root string
 }
@@ -51,9 +51,9 @@ func NewStateStore(root string) *StateStore {
 	return &StateStore{Root: root}
 }
 
-// InitDivergenceDir creates the .divergence/ directory structure and writes
+// InitGateDir creates the .gate/ directory structure and writes
 // a default config.yaml if one does not already exist.
-func InitDivergenceDir(root string) error {
+func InitGateDir(root string) error {
 	dirs := []string{
 		filepath.Join(root, ".run"),
 		filepath.Join(root, "history"),
