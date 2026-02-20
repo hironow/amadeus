@@ -267,6 +267,7 @@ just vet            # Run go vet
 just lint           # fmt check + vet + markdown lint
 just lint-md        # Lint markdown files only
 just check          # fmt + vet + test (pre-commit check)
+just doctor         # Build and run amadeus doctor (smoke test)
 just clean          # Clean build artifacts
 just prek-install   # Install prek hooks (pre-commit + pre-push)
 just prek-run       # Run all prek hooks on all files

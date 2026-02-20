@@ -41,11 +41,11 @@ install: build
 
 # Run all tests
 test:
-    go test ./...
+    go test ./... -count=1 -timeout=300s
 
 # Run tests with verbose output
 test-v:
-    go test -v ./...
+    go test ./... -count=1 -timeout=300s -v
 
 # Run tests with race detector
 test-race:
@@ -71,6 +71,10 @@ vet:
 # Lint (fmt check + vet + markdown lint)
 lint: vet lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
+
+# Run amadeus doctor (quick smoke test after build)
+doctor: build
+    ./amadeus doctor
 
 # Format, vet, test — full check before commit
 check: fmt vet test
