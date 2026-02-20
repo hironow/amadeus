@@ -12,7 +12,7 @@ This single command executes a three-phase pipeline:
 
 1. **Phase 1 (Reading Steiner)** — Detect shifts: scan merged PRs or the full codebase for structural changes
 2. **Phase 2 (Divergence Meter)** — Measure divergence: Claude evaluates the changes against ADRs and DoDs, scoring four axes 0-100
-3. **Phase 3 (D-Mail)** — Route corrections: generate targeted messages to Sightjack or Paintress based on severity
+3. **Phase 3 (D-Mail)** — Route corrections: generate feedback D-Mails routed by severity
 
 ## Why "Amadeus"?
 
@@ -77,14 +77,14 @@ Previous: 0.23  ->  Current: 0.45  ->  Delta: 0.22 > 0.15 threshold
 D-Mails are routed based on severity, determined by the weighted divergence score and per-axis overrides:
 
 ```
-LOW    (score <= 0.25) -> Auto-sent to target tool (Sightjack/Paintress)
-MEDIUM (score <= 0.50) -> Auto-sent with elevated priority
-HIGH   (score >  0.50) -> Held as PENDING, requires human approval
+low    (score <= 0.25) -> Auto-sent
+medium (score <= 0.50) -> Auto-sent with elevated priority
+high   (score >  0.50) -> Held as pending, requires human approval
 ```
 
-- **`amadeus resolve <id> --approve`** — approve a pending D-Mail
-- **`amadeus resolve <id> --reject --reason "..."`** — reject with reason
-- Per-axis overrides can force HIGH severity for critical axes (e.g., ADR integrity > 60 always HIGH)
+- **`amadeus resolve <name> --approve`** — approve a pending D-Mail
+- **`amadeus resolve <name> --reject --reason "..."`** — reject with reason
+- Per-axis overrides can force high severity for critical axes (e.g., ADR integrity > 60 always high)
 
 ## Architecture
 
@@ -105,14 +105,19 @@ amadeus check
     |  Phase 3: D-Mail
     |  +-- Generate D-Mails from Claude candidates
     |  +-- Route by severity (auto-send or hold for approval)
-    |  +-- Persist to .divergence/dmails/
+    |  +-- Dual-write to outbox/ + archive/
     |
     v
 .divergence/                  <- Persistent state
     +-- config.yaml           <- Weights, thresholds, intervals
-    +-- state/latest.json     <- Current check state
+    +-- .run/                 <- Ephemeral state (gitignored)
+    |   +-- latest.json       <- Current check state
+    |   +-- baseline.json     <- Full calibration baseline
+    |   +-- resolutions.json  <- D-Mail approval/rejection state
     +-- history/              <- Historical check results
-    +-- dmails/               <- D-Mail messages
+    +-- outbox/               <- Outgoing D-Mails (gitignored)
+    +-- inbox/                <- Incoming D-Mails (gitignored)
+    +-- archive/              <- All D-Mails (git-tracked)
 ```
 
 ### Scoring Axes
@@ -126,12 +131,34 @@ amadeus check
 
 Weights and thresholds are configurable in `.divergence/config.yaml`.
 
-### D-Mail Targets
+### D-Mail Format
 
-| Target | Downstream Tool | Purpose |
-|--------|----------------|---------|
-| `sightjack` | [Sightjack](https://github.com/hironow/sightjack) | Issue architecture: DoD gaps, dependency ordering |
-| `paintress` | [Paintress](https://github.com/hironow/paintress) | Autonomous implementation: code fixes, test additions |
+D-Mails use YAML frontmatter + Markdown body, stored as `.md` files:
+
+```yaml
+---
+name: feedback-001
+kind: feedback
+description: "ADR-003 violation detected"
+issues:
+  - MY-42
+severity: high
+---
+
+# ADR-003 Violation
+
+The auth module violates the JWT requirement specified in ADR-003.
+```
+
+**Kinds** (role-based addressing):
+
+| Kind | Producer | Purpose |
+|------|----------|---------|
+| `feedback` | Amadeus (verifier) | Corrective actions from divergence detection |
+| `specification` | Paintress (designer) | Updated baseline expectations |
+| `report` | Sightjack (implementer) | Implementation status reports |
+
+**Resolution sidecar**: D-Mail `.md` files are immutable. Approval/rejection state is tracked separately in `.run/resolutions.json`.
 
 ## Setup
 
@@ -157,11 +184,9 @@ Amadeus creates `.divergence/` with config, state, history, and D-Mail storage a
 |---------|-------------|
 | `amadeus check` | Execute three-phase divergence check |
 | `amadeus init` | Initialize `.divergence/` directory with default config |
-| `amadeus doctor` | Check environment health (git, Claude CLI, config, Linear MCP) |
-| `amadeus resolve <id>` | Approve or reject a pending D-Mail |
+| `amadeus doctor` | Check environment health (git, Claude CLI, config) |
+| `amadeus resolve <name>` | Approve or reject a pending D-Mail |
 | `amadeus log` | Print check history and D-Mail log |
-| `amadeus sync` | Show D-Mails awaiting Linear linking |
-| `amadeus link <dmail-id> <issue-id>` | Link a D-Mail to a Linear issue |
 | `amadeus --version` | Show version and exit |
 
 ## Usage
@@ -179,6 +204,9 @@ amadeus check --dry-run
 # Summary-only output
 amadeus check --quiet
 
+# JSON output (machine-readable, stdout)
+amadeus check --json
+
 # Verbose logging
 amadeus check --verbose
 
@@ -186,13 +214,13 @@ amadeus check --verbose
 amadeus check --config /path/to/config.yaml
 
 # Approve a pending D-Mail
-amadeus resolve DM-001 --approve
+amadeus resolve feedback-001 --approve
 
 # Reject a pending D-Mail
-amadeus resolve DM-001 --reject --reason "Not applicable to current sprint"
+amadeus resolve feedback-001 --reject --reason "Not applicable to current sprint"
 
-# Link D-Mail to Linear issue
-amadeus link DM-001 MY-123
+# JSON output for scripting
+amadeus log --json | jq '.dmails[] | select(.status == "pending")'
 ```
 
 ## Options
@@ -204,7 +232,25 @@ amadeus link DM-001 MY-123
 | `--dry-run` | | `false` | Build prompt only, skip Claude |
 | `--full` | | `false` | Force full calibration check |
 | `--quiet` | `-q` | `false` | Summary-only output |
+| `--json` | | `false` | Structured JSON output to stdout |
 | `--version` | | | Show version and exit |
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success (no drift / operation completed) |
+| `1` | Runtime error |
+| `2` | Drift detected (divergence threshold exceeded) |
+
+```bash
+amadeus check --quiet
+case $? in
+  0) echo "clean" ;;
+  2) echo "drift detected" >&2 ;;
+  *) echo "error" >&2; exit 1 ;;
+esac
+```
 
 ## Configuration
 
@@ -286,7 +332,7 @@ just jaeger-down    # Stop Jaeger
 +-- divergence_meter.go      Phase 2: Scoring bridge (Claude -> scores)
 +-- claude.go                Claude CLI integration + prompt rendering
 +-- scoring.go               Divergence scoring (weights, thresholds, severity)
-+-- dmail.go                 D-Mail model (status, target, routing)
++-- dmail.go                 D-Mail model (YAML+MD format, resolution sidecar)
 +-- config.go                Configuration loader (.divergence/config.yaml)
 +-- state.go                 State persistence (.divergence/)
 +-- git.go                   Git client (merged PRs, diffs, HEAD)
@@ -315,16 +361,16 @@ Sightjack (pre-merge)      Paintress (execution)      Amadeus (post-merge)
     |                           |                          |
     v                           v                          v
 Linear Issues -----------> Git Repository -----------> .divergence/
-                                                           |
-                                              D-Mail ------+-----> Sightjack
-                                              (feedback)   +-----> Paintress
+                                |                          |
+                   D-Mail       |         D-Mail           |
+                  (report) -----+----> inbox/         outbox/ ----> feedback
+                  (specification)                      archive/ (immutable)
 ```
 
 ## Prerequisites
 
 - Go 1.25+
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-- [Linear MCP Server](https://github.com/anthropics/model-context-protocol) configured for Claude (for `amadeus doctor` Linear check and `amadeus link`)
 - [Docker](https://www.docker.com/) (optional, for Jaeger tracing)
 
 ## License
