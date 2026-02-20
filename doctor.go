@@ -72,6 +72,8 @@ func checkTool(ctx context.Context, name string) DoctorCheckResult {
 }
 
 // checkGitRepo verifies the given directory is inside a git repository.
+// Uses exec.Command directly (not execCommand) because cmd.Dir must be set,
+// and tests use real git repos via git init.
 func checkGitRepo(dir string) DoctorCheckResult {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	cmd.Dir = dir
@@ -124,7 +126,7 @@ func checkDivergenceDir(repoRoot string) DoctorCheckResult {
 }
 
 // checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
-// Looks for a line containing "linear" (case-insensitive) and "Connected".
+// Looks for a line containing "linear" and "connected" (both case-insensitive).
 func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
 	cmd := execCommand(ctx, claudeCmd, "mcp", "list")
 	out, err := cmd.Output()
@@ -195,6 +197,8 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 }
 
 // checkConfig validates that config.yaml exists and can be loaded.
+// Checks file existence explicitly because LoadConfig returns DefaultConfig
+// (no error) for missing files, but doctor should flag a missing config.
 func checkConfig(path string) DoctorCheckResult {
 	if _, err := os.Stat(path); err != nil {
 		return DoctorCheckResult{

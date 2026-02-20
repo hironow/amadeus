@@ -68,7 +68,7 @@ func run() error {
 	case "init":
 		return runInit()
 	case "doctor":
-		return runDoctor(configPath, verbose)
+		return runDoctor(configPath)
 	default:
 		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, sync, link, doctor)", cmd)
 	}
@@ -271,7 +271,7 @@ func runInit() error {
 	return nil
 }
 
-func runDoctor(configPath string, verbose bool) error {
+func runDoctor(configPath string) error {
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
