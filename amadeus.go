@@ -747,6 +747,13 @@ func (a *Amadeus) PrintLogJSON() error {
 	if err != nil {
 		return fmt.Errorf("load resolutions: %w", err)
 	}
+	consumed, err := a.Store.LoadConsumed()
+	if err != nil {
+		return fmt.Errorf("load consumed: %w", err)
+	}
+	if consumed == nil {
+		consumed = []ConsumedRecord{}
+	}
 	if history == nil {
 		history = []CheckResult{}
 	}
@@ -775,11 +782,13 @@ func (a *Amadeus) PrintLogJSON() error {
 	}
 
 	output := struct {
-		History []CheckResult   `json:"history"`
-		DMails  []dmailJSONView `json:"dmails"`
+		History  []CheckResult    `json:"history"`
+		DMails   []dmailJSONView  `json:"dmails"`
+		Consumed []ConsumedRecord `json:"consumed"`
 	}{
-		History: history,
-		DMails:  views,
+		History:  history,
+		DMails:   views,
+		Consumed: consumed,
 	}
 	return a.writeDataJSON(output)
 }

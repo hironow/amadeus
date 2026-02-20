@@ -1064,3 +1064,40 @@ func TestPrintLog_ShowsConsumed(t *testing.T) {
 		t.Errorf("expected 'report-001' in output, got:\n%s", output)
 	}
 }
+
+func TestPrintLogJSON_IncludesConsumed(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	store.SaveConsumed([]ConsumedRecord{
+		{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"},
+	})
+
+	var buf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Logger:  NewLogger(io.Discard, false),
+		DataOut: &buf,
+	}
+
+	// when
+	if err := a.PrintLogJSON(); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, `"consumed"`) {
+		t.Errorf("expected 'consumed' key in JSON, got:\n%s", output)
+	}
+	if !strings.Contains(output, "report-001") {
+		t.Errorf("expected 'report-001' in JSON output, got:\n%s", output)
+	}
+}
