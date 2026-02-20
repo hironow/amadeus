@@ -2,6 +2,8 @@ package amadeus
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -297,7 +299,7 @@ func TestResolveDMail_Approve(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "approve", "")
+	err := a.ResolveDMail(context.Background(), "d-001", "approve", "")
 
 	// then
 	if err != nil {
@@ -337,7 +339,7 @@ func TestResolveDMail_Reject(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "reject", "false positive")
+	err := a.ResolveDMail(context.Background(), "d-001", "reject", "false positive")
 
 	// then
 	if err != nil {
@@ -376,7 +378,7 @@ func TestResolveDMail_AlreadyResolved(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "reject", "oops")
+	err := a.ResolveDMail(context.Background(), "d-001", "reject", "oops")
 
 	// then: should error
 	if err == nil {
@@ -395,7 +397,7 @@ func TestResolveDMail_NotFound(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-999", "approve", "")
+	err := a.ResolveDMail(context.Background(), "d-999", "approve", "")
 
 	// then
 	if err == nil {
@@ -425,7 +427,7 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
 
 	// when
-	err := a.ResolveDMail("d-001", "reject", "")
+	err := a.ResolveDMail(context.Background(), "d-001", "reject", "")
 
 	// then
 	if err == nil {
@@ -577,6 +579,79 @@ func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
 	}
 }
 
+func TestLinkDMail_Success(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Summary: "test"}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.LinkDMail("d-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	loaded, _ := store.LoadDMail("d-001")
+	if loaded.LinearIssueID == nil || *loaded.LinearIssueID != "MY-250" {
+		t.Errorf("expected LinearIssueID MY-250, got %v", loaded.LinearIssueID)
+	}
+}
+
+func TestLinkDMail_AlreadyLinked(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	issueID := "MY-100"
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.LinkDMail("d-001", "MY-250")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for already-linked D-Mail")
+	}
+	if !strings.Contains(err.Error(), "already linked") {
+		t.Errorf("expected 'already linked' error, got: %v", err)
+	}
+}
+
+func TestLinkDMail_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.LinkDMail("d-999", "MY-250")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for non-existent D-Mail")
+	}
+}
+
 func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
@@ -598,5 +673,82 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "No history") {
 		t.Errorf("expected 'No history' in output, got:\n%s", output)
+	}
+}
+
+func TestPrintSync_UnsyncedDMails(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: 2 unsynced D-Mails
+	for _, d := range []DMail{
+		{ID: "d-001", Severity: SeverityHigh, Status: DMailPending, Target: TargetSightjack, Summary: "ADR violation"},
+		{ID: "d-002", Severity: SeverityLow, Status: DMailSent, Target: TargetPaintress, Summary: "naming issue"},
+	} {
+		if err := store.SaveDMail(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.PrintSync()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintSync failed: %v", err)
+	}
+	output := buf.String()
+	var result struct {
+		Unsynced []DMail `json:"unsynced"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+	}
+	if len(result.Unsynced) != 2 {
+		t.Errorf("expected 2 unsynced, got %d", len(result.Unsynced))
+	}
+}
+
+func TestPrintSync_NoneUnsynced(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: all linked
+	issueID := "MY-100"
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+
+	// when
+	err := a.PrintSync()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintSync failed: %v", err)
+	}
+	output := buf.String()
+	var result struct {
+		Unsynced []DMail `json:"unsynced"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if len(result.Unsynced) != 0 {
+		t.Errorf("expected 0 unsynced, got %d", len(result.Unsynced))
 	}
 }

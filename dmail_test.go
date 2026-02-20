@@ -151,6 +151,131 @@ func TestLoadAllDMails_EmptyDir(t *testing.T) {
 	}
 }
 
+func TestDMail_LinearIssueID_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: a D-Mail with LinearIssueID set
+	issueID := "MY-250"
+	dmail := DMail{
+		ID:            "d-001",
+		Severity:      SeverityHigh,
+		Status:        DMailPending,
+		Target:        TargetSightjack,
+		Summary:       "test",
+		LinearIssueID: &issueID,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	loaded, err := store.LoadDMail("d-001")
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadDMail failed: %v", err)
+	}
+	if loaded.LinearIssueID == nil || *loaded.LinearIssueID != "MY-250" {
+		t.Errorf("expected LinearIssueID MY-250, got %v", loaded.LinearIssueID)
+	}
+}
+
+func TestDMail_LinearIssueID_OmittedWhenNil(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: a D-Mail without LinearIssueID
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	loaded, err := store.LoadDMail("d-001")
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadDMail failed: %v", err)
+	}
+	if loaded.LinearIssueID != nil {
+		t.Errorf("expected LinearIssueID nil, got %v", *loaded.LinearIssueID)
+	}
+}
+
+func TestLoadUnsyncedDMails_FiltersLinked(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: 3 D-Mails, 1 already linked
+	issueID := "MY-100"
+	for _, d := range []DMail{
+		{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Summary: "unsynced 1"},
+		{ID: "d-002", Severity: SeverityHigh, Status: DMailPending, Summary: "linked", LinearIssueID: &issueID},
+		{ID: "d-003", Severity: SeverityMedium, Status: DMailSent, Summary: "unsynced 2"},
+	} {
+		if err := store.SaveDMail(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// when
+	unsynced, err := store.LoadUnsyncedDMails()
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadUnsyncedDMails failed: %v", err)
+	}
+	if len(unsynced) != 2 {
+		t.Fatalf("expected 2 unsynced, got %d", len(unsynced))
+	}
+	if unsynced[0].ID != "d-001" {
+		t.Errorf("expected first unsynced d-001, got %s", unsynced[0].ID)
+	}
+	if unsynced[1].ID != "d-003" {
+		t.Errorf("expected second unsynced d-003, got %s", unsynced[1].ID)
+	}
+}
+
+func TestLoadUnsyncedDMails_AllLinked(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: all D-Mails already linked
+	issueID := "MY-100"
+	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	unsynced, err := store.LoadUnsyncedDMails()
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadUnsyncedDMails failed: %v", err)
+	}
+	if len(unsynced) != 0 {
+		t.Errorf("expected 0 unsynced, got %d", len(unsynced))
+	}
+}
+
 func TestRouteDMails_SeverityMapping(t *testing.T) {
 	tests := []struct {
 		name     string

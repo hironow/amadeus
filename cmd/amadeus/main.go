@@ -14,15 +14,20 @@ import (
 var version = "dev"
 
 func main() {
+	shutdown := amadeus.InitTracer("amadeus", version)
+
+	code := 0
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		code = 1
 	}
+	shutdown(context.Background())
+	os.Exit(code)
 }
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <check|resolve|log> [flags]")
+		return fmt.Errorf("usage: amadeus <init|check|resolve|log|sync|link|doctor> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -61,8 +66,16 @@ func run() error {
 		return runResolve(configPath, verbose, fs.Args())
 	case "log":
 		return runLog(configPath, verbose)
+	case "sync":
+		return runSync(configPath, verbose)
+	case "link":
+		return runLink(configPath, verbose, fs.Args())
+	case "init":
+		return runInit()
+	case "doctor":
+		return runDoctor(configPath)
 	default:
-		return fmt.Errorf("unknown command: %s (available: check, resolve, log)", cmd)
+		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, sync, link, doctor)", cmd)
 	}
 }
 
@@ -87,14 +100,11 @@ func runCheck(configPath string, verbose, dryRun, full, quiet bool) error {
 	}
 
 	logger := amadeus.NewLogger(os.Stdout, verbose)
-	claude := amadeus.NewClaudeClient()
-	claude.DryRun = dryRun
 
 	a := &amadeus.Amadeus{
 		Config: cfg,
 		Store:  amadeus.NewStateStore(divRoot),
 		Git:    amadeus.NewGitClient(repoRoot),
-		Claude: claude,
 		Logger: logger,
 	}
 
@@ -113,7 +123,7 @@ func runLog(configPath string, verbose bool) error {
 	divRoot := filepath.Join(repoRoot, ".divergence")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -163,7 +173,7 @@ func runResolve(configPath string, verbose bool, args []string) error {
 	divRoot := filepath.Join(repoRoot, ".divergence")
 
 	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus check' first")
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
 	}
 
 	if configPath == "" {
@@ -185,5 +195,107 @@ func runResolve(configPath string, verbose bool, args []string) error {
 	if reject {
 		action = "reject"
 	}
-	return a.ResolveDMail(id, action, reason)
+	return a.ResolveDMail(context.Background(), id, action, reason)
+}
+
+func runSync(configPath string, verbose bool) error {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+
+	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
+	}
+
+	if configPath == "" {
+		configPath = filepath.Join(divRoot, "config.yaml")
+	}
+	cfg, err := amadeus.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := amadeus.NewLogger(os.Stdout, verbose)
+	a := &amadeus.Amadeus{
+		Config: cfg,
+		Store:  amadeus.NewStateStore(divRoot),
+		Logger: logger,
+	}
+	return a.PrintSync()
+}
+
+func runLink(configPath string, verbose bool, args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: amadeus link <dmail-id> <linear-issue-id>")
+	}
+	dmailID := args[0]
+	linearIssueID := args[1]
+
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+
+	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
+		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
+	}
+
+	if configPath == "" {
+		configPath = filepath.Join(divRoot, "config.yaml")
+	}
+	cfg, err := amadeus.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := amadeus.NewLogger(os.Stdout, verbose)
+	a := &amadeus.Amadeus{
+		Config: cfg,
+		Store:  amadeus.NewStateStore(divRoot),
+		Logger: logger,
+	}
+	return a.LinkDMail(dmailID, linearIssueID)
+}
+
+func runInit() error {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+	if err := amadeus.InitDivergenceDir(divRoot); err != nil {
+		return fmt.Errorf("init .divergence: %w", err)
+	}
+	fmt.Printf("  Initialized %s\n", divRoot)
+	return nil
+}
+
+func runDoctor(configPath string) error {
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	divRoot := filepath.Join(repoRoot, ".divergence")
+	if configPath == "" {
+		configPath = filepath.Join(divRoot, "config.yaml")
+	}
+
+	ctx := context.Background()
+	results := amadeus.RunDoctor(ctx, configPath, repoRoot)
+
+	hasFail := false
+	for _, r := range results {
+		fmt.Printf("  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		if r.Status == amadeus.CheckFail {
+			hasFail = true
+		}
+	}
+
+	if hasFail {
+		return fmt.Errorf("some checks failed")
+	}
+	return nil
 }

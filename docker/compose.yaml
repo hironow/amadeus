@@ -1,0 +1,10 @@
+services:
+  jaeger:
+    image: jaegertracing/jaeger:2.15.1
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "16687:16687" # MCP (Model Context Protocol)
+      - "4318:4318"   # OTLP HTTP receiver
+    volumes:
+      - ./jaeger-v2-config.yaml:/etc/jaeger/config.yaml:ro
+    command: ["--config", "/etc/jaeger/config.yaml"]

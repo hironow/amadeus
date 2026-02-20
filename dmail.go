@@ -47,6 +47,7 @@ type DMail struct {
 	ResolvedAt     *time.Time  `json:"resolved_at,omitempty"`
 	ResolvedAction *string     `json:"resolved_action,omitempty"`
 	RejectReason   *string     `json:"reject_reason,omitempty"`
+	LinearIssueID  *string     `json:"linear_issue_id,omitempty"`
 }
 
 // RouteDMail applies severity-based status mapping.
@@ -100,6 +101,21 @@ func (s *StateStore) LoadDMail(id string) (DMail, error) {
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	path := filepath.Join(s.Root, "dmails", dmail.ID+".json")
 	return s.writeJSON(path, dmail)
+}
+
+// LoadUnsyncedDMails returns D-Mails that have no LinearIssueID, sorted by ID ascending.
+func (s *StateStore) LoadUnsyncedDMails() ([]DMail, error) {
+	all, err := s.LoadAllDMails()
+	if err != nil {
+		return nil, err
+	}
+	var unsynced []DMail
+	for _, d := range all {
+		if d.LinearIssueID == nil {
+			unsynced = append(unsynced, d)
+		}
+	}
+	return unsynced, nil
 }
 
 // LoadAllDMails reads all D-Mails from the dmails/ directory, sorted by ID ascending.

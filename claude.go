@@ -7,29 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 	"text/template"
 )
 
 //go:embed templates/*.md.tmpl
 var templateFS embed.FS
-
-// ClaudeClient wraps invocation of the Claude CLI.
-type ClaudeClient struct {
-	Command string
-	Model   string
-	Timeout int
-	DryRun  bool
-}
-
-// NewClaudeClient returns a ClaudeClient with sensible defaults.
-func NewClaudeClient() *ClaudeClient {
-	return &ClaudeClient{
-		Command: "claude",
-		Model:   "opus",
-		Timeout: 300,
-	}
-}
 
 // ClaudeResponse represents the structured JSON output from Claude.
 type ClaudeResponse struct {
@@ -81,14 +63,16 @@ func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
 	return resp, nil
 }
 
-// Run executes the Claude CLI with the given prompt and returns raw output.
-func (c *ClaudeClient) Run(ctx context.Context, prompt string) ([]byte, error) {
-	if c.DryRun {
-		return nil, nil
-	}
-	args := []string{"-p", "--output-format", "json", "--model", c.Model}
-	cmd := exec.CommandContext(ctx, c.Command, args...)
-	cmd.Stdin = strings.NewReader(prompt)
+// runClaude executes the Claude CLI with the given prompt via stdin and returns raw output.
+// Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
+func runClaude(ctx context.Context, prompt string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "claude",
+		"--model", "opus",
+		"--output-format", "json",
+		"--dangerously-skip-permissions",
+		"--print",
+	)
+	cmd.Stdin = bytes.NewBufferString(prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

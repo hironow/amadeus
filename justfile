@@ -41,19 +41,19 @@ install: build
 
 # Run all tests
 test:
-    go test ./...
+    go test -count=1 -timeout=300s ./...
 
 # Run tests with verbose output
 test-v:
-    go test -v ./...
+    go test -v -count=1 -timeout=300s ./...
 
 # Run tests with race detector
 test-race:
-    go test ./... -race -count=1 -timeout=120s
+    go test -race -count=1 -timeout=300s ./...
 
 # Run tests with coverage report
 cover:
-    go test ./... -coverprofile=coverage.out -count=1 -timeout=300s
+    go test -coverprofile=coverage.out -count=1 -timeout=300s ./...
     go tool cover -func=coverage.out
 
 # Open coverage in browser
@@ -72,10 +72,28 @@ vet:
 lint: vet lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
+# Run amadeus doctor (quick smoke test after build)
+doctor: build
+    ./amadeus doctor
+
 # Format, vet, test — full check before commit
 check: fmt vet test
 
+# Start Jaeger (OTel trace viewer) on http://localhost:16686
+jaeger:
+    docker compose -f docker/compose.yaml up -d
+    @echo "Jaeger UI:      http://localhost:16686"
+    @echo "OTLP endpoint:  http://localhost:4318"
+    @echo "MCP endpoint:   http://localhost:16687"
+    @echo ""
+    @echo "Run amadeus with tracing:"
+    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check"
+
+# Stop Jaeger
+jaeger-down:
+    docker compose -f docker/compose.yaml down
+
 # Clean build artifacts
 clean:
-    rm -f coverage.out
+    rm -f amadeus coverage.out
     go clean

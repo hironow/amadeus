@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
@@ -13,7 +16,6 @@ type Amadeus struct {
 	Config        Config
 	Store         *StateStore
 	Git           *GitClient
-	Claude        *ClaudeClient
 	Logger        *Logger
 	CheckCount    int  // number of diff checks since last full check
 	ForceFullNext bool // set when a divergence jump defers a full scan to the next run
@@ -41,6 +43,12 @@ func (a *Amadeus) ShouldFullCheck(forceFlag bool) bool {
 //   - Phase 2: Claude evaluates divergence, DivergenceMeter scores it
 //   - Phase 3: D-Mail generation and routing
 func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
+	ctx, span := tracer.Start(ctx, "amadeus.check",
+		trace.WithAttributes(
+			attribute.Bool("check.dry_run", opts.DryRun),
+		))
+	defer span.End()
+
 	previous, err := a.Store.LoadLatest()
 	if err != nil {
 		return fmt.Errorf("load previous state: %w", err)
@@ -61,9 +69,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	rs := &ReadingSteiner{Git: a.Git}
 	var report ShiftReport
 
+	_, span1 := tracer.Start(ctx, "reading_steiner")
 	if fullCheck {
 		report, err = rs.DetectShiftFull(a.Git.Dir)
 		if err != nil {
+			span1.End()
 			return fmt.Errorf("phase 1 (full): %w", err)
 		}
 	} else {
@@ -72,15 +82,24 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			fullCheck = true
 			report, err = rs.DetectShiftFull(a.Git.Dir)
 			if err != nil {
+				span1.End()
 				return fmt.Errorf("phase 1 (first run): %w", err)
 			}
 		} else {
 			report, err = rs.DetectShift(sinceCommit)
 			if err != nil {
+				span1.End()
 				return fmt.Errorf("phase 1 (diff): %w", err)
 			}
 		}
 	}
+	span.SetAttributes(attribute.Bool("check.full", fullCheck))
+	if report.Significant {
+		span1.AddEvent("shift.detected", trace.WithAttributes(
+			attribute.Int("shift.pr_count", len(report.MergedPRs)),
+		))
+	}
+	span1.End()
 
 	if !report.Significant {
 		if !opts.Quiet {
@@ -109,6 +128,8 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		}
 	}
 
+	_, span2 := tracer.Start(ctx, "divergence_meter")
+
 	var prompt string
 	if fullCheck {
 		prompt, err = BuildFullCheckPrompt(FullCheckParams{
@@ -122,35 +143,49 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		})
 	}
 	if err != nil {
+		span2.End()
 		return fmt.Errorf("phase 2 (build prompt): %w", err)
 	}
 
 	if opts.DryRun {
 		fmt.Println(prompt)
+		span2.End()
 		return nil
 	}
 
-	rawResp, err := a.Claude.Run(ctx, prompt)
+	rawResp, err := runClaude(ctx, prompt)
 	if err != nil {
+		span2.End()
 		return fmt.Errorf("phase 2 (claude): %w", err)
 	}
 
 	claudeResp, err := ParseClaudeResponse(rawResp)
 	if err != nil {
+		span2.End()
 		return fmt.Errorf("phase 2 (parse): %w", err)
 	}
 
 	meter := &DivergenceMeter{Config: a.Config}
 	meterResult := meter.ProcessResponse(claudeResp)
 
+	span2.AddEvent("divergence.evaluated", trace.WithAttributes(
+		attribute.Float64("divergence.value", meterResult.Divergence.Value),
+		attribute.String("divergence.severity", string(meterResult.Divergence.Severity)),
+	))
+
 	// Defer full scan to next run on large divergence jump
 	if !fullCheck && a.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
+		span2.AddEvent("divergence.jump", trace.WithAttributes(
+			attribute.Float64("divergence.previous", previous.Divergence),
+			attribute.Float64("divergence.current", meterResult.Divergence.Value),
+		))
 		if !opts.Quiet {
 			a.Logger.Info("Divergence jump detected (%.2f → %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
 		a.FlagForceFullNext()
 	}
+	span2.End()
 
 	currentCommit, err := a.Git.CurrentCommit()
 	if err != nil {
@@ -158,10 +193,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 	now := time.Now().UTC()
 
+	_, span3 := tracer.Start(ctx, "dmail")
 	var dmails []DMail
 	for _, candidate := range meterResult.DMailCandidates {
 		id, err := a.Store.NextDMailID()
 		if err != nil {
+			span3.End()
 			return fmt.Errorf("phase 3 (dmail id): %w", err)
 		}
 		dmail := DMail{
@@ -175,10 +212,17 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		}
 		dmail = RouteDMail(dmail)
 		if err := a.Store.SaveDMail(dmail); err != nil {
+			span3.End()
 			return fmt.Errorf("phase 3 (save dmail): %w", err)
 		}
+		span3.AddEvent("dmail.created", trace.WithAttributes(
+			attribute.String("dmail.id", dmail.ID),
+			attribute.String("dmail.severity", string(dmail.Severity)),
+			attribute.String("dmail.target", string(dmail.Target)),
+		))
 		dmails = append(dmails, dmail)
 	}
+	span3.End()
 
 	var prNumbers []string
 	for _, pr := range report.MergedPRs {
@@ -309,11 +353,14 @@ func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, prev
 		pendingStr)
 }
 
-// ShouldPromoteToFull returns true when the divergence jump between the
-// previous and current values exceeds the configured on_divergence_jump threshold.
-// This triggers an automatic recalibration (baseline reset).
+// ShouldPromoteToFull returns true when the absolute divergence change between
+// the previous and current values exceeds the configured on_divergence_jump threshold.
+// Both increases and decreases trigger recalibration.
 func (a *Amadeus) ShouldPromoteToFull(previousDivergence, currentDivergence float64) bool {
 	delta := currentDivergence - previousDivergence
+	if delta < 0 {
+		delta = -delta
+	}
 	return delta >= a.Config.FullCheck.OnDivergenceJump
 }
 
@@ -353,7 +400,14 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 
 // ResolveDMail updates a pending D-Mail to approved or rejected status.
 // action must be "approve" or "reject". reason is required for reject.
-func (a *Amadeus) ResolveDMail(id string, action string, reason string) error {
+func (a *Amadeus) ResolveDMail(ctx context.Context, id string, action string, reason string) error {
+	_, span := tracer.Start(ctx, "amadeus.resolve",
+		trace.WithAttributes(
+			attribute.String("dmail.id", id),
+			attribute.String("resolve.action", action),
+		))
+	defer span.End()
+
 	dmail, err := a.Store.LoadDMail(id)
 	if err != nil {
 		return err
@@ -382,6 +436,11 @@ func (a *Amadeus) ResolveDMail(id string, action string, reason string) error {
 	if err := a.Store.SaveDMail(dmail); err != nil {
 		return fmt.Errorf("save resolved dmail: %w", err)
 	}
+
+	span.AddEvent("dmail.resolved", trace.WithAttributes(
+		attribute.String("dmail.id", id),
+		attribute.String("dmail.status", string(dmail.Status)),
+	))
 
 	a.Logger.Info("D-Mail %s %s.", id, action+"d")
 	a.Logger.Info("%s → %sd at %s", dmail.Summary, action, now.Format(time.RFC3339))
@@ -453,6 +512,46 @@ func (a *Amadeus) PrintLog() error {
 		}
 	}
 
+	return nil
+}
+
+// LinkDMail associates a D-Mail with a Linear issue ID.
+// Returns an error if the D-Mail is already linked.
+func (a *Amadeus) LinkDMail(dmailID string, linearIssueID string) error {
+	dmail, err := a.Store.LoadDMail(dmailID)
+	if err != nil {
+		return err
+	}
+	if dmail.LinearIssueID != nil {
+		return fmt.Errorf("D-Mail %s is already linked to %s", dmailID, *dmail.LinearIssueID)
+	}
+	dmail.LinearIssueID = &linearIssueID
+	if err := a.Store.SaveDMail(dmail); err != nil {
+		return fmt.Errorf("save linked dmail: %w", err)
+	}
+	a.Logger.Info("D-Mail %s linked to %s", dmailID, linearIssueID)
+	return nil
+}
+
+// PrintSync outputs unsynced D-Mails as JSON to the logger's writer.
+func (a *Amadeus) PrintSync() error {
+	unsynced, err := a.Store.LoadUnsyncedDMails()
+	if err != nil {
+		return fmt.Errorf("load unsynced dmails: %w", err)
+	}
+	output := struct {
+		Unsynced []DMail `json:"unsynced"`
+	}{
+		Unsynced: unsynced,
+	}
+	if output.Unsynced == nil {
+		output.Unsynced = []DMail{}
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal sync output: %w", err)
+	}
+	fmt.Fprintln(a.Logger.Writer(), string(data))
 	return nil
 }
 
