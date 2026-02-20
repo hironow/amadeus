@@ -575,19 +575,25 @@ func (a *Amadeus) resolveDMailCore(ctx context.Context, name, action, reason str
 	// Move file from pending/ before persisting resolution.
 	// If move fails, no resolution is saved — avoids orphan resolution
 	// that would block future resolve attempts.
+	// If SaveResolution fails after move, roll back the move to keep
+	// the pending file in place for a future retry.
 	switch action {
 	case "approve":
 		if err := a.Store.MovePendingToOutbox(name); err != nil {
 			return DMail{}, Resolution{}, span, fmt.Errorf("move to outbox: %w", err)
 		}
+		if err := a.Store.SaveResolution(resolution); err != nil {
+			_ = a.Store.MoveOutboxToPending(name) // best-effort rollback
+			return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
+		}
 	case "reject":
 		if err := a.Store.MovePendingToRejected(name); err != nil {
 			return DMail{}, Resolution{}, span, fmt.Errorf("move to rejected: %w", err)
 		}
-	}
-
-	if err := a.Store.SaveResolution(resolution); err != nil {
-		return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
+		if err := a.Store.SaveResolution(resolution); err != nil {
+			_ = a.Store.MoveRejectedToPending(name) // best-effort rollback
+			return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
+		}
 	}
 
 	span.AddEvent("dmail.resolved", trace.WithAttributes(

@@ -319,6 +319,22 @@ func (s *StateStore) MovePendingToRejected(name string) error {
 	return os.Rename(src, dst)
 }
 
+// MoveOutboxToPending moves a D-Mail from outbox/ back to pending/ (rollback).
+func (s *StateStore) MoveOutboxToPending(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "outbox", filename)
+	dst := filepath.Join(s.Root, "pending", filename)
+	return os.Rename(src, dst)
+}
+
+// MoveRejectedToPending moves a D-Mail from rejected/ back to pending/ (rollback).
+func (s *StateStore) MoveRejectedToPending(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "rejected", filename)
+	dst := filepath.Join(s.Root, "pending", filename)
+	return os.Rename(src, dst)
+}
+
 // ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
 // copies to archive/ (skip if already exists), and removes from inbox/.
 // Returns the parsed D-Mails sorted by name.

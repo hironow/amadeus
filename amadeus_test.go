@@ -519,6 +519,50 @@ func TestResolveDMail_MoveFailure_NoOrphanResolution(t *testing.T) {
 	}
 }
 
+func TestResolveDMail_SaveFailure_RollsBackMove(t *testing.T) {
+	// given: a high-severity D-Mail saved to pending/ via routing
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate SaveResolution failure by making .run/ directory read-only
+	runDir := filepath.Join(root, ".run")
+	if err := os.Chmod(runDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(runDir, 0o755) })
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when: resolve should fail at SaveResolution
+	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
+
+	// then: error expected
+	if err == nil {
+		t.Fatal("expected error when SaveResolution fails")
+	}
+	// then: file should be rolled back to pending/ (not stuck in outbox/)
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	if _, statErr := os.Stat(pendingPath); statErr != nil {
+		t.Errorf("expected file back in pending/ after rollback: %v", statErr)
+	}
+	if _, statErr := os.Stat(outboxPath); statErr == nil {
+		t.Error("expected file NOT in outbox/ after rollback")
+	}
+}
+
 func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
