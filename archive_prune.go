@@ -28,7 +28,7 @@ func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandid
 	}
 
 	cutoff := time.Now().Add(-maxAge)
-	var candidates []PruneCandidate
+	candidates := []PruneCandidate{}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue

@@ -18,8 +18,8 @@ func TestFindPruneCandidates_DirNotExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(candidates) != 0 {
-		t.Errorf("expected empty, got %v", candidates)
+	if candidates != nil {
+		t.Errorf("expected nil for missing directory, got %v", candidates)
 	}
 }
 
@@ -33,6 +33,9 @@ func TestFindPruneCandidates_EmptyDir(t *testing.T) {
 	// then
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+	if candidates == nil {
+		t.Error("expected non-nil empty slice for existing directory, got nil")
 	}
 	if len(candidates) != 0 {
 		t.Errorf("expected empty, got %v", candidates)
@@ -91,8 +94,34 @@ func TestFindPruneCandidates_IgnoresNonMdFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	if candidates == nil {
+		t.Error("expected non-nil empty slice for existing directory, got nil")
+	}
 	if len(candidates) != 0 {
 		t.Errorf("expected empty (non-md ignored), got %d", len(candidates))
+	}
+}
+
+func TestFindPruneCandidates_RecentFilesOnly(t *testing.T) {
+	// given: directory exists with only recent .md files
+	dir := t.TempDir()
+	recentFile := filepath.Join(dir, "feedback-001.md")
+	if err := os.WriteFile(recentFile, []byte("recent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+
+	// then
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if candidates == nil {
+		t.Error("expected non-nil empty slice for existing directory with recent files, got nil")
+	}
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates, got %d", len(candidates))
 	}
 }
 
