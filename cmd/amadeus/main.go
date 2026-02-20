@@ -32,7 +32,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor|install-hook|uninstall-hook> [flags]")
+		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor|validate|install-hook|uninstall-hook> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -83,12 +83,14 @@ func run() error {
 		return runInit()
 	case "doctor":
 		return runDoctor(configPath, jsonOut)
+	case "validate":
+		return runValidate(configPath)
 	case "install-hook":
 		return runInstallHook()
 	case "uninstall-hook":
 		return runUninstallHook()
 	default:
-		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor, install-hook, uninstall-hook)", cmd)
+		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor, validate, install-hook, uninstall-hook)", cmd)
 	}
 }
 
@@ -267,6 +269,29 @@ func runInit() error {
 		return fmt.Errorf("init .divergence: %w", err)
 	}
 	fmt.Printf("  Initialized %s\n", divRoot)
+	return nil
+}
+
+func runValidate(configPath string) error {
+	if configPath == "" {
+		repoRoot, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get working directory: %w", err)
+		}
+		configPath = filepath.Join(repoRoot, ".divergence", "config.yaml")
+	}
+	cfg, err := amadeus.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	errs := amadeus.ValidateConfig(cfg)
+	if len(errs) > 0 {
+		for _, e := range errs {
+			fmt.Fprintf(os.Stderr, "  [FAIL] %s\n", e)
+		}
+		return fmt.Errorf("%d validation error(s)", len(errs))
+	}
+	fmt.Printf("  [OK] %s is valid\n", configPath)
 	return nil
 }
 

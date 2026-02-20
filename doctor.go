@@ -227,7 +227,7 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
-	_, err := LoadConfig(path)
+	cfg, err := LoadConfig(path)
 	if err != nil {
 		return DoctorCheckResult{
 			Name:    "Config",
@@ -235,9 +235,16 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
+	if errs := ValidateConfig(cfg); len(errs) > 0 {
+		return DoctorCheckResult{
+			Name:    "Config",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s: %s", path, strings.Join(errs, "; ")),
+		}
+	}
 	return DoctorCheckResult{
 		Name:    "Config",
 		Status:  CheckOK,
-		Message: fmt.Sprintf("%s loaded successfully", path),
+		Message: fmt.Sprintf("%s loaded and validated", path),
 	}
 }
