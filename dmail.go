@@ -292,3 +292,53 @@ func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
 	existing = append(existing, records...)
 	return s.writeJSON(filepath.Join(s.Root, ".run", "consumed.json"), existing)
 }
+
+// ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
+// copies to archive/ (skip if already exists), and removes from inbox/.
+// Returns the parsed D-Mails sorted by name.
+func (s *StateStore) ScanInbox() ([]DMail, error) {
+	inboxDir := filepath.Join(s.Root, "inbox")
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read inbox: %w", err)
+	}
+
+	var dmails []DMail
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		inboxPath := filepath.Join(inboxDir, e.Name())
+		data, err := os.ReadFile(inboxPath)
+		if err != nil {
+			return nil, fmt.Errorf("read inbox file %s: %w", e.Name(), err)
+		}
+		dmail, err := ParseDMail(data)
+		if err != nil {
+			return nil, fmt.Errorf("parse inbox file %s: %w", e.Name(), err)
+		}
+
+		// Copy to archive (skip if exists)
+		archivePath := filepath.Join(s.Root, "archive", e.Name())
+		if _, statErr := os.Stat(archivePath); errors.Is(statErr, fs.ErrNotExist) {
+			if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+				return nil, fmt.Errorf("archive %s: %w", e.Name(), err)
+			}
+		}
+
+		// Remove from inbox
+		if err := os.Remove(inboxPath); err != nil {
+			return nil, fmt.Errorf("remove inbox %s: %w", e.Name(), err)
+		}
+
+		dmails = append(dmails, dmail)
+	}
+
+	sort.Slice(dmails, func(i, j int) bool {
+		return dmails[i].Name < dmails[j].Name
+	})
+	return dmails, nil
+}

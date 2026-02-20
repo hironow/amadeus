@@ -2,6 +2,7 @@ package amadeus
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -591,6 +592,72 @@ func TestSaveConsumed_Appends(t *testing.T) {
 	}
 	if len(loaded) != 2 {
 		t.Fatalf("expected 2 records after two saves, got %d", len(loaded))
+	}
+}
+
+func TestScanInbox_Empty(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 0 {
+		t.Fatalf("expected empty, got %d", len(dmails))
+	}
+}
+
+func TestScanInbox_SingleReport(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// Drop a report into inbox/
+	content := []byte("---\nname: report-001\nkind: report\ndescription: test report\n---\n\nReport body.\n")
+	inboxPath := filepath.Join(root, "inbox", "report-001.md")
+	if err := os.WriteFile(inboxPath, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then: parsed correctly
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1, got %d", len(dmails))
+	}
+	if dmails[0].Name != "report-001" {
+		t.Errorf("expected report-001, got %s", dmails[0].Name)
+	}
+	if dmails[0].Kind != KindReport {
+		t.Errorf("expected report kind, got %s", dmails[0].Kind)
+	}
+
+	// then: copied to archive/
+	archivePath := filepath.Join(root, "archive", "report-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("expected file in archive: %v", err)
+	}
+
+	// then: removed from inbox/
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected file removed from inbox")
 	}
 }
 
