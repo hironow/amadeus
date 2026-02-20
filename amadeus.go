@@ -59,7 +59,6 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	a.ForceFullNext = previous.ForceFullNext
 
 	fullCheck := a.ShouldFullCheck(opts.Full)
-	span.SetAttributes(attribute.Bool("check.full", fullCheck))
 	if a.ForceFullNext {
 		if !opts.Quiet {
 			a.Logger.Info("Full scan triggered by previous divergence jump")
@@ -94,6 +93,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			}
 		}
 	}
+	span.SetAttributes(attribute.Bool("check.full", fullCheck))
 	if report.Significant {
 		span1.AddEvent("shift.detected", trace.WithAttributes(
 			attribute.Int("shift.pr_count", len(report.MergedPRs)),
