@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 	"text/template"
 )
 
@@ -86,9 +85,13 @@ func (c *ClaudeClient) Run(ctx context.Context, prompt string) ([]byte, error) {
 	if c.DryRun {
 		return nil, nil
 	}
-	args := []string{"-p", "--output-format", "json", "--model", c.Model}
-	cmd := exec.CommandContext(ctx, c.Command, args...)
-	cmd.Stdin = strings.NewReader(prompt)
+	cmd := exec.CommandContext(ctx, c.Command,
+		"--model", c.Model,
+		"--output-format", "json",
+		"--dangerously-skip-permissions",
+		"--print",
+		"-p", prompt,
+	)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
