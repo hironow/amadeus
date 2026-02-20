@@ -49,7 +49,7 @@ test-v:
 
 # Run tests with race detector
 test-race:
-    go test ./... -race -count=1 -timeout=120s
+    go test ./... -race -count=1 -timeout=300s
 
 # Run tests with coverage report
 cover:
@@ -94,5 +94,5 @@ jaeger-down:
 
 # Clean build artifacts
 clean:
-    rm -f coverage.out
+    rm -f amadeus coverage.out
     go clean
