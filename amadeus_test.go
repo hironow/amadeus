@@ -704,6 +704,30 @@ func TestExitCode_WrappedDriftError(t *testing.T) {
 	}
 }
 
+func TestRunCheck_DryRun_NilDataOut_NoPanic(t *testing.T) {
+	// given: an Amadeus with DataOut=nil (library usage without explicit wiring)
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".divergence")
+	if err := InitDivergenceDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: nil, // intentionally nil
+	}
+
+	// when: DryRun should not panic
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("RunCheck DryRun with nil DataOut should not fail: %v", err)
+	}
+}
+
 func TestPrintCheckOutput_JSON(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{

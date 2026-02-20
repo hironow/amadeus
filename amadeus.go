@@ -183,7 +183,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 
 	if opts.DryRun {
-		fmt.Fprintln(a.DataOut, prompt)
+		w := a.DataOut
+		if w == nil {
+			w = io.Discard
+		}
+		fmt.Fprintln(w, prompt)
 		span2.End()
 		return nil
 	}
