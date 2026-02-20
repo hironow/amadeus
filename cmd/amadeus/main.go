@@ -504,6 +504,10 @@ func runArchivePrune(args []string) error {
 		return fmt.Errorf("find prune candidates: %w", err)
 	}
 
+	if candidates == nil {
+		fmt.Fprintf(os.Stderr, "Archive directory does not exist: %s\n", archiveDir)
+		return nil
+	}
 	if len(candidates) == 0 {
 		fmt.Fprintf(os.Stderr, "No files older than %d days in %s\n", days, archiveDir)
 		return nil
@@ -523,6 +527,10 @@ func runArchivePrune(args []string) error {
 		fmt.Fprintf(os.Stderr, "\nDelete these %d file(s)? [y/N] ", len(candidates))
 		scanner := bufio.NewScanner(os.Stdin)
 		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return fmt.Errorf("read confirmation: %w", err)
+			}
+			fmt.Fprintln(os.Stderr, "Cancelled.")
 			return nil
 		}
 		answer := strings.TrimSpace(scanner.Text())
