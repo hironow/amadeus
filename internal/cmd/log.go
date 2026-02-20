@@ -1,0 +1,57 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/hironow/amadeus"
+	"github.com/spf13/cobra"
+)
+
+func newLogCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "log",
+		Short: "Show divergence log",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, _ := cmd.Flags().GetString("config")
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			jsonOut, _ := cmd.Flags().GetBool("json")
+
+			repoRoot, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			divRoot := filepath.Join(repoRoot, ".gate")
+
+			if _, err := os.Stat(divRoot); os.IsNotExist(err) {
+				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
+			}
+
+			if configPath == "" {
+				configPath = filepath.Join(divRoot, "config.yaml")
+			}
+			cfg, err := amadeus.LoadConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("load config: %w", err)
+			}
+
+			logger := amadeus.NewLogger(os.Stderr, verbose)
+			a := &amadeus.Amadeus{
+				Config:  cfg,
+				Store:   amadeus.NewStateStore(divRoot),
+				Logger:  logger,
+				DataOut: os.Stdout,
+			}
+			if jsonOut {
+				return a.PrintLogJSON()
+			}
+			return a.PrintLog()
+		},
+	}
+
+	cmd.Flags().Bool("json", false, "output as JSON")
+
+	return cmd
+}
