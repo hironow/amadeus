@@ -73,11 +73,11 @@ func UninstallHook(gitDir string) error {
 		return fmt.Errorf("amadeus hook not found in %s", hookPath)
 	}
 
-	endIdx := strings.Index(content, hookMarkerEnd)
-	if endIdx < 0 {
+	endRelIdx := strings.Index(content[beginIdx:], hookMarkerEnd)
+	if endRelIdx < 0 {
 		return fmt.Errorf("malformed amadeus hook section (missing end marker)")
 	}
-	endIdx += len(hookMarkerEnd)
+	endIdx := beginIdx + endRelIdx + len(hookMarkerEnd)
 	// Consume trailing newline
 	if endIdx < len(content) && content[endIdx] == '\n' {
 		endIdx++

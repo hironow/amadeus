@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -330,6 +331,9 @@ func runValidate(configPath string) error {
 		}
 		configPath = filepath.Join(repoRoot, ".gate", "config.yaml")
 	}
+	if _, err := os.Stat(configPath); err != nil {
+		return fmt.Errorf("config not found: %s", configPath)
+	}
 	cfg, err := amadeus.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -370,13 +374,18 @@ func runUninstallHook() error {
 }
 
 func findGitDir() (string, error) {
-	repoRoot, err := os.Getwd()
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("get working directory: %w", err)
+		return "", fmt.Errorf("not a git repository")
 	}
-	gitDir := filepath.Join(repoRoot, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("not a git repository (no .git directory)")
+	gitDir := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(gitDir) {
+		repoRoot, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("get working directory: %w", err)
+		}
+		gitDir = filepath.Join(repoRoot, gitDir)
 	}
 	return gitDir, nil
 }

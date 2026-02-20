@@ -183,3 +183,23 @@ func TestUninstallHook_NoAmadeusSection(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestUninstallHook_EndMarkerBeforeBegin(t *testing.T) {
+	// given: a malformed hook where end marker appears before begin marker
+	gitDir := t.TempDir()
+	hooksDir := filepath.Join(gitDir, "hooks")
+	os.MkdirAll(hooksDir, 0o755)
+	malformed := "#!/bin/sh\n" + hookMarkerEnd + "\nsome stuff\n" + hookMarkerBegin + "\namadeus check\n"
+	os.WriteFile(filepath.Join(hooksDir, "post-merge"), []byte(malformed), 0o755)
+
+	// when
+	err := UninstallHook(gitDir)
+
+	// then: should report malformed, not silently produce garbled output
+	if err == nil {
+		t.Fatal("expected error for malformed hook with end marker before begin")
+	}
+	if !strings.Contains(err.Error(), "malformed") {
+		t.Errorf("expected 'malformed' in error, got: %v", err)
+	}
+}
