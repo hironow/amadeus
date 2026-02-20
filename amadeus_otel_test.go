@@ -43,7 +43,7 @@ func newTestAmadeus(t *testing.T, repoRoot string) *Amadeus {
 	store := NewStateStore(divRoot)
 	logger := NewLogger(&bytes.Buffer{}, false)
 	git := NewGitClient(repoRoot)
-	return &Amadeus{Config: cfg, Store: store, Git: git, Logger: logger}
+	return &Amadeus{Config: cfg, Store: store, Git: git, Logger: logger, DataOut: &bytes.Buffer{}}
 }
 
 func TestRunCheck_CreatesRootSpan(t *testing.T) {
@@ -220,9 +220,10 @@ func TestResolveDMail_CreatesSpan(t *testing.T) {
 	store.SaveDMail(dmail)
 
 	a := &Amadeus{
-		Config: DefaultConfig(),
-		Store:  store,
-		Logger: NewLogger(&bytes.Buffer{}, false),
+		Config:  DefaultConfig(),
+		Store:   store,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &bytes.Buffer{},
 	}
 
 	// when

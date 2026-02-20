@@ -99,13 +99,14 @@ func runCheck(configPath string, verbose, dryRun, full, quiet bool) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := amadeus.NewLogger(os.Stdout, verbose)
+	logger := amadeus.NewLogger(os.Stderr, verbose)
 
 	a := &amadeus.Amadeus{
-		Config: cfg,
-		Store:  amadeus.NewStateStore(divRoot),
-		Git:    amadeus.NewGitClient(repoRoot),
-		Logger: logger,
+		Config:  cfg,
+		Store:   amadeus.NewStateStore(divRoot),
+		Git:     amadeus.NewGitClient(repoRoot),
+		Logger:  logger,
+		DataOut: os.Stdout,
 	}
 
 	return a.RunCheck(context.Background(), amadeus.CheckOptions{
@@ -134,11 +135,12 @@ func runLog(configPath string, verbose bool) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := amadeus.NewLogger(os.Stdout, verbose)
+	logger := amadeus.NewLogger(os.Stderr, verbose)
 	a := &amadeus.Amadeus{
-		Config: cfg,
-		Store:  amadeus.NewStateStore(divRoot),
-		Logger: logger,
+		Config:  cfg,
+		Store:   amadeus.NewStateStore(divRoot),
+		Logger:  logger,
+		DataOut: os.Stdout,
 	}
 	return a.PrintLog()
 }
@@ -184,11 +186,12 @@ func runResolve(configPath string, verbose bool, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := amadeus.NewLogger(os.Stdout, verbose)
+	logger := amadeus.NewLogger(os.Stderr, verbose)
 	a := &amadeus.Amadeus{
-		Config: cfg,
-		Store:  amadeus.NewStateStore(divRoot),
-		Logger: logger,
+		Config:  cfg,
+		Store:   amadeus.NewStateStore(divRoot),
+		Logger:  logger,
+		DataOut: os.Stdout,
 	}
 
 	action := "approve"
@@ -217,11 +220,12 @@ func runSync(configPath string, verbose bool) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := amadeus.NewLogger(os.Stdout, verbose)
+	logger := amadeus.NewLogger(os.Stderr, verbose)
 	a := &amadeus.Amadeus{
-		Config: cfg,
-		Store:  amadeus.NewStateStore(divRoot),
-		Logger: logger,
+		Config:  cfg,
+		Store:   amadeus.NewStateStore(divRoot),
+		Logger:  logger,
+		DataOut: os.Stdout,
 	}
 	return a.PrintSync()
 }
@@ -251,11 +255,12 @@ func runLink(configPath string, verbose bool, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := amadeus.NewLogger(os.Stdout, verbose)
+	logger := amadeus.NewLogger(os.Stderr, verbose)
 	a := &amadeus.Amadeus{
-		Config: cfg,
-		Store:  amadeus.NewStateStore(divRoot),
-		Logger: logger,
+		Config:  cfg,
+		Store:   amadeus.NewStateStore(divRoot),
+		Logger:  logger,
+		DataOut: os.Stdout,
 	}
 	return a.LinkDMail(dmailID, linearIssueID)
 }

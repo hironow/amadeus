@@ -295,8 +295,8 @@ func TestResolveDMail_Approve(t *testing.T) {
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.ResolveDMail(context.Background(), "d-001", "approve", "")
@@ -314,6 +314,13 @@ func TestResolveDMail_Approve(t *testing.T) {
 	}
 	if loaded.ResolvedAction == nil || *loaded.ResolvedAction != "approve" {
 		t.Errorf("expected ResolvedAction approve, got %v", loaded.ResolvedAction)
+	}
+	// confirmation should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	if !strings.Contains(dataBuf.String(), "approved") {
+		t.Errorf("expected 'approved' in DataOut, got: %s", dataBuf.String())
 	}
 }
 
@@ -335,8 +342,8 @@ func TestResolveDMail_Reject(t *testing.T) {
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.ResolveDMail(context.Background(), "d-001", "reject", "false positive")
@@ -374,8 +381,8 @@ func TestResolveDMail_AlreadyResolved(t *testing.T) {
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.ResolveDMail(context.Background(), "d-001", "reject", "oops")
@@ -393,8 +400,8 @@ func TestResolveDMail_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.ResolveDMail(context.Background(), "d-999", "approve", "")
@@ -423,8 +430,8 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.ResolveDMail(context.Background(), "d-001", "reject", "")
@@ -444,10 +451,11 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 }
 
 func TestAmadeus_PrintCheckOutput(t *testing.T) {
-	var buf bytes.Buffer
+	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config: DefaultConfig(),
-		Logger: NewLogger(&buf, false),
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
 	}
 	result := CheckResult{
 		Divergence: 0.145,
@@ -463,7 +471,12 @@ func TestAmadeus_PrintCheckOutput(t *testing.T) {
 		{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Target: TargetPaintress, Summary: "naming issue"},
 	}
 	a.PrintCheckOutput(result, dmails, 0.133)
-	output := buf.String()
+
+	// result display should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	if !strings.Contains(output, "Divergence") {
 		t.Errorf("expected 'Divergence' in output, got:\n%s", output)
 	}
@@ -514,8 +527,8 @@ func TestAmadeus_PrintLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintLog()
@@ -524,7 +537,11 @@ func TestAmadeus_PrintLog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrintLog failed: %v", err)
 	}
-	output := buf.String()
+	// result display should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	if !strings.Contains(output, "History:") {
 		t.Errorf("expected 'History:' in output, got:\n%s", output)
 	}
@@ -540,10 +557,11 @@ func TestAmadeus_PrintLog(t *testing.T) {
 }
 
 func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
-	var buf bytes.Buffer
+	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config: DefaultConfig(),
-		Logger: NewLogger(&buf, false),
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
 	}
 	result := CheckResult{
 		Divergence: 0.145,
@@ -562,8 +580,11 @@ func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
 	// when: quiet mode
 	a.PrintCheckOutputQuiet(result, dmails, 0.133)
 
-	// then: single line with divergence, delta, dmail count, pending count
-	output := strings.TrimSpace(buf.String())
+	// then: result display should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := strings.TrimSpace(dataBuf.String())
 	lines := strings.Split(output, "\n")
 	if len(lines) != 1 {
 		t.Errorf("expected 1 line in quiet mode, got %d:\n%s", len(lines), output)
@@ -590,8 +611,8 @@ func TestLinkDMail_Success(t *testing.T) {
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.LinkDMail("d-001", "MY-250")
@@ -618,8 +639,8 @@ func TestLinkDMail_AlreadyLinked(t *testing.T) {
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.LinkDMail("d-001", "MY-250")
@@ -640,8 +661,8 @@ func TestLinkDMail_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.LinkDMail("d-999", "MY-250")
@@ -660,8 +681,8 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	}
 	store := NewStateStore(root)
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintLog()
@@ -670,7 +691,10 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrintLog failed: %v", err)
 	}
-	output := buf.String()
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	if !strings.Contains(output, "No history") {
 		t.Errorf("expected 'No history' in output, got:\n%s", output)
 	}
@@ -694,8 +718,8 @@ func TestPrintSync_UnsyncedDMails(t *testing.T) {
 		}
 	}
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintSync()
@@ -704,12 +728,15 @@ func TestPrintSync_UnsyncedDMails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrintSync failed: %v", err)
 	}
-	output := buf.String()
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	var result struct {
 		Unsynced []DMail `json:"unsynced"`
 	}
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+		t.Fatalf("DataOut is not valid JSON: %v\noutput: %s", err, output)
 	}
 	if len(result.Unsynced) != 2 {
 		t.Errorf("expected 2 unsynced, got %d", len(result.Unsynced))
@@ -731,8 +758,8 @@ func TestPrintSync_NoneUnsynced(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintSync()
@@ -741,12 +768,12 @@ func TestPrintSync_NoneUnsynced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrintSync failed: %v", err)
 	}
-	output := buf.String()
+	output := dataBuf.String()
 	var result struct {
 		Unsynced []DMail `json:"unsynced"`
 	}
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
+		t.Fatalf("DataOut is not valid JSON: %v", err)
 	}
 	if len(result.Unsynced) != 0 {
 		t.Errorf("expected 0 unsynced, got %d", len(result.Unsynced))

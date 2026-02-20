@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -17,8 +18,9 @@ type Amadeus struct {
 	Store         *StateStore
 	Git           *GitClient
 	Logger        *Logger
-	CheckCount    int  // number of diff checks since last full check
-	ForceFullNext bool // set when a divergence jump defers a full scan to the next run
+	DataOut       io.Writer // machine-readable output (stdout); Logger is for human progress (stderr)
+	CheckCount    int       // number of diff checks since last full check
+	ForceFullNext bool      // set when a divergence jump defers a full scan to the next run
 }
 
 // CheckOptions controls how RunCheck operates.
@@ -114,7 +116,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			return fmt.Errorf("save check state: %w", err)
 		}
 		if opts.Quiet {
-			a.Logger.Info("%s (%s) 0 D-Mails",
+			a.dataOut("%s (%s) 0 D-Mails",
 				FormatDivergence(previous.Divergence*100),
 				FormatDelta(previous.Divergence, previous.Divergence))
 		}
@@ -148,7 +150,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 
 	if opts.DryRun {
-		fmt.Println(prompt)
+		fmt.Fprintln(a.DataOut, prompt)
 		span2.End()
 		return nil
 	}
@@ -272,10 +274,19 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	return nil
 }
 
+// dataOut writes a formatted line to DataOut (stdout / machine-facing).
+func (a *Amadeus) dataOut(format string, args ...any) {
+	w := a.DataOut
+	if w == nil {
+		w = io.Discard
+	}
+	fmt.Fprintf(w, "  "+format+"\n", args...)
+}
+
 // PrintCheckOutput renders the CLI display for a completed check.
 func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousDivergence float64) {
-	a.Logger.Info("")
-	a.Logger.Info("Divergence: %s (%s)",
+	a.dataOut("")
+	a.dataOut("Divergence: %s (%s)",
 		FormatDivergence(result.Divergence*100),
 		FormatDelta(result.Divergence, previousDivergence))
 
@@ -291,7 +302,7 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 		if score, ok := result.Axes[axis]; ok {
 			weight := weightForAxis(axis, a.Config.Weights)
 			contribution := float64(score.Score) * weight
-			a.Logger.Info("  %-22s %s — %s",
+			a.dataOut("  %-22s %s — %s",
 				axisNames[axis]+":",
 				FormatDivergence(contribution),
 				score.Details)
@@ -299,8 +310,8 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 	}
 
 	if len(dmails) > 0 {
-		a.Logger.Info("")
-		a.Logger.Info("D-Mails:")
+		a.dataOut("")
+		a.dataOut("D-Mails:")
 		pending := 0
 		for _, d := range dmails {
 			var prefix string
@@ -317,12 +328,12 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 			if d.Status == DMailPending {
 				status = "awaiting approval"
 			}
-			a.Logger.Info("  %s %s %s → %s to %s",
+			a.dataOut("  %s %s %s → %s to %s",
 				prefix, d.ID, d.Summary, status, string(d.Target))
 		}
 		if pending > 0 {
-			a.Logger.Info("")
-			a.Logger.Info("%d pending. Run `amadeus resolve <id> --approve` or `--reject`", pending)
+			a.dataOut("")
+			a.dataOut("%d pending. Run `amadeus resolve <id> --approve` or `--reject`", pending)
 		}
 	}
 }
@@ -345,7 +356,7 @@ func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, prev
 		pendingStr = fmt.Sprintf(" (%d pending)", pending)
 	}
 
-	a.Logger.Info("%s (%s) %d %s%s",
+	a.dataOut("%s (%s) %d %s%s",
 		FormatDivergence(result.Divergence*100),
 		FormatDelta(result.Divergence, previousDivergence),
 		len(dmails),
@@ -442,25 +453,25 @@ func (a *Amadeus) ResolveDMail(ctx context.Context, id string, action string, re
 		attribute.String("dmail.status", string(dmail.Status)),
 	))
 
-	a.Logger.Info("D-Mail %s %s.", id, action+"d")
-	a.Logger.Info("%s → %sd at %s", dmail.Summary, action, now.Format(time.RFC3339))
+	a.dataOut("D-Mail %s %s.", id, action+"d")
+	a.dataOut("%s → %sd at %s", dmail.Summary, action, now.Format(time.RFC3339))
 	return nil
 }
 
-// PrintLog renders the history and D-Mail log to the logger.
+// PrintLog renders the history and D-Mail log to DataOut.
 func (a *Amadeus) PrintLog() error {
 	history, err := a.Store.LoadHistory()
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}
 
-	a.Logger.Info("")
+	a.dataOut("")
 	if len(history) == 0 {
-		a.Logger.Info("No history yet. Run `amadeus check` first.")
+		a.dataOut("No history yet. Run `amadeus check` first.")
 		return nil
 	}
 
-	a.Logger.Info("History:")
+	a.dataOut("History:")
 	for i, h := range history {
 		var delta string
 		if h.Type == CheckTypeFull {
@@ -475,7 +486,7 @@ func (a *Amadeus) PrintLog() error {
 		if dmailCount == 1 {
 			dmailLabel = "D-Mail"
 		}
-		a.Logger.Info("  %s  %s  %-4s  %s %s  %d %s",
+		a.dataOut("  %s  %s  %-4s  %s %s  %d %s",
 			h.CheckedAt.Format("2006-01-02T15:04"),
 			h.Commit,
 			string(h.Type),
@@ -491,8 +502,8 @@ func (a *Amadeus) PrintLog() error {
 	}
 
 	if len(dmails) > 0 {
-		a.Logger.Info("")
-		a.Logger.Info("D-Mails:")
+		a.dataOut("")
+		a.dataOut("D-Mails:")
 		for _, d := range dmails {
 			var severityTag string
 			switch d.Severity {
@@ -503,7 +514,7 @@ func (a *Amadeus) PrintLog() error {
 			default:
 				severityTag = "[LOW] "
 			}
-			a.Logger.Info("  %s  %s %-10s %s → %s",
+			a.dataOut("  %s  %s %-10s %s → %s",
 				d.ID,
 				severityTag,
 				string(d.Status),
@@ -529,7 +540,7 @@ func (a *Amadeus) LinkDMail(dmailID string, linearIssueID string) error {
 	if err := a.Store.SaveDMail(dmail); err != nil {
 		return fmt.Errorf("save linked dmail: %w", err)
 	}
-	a.Logger.Info("D-Mail %s linked to %s", dmailID, linearIssueID)
+	a.dataOut("D-Mail %s linked to %s", dmailID, linearIssueID)
 	return nil
 }
 
@@ -551,7 +562,7 @@ func (a *Amadeus) PrintSync() error {
 	if err != nil {
 		return fmt.Errorf("marshal sync output: %w", err)
 	}
-	fmt.Fprintln(a.Logger.Writer(), string(data))
+	fmt.Fprintln(a.DataOut, string(data))
 	return nil
 }
 
