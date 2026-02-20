@@ -46,6 +46,7 @@ This document describes what each directory/file does, who creates it, and how i
 outbox/
 inbox/
 pending/
+rejected/
 ```
 
 | Path | Git Status | Reason |
@@ -58,7 +59,7 @@ pending/
 | `outbox/` | Ignored | Transient; courier picks up and delivers |
 | `inbox/` | Ignored | Transient; consumed and archived on check |
 | `pending/` | Ignored | Transient; moved to outbox/ or rejected/ on resolve |
-| `rejected/` | Not ignored | Audit record of human rejection decisions |
+| `rejected/` | Ignored | Transient; human rejection decisions (audit via resolutions.json) |
 
 ## Check Pipeline Data Flow
 

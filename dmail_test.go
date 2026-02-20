@@ -217,6 +217,43 @@ func TestInitDivergenceDir_GitignoreContainsOutboxInbox(t *testing.T) {
 	if !strings.Contains(content, "pending/") {
 		t.Errorf("expected .gitignore to contain 'pending/', got: %s", content)
 	}
+	if !strings.Contains(content, "rejected/") {
+		t.Errorf("expected .gitignore to contain 'rejected/', got: %s", content)
+	}
+}
+
+func TestMovePendingToRejected_CreatesDirectoryOnDemand(t *testing.T) {
+	// given: a repo where rejected/ does not exist (pre-update installation)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:     "feedback-001",
+		Kind:     KindFeedback,
+		Severity: SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Remove rejected/ to simulate pre-update repo
+	if err := os.Remove(filepath.Join(root, "rejected")); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: move to rejected
+	err := store.MovePendingToRejected("feedback-001")
+
+	// then: should succeed (directory created on demand)
+	if err != nil {
+		t.Fatalf("MovePendingToRejected failed on missing dir: %v", err)
+	}
+	rejectedPath := filepath.Join(root, "rejected", "feedback-001.md")
+	if _, statErr := os.Stat(rejectedPath); statErr != nil {
+		t.Errorf("expected file in rejected/: %v", statErr)
+	}
 }
 
 func TestNextDMailName_EmptyArchive(t *testing.T) {

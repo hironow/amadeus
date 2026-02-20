@@ -312,10 +312,15 @@ func (s *StateStore) MovePendingToOutbox(name string) error {
 }
 
 // MovePendingToRejected moves a D-Mail from pending/ to rejected/.
+// Creates the rejected/ directory on demand for pre-update installations.
 func (s *StateStore) MovePendingToRejected(name string) error {
 	filename := name + ".md"
 	src := filepath.Join(s.Root, "pending", filename)
-	dst := filepath.Join(s.Root, "rejected", filename)
+	rejectedDir := filepath.Join(s.Root, "rejected")
+	if err := os.MkdirAll(rejectedDir, 0o755); err != nil {
+		return err
+	}
+	dst := filepath.Join(rejectedDir, filename)
 	return os.Rename(src, dst)
 }
 
