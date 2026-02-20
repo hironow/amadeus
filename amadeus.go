@@ -635,7 +635,10 @@ func (a *Amadeus) PrintLog() error {
 	}
 
 	if len(dmails) > 0 {
-		resolutions, _ := a.Store.LoadResolutions()
+		resolutions, err := a.Store.LoadResolutions()
+		if err != nil {
+			return fmt.Errorf("load resolutions: %w", err)
+		}
 		a.dataOut("")
 		a.dataOut("D-Mails:")
 		for _, d := range dmails {
