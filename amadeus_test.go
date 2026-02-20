@@ -480,6 +480,45 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	}
 }
 
+func TestResolveDMail_MoveFailure_NoOrphanResolution(t *testing.T) {
+	// given: a high-severity D-Mail saved to pending/ via routing
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate move failure by removing the pending file before resolve
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	if err := os.Remove(pendingPath); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when: resolve should fail because pending file is missing
+	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
+
+	// then: error expected
+	if err == nil {
+		t.Fatal("expected error when pending file is missing")
+	}
+	// then: resolution must NOT be persisted (no orphan resolution)
+	_, resErr := store.LoadResolution("feedback-001")
+	if resErr == nil {
+		t.Error("expected no resolution to exist after move failure — orphan resolution detected")
+	}
+}
+
 func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
