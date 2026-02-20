@@ -53,7 +53,9 @@ func InitDivergenceDir(root string) error {
 	dirs := []string{
 		filepath.Join(root, ".run"),
 		filepath.Join(root, "history"),
-		filepath.Join(root, "dmails"),
+		filepath.Join(root, "outbox"),
+		filepath.Join(root, "inbox"),
+		filepath.Join(root, "archive"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -76,20 +78,32 @@ func InitDivergenceDir(root string) error {
 		}
 	}
 	gitignorePath := filepath.Join(root, ".gitignore")
+	requiredEntries := []string{".run/", "outbox/", "inbox/"}
 	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
-		if err := os.WriteFile(gitignorePath, []byte(".run/\n"), 0o644); err != nil {
+		content := strings.Join(requiredEntries, "\n") + "\n"
+		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {
 			return err
 		}
 	} else if err == nil {
 		existing, readErr := os.ReadFile(gitignorePath)
-		if readErr == nil && !strings.Contains(string(existing), ".run/") {
-			f, openErr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0o644)
-			if openErr == nil {
-				defer f.Close()
-				if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
-					f.Write([]byte("\n"))
+		if readErr == nil {
+			var toAdd []string
+			for _, entry := range requiredEntries {
+				if !strings.Contains(string(existing), entry) {
+					toAdd = append(toAdd, entry)
 				}
-				f.Write([]byte(".run/\n"))
+			}
+			if len(toAdd) > 0 {
+				f, openErr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0o644)
+				if openErr == nil {
+					defer f.Close()
+					if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
+						f.Write([]byte("\n"))
+					}
+					for _, entry := range toAdd {
+						f.Write([]byte(entry + "\n"))
+					}
+				}
 			}
 		}
 	}

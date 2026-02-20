@@ -22,10 +22,9 @@ type ClaudeResponse struct {
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.
 type ClaudeDMailCandidate struct {
-	Target  DMailTarget `json:"target"`
-	Type    string      `json:"type"`
-	Summary string      `json:"summary"`
-	Detail  string      `json:"detail"`
+	Description string   `json:"description"`
+	Detail      string   `json:"detail"`
+	Issues      []string `json:"issues,omitempty"`
 }
 
 // DiffCheckParams holds the template parameters for a diff-based check.

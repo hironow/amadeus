@@ -66,7 +66,7 @@ func TestDetermineSeverity_Low(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityLow {
-		t.Errorf("expected LOW, got %s", sev.Severity)
+		t.Errorf("expected low, got %s", sev.Severity)
 	}
 	if sev.Overridden {
 		t.Error("expected no override")
@@ -79,7 +79,7 @@ func TestDetermineSeverity_Medium(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityMedium {
-		t.Errorf("expected MEDIUM, got %s", sev.Severity)
+		t.Errorf("expected medium, got %s", sev.Severity)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestDetermineSeverity_High(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityHigh {
-		t.Errorf("expected HIGH, got %s", sev.Severity)
+		t.Errorf("expected high, got %s", sev.Severity)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestDetermineSeverity_ADROverrideForceHigh(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityHigh {
-		t.Errorf("expected HIGH (ADR override), got %s", sev.Severity)
+		t.Errorf("expected high (ADR override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")
@@ -113,7 +113,7 @@ func TestDetermineSeverity_DoDOverrideForceHigh(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityHigh {
-		t.Errorf("expected HIGH (DoD override), got %s", sev.Severity)
+		t.Errorf("expected high (DoD override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")
@@ -126,7 +126,7 @@ func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityMedium {
-		t.Errorf("expected MEDIUM (Dep override), got %s", sev.Severity)
+		t.Errorf("expected medium (Dep override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")

@@ -1,13 +1,30 @@
 package amadeus
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
+)
+
+// DMailKind represents the type of D-Mail message.
+type DMailKind string
+
+const (
+	// KindFeedback is produced by the verifier role.
+	KindFeedback DMailKind = "feedback"
+	// KindSpecification is produced by the designer role.
+	KindSpecification DMailKind = "specification"
+	// KindReport is produced by the implementer role.
+	KindReport DMailKind = "report"
 )
 
 // DMailStatus represents the lifecycle status of a D-Mail.
@@ -24,121 +41,216 @@ const (
 	DMailRejected DMailStatus = "rejected"
 )
 
-// DMailTarget represents the destination tool for a D-Mail.
-type DMailTarget string
+// dmailFrontmatter is the YAML frontmatter of a D-Mail file.
+type dmailFrontmatter struct {
+	Name        string            `yaml:"name"`
+	Kind        DMailKind         `yaml:"kind"`
+	Description string            `yaml:"description"`
+	Issues      []string          `yaml:"issues,omitempty"`
+	Severity    Severity          `yaml:"severity,omitempty"`
+	Metadata    map[string]string `yaml:"metadata,omitempty"`
+}
 
-const (
-	// TargetSightjack routes the D-Mail to the Sightjack tool.
-	TargetSightjack DMailTarget = "sightjack"
-	// TargetPaintress routes the D-Mail to the Paintress tool.
-	TargetPaintress DMailTarget = "paintress"
-)
-
-// DMail is the correction routing message produced by Phase 3.
+// DMail is the correction routing message using YAML frontmatter + Markdown body.
 type DMail struct {
-	ID             string      `json:"id"`
-	Severity       Severity    `json:"severity"`
-	Status         DMailStatus `json:"status"`
-	Target         DMailTarget `json:"target"`
-	Type           string      `json:"type"`
-	Summary        string      `json:"summary"`
-	Detail         string      `json:"detail"`
-	CreatedAt      time.Time   `json:"created_at"`
-	ResolvedAt     *time.Time  `json:"resolved_at,omitempty"`
-	ResolvedAction *string     `json:"resolved_action,omitempty"`
-	RejectReason   *string     `json:"reject_reason,omitempty"`
-	LinearIssueID  *string     `json:"linear_issue_id,omitempty"`
+	Name        string            `yaml:"name"`
+	Kind        DMailKind         `yaml:"kind"`
+	Description string            `yaml:"description"`
+	Issues      []string          `yaml:"issues,omitempty"`
+	Severity    Severity          `yaml:"severity,omitempty"`
+	Metadata    map[string]string `yaml:"metadata,omitempty"`
+	Body        string            `yaml:"-"`
+}
+
+// ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
+func ParseDMail(data []byte) (DMail, error) {
+	str := string(data)
+	if !strings.HasPrefix(str, "---\n") {
+		return DMail{}, fmt.Errorf("missing opening frontmatter delimiter")
+	}
+	rest := str[4:] // skip opening "---\n"
+	idx := strings.Index(rest, "\n---\n")
+	if idx < 0 {
+		return DMail{}, fmt.Errorf("missing closing frontmatter delimiter")
+	}
+	yamlPart := rest[:idx]
+	bodyPart := rest[idx+5:] // skip "\n---\n"
+
+	var fm dmailFrontmatter
+	if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
+		return DMail{}, fmt.Errorf("parse frontmatter: %w", err)
+	}
+
+	return DMail{
+		Name:        fm.Name,
+		Kind:        fm.Kind,
+		Description: fm.Description,
+		Issues:      fm.Issues,
+		Severity:    fm.Severity,
+		Metadata:    fm.Metadata,
+		Body:        strings.TrimLeft(bodyPart, "\n"),
+	}, nil
+}
+
+// MarshalDMail serializes a DMail to YAML frontmatter + Markdown format.
+func MarshalDMail(dmail DMail) ([]byte, error) {
+	fm := dmailFrontmatter{
+		Name:        dmail.Name,
+		Kind:        dmail.Kind,
+		Description: dmail.Description,
+		Issues:      dmail.Issues,
+		Severity:    dmail.Severity,
+		Metadata:    dmail.Metadata,
+	}
+	yamlData, err := yaml.Marshal(fm)
+	if err != nil {
+		return nil, fmt.Errorf("marshal frontmatter: %w", err)
+	}
+
+	var buf bytes.Buffer
+	buf.WriteString("---\n")
+	buf.Write(yamlData)
+	buf.WriteString("---\n")
+	if dmail.Body != "" {
+		buf.WriteString("\n")
+		buf.WriteString(dmail.Body)
+		if !strings.HasSuffix(dmail.Body, "\n") {
+			buf.WriteString("\n")
+		}
+	}
+	return buf.Bytes(), nil
 }
 
 // RouteDMail applies severity-based status mapping.
 // HIGH severity requires human approval (pending); all others are auto-sent.
-func RouteDMail(dmail DMail) DMail {
-	switch dmail.Severity {
-	case SeverityHigh:
-		dmail.Status = DMailPending
-	default:
-		dmail.Status = DMailSent
+func RouteDMail(severity Severity) DMailStatus {
+	if severity == SeverityHigh {
+		return DMailPending
 	}
-	return dmail
+	return DMailSent
 }
 
-// NextDMailID returns the next sequential D-Mail ID by scanning existing files
-// in the dmails/ directory.
-func (s *StateStore) NextDMailID() (string, error) {
-	dmailDir := filepath.Join(s.Root, "dmails")
-	entries, err := os.ReadDir(dmailDir)
+// NextDMailName returns the next sequential D-Mail name by scanning existing
+// .md files in the archive/ directory.
+func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
+	archiveDir := filepath.Join(s.Root, "archive")
+	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
 		return "", err
 	}
+	prefix := string(kind) + "-"
 	maxNum := 0
 	for _, e := range entries {
-		name := strings.TrimSuffix(e.Name(), ".json")
-		if strings.HasPrefix(name, "d-") {
+		name := strings.TrimSuffix(e.Name(), ".md")
+		if strings.HasPrefix(name, prefix) {
 			var num int
-			if _, err := fmt.Sscanf(name, "d-%d", &num); err == nil && num > maxNum {
+			if _, err := fmt.Sscanf(name, prefix+"%d", &num); err == nil && num > maxNum {
 				maxNum = num
 			}
 		}
 	}
-	return fmt.Sprintf("d-%03d", maxNum+1), nil
+	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// LoadDMail reads a single D-Mail by ID from the dmails/ directory.
-func (s *StateStore) LoadDMail(id string) (DMail, error) {
-	path := filepath.Join(s.Root, "dmails", id+".json")
+// SaveDMail writes a D-Mail to both outbox/ and archive/ (dual-write pattern).
+func (s *StateStore) SaveDMail(dmail DMail) error {
+	data, err := MarshalDMail(dmail)
+	if err != nil {
+		return fmt.Errorf("marshal dmail: %w", err)
+	}
+	filename := dmail.Name + ".md"
+	outboxPath := filepath.Join(s.Root, "outbox", filename)
+	archivePath := filepath.Join(s.Root, "archive", filename)
+	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
+		return fmt.Errorf("write outbox: %w", err)
+	}
+	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+		return fmt.Errorf("write archive: %w", err)
+	}
+	return nil
+}
+
+// LoadDMail reads a single D-Mail by name from the archive/ directory.
+func (s *StateStore) LoadDMail(name string) (DMail, error) {
+	path := filepath.Join(s.Root, "archive", name+".md")
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return DMail{}, fmt.Errorf("load dmail %s: %w", id, err)
+		return DMail{}, fmt.Errorf("load dmail %s: %w", name, err)
 	}
-	var dmail DMail
-	if err := json.Unmarshal(data, &dmail); err != nil {
-		return DMail{}, fmt.Errorf("parse dmail %s: %w", id, err)
-	}
-	return dmail, nil
+	return ParseDMail(data)
 }
 
-// SaveDMail writes a D-Mail to the dmails/ directory as JSON.
-func (s *StateStore) SaveDMail(dmail DMail) error {
-	path := filepath.Join(s.Root, "dmails", dmail.ID+".json")
-	return s.writeJSON(path, dmail)
-}
-
-// LoadUnsyncedDMails returns D-Mails that have no LinearIssueID, sorted by ID ascending.
-func (s *StateStore) LoadUnsyncedDMails() ([]DMail, error) {
-	all, err := s.LoadAllDMails()
-	if err != nil {
-		return nil, err
-	}
-	var unsynced []DMail
-	for _, d := range all {
-		if d.LinearIssueID == nil {
-			unsynced = append(unsynced, d)
-		}
-	}
-	return unsynced, nil
-}
-
-// LoadAllDMails reads all D-Mails from the dmails/ directory, sorted by ID ascending.
+// LoadAllDMails reads all D-Mails from the archive/ directory, sorted by name ascending.
 func (s *StateStore) LoadAllDMails() ([]DMail, error) {
-	dmailDir := filepath.Join(s.Root, "dmails")
-	entries, err := os.ReadDir(dmailDir)
+	archiveDir := filepath.Join(s.Root, "archive")
+	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
 		return nil, err
 	}
 	var dmails []DMail
 	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".json") {
+		if !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		id := strings.TrimSuffix(e.Name(), ".json")
-		dmail, err := s.LoadDMail(id)
+		name := strings.TrimSuffix(e.Name(), ".md")
+		dmail, err := s.LoadDMail(name)
 		if err != nil {
 			return nil, err
 		}
 		dmails = append(dmails, dmail)
 	}
 	sort.Slice(dmails, func(i, j int) bool {
-		return dmails[i].ID < dmails[j].ID
+		return dmails[i].Name < dmails[j].Name
 	})
 	return dmails, nil
+}
+
+// Resolution tracks the approval state of a D-Mail, stored as a sidecar file
+// in .run/resolutions.json. The D-Mail .md file itself is immutable.
+type Resolution struct {
+	Name       string     `json:"name"`
+	Status     string     `json:"status"`
+	Action     string     `json:"action,omitempty"`
+	Reason     string     `json:"reason,omitempty"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+}
+
+// LoadResolutions reads all resolutions from .run/resolutions.json.
+func (s *StateStore) LoadResolutions() (map[string]Resolution, error) {
+	path := filepath.Join(s.Root, ".run", "resolutions.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return make(map[string]Resolution), nil
+		}
+		return nil, err
+	}
+	var resolutions map[string]Resolution
+	if err := json.Unmarshal(data, &resolutions); err != nil {
+		return nil, err
+	}
+	return resolutions, nil
+}
+
+// LoadResolution reads a single resolution by D-Mail name.
+func (s *StateStore) LoadResolution(name string) (Resolution, error) {
+	resolutions, err := s.LoadResolutions()
+	if err != nil {
+		return Resolution{}, err
+	}
+	res, ok := resolutions[name]
+	if !ok {
+		return Resolution{}, fmt.Errorf("no resolution for %s", name)
+	}
+	return res, nil
+}
+
+// SaveResolution writes or updates a resolution in .run/resolutions.json.
+func (s *StateStore) SaveResolution(res Resolution) error {
+	resolutions, err := s.LoadResolutions()
+	if err != nil {
+		return err
+	}
+	resolutions[res.Name] = res
+	return s.writeJSON(filepath.Join(s.Root, ".run", "resolutions.json"), resolutions)
 }

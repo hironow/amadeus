@@ -30,7 +30,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <init|check|resolve|log|sync|link|doctor> [flags]")
+		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -71,16 +71,12 @@ func run() error {
 		return runResolve(configPath, verbose, jsonOut, fs.Args())
 	case "log":
 		return runLog(configPath, verbose, jsonOut)
-	case "sync":
-		return runSync(configPath, verbose)
-	case "link":
-		return runLink(configPath, verbose, jsonOut, fs.Args())
 	case "init":
 		return runInit()
 	case "doctor":
 		return runDoctor(configPath, jsonOut)
 	default:
-		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, sync, link, doctor)", cmd)
+		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor)", cmd)
 	}
 }
 
@@ -156,7 +152,7 @@ func runLog(configPath string, verbose, jsonOut bool) error {
 
 func runResolve(configPath string, verbose, jsonOut bool, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: amadeus resolve <id> --approve or --reject --reason \"...\"")
+		return fmt.Errorf("usage: amadeus resolve <name> --approve or --reject --reason \"...\"")
 	}
 	id := args[0]
 
@@ -211,73 +207,6 @@ func runResolve(configPath string, verbose, jsonOut bool, args []string) error {
 		return a.ResolveDMailJSON(context.Background(), id, action, reason)
 	}
 	return a.ResolveDMail(context.Background(), id, action, reason)
-}
-
-func runSync(configPath string, verbose bool) error {
-	repoRoot, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	divRoot := filepath.Join(repoRoot, ".divergence")
-
-	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
-	}
-
-	if configPath == "" {
-		configPath = filepath.Join(divRoot, "config.yaml")
-	}
-	cfg, err := amadeus.LoadConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	logger := amadeus.NewLogger(os.Stderr, verbose)
-	a := &amadeus.Amadeus{
-		Config:  cfg,
-		Store:   amadeus.NewStateStore(divRoot),
-		Logger:  logger,
-		DataOut: os.Stdout,
-	}
-	return a.PrintSync()
-}
-
-func runLink(configPath string, verbose, jsonOut bool, args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: amadeus link <dmail-id> <linear-issue-id>")
-	}
-	dmailID := args[0]
-	linearIssueID := args[1]
-
-	repoRoot, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	divRoot := filepath.Join(repoRoot, ".divergence")
-
-	if _, err := os.Stat(divRoot); os.IsNotExist(err) {
-		return fmt.Errorf(".divergence/ not found. Run 'amadeus init' first")
-	}
-
-	if configPath == "" {
-		configPath = filepath.Join(divRoot, "config.yaml")
-	}
-	cfg, err := amadeus.LoadConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	logger := amadeus.NewLogger(os.Stderr, verbose)
-	a := &amadeus.Amadeus{
-		Config:  cfg,
-		Store:   amadeus.NewStateStore(divRoot),
-		Logger:  logger,
-		DataOut: os.Stdout,
-	}
-	if jsonOut {
-		return a.LinkDMailJSON(dmailID, linearIssueID)
-	}
-	return a.LinkDMail(dmailID, linearIssueID)
 }
 
 func runInit() error {

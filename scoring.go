@@ -49,9 +49,9 @@ type DivergenceResult struct {
 type Severity string
 
 const (
-	SeverityLow    Severity = "LOW"
-	SeverityMedium Severity = "MEDIUM"
-	SeverityHigh   Severity = "HIGH"
+	SeverityLow    Severity = "low"
+	SeverityMedium Severity = "medium"
+	SeverityHigh   Severity = "high"
 )
 
 // Thresholds holds the severity threshold configuration.

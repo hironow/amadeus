@@ -19,10 +19,7 @@ Evaluate how these changes affect each integrity axis.
 Score each axis 0-100 (0 = full compliance, 100 = full deviation).
 
 Output MUST be valid JSON matching this exact schema:
-{"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"dmails":[{"target":"sightjack|paintress","type":"Type-S|Type-P|Type-SP","summary":"","detail":""}],"reasoning":""}
+{"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"dmails":[{"description":"","detail":"","issues":[]}],"reasoning":""}
 
 For D-Mails:
-- target "sightjack" for design/architecture issues (Type-S)
-- target "paintress" for implementation issues (Type-P)
-- target either for interpretation gaps (Type-SP)
 - Only generate D-Mails for actual issues found. Empty array if none.
