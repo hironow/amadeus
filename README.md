@@ -115,14 +115,6 @@ amadeus check
     +-- dmails/               <- D-Mail messages
 ```
 
-Legend:
-- Reading Steiner: shift detection (Phase 1)
-- Divergence Meter: scoring and evaluation (Phase 2)
-- D-Mail: corrective message routing (Phase 3)
-- ShiftReport: merged PRs, diffs, significance flag
-- ADR: Architecture Decision Record
-- DoD: Definition of Done
-
 ### Scoring Axes
 
 | Axis | Weight | What It Measures |
@@ -316,12 +308,6 @@ Linear Issues -----------> Git Repository -----------> .divergence/
                                               D-Mail ------+-----> Sightjack
                                               (feedback)   +-----> Paintress
 ```
-
-Legend:
-- Sightjack: pre-merge issue architecture tool
-- Paintress: autonomous code implementation loop
-- Amadeus: post-merge integrity verification
-- D-Mail: corrective feedback routed back to upstream tools
 
 ## Prerequisites
 
