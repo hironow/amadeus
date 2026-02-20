@@ -504,10 +504,14 @@ func (a *Amadeus) resolveDMailCore(ctx context.Context, name, action, reason str
 		return DMail{}, Resolution{}, span, err
 	}
 
-	// Check if already resolved
+	// Check if already resolved.
+	// Distinguish "not found" (ok to proceed) from read/parse errors (must surface).
 	existing, err := a.Store.LoadResolution(name)
 	if err == nil && existing.Status != "" {
 		return DMail{}, Resolution{}, span, fmt.Errorf("D-Mail %s is already %s", name, existing.Status)
+	}
+	if err != nil && !errors.Is(err, ErrNoResolution) {
+		return DMail{}, Resolution{}, span, fmt.Errorf("load resolution: %w", err)
 	}
 
 	// Only HIGH severity DMails are pending (eligible for resolution)

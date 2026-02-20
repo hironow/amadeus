@@ -1,6 +1,7 @@
 package amadeus
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,6 +92,40 @@ func TestParseDMail_MissingDelimiters(t *testing.T) {
 	_, err := ParseDMail([]byte(raw))
 	if err == nil {
 		t.Error("expected error for missing delimiters")
+	}
+}
+
+func TestParseDMail_LegacyUppercaseSeverity(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: feedback
+description: "legacy uppercase severity"
+severity: HIGH
+---
+`
+	dmail, err := ParseDMail([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+	if dmail.Severity != SeverityHigh {
+		t.Errorf("expected severity 'high', got %q", dmail.Severity)
+	}
+}
+
+func TestParseDMail_LegacyMixedCaseSeverity(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: feedback
+description: "mixed case"
+severity: Medium
+---
+`
+	dmail, err := ParseDMail([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+	if dmail.Severity != SeverityMedium {
+		t.Errorf("expected severity 'medium', got %q", dmail.Severity)
 	}
 }
 
@@ -394,6 +429,79 @@ func TestRouteDMail_SeverityMapping(t *testing.T) {
 				t.Errorf("expected status %s, got %s", tt.expected, status)
 			}
 		})
+	}
+}
+
+func TestLoadResolution_NotFound_ReturnsSentinelError(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	_, err := store.LoadResolution("feedback-999")
+	if err == nil {
+		t.Fatal("expected error for non-existent resolution")
+	}
+	if !errors.Is(err, ErrNoResolution) {
+		t.Errorf("expected ErrNoResolution, got: %v", err)
+	}
+}
+
+func TestLoadResolutions_CorruptedJSON_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write corrupted JSON to resolutions.json
+	runDir := filepath.Join(root, ".run")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "resolutions.json"), []byte("{invalid json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(root)
+	_, err := store.LoadResolutions()
+	if err == nil {
+		t.Fatal("expected error for corrupted JSON")
+	}
+	// Must NOT be ErrNoResolution — it's a real parse error
+	if errors.Is(err, ErrNoResolution) {
+		t.Error("corrupted JSON should not return ErrNoResolution")
+	}
+}
+
+func TestSaveResolution_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	res := Resolution{
+		Name:   "feedback-001",
+		Status: "approved",
+		Action: "approve",
+	}
+	if err := store.SaveResolution(res); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := store.LoadResolution("feedback-001")
+	if err != nil {
+		t.Fatalf("LoadResolution failed: %v", err)
+	}
+	if loaded.Status != "approved" {
+		t.Errorf("expected status approved, got %s", loaded.Status)
+	}
+	if loaded.Action != "approve" {
+		t.Errorf("expected action approve, got %s", loaded.Action)
 	}
 }
 

@@ -86,7 +86,7 @@ func ParseDMail(data []byte) (DMail, error) {
 		Kind:        fm.Kind,
 		Description: fm.Description,
 		Issues:      fm.Issues,
-		Severity:    fm.Severity,
+		Severity:    NormalizeSeverity(fm.Severity),
 		Metadata:    fm.Metadata,
 		Body:        strings.TrimLeft(bodyPart, "\n"),
 	}, nil
@@ -205,6 +205,9 @@ func (s *StateStore) LoadAllDMails() ([]DMail, error) {
 	return dmails, nil
 }
 
+// ErrNoResolution is returned when no resolution exists for a given D-Mail name.
+var ErrNoResolution = errors.New("no resolution found")
+
 // Resolution tracks the approval state of a D-Mail, stored as a sidecar file
 // in .run/resolutions.json. The D-Mail .md file itself is immutable.
 type Resolution struct {
@@ -240,7 +243,7 @@ func (s *StateStore) LoadResolution(name string) (Resolution, error) {
 	}
 	res, ok := resolutions[name]
 	if !ok {
-		return Resolution{}, fmt.Errorf("no resolution for %s", name)
+		return Resolution{}, fmt.Errorf("%w: %s", ErrNoResolution, name)
 	}
 	return res, nil
 }

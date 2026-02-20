@@ -133,6 +133,33 @@ func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
 	}
 }
 
+func TestNormalizeSeverity(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Severity
+		expected Severity
+	}{
+		{"lowercase low", SeverityLow, SeverityLow},
+		{"lowercase medium", SeverityMedium, SeverityMedium},
+		{"lowercase high", SeverityHigh, SeverityHigh},
+		{"uppercase LOW", Severity("LOW"), SeverityLow},
+		{"uppercase MEDIUM", Severity("MEDIUM"), SeverityMedium},
+		{"uppercase HIGH", Severity("HIGH"), SeverityHigh},
+		{"mixed case High", Severity("High"), SeverityHigh},
+		{"mixed case Medium", Severity("Medium"), SeverityMedium},
+		{"empty string", Severity(""), Severity("")},
+		{"unrecognized", Severity("critical"), Severity("critical")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeSeverity(tt.input)
+			if got != tt.expected {
+				t.Errorf("NormalizeSeverity(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestFormatDivergence(t *testing.T) {
 	tests := []struct {
 		name     string

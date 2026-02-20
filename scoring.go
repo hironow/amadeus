@@ -1,6 +1,9 @@
 package amadeus
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Axis represents an evaluation axis for divergence scoring.
 type Axis string
@@ -53,6 +56,21 @@ const (
 	SeverityMedium Severity = "medium"
 	SeverityHigh   Severity = "high"
 )
+
+// NormalizeSeverity converts legacy uppercase severity values to lowercase.
+// Returns the input unchanged if already lowercase or unrecognized.
+func NormalizeSeverity(s Severity) Severity {
+	switch Severity(strings.ToLower(string(s))) {
+	case SeverityLow:
+		return SeverityLow
+	case SeverityMedium:
+		return SeverityMedium
+	case SeverityHigh:
+		return SeverityHigh
+	default:
+		return s
+	}
+}
 
 // Thresholds holds the severity threshold configuration.
 type Thresholds struct {
