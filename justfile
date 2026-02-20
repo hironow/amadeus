@@ -41,19 +41,19 @@ install: build
 
 # Run all tests
 test:
-    go test ./... -count=1 -timeout=300s
+    go test -count=1 -timeout=300s ./...
 
 # Run tests with verbose output
 test-v:
-    go test ./... -count=1 -timeout=300s -v
+    go test -v -count=1 -timeout=300s ./...
 
 # Run tests with race detector
 test-race:
-    go test ./... -race -count=1 -timeout=300s
+    go test -race -count=1 -timeout=300s ./...
 
 # Run tests with coverage report
 cover:
-    go test ./... -coverprofile=coverage.out -count=1 -timeout=300s
+    go test -coverprofile=coverage.out -count=1 -timeout=300s ./...
     go tool cover -func=coverage.out
 
 # Open coverage in browser
