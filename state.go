@@ -36,6 +36,7 @@ type CheckResult struct {
 	Type                CheckType          `json:"type"`
 	Divergence          float64            `json:"divergence"`
 	Axes                map[Axis]AxisScore `json:"axes"`
+	ImpactRadius        []ImpactEntry      `json:"impact_radius,omitempty"`
 	PRsEvaluated        []string           `json:"prs_evaluated"`
 	DMails              []string           `json:"dmails"`
 	CheckCountSinceFull int                `json:"check_count_since_full"`

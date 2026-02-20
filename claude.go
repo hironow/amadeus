@@ -13,11 +13,19 @@ import (
 //go:embed templates/*.md.tmpl
 var templateFS embed.FS
 
+// ImpactEntry represents a single entry in the impact radius map.
+type ImpactEntry struct {
+	Area   string `json:"area"`
+	Impact string `json:"impact"` // direct, indirect, transitive
+	Detail string `json:"detail"`
+}
+
 // ClaudeResponse represents the structured JSON output from Claude.
 type ClaudeResponse struct {
-	Axes      map[Axis]AxisScore     `json:"axes"`
-	DMails    []ClaudeDMailCandidate `json:"dmails"`
-	Reasoning string                 `json:"reasoning"`
+	Axes         map[Axis]AxisScore     `json:"axes"`
+	DMails       []ClaudeDMailCandidate `json:"dmails"`
+	Reasoning    string                 `json:"reasoning"`
+	ImpactRadius []ImpactEntry          `json:"impact_radius,omitempty"`
 }
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.

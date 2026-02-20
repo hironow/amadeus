@@ -330,6 +330,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		Type:                checkType,
 		Divergence:          meterResult.Divergence.Value,
 		Axes:                meterResult.Divergence.Axes,
+		ImpactRadius:        meterResult.ImpactRadius,
 		PRsEvaluated:        prNumbers,
 		DMails:              dmailNames,
 		CheckCountSinceFull: a.CheckCount,
@@ -413,6 +414,14 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 		}
 	}
 
+	if len(result.ImpactRadius) > 0 {
+		a.dataOut("")
+		a.dataOut("Impact Radius:")
+		for _, entry := range result.ImpactRadius {
+			a.dataOut("  [%s] %s — %s", entry.Impact, entry.Area, entry.Detail)
+		}
+	}
+
 	if len(dmails) > 0 {
 		a.dataOut("")
 		a.dataOut("D-Mails:")
@@ -448,18 +457,23 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 // PrintCheckOutputJSON writes the check result as JSON to DataOut.
 func (a *Amadeus) PrintCheckOutputJSON(result CheckResult, dmails []DMail, previousDivergence float64) error {
 	output := struct {
-		Divergence float64            `json:"divergence"`
-		Delta      float64            `json:"delta"`
-		Axes       map[Axis]AxisScore `json:"axes"`
-		DMails     []DMail            `json:"dmails"`
+		Divergence   float64            `json:"divergence"`
+		Delta        float64            `json:"delta"`
+		Axes         map[Axis]AxisScore `json:"axes"`
+		ImpactRadius []ImpactEntry      `json:"impact_radius"`
+		DMails       []DMail            `json:"dmails"`
 	}{
-		Divergence: result.Divergence,
-		Delta:      result.Divergence - previousDivergence,
-		Axes:       result.Axes,
-		DMails:     dmails,
+		Divergence:   result.Divergence,
+		Delta:        result.Divergence - previousDivergence,
+		Axes:         result.Axes,
+		ImpactRadius: result.ImpactRadius,
+		DMails:       dmails,
 	}
 	if output.DMails == nil {
 		output.DMails = []DMail{}
+	}
+	if output.ImpactRadius == nil {
+		output.ImpactRadius = []ImpactEntry{}
 	}
 	return a.writeDataJSON(output)
 }

@@ -601,6 +601,69 @@ func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	}
 }
 
+func TestAmadeus_PrintCheckOutput_IncludesImpactRadius(t *testing.T) {
+	// given
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 10, Details: "ok"},
+			AxisDoD:        {Score: 0, Details: "ok"},
+			AxisDependency: {Score: 0, Details: "ok"},
+			AxisImplicit:   {Score: 0, Details: "ok"},
+		},
+		ImpactRadius: []ImpactEntry{
+			{Area: "auth/session.go", Impact: "direct", Detail: "Session validation changed"},
+			{Area: "api/handler.go", Impact: "indirect", Detail: "Uses auth session"},
+		},
+	}
+
+	// when
+	a.PrintCheckOutput(result, nil, 0.08)
+
+	// then
+	output := dataBuf.String()
+	if !strings.Contains(output, "Impact Radius") {
+		t.Errorf("expected 'Impact Radius' section in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "auth/session.go") {
+		t.Errorf("expected 'auth/session.go' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "direct") {
+		t.Errorf("expected 'direct' in output, got:\n%s", output)
+	}
+}
+
+func TestAmadeus_PrintCheckOutput_NoImpactRadius(t *testing.T) {
+	// given: no impact radius data
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR: {Score: 10, Details: "ok"},
+		},
+	}
+
+	// when
+	a.PrintCheckOutput(result, nil, 0.08)
+
+	// then: should not show Impact Radius section
+	output := dataBuf.String()
+	if strings.Contains(output, "Impact Radius") {
+		t.Errorf("expected no 'Impact Radius' section when empty, got:\n%s", output)
+	}
+}
+
 func TestAmadeus_PrintLog(t *testing.T) {
 	// given: history and D-Mails
 	dir := t.TempDir()
@@ -1125,6 +1188,86 @@ func TestPrintCheckOutput_JSON(t *testing.T) {
 	// should contain dmails
 	if _, ok := parsed["dmails"]; !ok {
 		t.Error("expected 'dmails' key in JSON output")
+	}
+}
+
+func TestPrintCheckOutputJSON_IncludesImpactRadius(t *testing.T) {
+	// given
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR: {Score: 10, Details: "ok"},
+		},
+		ImpactRadius: []ImpactEntry{
+			{Area: "auth/session.go", Impact: "direct", Detail: "Session validation changed"},
+			{Area: "api/handler.go", Impact: "indirect", Detail: "Uses auth session"},
+		},
+	}
+
+	// when
+	if err := a.PrintCheckOutputJSON(result, nil, 0.08); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	ir, ok := parsed["impact_radius"]
+	if !ok {
+		t.Fatal("expected 'impact_radius' key in JSON output")
+	}
+	entries, ok := ir.([]any)
+	if !ok {
+		t.Fatalf("expected impact_radius to be array, got %T", ir)
+	}
+	if len(entries) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(entries))
+	}
+}
+
+func TestPrintCheckOutputJSON_EmptyImpactRadius(t *testing.T) {
+	// given: no impact radius data
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR: {Score: 10, Details: "ok"},
+		},
+	}
+
+	// when
+	if err := a.PrintCheckOutputJSON(result, nil, 0.08); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: impact_radius should be empty array (not null)
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	ir, ok := parsed["impact_radius"]
+	if !ok {
+		t.Fatal("expected 'impact_radius' key in JSON output")
+	}
+	entries, ok := ir.([]any)
+	if !ok {
+		t.Fatalf("expected impact_radius to be array, got %T", ir)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(entries))
 	}
 }
 

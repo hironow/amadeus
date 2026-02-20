@@ -25,8 +25,13 @@ The following Linear Issue IDs were found in the merged commits: {{.LinkedIssueI
 Evaluate how these changes affect each integrity axis.
 Score each axis 0-100 (0 = full compliance, 100 = full deviation).
 
+Also produce an **impact_radius** map: identify which areas of the codebase are affected by these changes and how.
+- "direct": Files/modules directly modified in the diff
+- "indirect": Files/modules that import or depend on directly changed code
+- "transitive": Files/modules further downstream that may be affected
+
 Output MUST be valid JSON matching this exact schema:
-{"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"dmails":[{"description":"","detail":"","issues":[]}],"reasoning":""}
+{"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"dmails":[{"description":"","detail":"","issues":[]}],"reasoning":""}
 
 For D-Mails:
 - Only generate D-Mails for actual issues found. Empty array if none.

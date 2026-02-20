@@ -32,6 +32,62 @@ func TestDivergenceMeter_ProcessResponse(t *testing.T) {
 	}
 }
 
+func TestDivergenceMeter_ProcessResponse_PassesImpactRadius(t *testing.T) {
+	// given
+	meter := &DivergenceMeter{Config: DefaultConfig()}
+	resp := ClaudeResponse{
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 0, Details: "ok"},
+			AxisDoD:        {Score: 0, Details: "ok"},
+			AxisDependency: {Score: 0, Details: "ok"},
+			AxisImplicit:   {Score: 0, Details: "ok"},
+		},
+		DMails:    []ClaudeDMailCandidate{},
+		Reasoning: "clean",
+		ImpactRadius: []ImpactEntry{
+			{Area: "auth/session.go", Impact: "direct", Detail: "changed"},
+			{Area: "api/handler.go", Impact: "indirect", Detail: "calls auth"},
+		},
+	}
+
+	// when
+	result := meter.ProcessResponse(resp)
+
+	// then
+	if len(result.ImpactRadius) != 2 {
+		t.Fatalf("expected 2 impact entries, got %d", len(result.ImpactRadius))
+	}
+	if result.ImpactRadius[0].Area != "auth/session.go" {
+		t.Errorf("expected area 'auth/session.go', got %q", result.ImpactRadius[0].Area)
+	}
+	if result.ImpactRadius[1].Impact != "indirect" {
+		t.Errorf("expected impact 'indirect', got %q", result.ImpactRadius[1].Impact)
+	}
+}
+
+func TestDivergenceMeter_ProcessResponse_NilImpactRadius(t *testing.T) {
+	// given: ClaudeResponse without ImpactRadius
+	meter := &DivergenceMeter{Config: DefaultConfig()}
+	resp := ClaudeResponse{
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 0, Details: "ok"},
+			AxisDoD:        {Score: 0, Details: "ok"},
+			AxisDependency: {Score: 0, Details: "ok"},
+			AxisImplicit:   {Score: 0, Details: "ok"},
+		},
+		DMails:    []ClaudeDMailCandidate{},
+		Reasoning: "clean",
+	}
+
+	// when
+	result := meter.ProcessResponse(resp)
+
+	// then
+	if result.ImpactRadius != nil {
+		t.Errorf("expected nil impact radius, got %v", result.ImpactRadius)
+	}
+}
+
 func TestDivergenceMeter_ProcessResponse_HighSeverity(t *testing.T) {
 	meter := &DivergenceMeter{
 		Config: DefaultConfig(),

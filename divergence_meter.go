@@ -5,6 +5,7 @@ type MeterResult struct {
 	Divergence      DivergenceResult
 	DMailCandidates []ClaudeDMailCandidate
 	Reasoning       string
+	ImpactRadius    []ImpactEntry
 }
 
 // DivergenceMeter bridges Claude output and the scoring engine.
@@ -25,5 +26,6 @@ func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
 		Divergence:      divergence,
 		DMailCandidates: resp.DMails,
 		Reasoning:       resp.Reasoning,
+		ImpactRadius:    resp.ImpactRadius,
 	}
 }
