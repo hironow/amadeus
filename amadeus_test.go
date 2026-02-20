@@ -776,6 +776,88 @@ func TestPrintCheckOutput_JSON(t *testing.T) {
 	}
 }
 
+func TestRunCheck_ConsumesInbox(t *testing.T) {
+	// given: set up .divergence with an inbox report
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Drop a report into inbox/
+	content := []byte("---\nname: report-001\nkind: report\ndescription: test report\n---\n\nReport body.\n")
+	if err := os.WriteFile(filepath.Join(root, "inbox", "report-001.md"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(root)
+
+	// Verify inbox has file before scan
+	inboxEntries, _ := os.ReadDir(filepath.Join(root, "inbox"))
+	mdBefore := 0
+	for _, e := range inboxEntries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdBefore++
+		}
+	}
+	if mdBefore != 1 {
+		t.Fatalf("expected 1 inbox file before, got %d", mdBefore)
+	}
+
+	// when: consume inbox directly (RunCheck requires Claude, so test ScanInbox + SaveConsumed)
+	dmails, err := store.ScanInbox()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1 consumed, got %d", len(dmails))
+	}
+
+	// Save consumed records (same logic as in RunCheck)
+	now := time.Now().UTC()
+	var records []ConsumedRecord
+	for _, d := range dmails {
+		records = append(records, ConsumedRecord{
+			Name:       d.Name,
+			Kind:       d.Kind,
+			ConsumedAt: now,
+			Source:     d.Name + ".md",
+		})
+	}
+	if err := store.SaveConsumed(records); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: inbox is empty
+	inboxEntries, _ = os.ReadDir(filepath.Join(root, "inbox"))
+	mdAfter := 0
+	for _, e := range inboxEntries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdAfter++
+		}
+	}
+	if mdAfter != 0 {
+		t.Errorf("expected inbox empty after scan, got %d", mdAfter)
+	}
+
+	// then: archive has the file
+	if _, err := os.Stat(filepath.Join(root, "archive", "report-001.md")); err != nil {
+		t.Errorf("expected report in archive: %v", err)
+	}
+
+	// then: consumed records persisted
+	loaded, err := store.LoadConsumed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 1 {
+		t.Fatalf("expected 1 consumed record, got %d", len(loaded))
+	}
+	if loaded[0].Name != "report-001" {
+		t.Errorf("expected report-001, got %s", loaded[0].Name)
+	}
+}
+
 func TestPrintLogJSON(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")

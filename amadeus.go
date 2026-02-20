@@ -89,6 +89,33 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	a.CheckCount = previous.CheckCountSinceFull
 	a.ForceFullNext = previous.ForceFullNext
 
+	// Phase 0: Consume inbox D-Mails
+	consumed, scanErr := a.Store.ScanInbox()
+	if scanErr != nil {
+		return fmt.Errorf("scan inbox: %w", scanErr)
+	}
+	if len(consumed) > 0 {
+		if !opts.Quiet {
+			a.Logger.Info("Consumed %d report(s) from inbox", len(consumed))
+		}
+		span.AddEvent("inbox.consumed", trace.WithAttributes(
+			attribute.Int("inbox.count", len(consumed)),
+		))
+		now := time.Now().UTC()
+		var records []ConsumedRecord
+		for _, d := range consumed {
+			records = append(records, ConsumedRecord{
+				Name:       d.Name,
+				Kind:       d.Kind,
+				ConsumedAt: now,
+				Source:     d.Name + ".md",
+			})
+		}
+		if err := a.Store.SaveConsumed(records); err != nil {
+			return fmt.Errorf("save consumed: %w", err)
+		}
+	}
+
 	fullCheck := a.ShouldFullCheck(opts.Full)
 	if a.ForceFullNext {
 		if !opts.Quiet {
