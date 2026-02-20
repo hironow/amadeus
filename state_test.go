@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-func TestInitDivergenceDir_CreatesStructure(t *testing.T) {
+func TestInitGateDir_CreatesStructure(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	err := InitDivergenceDir(root)
+	root := filepath.Join(dir, ".gate")
+	err := InitGateDir(root)
 	if err != nil {
-		t.Fatalf("InitDivergenceDir failed: %v", err)
+		t.Fatalf("InitGateDir failed: %v", err)
 	}
 	for _, sub := range []string{".run", "history", "outbox", "inbox", "archive"} {
 		path := filepath.Join(root, sub)
@@ -43,8 +43,8 @@ func TestInitDivergenceDir_CreatesStructure(t *testing.T) {
 
 func TestSaveAndLoadCheckResult(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	result := CheckResult{
@@ -81,8 +81,8 @@ func TestSaveAndLoadCheckResult(t *testing.T) {
 
 func TestSaveHistory_SecondPrecision(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -123,8 +123,8 @@ func TestSaveHistory_SecondPrecision(t *testing.T) {
 
 func TestSaveHistory_SameSecond_NoClobber(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -158,8 +158,8 @@ func TestSaveHistory_SameSecond_NoClobber(t *testing.T) {
 
 func TestSaveHistory_UnreadableDir_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -186,8 +186,8 @@ func TestSaveHistory_UnreadableDir_ReturnsError(t *testing.T) {
 
 func TestLoadHistory_MultipleEntries(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -238,8 +238,8 @@ func TestLoadHistory_MultipleEntries(t *testing.T) {
 
 func TestLoadHistory_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -256,9 +256,9 @@ func TestLoadHistory_EmptyDir(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_MigratesLegacyState(t *testing.T) {
+func TestInitGateDir_MigratesLegacyState(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
+	root := filepath.Join(dir, ".gate")
 
 	// given: legacy state/ directory with latest.json and baseline.json
 	legacyDir := filepath.Join(root, "state")
@@ -274,9 +274,9 @@ func TestInitDivergenceDir_MigratesLegacyState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// when: InitDivergenceDir is called
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatalf("InitDivergenceDir failed: %v", err)
+	// when: InitGateDir is called
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
 	}
 
 	// then: files should be migrated to .run/
@@ -301,14 +301,14 @@ func TestInitDivergenceDir_MigratesLegacyState(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_SkipsMigrationWhenNoLegacy(t *testing.T) {
+func TestInitGateDir_SkipsMigrationWhenNoLegacy(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
+	root := filepath.Join(dir, ".gate")
 
 	// given: no legacy state/ directory
-	// when: InitDivergenceDir is called
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatalf("InitDivergenceDir failed: %v", err)
+	// when: InitGateDir is called
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
 	}
 
 	// then: .run/ should exist but be empty (no migrated files)
@@ -321,9 +321,9 @@ func TestInitDivergenceDir_SkipsMigrationWhenNoLegacy(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_DoesNotOverwriteExistingRun(t *testing.T) {
+func TestInitGateDir_DoesNotOverwriteExistingRun(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
+	root := filepath.Join(dir, ".gate")
 
 	// given: .run/ already has latest.json AND state/ also exists (edge case)
 	runDir := filepath.Join(root, ".run")
@@ -340,9 +340,9 @@ func TestInitDivergenceDir_DoesNotOverwriteExistingRun(t *testing.T) {
 	os.WriteFile(filepath.Join(runDir, "latest.json"), existingData, 0o644)
 	os.WriteFile(filepath.Join(stateDir, "latest.json"), legacyData, 0o644)
 
-	// when: InitDivergenceDir is called
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatalf("InitDivergenceDir failed: %v", err)
+	// when: InitGateDir is called
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
 	}
 
 	// then: .run/latest.json should NOT be overwritten by legacy data
@@ -355,9 +355,9 @@ func TestInitDivergenceDir_DoesNotOverwriteExistingRun(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_AppendsEntriesToExistingGitignore(t *testing.T) {
+func TestInitGateDir_AppendsEntriesToExistingGitignore(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
+	root := filepath.Join(dir, ".gate")
 	os.MkdirAll(root, 0o755)
 
 	// given: existing .gitignore without required entries
@@ -365,8 +365,8 @@ func TestInitDivergenceDir_AppendsEntriesToExistingGitignore(t *testing.T) {
 	os.WriteFile(gitignorePath, []byte("*.log\ntemp/\n"), 0o644)
 
 	// when
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatalf("InitDivergenceDir failed: %v", err)
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
 	}
 
 	// then: .gitignore should contain all required entries
@@ -386,19 +386,19 @@ func TestInitDivergenceDir_AppendsEntriesToExistingGitignore(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_SkipsGitignoreAppendIfAlreadyPresent(t *testing.T) {
+func TestInitGateDir_SkipsGitignoreAppendIfAlreadyPresent(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
+	root := filepath.Join(dir, ".gate")
 	os.MkdirAll(root, 0o755)
 
 	// given: existing .gitignore that already has all required entries
 	gitignorePath := filepath.Join(root, ".gitignore")
-	original := "*.log\n.run/\noutbox/\ninbox/\ntemp/\n"
+	original := "*.log\n.run/\noutbox/\ninbox/\npending/\nrejected/\ntemp/\n"
 	os.WriteFile(gitignorePath, []byte(original), 0o644)
 
 	// when
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatalf("InitDivergenceDir failed: %v", err)
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
 	}
 
 	// then: .gitignore should be unchanged
@@ -411,10 +411,111 @@ func TestInitDivergenceDir_SkipsGitignoreAppendIfAlreadyPresent(t *testing.T) {
 	}
 }
 
+func TestInitGateDir_CreatesSkillDirectories(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+
+	// when
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
+	}
+
+	// then: skills directories should exist
+	for _, sub := range []string{
+		filepath.Join("skills", "dmail-sendable"),
+		filepath.Join("skills", "dmail-readable"),
+	} {
+		path := filepath.Join(root, sub)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("expected %s to exist: %v", sub, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("expected %s to be a directory", sub)
+		}
+	}
+}
+
+func TestInitGateDir_CreatesSkillMDFiles(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+
+	// when
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("InitGateDir failed: %v", err)
+	}
+
+	// then: dmail-sendable/SKILL.md should exist with produces: [feedback]
+	sendablePath := filepath.Join(root, "skills", "dmail-sendable", "SKILL.md")
+	sendableData, err := os.ReadFile(sendablePath)
+	if err != nil {
+		t.Fatalf("expected dmail-sendable/SKILL.md to exist: %v", err)
+	}
+	sendableContent := string(sendableData)
+	if !strings.Contains(sendableContent, "name: dmail-sendable") {
+		t.Errorf("expected SKILL.md to contain 'name: dmail-sendable', got:\n%s", sendableContent)
+	}
+	if !strings.Contains(sendableContent, "produces:") {
+		t.Errorf("expected SKILL.md to contain 'produces:', got:\n%s", sendableContent)
+	}
+	if !strings.Contains(sendableContent, "- feedback") {
+		t.Errorf("expected SKILL.md to contain '- feedback', got:\n%s", sendableContent)
+	}
+
+	// then: dmail-readable/SKILL.md should exist with consumes: [report]
+	readablePath := filepath.Join(root, "skills", "dmail-readable", "SKILL.md")
+	readableData, err := os.ReadFile(readablePath)
+	if err != nil {
+		t.Fatalf("expected dmail-readable/SKILL.md to exist: %v", err)
+	}
+	readableContent := string(readableData)
+	if !strings.Contains(readableContent, "name: dmail-readable") {
+		t.Errorf("expected SKILL.md to contain 'name: dmail-readable', got:\n%s", readableContent)
+	}
+	if !strings.Contains(readableContent, "consumes:") {
+		t.Errorf("expected SKILL.md to contain 'consumes:', got:\n%s", readableContent)
+	}
+	if !strings.Contains(readableContent, "- report") {
+		t.Errorf("expected SKILL.md to contain '- report', got:\n%s", readableContent)
+	}
+}
+
+func TestInitGateDir_DoesNotOverwriteExistingSkillMD(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+
+	// given: first init creates SKILL.md files
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// given: modify the SKILL.md to simulate user customization
+	customPath := filepath.Join(root, "skills", "dmail-sendable", "SKILL.md")
+	customContent := []byte("---\nname: dmail-sendable\ndescription: custom\n---\n")
+	if err := os.WriteFile(customPath, customContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: re-init
+	if err := InitGateDir(root); err != nil {
+		t.Fatalf("second InitGateDir failed: %v", err)
+	}
+
+	// then: custom content should be preserved
+	data, err := os.ReadFile(customPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(customContent) {
+		t.Errorf("expected custom SKILL.md to be preserved, got:\n%s", string(data))
+	}
+}
+
 func TestLoadLatest_NoFile_ReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)

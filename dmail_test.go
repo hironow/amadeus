@@ -2,10 +2,13 @@ package amadeus
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseDMail_Valid(t *testing.T) {
@@ -175,13 +178,13 @@ func TestMarshalDMail_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_CreatesNewStructure(t *testing.T) {
+func TestInitGateDir_CreatesNewStructure(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	for _, sub := range []string{"outbox", "inbox", "archive"} {
+	for _, sub := range []string{"outbox", "inbox", "archive", "pending", "rejected"} {
 		path := filepath.Join(root, sub)
 		info, err := statDir(path)
 		if err != nil {
@@ -194,10 +197,10 @@ func TestInitDivergenceDir_CreatesNewStructure(t *testing.T) {
 	}
 }
 
-func TestInitDivergenceDir_GitignoreContainsOutboxInbox(t *testing.T) {
+func TestInitGateDir_GitignoreContainsOutboxInbox(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	data, err := readGitignore(root)
@@ -211,12 +214,52 @@ func TestInitDivergenceDir_GitignoreContainsOutboxInbox(t *testing.T) {
 	if !strings.Contains(content, "inbox/") {
 		t.Errorf("expected .gitignore to contain 'inbox/', got: %s", content)
 	}
+	if !strings.Contains(content, "pending/") {
+		t.Errorf("expected .gitignore to contain 'pending/', got: %s", content)
+	}
+	if !strings.Contains(content, "rejected/") {
+		t.Errorf("expected .gitignore to contain 'rejected/', got: %s", content)
+	}
+}
+
+func TestMovePendingToRejected_CreatesDirectoryOnDemand(t *testing.T) {
+	// given: a repo where rejected/ does not exist (pre-update installation)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:     "feedback-001",
+		Kind:     KindFeedback,
+		Severity: SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Remove rejected/ to simulate pre-update repo
+	if err := os.Remove(filepath.Join(root, "rejected")); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: move to rejected
+	err := store.MovePendingToRejected("feedback-001")
+
+	// then: should succeed (directory created on demand)
+	if err != nil {
+		t.Fatalf("MovePendingToRejected failed on missing dir: %v", err)
+	}
+	rejectedPath := filepath.Join(root, "rejected", "feedback-001.md")
+	if _, statErr := os.Stat(rejectedPath); statErr != nil {
+		t.Errorf("expected file in rejected/: %v", statErr)
+	}
 }
 
 func TestNextDMailName_EmptyArchive(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -231,8 +274,8 @@ func TestNextDMailName_EmptyArchive(t *testing.T) {
 
 func TestNextDMailName_Sequential(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -257,8 +300,8 @@ func TestNextDMailName_Sequential(t *testing.T) {
 
 func TestSaveDMail_DualWrite(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -283,10 +326,76 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 	}
 }
 
+func TestSaveDMail_HighSeverity_WritesToPending(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "high severity test",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: file exists in archive/ and pending/ (NOT outbox/)
+	archivePath := filepath.Join(root, "archive", "feedback-001.md")
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("expected file in archive: %v", err)
+	}
+	if _, err := os.Stat(pendingPath); err != nil {
+		t.Errorf("expected file in pending: %v", err)
+	}
+	if _, err := os.Stat(outboxPath); err == nil {
+		t.Error("expected file NOT in outbox for HIGH severity")
+	}
+}
+
+func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "low severity test",
+		Severity:    SeverityLow,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: file exists in archive/ and outbox/ (NOT pending/)
+	archivePath := filepath.Join(root, "archive", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("expected file in archive: %v", err)
+	}
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("expected file in outbox: %v", err)
+	}
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file NOT in pending for LOW severity")
+	}
+}
+
 func TestSaveDMail_Format(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -313,8 +422,8 @@ func TestSaveDMail_Format(t *testing.T) {
 
 func TestLoadDMail_Exists(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -350,8 +459,8 @@ func TestLoadDMail_Exists(t *testing.T) {
 
 func TestLoadDMail_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -364,8 +473,8 @@ func TestLoadDMail_NotFound(t *testing.T) {
 
 func TestLoadAllDMails_Multiple(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -397,8 +506,8 @@ func TestLoadAllDMails_Multiple(t *testing.T) {
 
 func TestLoadAllDMails_Empty(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -434,8 +543,8 @@ func TestRouteDMail_SeverityMapping(t *testing.T) {
 
 func TestLoadResolution_NotFound_ReturnsSentinelError(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -451,8 +560,8 @@ func TestLoadResolution_NotFound_ReturnsSentinelError(t *testing.T) {
 
 func TestLoadResolutions_CorruptedJSON_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 
@@ -478,8 +587,8 @@ func TestLoadResolutions_CorruptedJSON_ReturnsError(t *testing.T) {
 
 func TestSaveResolution_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -502,6 +611,287 @@ func TestSaveResolution_RoundTrip(t *testing.T) {
 	}
 	if loaded.Action != "approve" {
 		t.Errorf("expected action approve, got %s", loaded.Action)
+	}
+}
+
+func TestSaveConsumed_RoundTrip(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	records := []ConsumedRecord{
+		{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"},
+		{Name: "report-002", Kind: KindReport, ConsumedAt: now, Source: "report-002.md"},
+	}
+
+	// when
+	if err := store.SaveConsumed(records); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.LoadConsumed()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	if len(loaded) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(loaded))
+	}
+	if loaded[0].Name != "report-001" {
+		t.Errorf("expected report-001, got %s", loaded[0].Name)
+	}
+	if loaded[1].Kind != KindReport {
+		t.Errorf("expected report kind, got %s", loaded[1].Kind)
+	}
+}
+
+func TestLoadConsumed_Empty(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	loaded, err := store.LoadConsumed()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 0 {
+		t.Fatalf("expected empty slice, got %d", len(loaded))
+	}
+}
+
+func TestSaveConsumed_Appends(t *testing.T) {
+	// given: save first batch
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	first := []ConsumedRecord{{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"}}
+	if err := store.SaveConsumed(first); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: save second batch
+	second := []ConsumedRecord{{Name: "report-002", Kind: KindReport, ConsumedAt: now, Source: "report-002.md"}}
+	if err := store.SaveConsumed(second); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	loaded, err := store.LoadConsumed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 2 {
+		t.Fatalf("expected 2 records after two saves, got %d", len(loaded))
+	}
+}
+
+func TestScanInbox_Empty(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 0 {
+		t.Fatalf("expected empty, got %d", len(dmails))
+	}
+}
+
+func TestScanInbox_SingleReport(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// Drop a report into inbox/
+	content := []byte("---\nname: report-001\nkind: report\ndescription: test report\n---\n\nReport body.\n")
+	inboxPath := filepath.Join(root, "inbox", "report-001.md")
+	if err := os.WriteFile(inboxPath, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then: parsed correctly
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1, got %d", len(dmails))
+	}
+	if dmails[0].Name != "report-001" {
+		t.Errorf("expected report-001, got %s", dmails[0].Name)
+	}
+	if dmails[0].Kind != KindReport {
+		t.Errorf("expected report kind, got %s", dmails[0].Kind)
+	}
+
+	// then: copied to archive/
+	archivePath := filepath.Join(root, "archive", "report-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("expected file in archive: %v", err)
+	}
+
+	// then: removed from inbox/
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected file removed from inbox")
+	}
+}
+
+func TestScanInbox_MultipleReports(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	for _, name := range []string{"report-001", "report-002", "report-003"} {
+		content := fmt.Sprintf("---\nname: %s\nkind: report\ndescription: test\n---\n\nbody\n", name)
+		os.WriteFile(filepath.Join(root, "inbox", name+".md"), []byte(content), 0o644)
+	}
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 3 {
+		t.Fatalf("expected 3, got %d", len(dmails))
+	}
+	// Sorted by name
+	if dmails[0].Name != "report-001" || dmails[2].Name != "report-003" {
+		t.Errorf("expected sorted order, got %s, %s, %s", dmails[0].Name, dmails[1].Name, dmails[2].Name)
+	}
+	// inbox/ should be empty of .md files
+	entries, _ := os.ReadDir(filepath.Join(root, "inbox"))
+	mdCount := 0
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdCount++
+		}
+	}
+	if mdCount != 0 {
+		t.Errorf("expected inbox empty, got %d .md files", mdCount)
+	}
+}
+
+func TestScanInbox_InvalidFile(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	os.WriteFile(filepath.Join(root, "inbox", "bad.md"), []byte("not valid frontmatter"), 0o644)
+
+	// when
+	_, err := store.ScanInbox()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid file")
+	}
+	if !strings.Contains(err.Error(), "parse inbox file") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
+func TestScanInbox_AlreadyInArchive(t *testing.T) {
+	// given: file already exists in archive
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	content := []byte("---\nname: report-001\nkind: report\ndescription: original\n---\n\nOriginal body.\n")
+	os.WriteFile(filepath.Join(root, "archive", "report-001.md"), content, 0o644)
+
+	// Drop a different version into inbox
+	inboxContent := []byte("---\nname: report-001\nkind: report\ndescription: duplicate\n---\n\nDuplicate body.\n")
+	os.WriteFile(filepath.Join(root, "inbox", "report-001.md"), inboxContent, 0o644)
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then: no error
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1, got %d", len(dmails))
+	}
+
+	// then: archive file NOT overwritten
+	archiveData, _ := os.ReadFile(filepath.Join(root, "archive", "report-001.md"))
+	parsed, _ := ParseDMail(archiveData)
+	if parsed.Description != "original" {
+		t.Errorf("expected archive to keep 'original', got %q", parsed.Description)
+	}
+
+	// then: inbox file still removed
+	if _, err := os.Stat(filepath.Join(root, "inbox", "report-001.md")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected inbox file removed")
+	}
+}
+
+func TestScanInbox_SkipsNonMD(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	os.WriteFile(filepath.Join(root, "inbox", "readme.txt"), []byte("ignore me"), 0o644)
+
+	// when
+	dmails, err := store.ScanInbox()
+
+	// then
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 0 {
+		t.Fatalf("expected 0, got %d", len(dmails))
 	}
 }
 

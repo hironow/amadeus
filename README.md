@@ -32,7 +32,7 @@ This structure maps directly to post-merge integrity verification:
 | **D-Mail** | Phase 3: Corrective messages | Short, targeted actions sent to downstream tools to correct the timeline |
 | **Attractor Field** | ADRs + DoDs | Design constraints that pull the world line toward convergence |
 | **World Line Convergence** | Target state | All axes at low divergence, codebase aligned with architecture |
-| **.divergence/** | The device | Persistent state directory that tracks readings across checks |
+| **.gate/** | The device | Persistent state directory that tracks readings across checks |
 
 ### Three Design Principles
 
@@ -108,7 +108,7 @@ amadeus check
     |  +-- Dual-write to outbox/ + archive/
     |
     v
-.divergence/                  <- Persistent state
+.gate/                  <- Persistent state
     +-- config.yaml           <- Weights, thresholds, intervals
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
@@ -129,7 +129,7 @@ amadeus check
 | `dependency_integrity` | 0.2 | Dependency graph consistency |
 | `implicit_constraints` | 0.1 | Unwritten conventions and patterns |
 
-Weights and thresholds are configurable in `.divergence/config.yaml`.
+Weights and thresholds are configurable in `.gate/config.yaml`.
 
 ### D-Mail Format
 
@@ -166,7 +166,7 @@ The auth module violates the JWT requirement specified in ADR-003.
 # Build and install
 just install
 
-# Initialize .divergence/ with default config
+# Initialize .gate/ with default config
 amadeus init
 
 # Check environment health
@@ -176,14 +176,14 @@ amadeus doctor
 amadeus check
 ```
 
-Amadeus creates `.divergence/` with config, state, history, and D-Mail storage automatically.
+Amadeus creates `.gate/` with config, state, history, and D-Mail storage automatically.
 
 ## Subcommands
 
 | Command | Description |
 |---------|-------------|
 | `amadeus check` | Execute three-phase divergence check |
-| `amadeus init` | Initialize `.divergence/` directory with default config |
+| `amadeus init` | Initialize `.gate/` directory with default config |
 | `amadeus doctor` | Check environment health (git, Claude CLI, config) |
 | `amadeus resolve <name>` | Approve or reject a pending D-Mail |
 | `amadeus log` | Print check history and D-Mail log |
@@ -227,7 +227,7 @@ amadeus log --json | jq '.dmails[] | select(.status == "pending")'
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--config` | `-c` | `.divergence/config.yaml` | Config file path |
+| `--config` | `-c` | `.gate/config.yaml` | Config file path |
 | `--verbose` | `-v` | `false` | Verbose logging |
 | `--dry-run` | | `false` | Build prompt only, skip Claude |
 | `--full` | | `false` | Force full calibration check |
@@ -255,7 +255,7 @@ esac
 ## Configuration
 
 ```yaml
-# .divergence/config.yaml
+# .gate/config.yaml
 weights:
   adr_integrity: 0.4
   dod_fulfillment: 0.3
@@ -333,8 +333,8 @@ just jaeger-down    # Stop Jaeger
 +-- claude.go                Claude CLI integration + prompt rendering
 +-- scoring.go               Divergence scoring (weights, thresholds, severity)
 +-- dmail.go                 D-Mail model (YAML+MD format, resolution sidecar)
-+-- config.go                Configuration loader (.divergence/config.yaml)
-+-- state.go                 State persistence (.divergence/)
++-- config.go                Configuration loader (.gate/config.yaml)
++-- state.go                 State persistence (.gate/)
 +-- git.go                   Git client (merged PRs, diffs, HEAD)
 +-- doctor.go                Environment health checks
 +-- logger.go                Leveled logging
@@ -360,7 +360,7 @@ Sightjack (pre-merge)      Paintress (execution)      Amadeus (post-merge)
     |  Wave-by-wave approval    |  Expedition loop         |  D-Mail routing
     |                           |                          |
     v                           v                          v
-Linear Issues -----------> Git Repository -----------> .divergence/
+Linear Issues -----------> Git Repository -----------> .gate/
                                 |                          |
                    D-Mail       |         D-Mail           |
                   (report) -----+----> inbox/         outbox/ ----> feedback

@@ -89,6 +89,35 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	a.CheckCount = previous.CheckCountSinceFull
 	a.ForceFullNext = previous.ForceFullNext
 
+	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state)
+	if !opts.DryRun {
+		consumed, scanErr := a.Store.ScanInbox()
+		if scanErr != nil {
+			return fmt.Errorf("scan inbox: %w", scanErr)
+		}
+		if len(consumed) > 0 {
+			if !opts.Quiet {
+				a.Logger.Info("Consumed %d report(s) from inbox", len(consumed))
+			}
+			span.AddEvent("inbox.consumed", trace.WithAttributes(
+				attribute.Int("inbox.count", len(consumed)),
+			))
+			now := time.Now().UTC()
+			var records []ConsumedRecord
+			for _, d := range consumed {
+				records = append(records, ConsumedRecord{
+					Name:       d.Name,
+					Kind:       d.Kind,
+					ConsumedAt: now,
+					Source:     d.Name + ".md",
+				})
+			}
+			if err := a.Store.SaveConsumed(records); err != nil {
+				return fmt.Errorf("save consumed: %w", err)
+			}
+		}
+	}
+
 	fullCheck := a.ShouldFullCheck(opts.Full)
 	if a.ForceFullNext {
 		if !opts.Quiet {
@@ -545,8 +574,28 @@ func (a *Amadeus) resolveDMailCore(ctx context.Context, name, action, reason str
 		return DMail{}, Resolution{}, span, fmt.Errorf("unknown action: %s (use --approve or --reject)", action)
 	}
 
-	if err := a.Store.SaveResolution(resolution); err != nil {
-		return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
+	// Move file from pending/ before persisting resolution.
+	// If move fails, no resolution is saved — avoids orphan resolution
+	// that would block future resolve attempts.
+	// If SaveResolution fails after move, roll back the move to keep
+	// the pending file in place for a future retry.
+	switch action {
+	case "approve":
+		if err := a.Store.MovePendingToOutbox(name); err != nil {
+			return DMail{}, Resolution{}, span, fmt.Errorf("move to outbox: %w", err)
+		}
+		if err := a.Store.SaveResolution(resolution); err != nil {
+			_ = a.Store.MoveOutboxToPending(name) // best-effort rollback
+			return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
+		}
+	case "reject":
+		if err := a.Store.MovePendingToRejected(name); err != nil {
+			return DMail{}, Resolution{}, span, fmt.Errorf("move to rejected: %w", err)
+		}
+		if err := a.Store.SaveResolution(resolution); err != nil {
+			_ = a.Store.MoveRejectedToPending(name) // best-effort rollback
+			return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
+		}
 	}
 
 	span.AddEvent("dmail.resolved", trace.WithAttributes(
@@ -570,25 +619,37 @@ func (a *Amadeus) ResolveDMail(ctx context.Context, name string, action string, 
 	return nil
 }
 
-// ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
-func (a *Amadeus) ResolveDMailJSON(ctx context.Context, name string, action string, reason string) error {
+// ResolveOutput is the JSON-serializable result of resolving a D-Mail.
+type ResolveOutput struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Action     string `json:"action"`
+	ResolvedAt string `json:"resolved_at"`
+}
+
+// ResolveDMailResult resolves a D-Mail and returns the result as a struct.
+// Use this for batch operations where the caller aggregates results.
+func (a *Amadeus) ResolveDMailResult(ctx context.Context, name string, action string, reason string) (ResolveOutput, error) {
 	_, resolution, span, err := a.resolveDMailCore(ctx, name, action, reason)
 	defer span.End()
 	if err != nil {
+		return ResolveOutput{}, err
+	}
+	return ResolveOutput{
+		Name:       name,
+		Status:     resolution.Status,
+		Action:     action,
+		ResolvedAt: resolution.ResolvedAt.Format(time.RFC3339),
+	}, nil
+}
+
+// ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
+func (a *Amadeus) ResolveDMailJSON(ctx context.Context, name string, action string, reason string) error {
+	result, err := a.ResolveDMailResult(ctx, name, action, reason)
+	if err != nil {
 		return err
 	}
-	output := struct {
-		Name     string `json:"name"`
-		Status   string `json:"status"`
-		Action   string `json:"action"`
-		Resolved string `json:"resolved_at"`
-	}{
-		Name:     name,
-		Status:   resolution.Status,
-		Action:   action,
-		Resolved: resolution.ResolvedAt.Format(time.RFC3339),
-	}
-	return a.writeDataJSON(output)
+	return a.writeDataJSON(result)
 }
 
 // PrintLog renders the history and D-Mail log to DataOut.
@@ -663,7 +724,35 @@ func (a *Amadeus) PrintLog() error {
 		}
 	}
 
+	consumed, err := a.Store.LoadConsumed()
+	if err != nil {
+		return fmt.Errorf("load consumed: %w", err)
+	}
+	if len(consumed) > 0 {
+		a.dataOut("")
+		a.dataOut("Consumed:")
+		for _, c := range consumed {
+			a.dataOut("  %s  [%s]  %s",
+				c.Name,
+				string(c.Kind),
+				c.ConsumedAt.Format("2006-01-02T15:04"))
+		}
+	}
+
 	return nil
+}
+
+// dmailJSONView is a JSON-specific view that merges a DMail with its Resolution status.
+type dmailJSONView struct {
+	Name        string            `json:"name"`
+	Kind        DMailKind         `json:"kind"`
+	Description string            `json:"description"`
+	Issues      []string          `json:"issues,omitempty"`
+	Severity    Severity          `json:"severity,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	Status      string            `json:"status"`
+	ResolvedAt  *time.Time        `json:"resolved_at,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
 }
 
 // PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
@@ -676,18 +765,52 @@ func (a *Amadeus) PrintLogJSON() error {
 	if err != nil {
 		return fmt.Errorf("load dmails: %w", err)
 	}
+	resolutions, err := a.Store.LoadResolutions()
+	if err != nil {
+		return fmt.Errorf("load resolutions: %w", err)
+	}
+	consumed, err := a.Store.LoadConsumed()
+	if err != nil {
+		return fmt.Errorf("load consumed: %w", err)
+	}
+	if consumed == nil {
+		consumed = []ConsumedRecord{}
+	}
 	if history == nil {
 		history = []CheckResult{}
 	}
-	if dmails == nil {
-		dmails = []DMail{}
+
+	views := make([]dmailJSONView, len(dmails))
+	for i, d := range dmails {
+		status := string(RouteDMail(d.Severity))
+		var resolvedAt *time.Time
+		var reason string
+		if res, ok := resolutions[d.Name]; ok {
+			status = res.Status
+			resolvedAt = res.ResolvedAt
+			reason = res.Reason
+		}
+		views[i] = dmailJSONView{
+			Name:        d.Name,
+			Kind:        d.Kind,
+			Description: d.Description,
+			Issues:      d.Issues,
+			Severity:    d.Severity,
+			Metadata:    d.Metadata,
+			Status:      status,
+			ResolvedAt:  resolvedAt,
+			Reason:      reason,
+		}
 	}
+
 	output := struct {
-		History []CheckResult `json:"history"`
-		DMails  []DMail       `json:"dmails"`
+		History  []CheckResult    `json:"history"`
+		DMails   []dmailJSONView  `json:"dmails"`
+		Consumed []ConsumedRecord `json:"consumed"`
 	}{
-		History: history,
-		DMails:  dmails,
+		History:  history,
+		DMails:   views,
+		Consumed: consumed,
 	}
 	return a.writeDataJSON(output)
 }

@@ -152,20 +152,30 @@ func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
 	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// SaveDMail writes a D-Mail to both outbox/ and archive/ (dual-write pattern).
+// SaveDMail writes a D-Mail to archive/ and either outbox/ or pending/.
+// Archive is always written first so the permanent record exists even if
+// the second write fails. HIGH severity D-Mails go to pending/ for human
+// approval; all others go directly to outbox/ for courier delivery.
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	data, err := MarshalDMail(dmail)
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
 	filename := dmail.Name + ".md"
-	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	archivePath := filepath.Join(s.Root, "archive", filename)
-	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
-		return fmt.Errorf("write outbox: %w", err)
-	}
 	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
 		return fmt.Errorf("write archive: %w", err)
+	}
+	if RouteDMail(dmail.Severity) == DMailPending {
+		pendingPath := filepath.Join(s.Root, "pending", filename)
+		if err := os.WriteFile(pendingPath, data, 0o644); err != nil {
+			return fmt.Errorf("write pending: %w", err)
+		}
+		return nil
+	}
+	outboxPath := filepath.Join(s.Root, "outbox", filename)
+	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
+		return fmt.Errorf("write outbox: %w", err)
 	}
 	return nil
 }
@@ -256,4 +266,126 @@ func (s *StateStore) SaveResolution(res Resolution) error {
 	}
 	resolutions[res.Name] = res
 	return s.writeJSON(filepath.Join(s.Root, ".run", "resolutions.json"), resolutions)
+}
+
+// ConsumedRecord tracks a processed inbox D-Mail.
+type ConsumedRecord struct {
+	Name       string    `json:"name"`
+	Kind       DMailKind `json:"kind"`
+	ConsumedAt time.Time `json:"consumed_at"`
+	Source     string    `json:"source"`
+}
+
+// LoadConsumed reads all consumed records from .run/consumed.json.
+func (s *StateStore) LoadConsumed() ([]ConsumedRecord, error) {
+	path := filepath.Join(s.Root, ".run", "consumed.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return []ConsumedRecord{}, nil
+		}
+		return nil, err
+	}
+	var records []ConsumedRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+// SaveConsumed appends consumed records to .run/consumed.json.
+func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
+	existing, err := s.LoadConsumed()
+	if err != nil {
+		return err
+	}
+	existing = append(existing, records...)
+	return s.writeJSON(filepath.Join(s.Root, ".run", "consumed.json"), existing)
+}
+
+// MovePendingToOutbox moves a D-Mail from pending/ to outbox/ for courier delivery.
+func (s *StateStore) MovePendingToOutbox(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "pending", filename)
+	dst := filepath.Join(s.Root, "outbox", filename)
+	return os.Rename(src, dst)
+}
+
+// MovePendingToRejected moves a D-Mail from pending/ to rejected/.
+// Creates the rejected/ directory on demand for pre-update installations.
+func (s *StateStore) MovePendingToRejected(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "pending", filename)
+	rejectedDir := filepath.Join(s.Root, "rejected")
+	if err := os.MkdirAll(rejectedDir, 0o755); err != nil {
+		return err
+	}
+	dst := filepath.Join(rejectedDir, filename)
+	return os.Rename(src, dst)
+}
+
+// MoveOutboxToPending moves a D-Mail from outbox/ back to pending/ (rollback).
+func (s *StateStore) MoveOutboxToPending(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "outbox", filename)
+	dst := filepath.Join(s.Root, "pending", filename)
+	return os.Rename(src, dst)
+}
+
+// MoveRejectedToPending moves a D-Mail from rejected/ back to pending/ (rollback).
+func (s *StateStore) MoveRejectedToPending(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "rejected", filename)
+	dst := filepath.Join(s.Root, "pending", filename)
+	return os.Rename(src, dst)
+}
+
+// ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
+// copies to archive/ (skip if already exists), and removes from inbox/.
+// Returns the parsed D-Mails sorted by name.
+func (s *StateStore) ScanInbox() ([]DMail, error) {
+	inboxDir := filepath.Join(s.Root, "inbox")
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read inbox: %w", err)
+	}
+
+	var dmails []DMail
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		inboxPath := filepath.Join(inboxDir, e.Name())
+		data, err := os.ReadFile(inboxPath)
+		if err != nil {
+			return nil, fmt.Errorf("read inbox file %s: %w", e.Name(), err)
+		}
+		dmail, err := ParseDMail(data)
+		if err != nil {
+			return nil, fmt.Errorf("parse inbox file %s: %w", e.Name(), err)
+		}
+
+		// Copy to archive (skip if exists)
+		archivePath := filepath.Join(s.Root, "archive", e.Name())
+		if _, statErr := os.Stat(archivePath); errors.Is(statErr, fs.ErrNotExist) {
+			if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+				return nil, fmt.Errorf("archive %s: %w", e.Name(), err)
+			}
+		}
+
+		// Remove from inbox
+		if err := os.Remove(inboxPath); err != nil {
+			return nil, fmt.Errorf("remove inbox %s: %w", e.Name(), err)
+		}
+
+		dmails = append(dmails, dmail)
+	}
+
+	sort.Slice(dmails, func(i, j int) bool {
+		return dmails[i].Name < dmails[j].Name
+	})
+	return dmails, nil
 }

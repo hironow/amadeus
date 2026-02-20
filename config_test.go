@@ -3,6 +3,7 @@ package amadeus
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -61,5 +62,137 @@ func TestLoadConfig_FileNotFound_ReturnsDefault(t *testing.T) {
 	}
 	if cfg.Weights.ADRIntegrity != 0.4 {
 		t.Errorf("expected default ADR weight 0.4, got %f", cfg.Weights.ADRIntegrity)
+	}
+}
+
+func TestValidateConfig_DefaultIsValid(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("default config should be valid, got errors: %v", errs)
+	}
+}
+
+func TestValidateConfig_WeightsSumNot1(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Weights.ADRIntegrity = 0.5 // sum = 0.5+0.3+0.2+0.1 = 1.1
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected error for weights sum != 1.0")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "sum") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'sum' in error, got: %v", errs)
+	}
+}
+
+func TestValidateConfig_NegativeWeight(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Weights.ADRIntegrity = -0.1
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected error for negative weight")
+	}
+}
+
+func TestValidateConfig_ThresholdsOutOfOrder(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Thresholds.LowMax = 0.6
+	cfg.Thresholds.MediumMax = 0.3
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected error for out-of-order thresholds")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "low_max") && strings.Contains(e, "medium_max") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected threshold order error, got: %v", errs)
+	}
+}
+
+func TestValidateConfig_PerAxisOverrideOutOfRange(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.PerAxisOverride.ADRForceHigh = 150
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected error for override > 100")
+	}
+}
+
+func TestValidateConfig_FullCheckIntervalZero(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.FullCheck.Interval = 0
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected error for zero interval")
+	}
+}
+
+func TestValidateConfig_DivergenceJumpNegative(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.FullCheck.OnDivergenceJump = -0.1
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected error for negative divergence jump")
+	}
+}
+
+func TestValidateConfig_MultipleErrors(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Weights.ADRIntegrity = -0.1
+	cfg.Thresholds.LowMax = 0.8
+	cfg.FullCheck.Interval = 0
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	if len(errs) < 3 {
+		t.Errorf("expected at least 3 errors, got %d: %v", len(errs), errs)
 	}
 }

@@ -69,19 +69,19 @@ func TestCheckGitRepo_NotRepo(t *testing.T) {
 	}
 }
 
-func TestCheckDivergenceDir_Exists(t *testing.T) {
+func TestCheckGateDir_Exists(t *testing.T) {
 	dir := t.TempDir()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	result := checkDivergenceDir(dir)
+	result := checkGateDir(dir)
 	if result.Status != CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
-func TestCheckDivergenceDir_NotExist(t *testing.T) {
+func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
-	result := checkDivergenceDir(dir)
+	result := checkGateDir(dir)
 	if result.Status != CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -196,8 +196,8 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	defer func() { execCommand = exec.CommandContext }()
 
 	dir := t.TempDir()
-	// Create .divergence/ with config
-	divRoot := filepath.Join(dir, ".divergence")
+	// Create .gate/ with config
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	cfg := DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
@@ -212,12 +212,12 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := RunDoctor(ctx, configPath, dir)
 
-	// then: should have 6 results
-	if len(results) != 6 {
-		t.Fatalf("expected 6 results, got %d", len(results))
+	// then: should have 7 results
+	if len(results) != 7 {
+		t.Fatalf("expected 7 results, got %d", len(results))
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "claude", ".divergence/", "Config", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -235,7 +235,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 
 	dir := t.TempDir()
 	exec.Command("git", "init", dir).Run()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	cfg := DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
@@ -252,15 +252,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "amadeus.doctor" {
 			found = true
-			// Should have 6 doctor.check events (one per check)
+			// Should have 7 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 6 {
-				t.Errorf("expected 6 doctor.check events, got %d", eventCount)
+			if eventCount != 7 {
+				t.Errorf("expected 7 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -269,10 +269,108 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	}
 }
 
+func TestCheckSkillMD_BothExist(t *testing.T) {
+	// given: properly initialized .gate/ with skills
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	result := checkSkillMD(dir)
+
+	// then
+	if result.Status != CheckOK {
+		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckSkillMD_MissingSendable(t *testing.T) {
+	// given: .gate/ with only dmail-readable
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(filepath.Join(root, "skills", "dmail-sendable", "SKILL.md"))
+
+	// when
+	result := checkSkillMD(dir)
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Message, "dmail-sendable") {
+		t.Errorf("expected message to mention dmail-sendable, got: %s", result.Message)
+	}
+}
+
+func TestCheckSkillMD_NoGateDir(t *testing.T) {
+	// given: no .gate/ at all
+	dir := t.TempDir()
+
+	// when
+	result := checkSkillMD(dir)
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
+	// given: mock commands succeed
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	dir := t.TempDir()
+	divRoot := filepath.Join(dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	exec.Command("git", "init", dir).Run()
+
+	ctx := context.Background()
+	configPath := filepath.Join(divRoot, "config.yaml")
+
+	// when
+	results := RunDoctor(ctx, configPath, dir)
+
+	// then: should have 7 results (added SKILL.md check)
+	if len(results) != 7 {
+		names := make([]string, len(results))
+		for i, r := range results {
+			names[i] = r.Name
+		}
+		t.Fatalf("expected 7 results, got %d: %v", len(results), names)
+	}
+
+	// then: SKILL.md check should be present and OK
+	var skillResult DoctorCheckResult
+	found := false
+	for _, r := range results {
+		if r.Name == "SKILL.md" {
+			skillResult = r
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected SKILL.md check in doctor results")
+	}
+	if skillResult.Status != CheckOK {
+		t.Errorf("expected SKILL.md CheckOK, got %v: %s", skillResult.Status, skillResult.Message)
+	}
+}
+
 func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	// given: no need to mock execCommand for this test
 	dir := t.TempDir()
-	divRoot := filepath.Join(dir, ".divergence")
+	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	cfg := DefaultConfig()
 	data, _ := yaml.Marshal(cfg)

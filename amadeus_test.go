@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,8 +48,8 @@ func TestAmadeus_ShouldFullCheck_FullByForceFullNext(t *testing.T) {
 func TestAmadeus_DivergenceJump_SetsForceFullNext(t *testing.T) {
 	// given: a state store with previous divergence data
 	dir := t.TempDir()
-	root := dir + "/.divergence"
-	if err := InitDivergenceDir(root); err != nil {
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -80,8 +81,8 @@ func TestAmadeus_DivergenceJump_SetsForceFullNext(t *testing.T) {
 func TestAmadeus_NoShift_AdvancesCheckCount(t *testing.T) {
 	// given: a state store with a previous result at count=3
 	dir := t.TempDir()
-	root := dir + "/.divergence"
-	if err := InitDivergenceDir(root); err != nil {
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -114,8 +115,8 @@ func TestAmadeus_NoShift_AdvancesCheckCount(t *testing.T) {
 func TestAmadeus_NoShift_PreservesPriorDivergence(t *testing.T) {
 	// given: a state store with previous divergence data
 	dir := t.TempDir()
-	root := dir + "/.divergence"
-	if err := InitDivergenceDir(root); err != nil {
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -158,8 +159,8 @@ func TestAmadeus_NoShift_PreservesPriorDivergence(t *testing.T) {
 func TestAmadeus_NoShift_UpdatesCheckedAtAndHistory(t *testing.T) {
 	// given: a state store with a previous result from yesterday
 	dir := t.TempDir()
-	root := dir + "/.divergence"
-	if err := InitDivergenceDir(root); err != nil {
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -205,8 +206,8 @@ func TestAmadeus_NoShift_UpdatesCheckedAtAndHistory(t *testing.T) {
 func TestAmadeus_NoShift_ClearsStalePRAndDMailData(t *testing.T) {
 	// given: a previous result with PRs and DMails from a real check
 	dir := t.TempDir()
-	root := dir + "/.divergence"
-	if err := InitDivergenceDir(root); err != nil {
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -282,8 +283,8 @@ func TestAmadeus_ShouldPromoteToFull_ExactThreshold(t *testing.T) {
 func TestResolveDMail_Approve(t *testing.T) {
 	// given: a high-severity D-Mail (pending via routing)
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -326,13 +327,22 @@ func TestResolveDMail_Approve(t *testing.T) {
 	if !strings.Contains(dataBuf.String(), "approved") {
 		t.Errorf("expected 'approved' in DataOut, got: %s", dataBuf.String())
 	}
+	// then: file moved from pending/ to outbox/
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file removed from pending/")
+	}
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("expected file in outbox after approve: %v", err)
+	}
 }
 
 func TestResolveDMail_Reject(t *testing.T) {
 	// given: a high-severity D-Mail (pending via routing)
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -365,13 +375,22 @@ func TestResolveDMail_Reject(t *testing.T) {
 	if res.Reason != "false positive" {
 		t.Errorf("expected reason 'false positive', got %s", res.Reason)
 	}
+	// then: file moved from pending/ to rejected/
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	rejectedPath := filepath.Join(root, "rejected", "feedback-001.md")
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file removed from pending/")
+	}
+	if _, err := os.Stat(rejectedPath); err != nil {
+		t.Errorf("expected file in rejected after reject: %v", err)
+	}
 }
 
 func TestResolveDMail_AlreadyResolved(t *testing.T) {
 	// given: a D-Mail that already has a resolution
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -407,8 +426,8 @@ func TestResolveDMail_AlreadyResolved(t *testing.T) {
 
 func TestResolveDMail_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -427,8 +446,8 @@ func TestResolveDMail_NotFound(t *testing.T) {
 func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	// given: a high-severity D-Mail (pending via routing)
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -458,6 +477,89 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	_, resErr := store.LoadResolution("feedback-001")
 	if resErr == nil {
 		t.Error("expected no resolution to exist after failed reject")
+	}
+}
+
+func TestResolveDMail_MoveFailure_NoOrphanResolution(t *testing.T) {
+	// given: a high-severity D-Mail saved to pending/ via routing
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate move failure by removing the pending file before resolve
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	if err := os.Remove(pendingPath); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when: resolve should fail because pending file is missing
+	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
+
+	// then: error expected
+	if err == nil {
+		t.Fatal("expected error when pending file is missing")
+	}
+	// then: resolution must NOT be persisted (no orphan resolution)
+	_, resErr := store.LoadResolution("feedback-001")
+	if resErr == nil {
+		t.Error("expected no resolution to exist after move failure — orphan resolution detected")
+	}
+}
+
+func TestResolveDMail_SaveFailure_RollsBackMove(t *testing.T) {
+	// given: a high-severity D-Mail saved to pending/ via routing
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate SaveResolution failure by making .run/ directory read-only
+	runDir := filepath.Join(root, ".run")
+	if err := os.Chmod(runDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(runDir, 0o755) })
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when: resolve should fail at SaveResolution
+	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
+
+	// then: error expected
+	if err == nil {
+		t.Fatal("expected error when SaveResolution fails")
+	}
+	// then: file should be rolled back to pending/ (not stuck in outbox/)
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	if _, statErr := os.Stat(pendingPath); statErr != nil {
+		t.Errorf("expected file back in pending/ after rollback: %v", statErr)
+	}
+	if _, statErr := os.Stat(outboxPath); statErr == nil {
+		t.Error("expected file NOT in outbox/ after rollback")
 	}
 }
 
@@ -502,8 +604,8 @@ func TestAmadeus_PrintCheckOutput(t *testing.T) {
 func TestAmadeus_PrintLog(t *testing.T) {
 	// given: history and D-Mails
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -612,8 +714,8 @@ func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
 
 func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -707,8 +809,8 @@ func TestExitCode_WrappedDriftError(t *testing.T) {
 func TestRunCheck_DryRun_NilDataOut_NoPanic(t *testing.T) {
 	// given: an Amadeus with DataOut=nil (library usage without explicit wiring)
 	repo := setupTestRepo(t)
-	divRoot := filepath.Join(repo.dir, ".divergence")
-	if err := InitDivergenceDir(divRoot); err != nil {
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
 	a := &Amadeus{
@@ -725,6 +827,44 @@ func TestRunCheck_DryRun_NilDataOut_NoPanic(t *testing.T) {
 	// then
 	if err != nil {
 		t.Fatalf("RunCheck DryRun with nil DataOut should not fail: %v", err)
+	}
+}
+
+func TestRunCheck_DryRun_DoesNotConsumeInbox(t *testing.T) {
+	// given: inbox has a report d-mail
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	inboxDir := filepath.Join(divRoot, "inbox")
+	reportContent := "---\nname: report-001\nkind: report\ndescription: test\n---\nBody\n"
+	if err := os.WriteFile(filepath.Join(inboxDir, "report-001.md"), []byte(reportContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &bytes.Buffer{},
+	}
+
+	// when: dry-run check
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: inbox file should still exist (not consumed)
+	if _, err := os.Stat(filepath.Join(inboxDir, "report-001.md")); err != nil {
+		t.Errorf("inbox file should not be consumed in dry-run mode: %v", err)
+	}
+
+	// then: consumed.json should not exist
+	if _, err := os.Stat(filepath.Join(divRoot, ".run", "consumed.json")); err == nil {
+		t.Error("consumed.json should not be created in dry-run mode")
 	}
 }
 
@@ -776,10 +916,92 @@ func TestPrintCheckOutput_JSON(t *testing.T) {
 	}
 }
 
+func TestRunCheck_ConsumesInbox(t *testing.T) {
+	// given: set up .gate with an inbox report
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Drop a report into inbox/
+	content := []byte("---\nname: report-001\nkind: report\ndescription: test report\n---\n\nReport body.\n")
+	if err := os.WriteFile(filepath.Join(root, "inbox", "report-001.md"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(root)
+
+	// Verify inbox has file before scan
+	inboxEntries, _ := os.ReadDir(filepath.Join(root, "inbox"))
+	mdBefore := 0
+	for _, e := range inboxEntries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdBefore++
+		}
+	}
+	if mdBefore != 1 {
+		t.Fatalf("expected 1 inbox file before, got %d", mdBefore)
+	}
+
+	// when: consume inbox directly (RunCheck requires Claude, so test ScanInbox + SaveConsumed)
+	dmails, err := store.ScanInbox()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1 consumed, got %d", len(dmails))
+	}
+
+	// Save consumed records (same logic as in RunCheck)
+	now := time.Now().UTC()
+	var records []ConsumedRecord
+	for _, d := range dmails {
+		records = append(records, ConsumedRecord{
+			Name:       d.Name,
+			Kind:       d.Kind,
+			ConsumedAt: now,
+			Source:     d.Name + ".md",
+		})
+	}
+	if err := store.SaveConsumed(records); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: inbox is empty
+	inboxEntries, _ = os.ReadDir(filepath.Join(root, "inbox"))
+	mdAfter := 0
+	for _, e := range inboxEntries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdAfter++
+		}
+	}
+	if mdAfter != 0 {
+		t.Errorf("expected inbox empty after scan, got %d", mdAfter)
+	}
+
+	// then: archive has the file
+	if _, err := os.Stat(filepath.Join(root, "archive", "report-001.md")); err != nil {
+		t.Errorf("expected report in archive: %v", err)
+	}
+
+	// then: consumed records persisted
+	loaded, err := store.LoadConsumed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 1 {
+		t.Fatalf("expected 1 consumed record, got %d", len(loaded))
+	}
+	if loaded[0].Name != "report-001" {
+		t.Errorf("expected report-001, got %s", loaded[0].Name)
+	}
+}
+
 func TestPrintLogJSON(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -819,10 +1041,87 @@ func TestPrintLogJSON(t *testing.T) {
 	}
 }
 
+func TestPrintLogJSON_IncludesResolutionStatus(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// given: two D-Mails — one pending (high severity, no resolution), one approved
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback,
+		Description: "pending dmail", Severity: SeverityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-002", Kind: KindFeedback,
+		Description: "approved dmail", Severity: SeverityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := store.SaveResolution(Resolution{
+		Name: "feedback-002", Status: "approved", Action: "approve", ResolvedAt: &now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A low-severity D-Mail (auto-sent, no resolution)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-003", Kind: KindFeedback,
+		Description: "low sev dmail", Severity: SeverityLow,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintLogJSON()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLogJSON failed: %v", err)
+	}
+
+	var parsed struct {
+		DMails []struct {
+			Name       string  `json:"name"`
+			Status     string  `json:"status"`
+			ResolvedAt *string `json:"resolved_at,omitempty"`
+		} `json:"dmails"`
+	}
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if len(parsed.DMails) != 3 {
+		t.Fatalf("expected 3 dmails, got %d", len(parsed.DMails))
+	}
+
+	// feedback-001: high severity, no resolution → pending
+	if parsed.DMails[0].Status != "pending" {
+		t.Errorf("feedback-001: expected status 'pending', got %q", parsed.DMails[0].Status)
+	}
+	// feedback-002: high severity, approved resolution
+	if parsed.DMails[1].Status != "approved" {
+		t.Errorf("feedback-002: expected status 'approved', got %q", parsed.DMails[1].Status)
+	}
+	if parsed.DMails[1].ResolvedAt == nil {
+		t.Error("feedback-002: expected resolved_at to be set")
+	}
+	// feedback-003: low severity, no resolution → sent
+	if parsed.DMails[2].Status != "sent" {
+		t.Errorf("feedback-003: expected status 'sent', got %q", parsed.DMails[2].Status)
+	}
+}
+
 func TestResolveDMail_JSON(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
@@ -855,5 +1154,89 @@ func TestResolveDMail_JSON(t *testing.T) {
 	}
 	if parsed["status"] != "approved" {
 		t.Errorf("expected status 'approved', got %v", parsed["status"])
+	}
+}
+
+func TestPrintLog_ShowsConsumed(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	if err := store.SaveConsumed([]ConsumedRecord{
+		{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save a history entry so PrintLog doesn't bail early
+	store.SaveHistory(CheckResult{
+		CheckedAt:  now,
+		Commit:     "abc1234",
+		Type:       CheckTypeFull,
+		Divergence: 0.1,
+	})
+
+	var buf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Logger:  NewLogger(io.Discard, false),
+		DataOut: &buf,
+	}
+
+	// when
+	if err := a.PrintLog(); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "Consumed") {
+		t.Errorf("expected 'Consumed' section in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "report-001") {
+		t.Errorf("expected 'report-001' in output, got:\n%s", output)
+	}
+}
+
+func TestPrintLogJSON_IncludesConsumed(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	store.SaveConsumed([]ConsumedRecord{
+		{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"},
+	})
+
+	var buf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Logger:  NewLogger(io.Discard, false),
+		DataOut: &buf,
+	}
+
+	// when
+	if err := a.PrintLogJSON(); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, `"consumed"`) {
+		t.Errorf("expected 'consumed' key in JSON, got:\n%s", output)
+	}
+	if !strings.Contains(output, "report-001") {
+		t.Errorf("expected 'report-001' in JSON output, got:\n%s", output)
 	}
 }

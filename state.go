@@ -1,11 +1,13 @@
 package amadeus
 
 import (
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -13,6 +15,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed templates/skills/*/SKILL.md
+var skillTemplateFS embed.FS
 
 // CheckType represents the type of divergence check performed.
 type CheckType string
@@ -37,7 +42,7 @@ type CheckResult struct {
 	ForceFullNext       bool               `json:"force_full_next,omitempty"`
 }
 
-// StateStore manages reading and writing state files within the .divergence/ directory.
+// StateStore manages reading and writing state files within the .gate/ directory.
 type StateStore struct {
 	Root string
 }
@@ -47,15 +52,17 @@ func NewStateStore(root string) *StateStore {
 	return &StateStore{Root: root}
 }
 
-// InitDivergenceDir creates the .divergence/ directory structure and writes
+// InitGateDir creates the .gate/ directory structure and writes
 // a default config.yaml if one does not already exist.
-func InitDivergenceDir(root string) error {
+func InitGateDir(root string) error {
 	dirs := []string{
 		filepath.Join(root, ".run"),
 		filepath.Join(root, "history"),
 		filepath.Join(root, "outbox"),
 		filepath.Join(root, "inbox"),
 		filepath.Join(root, "archive"),
+		filepath.Join(root, "pending"),
+		filepath.Join(root, "rejected"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -66,6 +73,26 @@ func InitDivergenceDir(root string) error {
 	if err := migrateLegacyState(root); err != nil {
 		return fmt.Errorf("migrate legacy state: %w", err)
 	}
+	// Create skills directories and default SKILL.md files from embedded templates
+	skillNames := []string{"dmail-sendable", "dmail-readable"}
+	for _, name := range skillNames {
+		destDir := filepath.Join(root, "skills", name)
+		if err := os.MkdirAll(destDir, 0o755); err != nil {
+			return err
+		}
+		skillPath := filepath.Join(destDir, "SKILL.md")
+		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
+			tmplPath := path.Join("templates", "skills", name, "SKILL.md")
+			content, readErr := skillTemplateFS.ReadFile(tmplPath)
+			if readErr != nil {
+				return fmt.Errorf("read skill template %s: %w", name, readErr)
+			}
+			if err := os.WriteFile(skillPath, content, 0o644); err != nil {
+				return err
+			}
+		}
+	}
+
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		cfg := DefaultConfig()
@@ -78,7 +105,7 @@ func InitDivergenceDir(root string) error {
 		}
 	}
 	gitignorePath := filepath.Join(root, ".gitignore")
-	requiredEntries := []string{".run/", "outbox/", "inbox/"}
+	requiredEntries := []string{".run/", "outbox/", "inbox/", "pending/", "rejected/"}
 	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
 		content := strings.Join(requiredEntries, "\n") + "\n"
 		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {
