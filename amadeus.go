@@ -194,16 +194,26 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	_, span2 := tracer.Start(ctx, "divergence_meter")
 
+	repoRoot := a.Git.Dir
+	allADRs, _ := CollectADRs(repoRoot)
+	allDoDs, _ := CollectDoDs(repoRoot)
+	depMap, _ := CollectDependencyMap(repoRoot)
+
 	var prompt string
 	if fullCheck {
 		prompt, err = BuildFullCheckPrompt(FullCheckParams{
 			CodebaseStructure: report.CodebaseStructure,
+			AllADRs:           allADRs,
+			RecentDoDs:        allDoDs,
+			DependencyMap:     depMap,
 		})
 	} else {
 		prevJSON, _ := json.Marshal(previous)
 		prompt, err = BuildDiffCheckPrompt(DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
+			RelevantADRs:   allADRs,
+			LinkedDoDs:     allDoDs,
 		})
 	}
 	if err != nil {

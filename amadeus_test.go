@@ -868,6 +868,126 @@ func TestRunCheck_DryRun_DoesNotConsumeInbox(t *testing.T) {
 	}
 }
 
+func TestRunCheck_DryRun_FullCheck_IncludesADRsInPrompt(t *testing.T) {
+	// given: a repo with docs/adr/0001-test.md
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	adrDir := filepath.Join(repo.dir, "docs", "adr")
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-test.md"), []byte("# 0001. Use Go for CLI\n\nGo is the best choice.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: full dry-run check
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if !strings.Contains(prompt, "Use Go for CLI") {
+		t.Errorf("expected ADR content in prompt, got:\n%s", prompt)
+	}
+}
+
+func TestRunCheck_DryRun_FullCheck_NoADRs_StillWorks(t *testing.T) {
+	// given: a repo with NO docs/adr/ directory
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: full dry-run check
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then: no error, graceful degradation
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if dataBuf.Len() == 0 {
+		t.Error("expected prompt output, got empty")
+	}
+}
+
+func TestRunCheck_DryRun_DiffCheck_IncludesADRsInPrompt(t *testing.T) {
+	// given: a repo with ADRs and a previous check state (so diff mode triggers)
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	adrDir := filepath.Join(repo.dir, "docs", "adr")
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-auth.md"), []byte("# 0001. JWT Auth\n\nUse JWT.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+	// Save a previous state with current commit so diff mode detects the new PR merges
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Save a previous state with an older commit to trigger shift detection
+	if err := store.SaveLatest(CheckResult{Commit: commit + "~2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a new commit so there's a diff
+	repo.shell(t, "echo 'package main' > /repo/new.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #99 from feature/new")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: diff dry-run check
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if !strings.Contains(prompt, "JWT Auth") {
+		t.Errorf("expected ADR content in diff prompt, got:\n%s", prompt)
+	}
+}
+
 func TestPrintCheckOutput_JSON(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
