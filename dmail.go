@@ -303,6 +303,22 @@ func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
 	return s.writeJSON(filepath.Join(s.Root, ".run", "consumed.json"), existing)
 }
 
+// MovePendingToOutbox moves a D-Mail from pending/ to outbox/ for courier delivery.
+func (s *StateStore) MovePendingToOutbox(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "pending", filename)
+	dst := filepath.Join(s.Root, "outbox", filename)
+	return os.Rename(src, dst)
+}
+
+// MovePendingToRejected moves a D-Mail from pending/ to rejected/.
+func (s *StateStore) MovePendingToRejected(name string) error {
+	filename := name + ".md"
+	src := filepath.Join(s.Root, "pending", filename)
+	dst := filepath.Join(s.Root, "rejected", filename)
+	return os.Rename(src, dst)
+}
+
 // ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
 // copies to archive/ (skip if already exists), and removes from inbox/.
 // Returns the parsed D-Mails sorted by name.

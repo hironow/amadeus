@@ -576,6 +576,18 @@ func (a *Amadeus) resolveDMailCore(ctx context.Context, name, action, reason str
 		return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
 	}
 
+	// Move file from pending/ to outbox/ (approve) or rejected/ (reject)
+	switch action {
+	case "approve":
+		if err := a.Store.MovePendingToOutbox(name); err != nil {
+			return DMail{}, Resolution{}, span, fmt.Errorf("move to outbox: %w", err)
+		}
+	case "reject":
+		if err := a.Store.MovePendingToRejected(name); err != nil {
+			return DMail{}, Resolution{}, span, fmt.Errorf("move to rejected: %w", err)
+		}
+	}
+
 	span.AddEvent("dmail.resolved", trace.WithAttributes(
 		attribute.String("dmail.name", name),
 		attribute.String("dmail.status", resolution.Status),

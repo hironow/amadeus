@@ -327,6 +327,15 @@ func TestResolveDMail_Approve(t *testing.T) {
 	if !strings.Contains(dataBuf.String(), "approved") {
 		t.Errorf("expected 'approved' in DataOut, got: %s", dataBuf.String())
 	}
+	// then: file moved from pending/ to outbox/
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file removed from pending/")
+	}
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("expected file in outbox after approve: %v", err)
+	}
 }
 
 func TestResolveDMail_Reject(t *testing.T) {
@@ -365,6 +374,15 @@ func TestResolveDMail_Reject(t *testing.T) {
 	}
 	if res.Reason != "false positive" {
 		t.Errorf("expected reason 'false positive', got %s", res.Reason)
+	}
+	// then: file moved from pending/ to rejected/
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	rejectedPath := filepath.Join(root, "rejected", "feedback-001.md")
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file removed from pending/")
+	}
+	if _, err := os.Stat(rejectedPath); err != nil {
+		t.Errorf("expected file in rejected after reject: %v", err)
 	}
 }
 
