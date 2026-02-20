@@ -13,7 +13,14 @@ Evaluate how recent changes affect the codebase's alignment with its architectur
 
 ## DoDs (for linked Issues)
 {{.LinkedDoDs}}
+{{if .LinkedIssueIDs}}
+## Linked Linear Issues
+The following Linear Issue IDs were found in the merged commits: {{.LinkedIssueIDs}}
 
+**Action required**: Use the Linear MCP tool (`get_issue`) to fetch each issue's title, description, and acceptance criteria. Use this as the Definition of Done (DoD) context for evaluating `dod_fulfillment`.
+
+**Important**: Do NOT trust the issue's status field (e.g., "Done", "In Progress"). Statuses may be inaccurate due to human workflow errors. Focus exclusively on the issue description and acceptance criteria as the source of truth for what the PR should have achieved.
+{{end}}
 ## Task
 Evaluate how these changes affect each integrity axis.
 Score each axis 0-100 (0 = full compliance, 100 = full deviation).

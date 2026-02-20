@@ -33,6 +33,7 @@ type DiffCheckParams struct {
 	PRDiffs        string
 	RelevantADRs   string
 	LinkedDoDs     string
+	LinkedIssueIDs string
 }
 
 // FullCheckParams holds the template parameters for a full calibration check.

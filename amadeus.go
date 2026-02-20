@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -209,11 +210,17 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		})
 	} else {
 		prevJSON, _ := json.Marshal(previous)
+		var prTitles []string
+		for _, pr := range report.MergedPRs {
+			prTitles = append(prTitles, pr.Title)
+		}
+		issueIDs := ExtractIssueIDs(prTitles...)
 		prompt, err = BuildDiffCheckPrompt(DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
 			RelevantADRs:   allADRs,
 			LinkedDoDs:     allDoDs,
+			LinkedIssueIDs: strings.Join(issueIDs, ", "),
 		})
 	}
 	if err != nil {

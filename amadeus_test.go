@@ -988,6 +988,98 @@ func TestRunCheck_DryRun_DiffCheck_IncludesADRsInPrompt(t *testing.T) {
 	}
 }
 
+func TestRunCheck_DryRun_DiffCheck_IncludesIssueIDs(t *testing.T) {
+	// given: a repo with a merge commit containing an issue ID
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveLatest(CheckResult{Commit: commit + "~2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a merge commit with an issue ID in the message
+	repo.shell(t, "echo 'package main' > /repo/feature.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #10 from feat/dod-fetch (MY-303)")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: diff dry-run check
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if !strings.Contains(prompt, "MY-303") {
+		t.Errorf("expected issue ID MY-303 in diff prompt, got:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "Linear MCP") {
+		t.Errorf("expected Linear MCP instruction in diff prompt, got:\n%s", prompt)
+	}
+}
+
+func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_OmitsSection(t *testing.T) {
+	// given: a repo with a merge commit WITHOUT issue ID
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveLatest(CheckResult{Commit: commit + "~2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	repo.shell(t, "echo 'package main' > /repo/plain.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #11 from feat/no-issue-ref")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if strings.Contains(prompt, "Linked Linear Issues") {
+		t.Errorf("expected no Linked Linear Issues section when no IDs found, got:\n%s", prompt)
+	}
+}
+
 func TestPrintCheckOutput_JSON(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
