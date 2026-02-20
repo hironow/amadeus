@@ -1,6 +1,7 @@
 package amadeus
 
 import (
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed templates/skills/*/SKILL.md
+var skillTemplateFS embed.FS
 
 // CheckType represents the type of divergence check performed.
 type CheckType string
@@ -66,43 +70,21 @@ func InitDivergenceDir(root string) error {
 	if err := migrateLegacyState(root); err != nil {
 		return fmt.Errorf("migrate legacy state: %w", err)
 	}
-	// Create skills directories and default SKILL.md files
-	skills := []struct {
-		dir     string
-		content string
-	}{
-		{
-			dir: filepath.Join(root, "skills", "dmail-sendable"),
-			content: `---
-name: dmail-sendable
-description: Declares outbound D-Mail kinds for phonewave routing discovery.
-produces:
-  - feedback
----
-
-Amadeus D-Mail sendable skill.
-`,
-		},
-		{
-			dir: filepath.Join(root, "skills", "dmail-readable"),
-			content: `---
-name: dmail-readable
-description: Declares inbound D-Mail kinds for phonewave routing discovery.
-consumes:
-  - report
----
-
-Amadeus D-Mail readable skill.
-`,
-		},
-	}
-	for _, s := range skills {
-		if err := os.MkdirAll(s.dir, 0o755); err != nil {
+	// Create skills directories and default SKILL.md files from embedded templates
+	skillNames := []string{"dmail-sendable", "dmail-readable"}
+	for _, name := range skillNames {
+		destDir := filepath.Join(root, "skills", name)
+		if err := os.MkdirAll(destDir, 0o755); err != nil {
 			return err
 		}
-		skillPath := filepath.Join(s.dir, "SKILL.md")
+		skillPath := filepath.Join(destDir, "SKILL.md")
 		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
-			if err := os.WriteFile(skillPath, []byte(s.content), 0o644); err != nil {
+			tmplPath := filepath.Join("templates", "skills", name, "SKILL.md")
+			content, readErr := skillTemplateFS.ReadFile(tmplPath)
+			if readErr != nil {
+				return fmt.Errorf("read skill template %s: %w", name, readErr)
+			}
+			if err := os.WriteFile(skillPath, content, 0o644); err != nil {
 				return err
 			}
 		}
