@@ -65,6 +65,7 @@ func run() error {
 		full       bool
 		quiet      bool
 		jsonOut    bool
+		lang       string
 	)
 
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -77,6 +78,7 @@ func run() error {
 	fs.BoolVar(&quiet, "quiet", false, "summary-only output")
 	fs.BoolVar(&quiet, "q", false, "summary-only output")
 	fs.BoolVar(&jsonOut, "json", false, "output as JSON")
+	fs.StringVar(&lang, "lang", "", "output language (ja, en)")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		return err
@@ -84,7 +86,7 @@ func run() error {
 
 	switch cmd {
 	case "check":
-		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut)
+		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut, lang)
 	case "log":
 		return runLog(configPath, verbose, jsonOut)
 	case "init":
@@ -102,7 +104,7 @@ func run() error {
 	}
 }
 
-func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool) error {
+func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool, lang string) error {
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -120,6 +122,13 @@ func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool) err
 	cfg, err := amadeus.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+
+	if lang != "" {
+		if !amadeus.ValidLang(lang) {
+			return fmt.Errorf("unsupported language: %s (supported: ja, en)", lang)
+		}
+		cfg.Lang = lang
 	}
 
 	logger := amadeus.NewLogger(os.Stderr, verbose)

@@ -52,14 +52,16 @@ type FullCheckParams struct {
 	DependencyMap     string
 }
 
-// BuildDiffCheckPrompt renders the diff_check template with the given parameters.
-func BuildDiffCheckPrompt(params DiffCheckParams) (string, error) {
-	return renderTemplate("templates/diff_check.md.tmpl", params)
+// BuildDiffCheckPrompt renders the diff_check template for the given language.
+func BuildDiffCheckPrompt(lang string, params DiffCheckParams) (string, error) {
+	name := fmt.Sprintf("templates/diff_check_%s.md.tmpl", lang)
+	return renderTemplate(name, params)
 }
 
-// BuildFullCheckPrompt renders the full_check template with the given parameters.
-func BuildFullCheckPrompt(params FullCheckParams) (string, error) {
-	return renderTemplate("templates/full_check.md.tmpl", params)
+// BuildFullCheckPrompt renders the full_check template for the given language.
+func BuildFullCheckPrompt(lang string, params FullCheckParams) (string, error) {
+	name := fmt.Sprintf("templates/full_check_%s.md.tmpl", lang)
+	return renderTemplate(name, params)
 }
 
 // ParseClaudeResponse parses raw JSON bytes into a ClaudeResponse.

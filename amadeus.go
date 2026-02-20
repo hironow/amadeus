@@ -211,7 +211,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	var prompt string
 	if fullCheck {
-		prompt, err = BuildFullCheckPrompt(FullCheckParams{
+		prompt, err = BuildFullCheckPrompt(a.Config.Lang, FullCheckParams{
 			CodebaseStructure: report.CodebaseStructure,
 			AllADRs:           allADRs,
 			RecentDoDs:        allDoDs,
@@ -224,7 +224,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			prTitles = append(prTitles, pr.Title)
 		}
 		issueIDs := ExtractIssueIDs(prTitles...)
-		prompt, err = BuildDiffCheckPrompt(DiffCheckParams{
+		prompt, err = BuildDiffCheckPrompt(a.Config.Lang, DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
 			RelevantADRs:   allADRs,
