@@ -129,6 +129,8 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		}
 	}
 
+	_, span2 := tracer.Start(ctx, "divergence_meter")
+
 	var prompt string
 	if fullCheck {
 		prompt, err = BuildFullCheckPrompt(FullCheckParams{
@@ -142,35 +144,49 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		})
 	}
 	if err != nil {
+		span2.End()
 		return fmt.Errorf("phase 2 (build prompt): %w", err)
 	}
 
 	if opts.DryRun {
 		fmt.Println(prompt)
+		span2.End()
 		return nil
 	}
 
 	rawResp, err := a.Claude.Run(ctx, prompt)
 	if err != nil {
+		span2.End()
 		return fmt.Errorf("phase 2 (claude): %w", err)
 	}
 
 	claudeResp, err := ParseClaudeResponse(rawResp)
 	if err != nil {
+		span2.End()
 		return fmt.Errorf("phase 2 (parse): %w", err)
 	}
 
 	meter := &DivergenceMeter{Config: a.Config}
 	meterResult := meter.ProcessResponse(claudeResp)
 
+	span2.AddEvent("divergence.evaluated", trace.WithAttributes(
+		attribute.Float64("divergence.value", meterResult.Divergence.Value),
+		attribute.String("divergence.severity", string(meterResult.Divergence.Severity)),
+	))
+
 	// Defer full scan to next run on large divergence jump
 	if !fullCheck && a.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
+		span2.AddEvent("divergence.jump", trace.WithAttributes(
+			attribute.Float64("divergence.previous", previous.Divergence),
+			attribute.Float64("divergence.current", meterResult.Divergence.Value),
+		))
 		if !opts.Quiet {
 			a.Logger.Info("Divergence jump detected (%.2f → %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
 		a.FlagForceFullNext()
 	}
+	span2.End()
 
 	currentCommit, err := a.Git.CurrentCommit()
 	if err != nil {
@@ -178,10 +194,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 	now := time.Now().UTC()
 
+	_, span3 := tracer.Start(ctx, "dmail")
 	var dmails []DMail
 	for _, candidate := range meterResult.DMailCandidates {
 		id, err := a.Store.NextDMailID()
 		if err != nil {
+			span3.End()
 			return fmt.Errorf("phase 3 (dmail id): %w", err)
 		}
 		dmail := DMail{
@@ -195,10 +213,17 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		}
 		dmail = RouteDMail(dmail)
 		if err := a.Store.SaveDMail(dmail); err != nil {
+			span3.End()
 			return fmt.Errorf("phase 3 (save dmail): %w", err)
 		}
+		span3.AddEvent("dmail.created", trace.WithAttributes(
+			attribute.String("dmail.id", dmail.ID),
+			attribute.String("dmail.severity", string(dmail.Severity)),
+			attribute.String("dmail.target", string(dmail.Target)),
+		))
 		dmails = append(dmails, dmail)
 	}
+	span3.End()
 
 	var prNumbers []string
 	for _, pr := range report.MergedPRs {

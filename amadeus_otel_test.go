@@ -171,3 +171,33 @@ func TestRunCheck_Phase1ShiftDetectedEvent(t *testing.T) {
 		t.Error("expected 'shift.detected' event on reading_steiner span")
 	}
 }
+
+func TestRunCheck_Phase2SpanExists(t *testing.T) {
+	// given
+	exp := setupTestTracer(t)
+	repo := setupTestRepo(t)
+	a := newTestAmadeus(t, repo.dir)
+
+	// when: DryRun enters Phase 2 (prompt building) then returns early
+	a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then: divergence_meter span should exist (created before DryRun return)
+	spans := exp.GetSpans()
+	if !containsSpan(spans, "divergence_meter") {
+		t.Errorf("expected 'divergence_meter' span, got: %v", spanNames(spans))
+	}
+
+	// then: divergence_meter should be child of amadeus.check
+	var rootSpanID, phase2ParentSpanID string
+	for _, s := range spans {
+		if s.Name == "amadeus.check" {
+			rootSpanID = s.SpanContext.SpanID().String()
+		}
+		if s.Name == "divergence_meter" {
+			phase2ParentSpanID = s.Parent.SpanID().String()
+		}
+	}
+	if rootSpanID != "" && phase2ParentSpanID != rootSpanID {
+		t.Errorf("expected divergence_meter parent=%s, got parent=%s", rootSpanID, phase2ParentSpanID)
+	}
+}
