@@ -14,6 +14,9 @@ import (
 var version = "dev"
 
 func main() {
+	shutdown := amadeus.InitTracer("amadeus", version)
+	defer shutdown(context.Background())
+
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
