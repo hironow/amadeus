@@ -43,7 +43,7 @@ func newTestAmadeus(t *testing.T, repoRoot string) *Amadeus {
 	store := NewStateStore(divRoot)
 	logger := NewLogger(&bytes.Buffer{}, false)
 	git := NewGitClient(repoRoot)
-	return &Amadeus{Config: cfg, Store: store, Git: git, Logger: logger}
+	return &Amadeus{Config: cfg, Store: store, Git: git, Logger: logger, DataOut: &bytes.Buffer{}}
 }
 
 func TestRunCheck_CreatesRootSpan(t *testing.T) {
@@ -209,24 +209,23 @@ func TestResolveDMail_CreatesSpan(t *testing.T) {
 	store := NewStateStore(divRoot)
 
 	dmail := DMail{
-		ID:       "DM-001",
-		Severity: SeverityLow,
-		Target:   "sightjack",
-		Type:     "Type-S",
-		Summary:  "test dmail",
-		Detail:   "detail",
-		Status:   DMailPending,
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "test dmail",
+		Severity:    SeverityHigh,
+		Body:        "detail",
 	}
 	store.SaveDMail(dmail)
 
 	a := &Amadeus{
-		Config: DefaultConfig(),
-		Store:  store,
-		Logger: NewLogger(&bytes.Buffer{}, false),
+		Config:  DefaultConfig(),
+		Store:   store,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &bytes.Buffer{},
 	}
 
 	// when
-	err := a.ResolveDMail(context.Background(), "DM-001", "approve", "")
+	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
 	if err != nil {
 		t.Fatalf("ResolveDMail: %v", err)
 	}

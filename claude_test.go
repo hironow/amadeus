@@ -15,9 +15,7 @@ func TestParseClaudeResponse_Valid(t *testing.T) {
 		},
 		"dmails": [
 			{
-				"target": "sightjack",
-				"type": "Type-S",
-				"summary": "ADR-003 needs update",
+				"description": "ADR-003 needs update",
 				"detail": "Auth module violates ADR-003"
 			}
 		],
@@ -33,8 +31,8 @@ func TestParseClaudeResponse_Valid(t *testing.T) {
 	if len(resp.DMails) != 1 {
 		t.Fatalf("expected 1 D-Mail, got %d", len(resp.DMails))
 	}
-	if resp.DMails[0].Target != TargetSightjack {
-		t.Errorf("expected target sightjack, got %s", resp.DMails[0].Target)
+	if resp.DMails[0].Description != "ADR-003 needs update" {
+		t.Errorf("expected description 'ADR-003 needs update', got %s", resp.DMails[0].Description)
 	}
 }
 

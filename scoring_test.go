@@ -66,7 +66,7 @@ func TestDetermineSeverity_Low(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityLow {
-		t.Errorf("expected LOW, got %s", sev.Severity)
+		t.Errorf("expected low, got %s", sev.Severity)
 	}
 	if sev.Overridden {
 		t.Error("expected no override")
@@ -79,7 +79,7 @@ func TestDetermineSeverity_Medium(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityMedium {
-		t.Errorf("expected MEDIUM, got %s", sev.Severity)
+		t.Errorf("expected medium, got %s", sev.Severity)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestDetermineSeverity_High(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityHigh {
-		t.Errorf("expected HIGH, got %s", sev.Severity)
+		t.Errorf("expected high, got %s", sev.Severity)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestDetermineSeverity_ADROverrideForceHigh(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityHigh {
-		t.Errorf("expected HIGH (ADR override), got %s", sev.Severity)
+		t.Errorf("expected high (ADR override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")
@@ -113,7 +113,7 @@ func TestDetermineSeverity_DoDOverrideForceHigh(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityHigh {
-		t.Errorf("expected HIGH (DoD override), got %s", sev.Severity)
+		t.Errorf("expected high (DoD override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")
@@ -126,10 +126,37 @@ func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
 	}}
 	sev := DetermineSeverity(result, DefaultThresholds())
 	if sev.Severity != SeverityMedium {
-		t.Errorf("expected MEDIUM (Dep override), got %s", sev.Severity)
+		t.Errorf("expected medium (Dep override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")
+	}
+}
+
+func TestNormalizeSeverity(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Severity
+		expected Severity
+	}{
+		{"lowercase low", SeverityLow, SeverityLow},
+		{"lowercase medium", SeverityMedium, SeverityMedium},
+		{"lowercase high", SeverityHigh, SeverityHigh},
+		{"uppercase LOW", Severity("LOW"), SeverityLow},
+		{"uppercase MEDIUM", Severity("MEDIUM"), SeverityMedium},
+		{"uppercase HIGH", Severity("HIGH"), SeverityHigh},
+		{"mixed case High", Severity("High"), SeverityHigh},
+		{"mixed case Medium", Severity("Medium"), SeverityMedium},
+		{"empty string", Severity(""), Severity("")},
+		{"unrecognized", Severity("critical"), Severity("critical")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeSeverity(tt.input)
+			if got != tt.expected {
+				t.Errorf("NormalizeSeverity(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
 	}
 }
 

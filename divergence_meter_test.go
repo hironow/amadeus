@@ -16,7 +16,7 @@ func TestDivergenceMeter_ProcessResponse(t *testing.T) {
 			AxisImplicit:   {Score: 5, Details: "naming"},
 		},
 		DMails: []ClaudeDMailCandidate{
-			{Target: TargetSightjack, Type: "Type-S", Summary: "ADR-003", Detail: "violation"},
+			{Description: "ADR-003", Detail: "violation"},
 		},
 		Reasoning: "Minor tensions",
 	}
@@ -25,7 +25,7 @@ func TestDivergenceMeter_ProcessResponse(t *testing.T) {
 		t.Errorf("expected internal 14.5, got %f", result.Divergence.Internal)
 	}
 	if result.Divergence.Severity != SeverityLow {
-		t.Errorf("expected LOW severity, got %s", result.Divergence.Severity)
+		t.Errorf("expected low severity, got %s", result.Divergence.Severity)
 	}
 	if len(result.DMailCandidates) != 1 {
 		t.Errorf("expected 1 D-Mail candidate, got %d", len(result.DMailCandidates))
@@ -48,6 +48,6 @@ func TestDivergenceMeter_ProcessResponse_HighSeverity(t *testing.T) {
 	}
 	result := meter.ProcessResponse(resp)
 	if result.Divergence.Severity != SeverityHigh {
-		t.Errorf("expected HIGH severity, got %s", result.Divergence.Severity)
+		t.Errorf("expected high severity, got %s", result.Divergence.Severity)
 	}
 }

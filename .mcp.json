@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "jaeger": {
+      "type": "http",
+      "url": "http://localhost:16687/mcp"
+    }
+  }
+}

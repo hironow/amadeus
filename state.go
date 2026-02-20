@@ -51,14 +51,20 @@ func NewStateStore(root string) *StateStore {
 // a default config.yaml if one does not already exist.
 func InitDivergenceDir(root string) error {
 	dirs := []string{
-		filepath.Join(root, "state"),
+		filepath.Join(root, ".run"),
 		filepath.Join(root, "history"),
-		filepath.Join(root, "dmails"),
+		filepath.Join(root, "outbox"),
+		filepath.Join(root, "inbox"),
+		filepath.Join(root, "archive"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return err
 		}
+	}
+	// Migrate legacy state/ → .run/ (v0.0.11 → v0.0.12)
+	if err := migrateLegacyState(root); err != nil {
+		return fmt.Errorf("migrate legacy state: %w", err)
 	}
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
@@ -71,17 +77,82 @@ func InitDivergenceDir(root string) error {
 			return err
 		}
 	}
+	gitignorePath := filepath.Join(root, ".gitignore")
+	requiredEntries := []string{".run/", "outbox/", "inbox/"}
+	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
+		content := strings.Join(requiredEntries, "\n") + "\n"
+		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {
+			return err
+		}
+	} else if err == nil {
+		existing, readErr := os.ReadFile(gitignorePath)
+		if readErr == nil {
+			var toAdd []string
+			for _, entry := range requiredEntries {
+				if !strings.Contains(string(existing), entry) {
+					toAdd = append(toAdd, entry)
+				}
+			}
+			if len(toAdd) > 0 {
+				f, openErr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0o644)
+				if openErr == nil {
+					defer f.Close()
+					if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
+						f.Write([]byte("\n"))
+					}
+					for _, entry := range toAdd {
+						f.Write([]byte(entry + "\n"))
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// migrateLegacyState moves files from the legacy state/ directory to .run/.
+// Files are only moved if the destination does not already exist, preventing
+// accidental overwrites. After migration, the empty state/ directory is removed.
+func migrateLegacyState(root string) error {
+	legacyDir := filepath.Join(root, "state")
+	if _, err := os.Stat(legacyDir); errors.Is(err, fs.ErrNotExist) {
+		return nil // no legacy directory, nothing to do
+	}
+
+	runDir := filepath.Join(root, ".run")
+	for _, name := range []string{"latest.json", "baseline.json"} {
+		src := filepath.Join(legacyDir, name)
+		dst := filepath.Join(runDir, name)
+		if _, err := os.Stat(src); errors.Is(err, fs.ErrNotExist) {
+			continue // file doesn't exist in legacy dir
+		}
+		if _, err := os.Stat(dst); err == nil {
+			continue // destination already exists, don't overwrite
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return fmt.Errorf("migrate %s: %w", name, err)
+		}
+	}
+
+	// Remove legacy directory if empty
+	entries, err := os.ReadDir(legacyDir)
+	if err != nil {
+		return nil // non-critical, ignore
+	}
+	if len(entries) == 0 {
+		os.Remove(legacyDir)
+	}
 	return nil
 }
 
 // SaveLatest writes the check result as the latest state.
 func (s *StateStore) SaveLatest(result CheckResult) error {
-	return s.writeJSON(filepath.Join(s.Root, "state", "latest.json"), result)
+	return s.writeJSON(filepath.Join(s.Root, ".run", "latest.json"), result)
 }
 
 // SaveBaseline writes the check result as the baseline state.
 func (s *StateStore) SaveBaseline(result CheckResult) error {
-	return s.writeJSON(filepath.Join(s.Root, "state", "baseline.json"), result)
+	return s.writeJSON(filepath.Join(s.Root, ".run", "baseline.json"), result)
 }
 
 // SaveHistory writes the check result to the history directory with a timestamped filename.
@@ -111,7 +182,7 @@ func (s *StateStore) SaveHistory(result CheckResult) error {
 // If the file does not exist, it returns an empty CheckResult with no error.
 func (s *StateStore) LoadLatest() (CheckResult, error) {
 	var result CheckResult
-	data, err := os.ReadFile(filepath.Join(s.Root, "state", "latest.json"))
+	data, err := os.ReadFile(filepath.Join(s.Root, ".run", "latest.json"))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return result, nil

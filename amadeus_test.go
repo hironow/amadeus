@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -278,7 +280,7 @@ func TestAmadeus_ShouldPromoteToFull_ExactThreshold(t *testing.T) {
 }
 
 func TestResolveDMail_Approve(t *testing.T) {
-	// given: a pending HIGH D-Mail
+	// given: a high-severity D-Mail (pending via routing)
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
 	if err := InitDivergenceDir(root); err != nil {
@@ -286,39 +288,48 @@ func TestResolveDMail_Approve(t *testing.T) {
 	}
 	store := NewStateStore(root)
 	dmail := DMail{
-		ID:       "d-001",
-		Severity: SeverityHigh,
-		Status:   DMailPending,
-		Target:   TargetSightjack,
-		Summary:  "ADR violation",
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
 	}
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.ResolveDMail(context.Background(), "d-001", "approve", "")
+	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
 
 	// then
 	if err != nil {
 		t.Fatalf("ResolveDMail failed: %v", err)
 	}
-	loaded, _ := store.LoadDMail("d-001")
-	if loaded.Status != DMailApproved {
-		t.Errorf("expected status approved, got %s", loaded.Status)
+	res, err := store.LoadResolution("feedback-001")
+	if err != nil {
+		t.Fatalf("expected resolution to exist: %v", err)
 	}
-	if loaded.ResolvedAt == nil {
+	if res.Status != string(DMailApproved) {
+		t.Errorf("expected status approved, got %s", res.Status)
+	}
+	if res.ResolvedAt == nil {
 		t.Error("expected ResolvedAt to be set")
 	}
-	if loaded.ResolvedAction == nil || *loaded.ResolvedAction != "approve" {
-		t.Errorf("expected ResolvedAction approve, got %v", loaded.ResolvedAction)
+	if res.Action != "approve" {
+		t.Errorf("expected action approve, got %s", res.Action)
+	}
+	// confirmation should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	if !strings.Contains(dataBuf.String(), "approved") {
+		t.Errorf("expected 'approved' in DataOut, got: %s", dataBuf.String())
 	}
 }
 
 func TestResolveDMail_Reject(t *testing.T) {
-	// given: a pending HIGH D-Mail
+	// given: a high-severity D-Mail (pending via routing)
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
 	if err := InitDivergenceDir(root); err != nil {
@@ -326,59 +337,67 @@ func TestResolveDMail_Reject(t *testing.T) {
 	}
 	store := NewStateStore(root)
 	dmail := DMail{
-		ID:       "d-001",
-		Severity: SeverityHigh,
-		Status:   DMailPending,
-		Target:   TargetSightjack,
-		Summary:  "ADR violation",
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
 	}
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.ResolveDMail(context.Background(), "d-001", "reject", "false positive")
+	err := a.ResolveDMail(context.Background(), "feedback-001", "reject", "false positive")
 
 	// then
 	if err != nil {
 		t.Fatalf("ResolveDMail failed: %v", err)
 	}
-	loaded, _ := store.LoadDMail("d-001")
-	if loaded.Status != DMailRejected {
-		t.Errorf("expected status rejected, got %s", loaded.Status)
+	res, err := store.LoadResolution("feedback-001")
+	if err != nil {
+		t.Fatalf("expected resolution to exist: %v", err)
 	}
-	if loaded.RejectReason == nil || *loaded.RejectReason != "false positive" {
-		t.Errorf("expected reject reason 'false positive', got %v", loaded.RejectReason)
+	if res.Status != string(DMailRejected) {
+		t.Errorf("expected status rejected, got %s", res.Status)
+	}
+	if res.Reason != "false positive" {
+		t.Errorf("expected reason 'false positive', got %s", res.Reason)
 	}
 }
 
 func TestResolveDMail_AlreadyResolved(t *testing.T) {
-	// given: an already approved D-Mail
+	// given: a D-Mail that already has a resolution
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
 	if err := InitDivergenceDir(root); err != nil {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
-	now := time.Now().UTC()
-	action := "approve"
 	dmail := DMail{
-		ID:             "d-001",
-		Severity:       SeverityHigh,
-		Status:         DMailApproved,
-		ResolvedAt:     &now,
-		ResolvedAction: &action,
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
 	}
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	now := time.Now().UTC()
+	if err := store.SaveResolution(Resolution{
+		Name:       "feedback-001",
+		Status:     string(DMailApproved),
+		Action:     "approve",
+		ResolvedAt: &now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.ResolveDMail(context.Background(), "d-001", "reject", "oops")
+	err := a.ResolveDMail(context.Background(), "feedback-001", "reject", "oops")
 
 	// then: should error
 	if err == nil {
@@ -393,11 +412,11 @@ func TestResolveDMail_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewStateStore(root)
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.ResolveDMail(context.Background(), "d-999", "approve", "")
+	err := a.ResolveDMail(context.Background(), "feedback-999", "approve", "")
 
 	// then
 	if err == nil {
@@ -406,7 +425,7 @@ func TestResolveDMail_NotFound(t *testing.T) {
 }
 
 func TestResolveDMail_RejectEmptyReason(t *testing.T) {
-	// given: a pending HIGH D-Mail
+	// given: a high-severity D-Mail (pending via routing)
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
 	if err := InitDivergenceDir(root); err != nil {
@@ -414,20 +433,19 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	}
 	store := NewStateStore(root)
 	dmail := DMail{
-		ID:       "d-001",
-		Severity: SeverityHigh,
-		Status:   DMailPending,
-		Target:   TargetSightjack,
-		Summary:  "ADR violation",
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
 	}
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.ResolveDMail(context.Background(), "d-001", "reject", "")
+	err := a.ResolveDMail(context.Background(), "feedback-001", "reject", "")
 
 	// then
 	if err == nil {
@@ -436,18 +454,19 @@ func TestResolveDMail_RejectEmptyReason(t *testing.T) {
 	if !strings.Contains(err.Error(), "reason") {
 		t.Errorf("expected error to mention 'reason', got: %v", err)
 	}
-	// D-Mail should remain pending (not persisted)
-	loaded, _ := store.LoadDMail("d-001")
-	if loaded.Status != DMailPending {
-		t.Errorf("expected status to remain pending, got %s", loaded.Status)
+	// Resolution should not exist (not persisted)
+	_, resErr := store.LoadResolution("feedback-001")
+	if resErr == nil {
+		t.Error("expected no resolution to exist after failed reject")
 	}
 }
 
 func TestAmadeus_PrintCheckOutput(t *testing.T) {
-	var buf bytes.Buffer
+	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config: DefaultConfig(),
-		Logger: NewLogger(&buf, false),
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
 	}
 	result := CheckResult{
 		Divergence: 0.145,
@@ -460,15 +479,20 @@ func TestAmadeus_PrintCheckOutput(t *testing.T) {
 		PRsEvaluated: []string{"#120", "#122"},
 	}
 	dmails := []DMail{
-		{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Target: TargetPaintress, Summary: "naming issue"},
+		{Name: "feedback-001", Kind: KindFeedback, Description: "naming issue", Severity: SeverityLow},
 	}
 	a.PrintCheckOutput(result, dmails, 0.133)
-	output := buf.String()
+
+	// result display should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	if !strings.Contains(output, "Divergence") {
 		t.Errorf("expected 'Divergence' in output, got:\n%s", output)
 	}
-	if !strings.Contains(output, "d-001") {
-		t.Errorf("expected 'd-001' in output, got:\n%s", output)
+	if !strings.Contains(output, "feedback-001") {
+		t.Errorf("expected 'feedback-001' in output, got:\n%s", output)
 	}
 	if !strings.Contains(output, "ADR Integrity") {
 		t.Errorf("expected 'ADR Integrity' in output, got:\n%s", output)
@@ -504,18 +528,17 @@ func TestAmadeus_PrintLog(t *testing.T) {
 	}
 
 	dmail := DMail{
-		ID:       "d-001",
-		Severity: SeverityHigh,
-		Status:   DMailPending,
-		Target:   TargetSightjack,
-		Summary:  "ADR-003 violation",
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR-003 violation",
+		Severity:    SeverityHigh,
 	}
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintLog()
@@ -524,15 +547,19 @@ func TestAmadeus_PrintLog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrintLog failed: %v", err)
 	}
-	output := buf.String()
+	// result display should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	if !strings.Contains(output, "History:") {
 		t.Errorf("expected 'History:' in output, got:\n%s", output)
 	}
 	if !strings.Contains(output, "bbb") {
 		t.Errorf("expected commit 'bbb' in output, got:\n%s", output)
 	}
-	if !strings.Contains(output, "d-001") {
-		t.Errorf("expected 'd-001' in output, got:\n%s", output)
+	if !strings.Contains(output, "feedback-001") {
+		t.Errorf("expected 'feedback-001' in output, got:\n%s", output)
 	}
 	if !strings.Contains(output, "pending") {
 		t.Errorf("expected 'pending' in output, got:\n%s", output)
@@ -540,10 +567,11 @@ func TestAmadeus_PrintLog(t *testing.T) {
 }
 
 func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
-	var buf bytes.Buffer
+	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config: DefaultConfig(),
-		Logger: NewLogger(&buf, false),
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
 	}
 	result := CheckResult{
 		Divergence: 0.145,
@@ -555,15 +583,18 @@ func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
 		},
 	}
 	dmails := []DMail{
-		{ID: "d-001", Severity: SeverityLow, Status: DMailSent},
-		{ID: "d-002", Severity: SeverityHigh, Status: DMailPending},
+		{Name: "feedback-001", Kind: KindFeedback, Description: "low issue", Severity: SeverityLow},
+		{Name: "feedback-002", Kind: KindFeedback, Description: "high issue", Severity: SeverityHigh},
 	}
 
 	// when: quiet mode
 	a.PrintCheckOutputQuiet(result, dmails, 0.133)
 
-	// then: single line with divergence, delta, dmail count, pending count
-	output := strings.TrimSpace(buf.String())
+	// then: result display should go to DataOut, not Logger
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := strings.TrimSpace(dataBuf.String())
 	lines := strings.Split(output, "\n")
 	if len(lines) != 1 {
 		t.Errorf("expected 1 line in quiet mode, got %d:\n%s", len(lines), output)
@@ -579,79 +610,6 @@ func TestAmadeus_PrintCheckOutput_Quiet(t *testing.T) {
 	}
 }
 
-func TestLinkDMail_Success(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, Summary: "test"}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
-
-	// when
-	err := a.LinkDMail("d-001", "MY-250")
-
-	// then
-	if err != nil {
-		t.Fatalf("LinkDMail failed: %v", err)
-	}
-	loaded, _ := store.LoadDMail("d-001")
-	if loaded.LinearIssueID == nil || *loaded.LinearIssueID != "MY-250" {
-		t.Errorf("expected LinearIssueID MY-250, got %v", loaded.LinearIssueID)
-	}
-}
-
-func TestLinkDMail_AlreadyLinked(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	issueID := "MY-100"
-	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
-
-	// when
-	err := a.LinkDMail("d-001", "MY-250")
-
-	// then
-	if err == nil {
-		t.Fatal("expected error for already-linked D-Mail")
-	}
-	if !strings.Contains(err.Error(), "already linked") {
-		t.Errorf("expected 'already linked' error, got: %v", err)
-	}
-}
-
-func TestLinkDMail_NotFound(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
-
-	// when
-	err := a.LinkDMail("d-999", "MY-250")
-
-	// then
-	if err == nil {
-		t.Fatal("expected error for non-existent D-Mail")
-	}
-}
-
 func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
@@ -660,8 +618,8 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	}
 	store := NewStateStore(root)
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintLog()
@@ -670,53 +628,155 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrintLog failed: %v", err)
 	}
-	output := buf.String()
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.String()
 	if !strings.Contains(output, "No history") {
 		t.Errorf("expected 'No history' in output, got:\n%s", output)
 	}
 }
 
-func TestPrintSync_UnsyncedDMails(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".divergence")
-	if err := InitDivergenceDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
+func TestDriftError_IsDrift(t *testing.T) {
+	// given: a DriftError
+	err := &DriftError{Divergence: 0.35, DMails: 2}
 
-	// given: 2 unsynced D-Mails
-	for _, d := range []DMail{
-		{ID: "d-001", Severity: SeverityHigh, Status: DMailPending, Target: TargetSightjack, Summary: "ADR violation"},
-		{ID: "d-002", Severity: SeverityLow, Status: DMailSent, Target: TargetPaintress, Summary: "naming issue"},
-	} {
-		if err := store.SaveDMail(d); err != nil {
-			t.Fatal(err)
-		}
+	// then: it implements error and is detectable via errors.As
+	var de *DriftError
+	if !errors.As(err, &de) {
+		t.Fatal("expected errors.As to match DriftError")
 	}
-
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
-
-	// when
-	err := a.PrintSync()
-
-	// then
-	if err != nil {
-		t.Fatalf("PrintSync failed: %v", err)
+	if de.Divergence != 0.35 {
+		t.Errorf("expected divergence 0.35, got %f", de.Divergence)
 	}
-	output := buf.String()
-	var result struct {
-		Unsynced []DMail `json:"unsynced"`
-	}
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
-	}
-	if len(result.Unsynced) != 2 {
-		t.Errorf("expected 2 unsynced, got %d", len(result.Unsynced))
+	if de.DMails != 2 {
+		t.Errorf("expected 2 dmails, got %d", de.DMails)
 	}
 }
 
-func TestPrintSync_NoneUnsynced(t *testing.T) {
+func TestDriftError_Message(t *testing.T) {
+	err := &DriftError{Divergence: 0.35, DMails: 1}
+	msg := err.Error()
+	if !strings.Contains(msg, "drift") {
+		t.Errorf("expected 'drift' in error message, got: %s", msg)
+	}
+}
+
+func TestDriftError_NotConfusedWithRegularError(t *testing.T) {
+	// given: a regular error
+	err := fmt.Errorf("something broke")
+
+	// then: errors.As should NOT match DriftError
+	var de *DriftError
+	if errors.As(err, &de) {
+		t.Fatal("regular error should not match DriftError")
+	}
+}
+
+func TestExitCode_Nil(t *testing.T) {
+	if code := ExitCode(nil); code != 0 {
+		t.Errorf("expected 0 for nil, got %d", code)
+	}
+}
+
+func TestExitCode_DriftError(t *testing.T) {
+	err := &DriftError{Divergence: 0.35, DMails: 2}
+	if code := ExitCode(err); code != 2 {
+		t.Errorf("expected 2 for DriftError, got %d", code)
+	}
+}
+
+func TestExitCode_RegularError(t *testing.T) {
+	err := fmt.Errorf("something broke")
+	if code := ExitCode(err); code != 1 {
+		t.Errorf("expected 1 for regular error, got %d", code)
+	}
+}
+
+func TestExitCode_WrappedDriftError(t *testing.T) {
+	// given: DriftError wrapped in fmt.Errorf
+	inner := &DriftError{Divergence: 0.50, DMails: 3}
+	err := fmt.Errorf("check failed: %w", inner)
+
+	// then: should still detect drift via errors.As
+	if code := ExitCode(err); code != 2 {
+		t.Errorf("expected 2 for wrapped DriftError, got %d", code)
+	}
+}
+
+func TestRunCheck_DryRun_NilDataOut_NoPanic(t *testing.T) {
+	// given: an Amadeus with DataOut=nil (library usage without explicit wiring)
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".divergence")
+	if err := InitDivergenceDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: nil, // intentionally nil
+	}
+
+	// when: DryRun should not panic
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("RunCheck DryRun with nil DataOut should not fail: %v", err)
+	}
+}
+
+func TestPrintCheckOutput_JSON(t *testing.T) {
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.145,
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 15, Details: "ADR-003"},
+			AxisDoD:        {Score: 20, Details: "edge case"},
+			AxisDependency: {Score: 10, Details: "clean"},
+			AxisImplicit:   {Score: 5, Details: "naming"},
+		},
+	}
+	dmails := []DMail{
+		{Name: "feedback-001", Kind: KindFeedback, Description: "naming issue", Severity: SeverityLow},
+	}
+
+	// when
+	if err := a.PrintCheckOutputJSON(result, dmails, 0.133); err != nil {
+		t.Fatalf("PrintCheckOutputJSON failed: %v", err)
+	}
+
+	// then: DataOut should be valid JSON
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	output := dataBuf.Bytes()
+	var parsed map[string]any
+	if err := json.Unmarshal(output, &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+	}
+	// should contain divergence
+	if _, ok := parsed["divergence"]; !ok {
+		t.Error("expected 'divergence' key in JSON output")
+	}
+	// should contain axes
+	if _, ok := parsed["axes"]; !ok {
+		t.Error("expected 'axes' key in JSON output")
+	}
+	// should contain dmails
+	if _, ok := parsed["dmails"]; !ok {
+		t.Error("expected 'dmails' key in JSON output")
+	}
+}
+
+func TestPrintLogJSON(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
 	if err := InitDivergenceDir(root); err != nil {
@@ -724,31 +784,76 @@ func TestPrintSync_NoneUnsynced(t *testing.T) {
 	}
 	store := NewStateStore(root)
 
-	// given: all linked
-	issueID := "MY-100"
-	dmail := DMail{ID: "d-001", Severity: SeverityLow, Status: DMailSent, LinearIssueID: &issueID}
+	r1 := CheckResult{
+		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
+		Commit:     "aaa",
+		Type:       CheckTypeFull,
+		Divergence: 0.10,
+	}
+	if err := store.SaveHistory(r1); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintLogJSON()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLogJSON failed: %v", err)
+	}
+	if logBuf.Len() != 0 {
+		t.Errorf("expected no stderr output, got: %s", logBuf.String())
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if _, ok := parsed["history"]; !ok {
+		t.Error("expected 'history' key in JSON output")
+	}
+	if _, ok := parsed["dmails"]; !ok {
+		t.Error("expected 'dmails' key in JSON output")
+	}
+}
+
+func TestResolveDMail_JSON(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation",
+		Severity:    SeverityHigh,
+	}
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&buf, false)}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.PrintSync()
+	err := a.ResolveDMailJSON(context.Background(), "feedback-001", "approve", "")
 
 	// then
 	if err != nil {
-		t.Fatalf("PrintSync failed: %v", err)
+		t.Fatalf("ResolveDMailJSON failed: %v", err)
 	}
-	output := buf.String()
-	var result struct {
-		Unsynced []DMail `json:"unsynced"`
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, dataBuf.String())
 	}
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
+	if parsed["name"] != "feedback-001" {
+		t.Errorf("expected name 'feedback-001', got %v", parsed["name"])
 	}
-	if len(result.Unsynced) != 0 {
-		t.Errorf("expected 0 unsynced, got %d", len(result.Unsynced))
+	if parsed["status"] != "approved" {
+		t.Errorf("expected status 'approved', got %v", parsed["status"])
 	}
 }

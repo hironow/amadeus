@@ -3,6 +3,7 @@ package amadeus
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -14,11 +15,12 @@ func TestInitDivergenceDir_CreatesStructure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDivergenceDir failed: %v", err)
 	}
-	for _, sub := range []string{"state", "history", "dmails"} {
+	for _, sub := range []string{".run", "history", "outbox", "inbox", "archive"} {
 		path := filepath.Join(root, sub)
 		info, err := os.Stat(path)
 		if err != nil {
 			t.Errorf("expected %s to exist: %v", sub, err)
+			continue
 		}
 		if !info.IsDir() {
 			t.Errorf("expected %s to be a directory", sub)
@@ -27,6 +29,15 @@ func TestInitDivergenceDir_CreatesStructure(t *testing.T) {
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); err != nil {
 		t.Errorf("expected config.yaml to exist: %v", err)
+	}
+	// .gitignore must exist and contain .run/
+	gitignorePath := filepath.Join(root, ".gitignore")
+	data, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatalf("expected .gitignore to exist: %v", err)
+	}
+	if !strings.Contains(string(data), ".run/") {
+		t.Errorf("expected .gitignore to contain '.run/', got: %s", string(data))
 	}
 }
 
@@ -242,6 +253,161 @@ func TestLoadHistory_EmptyDir(t *testing.T) {
 	}
 	if len(history) != 0 {
 		t.Errorf("expected 0 entries, got %d", len(history))
+	}
+}
+
+func TestInitDivergenceDir_MigratesLegacyState(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: legacy state/ directory with latest.json and baseline.json
+	legacyDir := filepath.Join(root, "state")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	latestData := []byte(`{"commit":"legacy-abc","divergence":0.123}`)
+	baselineData := []byte(`{"commit":"legacy-base","divergence":0.050}`)
+	if err := os.WriteFile(filepath.Join(legacyDir, "latest.json"), latestData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyDir, "baseline.json"), baselineData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: InitDivergenceDir is called
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: files should be migrated to .run/
+	newLatest, err := os.ReadFile(filepath.Join(root, ".run", "latest.json"))
+	if err != nil {
+		t.Fatalf("expected .run/latest.json to exist: %v", err)
+	}
+	if string(newLatest) != string(latestData) {
+		t.Errorf("expected migrated latest data to match, got: %s", string(newLatest))
+	}
+	newBaseline, err := os.ReadFile(filepath.Join(root, ".run", "baseline.json"))
+	if err != nil {
+		t.Fatalf("expected .run/baseline.json to exist: %v", err)
+	}
+	if string(newBaseline) != string(baselineData) {
+		t.Errorf("expected migrated baseline data to match, got: %s", string(newBaseline))
+	}
+
+	// then: legacy state/ directory should be removed
+	if _, err := os.Stat(legacyDir); !os.IsNotExist(err) {
+		t.Errorf("expected legacy state/ directory to be removed, but it still exists")
+	}
+}
+
+func TestInitDivergenceDir_SkipsMigrationWhenNoLegacy(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: no legacy state/ directory
+	// when: InitDivergenceDir is called
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: .run/ should exist but be empty (no migrated files)
+	entries, err := os.ReadDir(filepath.Join(root, ".run"))
+	if err != nil {
+		t.Fatalf("expected .run/ to exist: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty .run/, got %d entries", len(entries))
+	}
+}
+
+func TestInitDivergenceDir_DoesNotOverwriteExistingRun(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+
+	// given: .run/ already has latest.json AND state/ also exists (edge case)
+	runDir := filepath.Join(root, ".run")
+	stateDir := filepath.Join(root, "state")
+	os.MkdirAll(runDir, 0o755)
+	os.MkdirAll(stateDir, 0o755)
+	os.MkdirAll(filepath.Join(root, "history"), 0o755)
+	os.MkdirAll(filepath.Join(root, "outbox"), 0o755)
+	os.MkdirAll(filepath.Join(root, "inbox"), 0o755)
+	os.MkdirAll(filepath.Join(root, "archive"), 0o755)
+
+	existingData := []byte(`{"commit":"existing","divergence":0.999}`)
+	legacyData := []byte(`{"commit":"legacy","divergence":0.001}`)
+	os.WriteFile(filepath.Join(runDir, "latest.json"), existingData, 0o644)
+	os.WriteFile(filepath.Join(stateDir, "latest.json"), legacyData, 0o644)
+
+	// when: InitDivergenceDir is called
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: .run/latest.json should NOT be overwritten by legacy data
+	data, err := os.ReadFile(filepath.Join(runDir, "latest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(existingData) {
+		t.Errorf("expected existing .run/latest.json to be preserved, got: %s", string(data))
+	}
+}
+
+func TestInitDivergenceDir_AppendsEntriesToExistingGitignore(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	os.MkdirAll(root, 0o755)
+
+	// given: existing .gitignore without required entries
+	gitignorePath := filepath.Join(root, ".gitignore")
+	os.WriteFile(gitignorePath, []byte("*.log\ntemp/\n"), 0o644)
+
+	// when
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: .gitignore should contain all required entries
+	data, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, entry := range []string{".run/", "outbox/", "inbox/"} {
+		if !strings.Contains(content, entry) {
+			t.Errorf("expected .gitignore to contain %q, got: %s", entry, content)
+		}
+	}
+	// then: original content should be preserved
+	if !strings.Contains(content, "*.log") {
+		t.Errorf("expected .gitignore to preserve original content, got: %s", content)
+	}
+}
+
+func TestInitDivergenceDir_SkipsGitignoreAppendIfAlreadyPresent(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	os.MkdirAll(root, 0o755)
+
+	// given: existing .gitignore that already has all required entries
+	gitignorePath := filepath.Join(root, ".gitignore")
+	original := "*.log\n.run/\noutbox/\ninbox/\ntemp/\n"
+	os.WriteFile(gitignorePath, []byte(original), 0o644)
+
+	// when
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatalf("InitDivergenceDir failed: %v", err)
+	}
+
+	// then: .gitignore should be unchanged
+	data, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != original {
+		t.Errorf("expected .gitignore to be unchanged, got: %s", string(data))
 	}
 }
 
