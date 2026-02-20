@@ -399,6 +399,13 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 // ResolveDMail updates a pending D-Mail to approved or rejected status.
 // action must be "approve" or "reject". reason is required for reject.
 func (a *Amadeus) ResolveDMail(id string, action string, reason string) error {
+	_, span := tracer.Start(context.Background(), "amadeus.resolve",
+		trace.WithAttributes(
+			attribute.String("dmail.id", id),
+			attribute.String("resolve.action", action),
+		))
+	defer span.End()
+
 	dmail, err := a.Store.LoadDMail(id)
 	if err != nil {
 		return err
@@ -427,6 +434,11 @@ func (a *Amadeus) ResolveDMail(id string, action string, reason string) error {
 	if err := a.Store.SaveDMail(dmail); err != nil {
 		return fmt.Errorf("save resolved dmail: %w", err)
 	}
+
+	span.AddEvent("dmail.resolved", trace.WithAttributes(
+		attribute.String("dmail.id", id),
+		attribute.String("dmail.status", string(dmail.Status)),
+	))
 
 	a.Logger.Info("D-Mail %s %s.", id, action+"d")
 	a.Logger.Info("%s → %sd at %s", dmail.Summary, action, now.Format(time.RFC3339))

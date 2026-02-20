@@ -225,6 +225,50 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
+	// given: mock commands succeed
+	exp := setupTestTracer(t)
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	dir := t.TempDir()
+	exec.Command("git", "init", dir).Run()
+	divRoot := filepath.Join(dir, ".divergence")
+	os.MkdirAll(divRoot, 0o755)
+	cfg := DefaultConfig()
+	data, _ := yaml.Marshal(cfg)
+	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
+
+	ctx := context.Background()
+
+	// when
+	RunDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir)
+
+	// then: amadeus.doctor span should exist
+	spans := exp.GetSpans()
+	found := false
+	for _, s := range spans {
+		if s.Name == "amadeus.doctor" {
+			found = true
+			// Should have 6 doctor.check events (one per check)
+			eventCount := 0
+			for _, event := range s.Events {
+				if event.Name == "doctor.check" {
+					eventCount++
+				}
+			}
+			if eventCount != 6 {
+				t.Errorf("expected 6 doctor.check events, got %d", eventCount)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected 'amadeus.doctor' span")
+	}
+}
+
 func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	// given: no need to mock execCommand for this test
 	dir := t.TempDir()

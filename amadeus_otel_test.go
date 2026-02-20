@@ -201,3 +201,55 @@ func TestRunCheck_Phase2SpanExists(t *testing.T) {
 		t.Errorf("expected divergence_meter parent=%s, got parent=%s", rootSpanID, phase2ParentSpanID)
 	}
 }
+
+func TestResolveDMail_CreatesSpan(t *testing.T) {
+	// given: a test tracer and an Amadeus with a pending D-Mail
+	exp := setupTestTracer(t)
+	dir := t.TempDir()
+	divRoot := filepath.Join(dir, ".divergence")
+	os.MkdirAll(divRoot, 0o755)
+	InitDivergenceDir(divRoot)
+	store := NewStateStore(divRoot)
+
+	dmail := DMail{
+		ID:       "DM-001",
+		Severity: SeverityLow,
+		Target:   "sightjack",
+		Type:     "Type-S",
+		Summary:  "test dmail",
+		Detail:   "detail",
+		Status:   DMailPending,
+	}
+	store.SaveDMail(dmail)
+
+	a := &Amadeus{
+		Config: DefaultConfig(),
+		Store:  store,
+		Logger: NewLogger(&bytes.Buffer{}, false),
+	}
+
+	// when
+	err := a.ResolveDMail("DM-001", "approve", "")
+	if err != nil {
+		t.Fatalf("ResolveDMail: %v", err)
+	}
+
+	// then: amadeus.resolve span should exist with dmail.resolved event
+	spans := exp.GetSpans()
+	if !containsSpan(spans, "amadeus.resolve") {
+		t.Errorf("expected 'amadeus.resolve' span, got: %v", spanNames(spans))
+	}
+	for _, s := range spans {
+		if s.Name == "amadeus.resolve" {
+			found := false
+			for _, event := range s.Events {
+				if event.Name == "dmail.resolved" {
+					found = true
+				}
+			}
+			if !found {
+				t.Error("expected 'dmail.resolved' event on amadeus.resolve span")
+			}
+		}
+	}
+}

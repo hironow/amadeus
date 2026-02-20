@@ -7,6 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // CheckStatus represents the outcome of a single doctor check.
@@ -165,6 +168,9 @@ func RunDoctor(ctx context.Context, configPath string, repoRoot string) []Doctor
 
 // RunDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
 func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
+	_, span := tracer.Start(ctx, "amadeus.doctor")
+	defer span.End()
+
 	var results []DoctorCheckResult
 
 	// 1. git binary
@@ -192,6 +198,13 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		})
 	} else {
 		results = append(results, checkLinearMCP(ctx, claudeCmd))
+	}
+
+	for _, r := range results {
+		span.AddEvent("doctor.check", trace.WithAttributes(
+			attribute.String("check.name", r.Name),
+			attribute.String("check.status", r.Status.StatusLabel()),
+		))
 	}
 
 	return results
