@@ -152,9 +152,10 @@ func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
 	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// SaveDMail writes a D-Mail to both archive/ and outbox/ (dual-write pattern).
-// Archive is written first so the permanent record exists even if the outbox
-// write fails; outbox is the ephemeral copy consumed by the courier.
+// SaveDMail writes a D-Mail to archive/ and either outbox/ or pending/.
+// Archive is always written first so the permanent record exists even if
+// the second write fails. HIGH severity D-Mails go to pending/ for human
+// approval; all others go directly to outbox/ for courier delivery.
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	data, err := MarshalDMail(dmail)
 	if err != nil {
@@ -162,10 +163,17 @@ func (s *StateStore) SaveDMail(dmail DMail) error {
 	}
 	filename := dmail.Name + ".md"
 	archivePath := filepath.Join(s.Root, "archive", filename)
-	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
 		return fmt.Errorf("write archive: %w", err)
 	}
+	if RouteDMail(dmail.Severity) == DMailPending {
+		pendingPath := filepath.Join(s.Root, "pending", filename)
+		if err := os.WriteFile(pendingPath, data, 0o644); err != nil {
+			return fmt.Errorf("write pending: %w", err)
+		}
+		return nil
+	}
+	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
 		return fmt.Errorf("write outbox: %w", err)
 	}

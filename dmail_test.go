@@ -289,6 +289,72 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 	}
 }
 
+func TestSaveDMail_HighSeverity_WritesToPending(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "high severity test",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: file exists in archive/ and pending/ (NOT outbox/)
+	archivePath := filepath.Join(root, "archive", "feedback-001.md")
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("expected file in archive: %v", err)
+	}
+	if _, err := os.Stat(pendingPath); err != nil {
+		t.Errorf("expected file in pending: %v", err)
+	}
+	if _, err := os.Stat(outboxPath); err == nil {
+		t.Error("expected file NOT in outbox for HIGH severity")
+	}
+}
+
+func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".divergence")
+	if err := InitDivergenceDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "low severity test",
+		Severity:    SeverityLow,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: file exists in archive/ and outbox/ (NOT pending/)
+	archivePath := filepath.Join(root, "archive", "feedback-001.md")
+	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("expected file in archive: %v", err)
+	}
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("expected file in outbox: %v", err)
+	}
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file NOT in pending for LOW severity")
+	}
+}
+
 func TestSaveDMail_Format(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".divergence")
