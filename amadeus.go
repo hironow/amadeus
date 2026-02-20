@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
@@ -41,6 +44,13 @@ func (a *Amadeus) ShouldFullCheck(forceFlag bool) bool {
 //   - Phase 2: Claude evaluates divergence, DivergenceMeter scores it
 //   - Phase 3: D-Mail generation and routing
 func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
+	ctx, span := tracer.Start(ctx, "amadeus.check",
+		trace.WithAttributes(
+			attribute.Bool("check.full", opts.Full),
+			attribute.Bool("check.dry_run", opts.DryRun),
+		))
+	defer span.End()
+
 	previous, err := a.Store.LoadLatest()
 	if err != nil {
 		return fmt.Errorf("load previous state: %w", err)
@@ -61,9 +71,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	rs := &ReadingSteiner{Git: a.Git}
 	var report ShiftReport
 
+	_, span1 := tracer.Start(ctx, "reading_steiner")
 	if fullCheck {
 		report, err = rs.DetectShiftFull(a.Git.Dir)
 		if err != nil {
+			span1.End()
 			return fmt.Errorf("phase 1 (full): %w", err)
 		}
 	} else {
@@ -72,15 +84,23 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			fullCheck = true
 			report, err = rs.DetectShiftFull(a.Git.Dir)
 			if err != nil {
+				span1.End()
 				return fmt.Errorf("phase 1 (first run): %w", err)
 			}
 		} else {
 			report, err = rs.DetectShift(sinceCommit)
 			if err != nil {
+				span1.End()
 				return fmt.Errorf("phase 1 (diff): %w", err)
 			}
 		}
 	}
+	if report.Significant {
+		span1.AddEvent("shift.detected", trace.WithAttributes(
+			attribute.Int("shift.pr_count", len(report.MergedPRs)),
+		))
+	}
+	span1.End()
 
 	if !report.Significant {
 		if !opts.Quiet {
