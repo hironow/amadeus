@@ -43,6 +43,16 @@ func run() error {
 
 	cmd := os.Args[1]
 
+	// resolve uses its own argument parser that supports interspersed
+	// flags and positional names (e.g. "feedback-001 --approve" and
+	// "--approve feedback-001" both work). Handle it before fs.Parse
+	// so that resolve-specific flags like --approve don't cause
+	// "flag provided but not defined" errors from the shared FlagSet.
+	if cmd == "resolve" {
+		ra := parseResolveArgs(os.Args[2:])
+		return runResolve(ra)
+	}
+
 	var (
 		configPath string
 		verbose    bool
@@ -70,8 +80,6 @@ func run() error {
 	switch cmd {
 	case "check":
 		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut)
-	case "resolve":
-		return runResolve(configPath, verbose, jsonOut, fs.Args())
 	case "log":
 		return runLog(configPath, verbose, jsonOut)
 	case "init":
@@ -160,11 +168,16 @@ func runLog(configPath string, verbose, jsonOut bool) error {
 }
 
 // resolveArgs holds the parsed arguments for the resolve command.
+// It includes both resolve-specific flags and common flags, because
+// resolve uses its own argument parser to support interspersed flags and names.
 type resolveArgs struct {
-	approve bool
-	reject  bool
-	reason  string
-	names   []string
+	approve    bool
+	reject     bool
+	reason     string
+	names      []string
+	configPath string
+	verbose    bool
+	jsonOut    bool
 }
 
 // parseResolveArgs extracts resolve-specific flags (--approve, --reject, --reason)
@@ -185,6 +198,18 @@ func parseResolveArgs(args []string) resolveArgs {
 			i++
 		case strings.HasPrefix(args[i], "--reason="):
 			ra.reason = strings.TrimPrefix(args[i], "--reason=")
+		case args[i] == "-c" && i+1 < len(args):
+			ra.configPath = args[i+1]
+			i++
+		case args[i] == "--config" && i+1 < len(args):
+			ra.configPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--config="):
+			ra.configPath = strings.TrimPrefix(args[i], "--config=")
+		case args[i] == "-v" || args[i] == "--verbose":
+			ra.verbose = true
+		case args[i] == "--json":
+			ra.jsonOut = true
 		default:
 			ra.names = append(ra.names, args[i])
 		}
@@ -192,9 +217,7 @@ func parseResolveArgs(args []string) resolveArgs {
 	return ra
 }
 
-func runResolve(configPath string, verbose, jsonOut bool, rawArgs []string) error {
-	ra := parseResolveArgs(rawArgs)
-
+func runResolve(ra resolveArgs) error {
 	// Also collect names from stdin if none provided as args
 	if len(ra.names) == 0 {
 		stdinNames, err := readNamesFromStdin()
@@ -224,6 +247,7 @@ func runResolve(configPath string, verbose, jsonOut bool, rawArgs []string) erro
 		return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 	}
 
+	configPath := ra.configPath
 	if configPath == "" {
 		configPath = filepath.Join(divRoot, "config.yaml")
 	}
@@ -232,7 +256,7 @@ func runResolve(configPath string, verbose, jsonOut bool, rawArgs []string) erro
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := amadeus.NewLogger(os.Stderr, verbose)
+	logger := amadeus.NewLogger(os.Stderr, ra.verbose)
 	a := &amadeus.Amadeus{
 		Config:  cfg,
 		Store:   amadeus.NewStateStore(divRoot),
@@ -247,7 +271,7 @@ func runResolve(configPath string, verbose, jsonOut bool, rawArgs []string) erro
 
 	ctx := context.Background()
 
-	if jsonOut {
+	if ra.jsonOut {
 		// Batch mode: collect all results and write as a JSON array.
 		var results []amadeus.ResolveOutput
 		var firstErr error

@@ -121,3 +121,50 @@ func TestParseResolveArgs_Empty(t *testing.T) {
 		t.Errorf("expected empty names, got %v", result.names)
 	}
 }
+
+func TestParseResolveArgs_CommonFlags(t *testing.T) {
+	// given: common flags mixed with resolve-specific flags
+	args := []string{"--approve", "-v", "--json", "-c", "custom.yaml", "feedback-001"}
+
+	// when
+	result := parseResolveArgs(args)
+
+	// then
+	if !result.approve {
+		t.Error("expected approve=true")
+	}
+	if !result.verbose {
+		t.Error("expected verbose=true")
+	}
+	if !result.jsonOut {
+		t.Error("expected jsonOut=true")
+	}
+	if result.configPath != "custom.yaml" {
+		t.Errorf("expected configPath='custom.yaml', got %q", result.configPath)
+	}
+	if len(result.names) != 1 || result.names[0] != "feedback-001" {
+		t.Errorf("expected names=[feedback-001], got %v", result.names)
+	}
+}
+
+func TestParseResolveArgs_CommonFlagsLongForm(t *testing.T) {
+	// given: long-form common flags
+	args := []string{"--verbose", "--config", "path.yaml", "feedback-001", "--reject", "--reason", "bad"}
+
+	// when
+	result := parseResolveArgs(args)
+
+	// then
+	if !result.reject {
+		t.Error("expected reject=true")
+	}
+	if !result.verbose {
+		t.Error("expected verbose=true")
+	}
+	if result.configPath != "path.yaml" {
+		t.Errorf("expected configPath='path.yaml', got %q", result.configPath)
+	}
+	if result.reason != "bad" {
+		t.Errorf("expected reason='bad', got %q", result.reason)
+	}
+}
