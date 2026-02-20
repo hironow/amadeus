@@ -253,6 +253,7 @@ Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.crea
 ## Development
 
 ```bash
+# Task runner (just)
 just build          # Build binary
 just install        # Build and install to /usr/local/bin
 just test           # Run all tests
@@ -263,8 +264,11 @@ just cover-html     # Open coverage in browser
 just fmt            # Format code (gofmt)
 just vet            # Run go vet
 just lint           # fmt check + vet + markdown lint
+just lint-md        # Lint markdown files only
 just check          # fmt + vet + test (pre-commit check)
 just clean          # Clean build artifacts
+just prek-install   # Install prek hooks (pre-commit + pre-push)
+just prek-run       # Run all prek hooks on all files
 ```
 
 ## File Structure
