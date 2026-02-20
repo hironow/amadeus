@@ -892,7 +892,9 @@ func TestPrintCheckOutput_JSON(t *testing.T) {
 	}
 
 	// when
-	a.PrintCheckOutputJSON(result, dmails, 0.133)
+	if err := a.PrintCheckOutputJSON(result, dmails, 0.133); err != nil {
+		t.Fatalf("PrintCheckOutputJSON failed: %v", err)
+	}
 
 	// then: DataOut should be valid JSON
 	if logBuf.Len() != 0 {
