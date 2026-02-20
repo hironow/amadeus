@@ -18,13 +18,14 @@ var tracer trace.Tracer = noop.NewTracerProvider().Tracer("amadeus")
 func InitTracer(serviceName, ver string) func(context.Context) error {
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
-		tracer = otel.Tracer(serviceName)
+		// No endpoint configured — keep the noop tracer to avoid
+		// accidentally recording spans via a host's global provider.
 		return func(context.Context) error { return nil }
 	}
 
 	exp, err := otlptracehttp.New(context.Background())
 	if err != nil {
-		tracer = otel.Tracer(serviceName)
+		// Exporter creation failed — keep noop so the CLI is not blocked.
 		return func(context.Context) error { return nil }
 	}
 

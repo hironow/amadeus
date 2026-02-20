@@ -75,6 +75,19 @@ lint: vet lint-md
 # Format, vet, test — full check before commit
 check: fmt vet test
 
+# Start Jaeger (OTel trace viewer) on http://localhost:16686
+jaeger:
+    docker compose -f docker/compose.yaml up -d
+    @echo "Jaeger UI: http://localhost:16686"
+    @echo "OTLP endpoint: http://localhost:4318"
+    @echo ""
+    @echo "Run amadeus with tracing:"
+    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check"
+
+# Stop Jaeger
+jaeger-down:
+    docker compose -f docker/compose.yaml down
+
 # Clean build artifacts
 clean:
     rm -f coverage.out

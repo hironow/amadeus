@@ -235,15 +235,16 @@ full_check:
 Amadeus instruments key operations with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
 
 ```bash
-# Start Jaeger
-docker run -d --name jaeger \
-  -p 16686:16686 -p 4318:4318 \
-  jaegertracing/all-in-one:latest
+# Start Jaeger (all-in-one trace viewer)
+just jaeger
 
-# Run with tracing enabled
+# Run amadeus with tracing enabled
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
 
 # View traces at http://localhost:16686
+
+# Stop Jaeger
+just jaeger-down
 ```
 
 Spans cover: `amadeus.check` (root), `reading_steiner`, `divergence_meter`, `dmail`, `amadeus.resolve`, and `amadeus.doctor`.
@@ -269,6 +270,8 @@ just check          # fmt + vet + test (pre-commit check)
 just clean          # Clean build artifacts
 just prek-install   # Install prek hooks (pre-commit + pre-push)
 just prek-run       # Run all prek hooks on all files
+just jaeger         # Start Jaeger trace viewer (docker)
+just jaeger-down    # Stop Jaeger
 ```
 
 ## File Structure
@@ -292,6 +295,8 @@ just prek-run       # Run all prek hooks on all files
 +-- templates/
 |   +-- diff_check.md.tmpl   Diff-based check prompt
 |   +-- full_check.md.tmpl   Full calibration prompt
++-- docker/
+|   +-- compose.yaml         Jaeger all-in-one for trace viewing
 +-- justfile                 Task runner
 ```
 
