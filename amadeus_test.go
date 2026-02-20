@@ -1143,6 +1143,63 @@ func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_OmitsSection(t *testing.T) {
 	}
 }
 
+func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_SuppressesDoDs(t *testing.T) {
+	// given: a repo with DoD files committed BEFORE the baseline,
+	// then a merge commit WITHOUT issue IDs after the baseline.
+	// DoDs should not appear in the prompt's LinkedDoDs section.
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create DoD files before the baseline commit
+	repo.shell(t, "mkdir -p /repo/docs/dod")
+	repo.shell(t, "echo '# Sprint 42 DoD' > /repo/docs/dod/sprint-42.md")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "add DoD files")
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+
+	// Set baseline to current commit (DoD files already exist)
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveLatest(CheckResult{Commit: commit}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a merge commit without issue IDs after the baseline
+	repo.shell(t, "echo 'package main' > /repo/plain.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #99 from feat/no-issue-ref")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	// DoD content should NOT appear in the LinkedDoDs section
+	// (DoD files exist on disk but no issue IDs were extracted from PR titles)
+	if strings.Contains(prompt, "Sprint 42 DoD") {
+		t.Errorf("expected DoDs to be suppressed when no issue IDs found, but prompt contains DoD content")
+	}
+}
+
 func TestPrintCheckOutput_JSON(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{

@@ -224,11 +224,15 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			prTitles = append(prTitles, pr.Title)
 		}
 		issueIDs := ExtractIssueIDs(prTitles...)
+		linkedDoDs := ""
+		if len(issueIDs) > 0 {
+			linkedDoDs = allDoDs
+		}
 		prompt, err = BuildDiffCheckPrompt(a.Config.Lang, DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
 			RelevantADRs:   allADRs,
-			LinkedDoDs:     allDoDs,
+			LinkedDoDs:     linkedDoDs,
 			LinkedIssueIDs: strings.Join(issueIDs, ", "),
 		})
 	}
