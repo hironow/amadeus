@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -194,16 +195,45 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	_, span2 := tracer.Start(ctx, "divergence_meter")
 
+	repoRoot := a.Git.Dir
+	allADRs, adrErr := CollectADRs(repoRoot)
+	if adrErr != nil && !opts.Quiet {
+		a.Logger.Info("Warning: failed to collect ADRs: %v", adrErr)
+	}
+	allDoDs, dodErr := CollectDoDs(repoRoot)
+	if dodErr != nil && !opts.Quiet {
+		a.Logger.Info("Warning: failed to collect DoDs: %v", dodErr)
+	}
+	depMap, depErr := CollectDependencyMap(repoRoot)
+	if depErr != nil && !opts.Quiet {
+		a.Logger.Info("Warning: failed to collect dependency map: %v", depErr)
+	}
+
 	var prompt string
 	if fullCheck {
-		prompt, err = BuildFullCheckPrompt(FullCheckParams{
+		prompt, err = BuildFullCheckPrompt(a.Config.Lang, FullCheckParams{
 			CodebaseStructure: report.CodebaseStructure,
+			AllADRs:           allADRs,
+			RecentDoDs:        allDoDs,
+			DependencyMap:     depMap,
 		})
 	} else {
 		prevJSON, _ := json.Marshal(previous)
-		prompt, err = BuildDiffCheckPrompt(DiffCheckParams{
+		var prTitles []string
+		for _, pr := range report.MergedPRs {
+			prTitles = append(prTitles, pr.Title)
+		}
+		issueIDs := ExtractIssueIDs(prTitles...)
+		linkedDoDs := ""
+		if len(issueIDs) > 0 {
+			linkedDoDs = allDoDs
+		}
+		prompt, err = BuildDiffCheckPrompt(a.Config.Lang, DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
+			RelevantADRs:   allADRs,
+			LinkedDoDs:     linkedDoDs,
+			LinkedIssueIDs: strings.Join(issueIDs, ", "),
 		})
 	}
 	if err != nil {
@@ -313,6 +343,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		Type:                checkType,
 		Divergence:          meterResult.Divergence.Value,
 		Axes:                meterResult.Divergence.Axes,
+		ImpactRadius:        meterResult.ImpactRadius,
 		PRsEvaluated:        prNumbers,
 		DMails:              dmailNames,
 		CheckCountSinceFull: a.CheckCount,
@@ -396,6 +427,14 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 		}
 	}
 
+	if len(result.ImpactRadius) > 0 {
+		a.dataOut("")
+		a.dataOut("Impact Radius:")
+		for _, entry := range result.ImpactRadius {
+			a.dataOut("  [%s] %s — %s", entry.Impact, entry.Area, entry.Detail)
+		}
+	}
+
 	if len(dmails) > 0 {
 		a.dataOut("")
 		a.dataOut("D-Mails:")
@@ -431,18 +470,23 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 // PrintCheckOutputJSON writes the check result as JSON to DataOut.
 func (a *Amadeus) PrintCheckOutputJSON(result CheckResult, dmails []DMail, previousDivergence float64) error {
 	output := struct {
-		Divergence float64            `json:"divergence"`
-		Delta      float64            `json:"delta"`
-		Axes       map[Axis]AxisScore `json:"axes"`
-		DMails     []DMail            `json:"dmails"`
+		Divergence   float64            `json:"divergence"`
+		Delta        float64            `json:"delta"`
+		Axes         map[Axis]AxisScore `json:"axes"`
+		ImpactRadius []ImpactEntry      `json:"impact_radius"`
+		DMails       []DMail            `json:"dmails"`
 	}{
-		Divergence: result.Divergence,
-		Delta:      result.Divergence - previousDivergence,
-		Axes:       result.Axes,
-		DMails:     dmails,
+		Divergence:   result.Divergence,
+		Delta:        result.Divergence - previousDivergence,
+		Axes:         result.Axes,
+		ImpactRadius: result.ImpactRadius,
+		DMails:       dmails,
 	}
 	if output.DMails == nil {
 		output.DMails = []DMail{}
+	}
+	if output.ImpactRadius == nil {
+		output.ImpactRadius = []ImpactEntry{}
 	}
 	return a.writeDataJSON(output)
 }

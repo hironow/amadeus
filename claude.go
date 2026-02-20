@@ -13,11 +13,19 @@ import (
 //go:embed templates/*.md.tmpl
 var templateFS embed.FS
 
+// ImpactEntry represents a single entry in the impact radius map.
+type ImpactEntry struct {
+	Area   string `json:"area"`
+	Impact string `json:"impact"` // direct, indirect, transitive
+	Detail string `json:"detail"`
+}
+
 // ClaudeResponse represents the structured JSON output from Claude.
 type ClaudeResponse struct {
-	Axes      map[Axis]AxisScore     `json:"axes"`
-	DMails    []ClaudeDMailCandidate `json:"dmails"`
-	Reasoning string                 `json:"reasoning"`
+	Axes         map[Axis]AxisScore     `json:"axes"`
+	DMails       []ClaudeDMailCandidate `json:"dmails"`
+	Reasoning    string                 `json:"reasoning"`
+	ImpactRadius []ImpactEntry          `json:"impact_radius,omitempty"`
 }
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.
@@ -33,6 +41,7 @@ type DiffCheckParams struct {
 	PRDiffs        string
 	RelevantADRs   string
 	LinkedDoDs     string
+	LinkedIssueIDs string
 }
 
 // FullCheckParams holds the template parameters for a full calibration check.
@@ -43,14 +52,16 @@ type FullCheckParams struct {
 	DependencyMap     string
 }
 
-// BuildDiffCheckPrompt renders the diff_check template with the given parameters.
-func BuildDiffCheckPrompt(params DiffCheckParams) (string, error) {
-	return renderTemplate("templates/diff_check.md.tmpl", params)
+// BuildDiffCheckPrompt renders the diff_check template for the given language.
+func BuildDiffCheckPrompt(lang string, params DiffCheckParams) (string, error) {
+	name := fmt.Sprintf("templates/diff_check_%s.md.tmpl", lang)
+	return renderTemplate(name, params)
 }
 
-// BuildFullCheckPrompt renders the full_check template with the given parameters.
-func BuildFullCheckPrompt(params FullCheckParams) (string, error) {
-	return renderTemplate("templates/full_check.md.tmpl", params)
+// BuildFullCheckPrompt renders the full_check template for the given language.
+func BuildFullCheckPrompt(lang string, params FullCheckParams) (string, error) {
+	name := fmt.Sprintf("templates/full_check_%s.md.tmpl", lang)
+	return renderTemplate(name, params)
 }
 
 // ParseClaudeResponse parses raw JSON bytes into a ClaudeResponse.

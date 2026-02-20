@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hironow/amadeus"
 )
@@ -33,7 +34,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor|validate|install-hook|uninstall-hook> [flags]")
+		return fmt.Errorf("usage: amadeus <init|check|resolve|log|doctor|validate|archive-prune|install-hook|uninstall-hook> [flags]")
 	}
 
 	if os.Args[1] == "--version" || os.Args[1] == "-version" {
@@ -53,6 +54,10 @@ func run() error {
 		return runResolve(ra)
 	}
 
+	if cmd == "archive-prune" {
+		return runArchivePrune(os.Args[2:])
+	}
+
 	var (
 		configPath string
 		verbose    bool
@@ -60,6 +65,7 @@ func run() error {
 		full       bool
 		quiet      bool
 		jsonOut    bool
+		lang       string
 	)
 
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -72,6 +78,7 @@ func run() error {
 	fs.BoolVar(&quiet, "quiet", false, "summary-only output")
 	fs.BoolVar(&quiet, "q", false, "summary-only output")
 	fs.BoolVar(&jsonOut, "json", false, "output as JSON")
+	fs.StringVar(&lang, "lang", "", "output language (ja, en)")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		return err
@@ -79,7 +86,7 @@ func run() error {
 
 	switch cmd {
 	case "check":
-		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut)
+		return runCheck(configPath, verbose, dryRun, full, quiet, jsonOut, lang)
 	case "log":
 		return runLog(configPath, verbose, jsonOut)
 	case "init":
@@ -93,11 +100,11 @@ func run() error {
 	case "uninstall-hook":
 		return runUninstallHook()
 	default:
-		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor, validate, install-hook, uninstall-hook)", cmd)
+		return fmt.Errorf("unknown command: %s (available: init, check, resolve, log, doctor, validate, archive-prune, install-hook, uninstall-hook)", cmd)
 	}
 }
 
-func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool) error {
+func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool, lang string) error {
 	repoRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -115,6 +122,13 @@ func runCheck(configPath string, verbose, dryRun, full, quiet, jsonOut bool) err
 	cfg, err := amadeus.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+
+	if lang != "" {
+		if !amadeus.ValidLang(lang) {
+			return fmt.Errorf("unsupported language: %s (supported: ja, en)", lang)
+		}
+		cfg.Lang = lang
 	}
 
 	logger := amadeus.NewLogger(os.Stderr, verbose)
@@ -465,5 +479,80 @@ func runDoctor(configPath string, jsonOut bool) error {
 	if hasFail {
 		return fmt.Errorf("some checks failed")
 	}
+	return nil
+}
+
+func runArchivePrune(args []string) error {
+	fs := flag.NewFlagSet("archive-prune", flag.ContinueOnError)
+	var (
+		days   int
+		dryRun bool
+		yes    bool
+	)
+	fs.IntVar(&days, "days", 30, "prune files older than N days")
+	fs.BoolVar(&dryRun, "dry-run", false, "show what would be pruned without deleting")
+	fs.BoolVar(&yes, "yes", false, "skip confirmation prompt")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if days < 1 {
+		return fmt.Errorf("--days must be >= 1 (got %d)", days)
+	}
+
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	archiveDir := filepath.Join(repoRoot, ".gate", "archive")
+
+	maxAge := time.Duration(days) * 24 * time.Hour
+	candidates, err := amadeus.FindPruneCandidates(archiveDir, maxAge)
+	if err != nil {
+		return fmt.Errorf("find prune candidates: %w", err)
+	}
+
+	if candidates == nil {
+		fmt.Fprintf(os.Stderr, "Archive directory does not exist: %s\n", archiveDir)
+		return nil
+	}
+	if len(candidates) == 0 {
+		fmt.Fprintf(os.Stderr, "No files older than %d days in %s\n", days, archiveDir)
+		return nil
+	}
+
+	fmt.Fprintf(os.Stderr, "Files to prune in %s (older than %d days):\n", archiveDir, days)
+	for _, c := range candidates {
+		fmt.Fprintf(os.Stderr, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
+	}
+
+	if dryRun {
+		fmt.Fprintf(os.Stderr, "\n(dry-run — no files deleted)\n")
+		return nil
+	}
+
+	if !yes {
+		fmt.Fprintf(os.Stderr, "\nDelete these %d file(s)? [y/N] ", len(candidates))
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return fmt.Errorf("read confirmation: %w", err)
+			}
+			fmt.Fprintln(os.Stderr, "Cancelled.")
+			return nil
+		}
+		answer := strings.TrimSpace(scanner.Text())
+		if answer != "y" && answer != "Y" {
+			fmt.Fprintln(os.Stderr, "Cancelled.")
+			return nil
+		}
+	}
+
+	count, err := amadeus.PruneFiles(candidates)
+	if err != nil {
+		return fmt.Errorf("prune: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "Pruned %d file(s).\n", count)
 	return nil
 }

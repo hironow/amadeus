@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -144,6 +145,32 @@ func TestParseResolveArgs_CommonFlags(t *testing.T) {
 	}
 	if len(result.names) != 1 || result.names[0] != "feedback-001" {
 		t.Errorf("expected names=[feedback-001], got %v", result.names)
+	}
+}
+
+func TestRunArchivePrune_NegativeDays(t *testing.T) {
+	// when: --days with negative value
+	err := runArchivePrune([]string{"--days", "-5"})
+
+	// then: should reject
+	if err == nil {
+		t.Fatal("expected error for negative --days")
+	}
+	if !strings.Contains(err.Error(), "--days must be >= 1") {
+		t.Errorf("expected '--days must be >= 1' in error, got: %v", err)
+	}
+}
+
+func TestRunArchivePrune_ZeroDays(t *testing.T) {
+	// when: --days 0
+	err := runArchivePrune([]string{"--days", "0"})
+
+	// then: should reject
+	if err == nil {
+		t.Fatal("expected error for --days 0")
+	}
+	if !strings.Contains(err.Error(), "--days must be >= 1") {
+		t.Errorf("expected '--days must be >= 1' in error, got: %v", err)
 	}
 }
 

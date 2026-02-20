@@ -196,3 +196,74 @@ func TestValidateConfig_MultipleErrors(t *testing.T) {
 		t.Errorf("expected at least 3 errors, got %d: %v", len(errs), errs)
 	}
 }
+
+func TestValidLang_Ja(t *testing.T) {
+	// when
+	result := ValidLang("ja")
+
+	// then
+	if !result {
+		t.Error("expected ValidLang(\"ja\") to be true")
+	}
+}
+
+func TestValidLang_En(t *testing.T) {
+	// when
+	result := ValidLang("en")
+
+	// then
+	if !result {
+		t.Error("expected ValidLang(\"en\") to be true")
+	}
+}
+
+func TestValidLang_Unknown(t *testing.T) {
+	// when
+	result := ValidLang("fr")
+
+	// then
+	if result {
+		t.Error("expected ValidLang(\"fr\") to be false")
+	}
+}
+
+func TestValidLang_Empty(t *testing.T) {
+	// when
+	result := ValidLang("")
+
+	// then
+	if result {
+		t.Error("expected ValidLang(\"\") to be false")
+	}
+}
+
+func TestDefaultConfig_LangIsJa(t *testing.T) {
+	// when
+	cfg := DefaultConfig()
+
+	// then
+	if cfg.Lang != "ja" {
+		t.Errorf("expected default Lang=\"ja\", got %q", cfg.Lang)
+	}
+}
+
+func TestValidateConfig_InvalidLang(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Lang = "fr"
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "lang") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected validation error mentioning 'lang', got: %v", errs)
+	}
+}

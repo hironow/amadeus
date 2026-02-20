@@ -10,8 +10,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ValidLang reports whether lang is a supported language code.
+func ValidLang(lang string) bool {
+	return lang == "ja" || lang == "en"
+}
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
+	Lang            string          `yaml:"lang"`
 	Weights         Weights         `yaml:"weights"`
 	Thresholds      Thresholds      `yaml:"thresholds"`
 	PerAxisOverride PerAxisOverride `yaml:"per_axis_override"`
@@ -28,6 +34,7 @@ type FullCheckConfig struct {
 func DefaultConfig() Config {
 	sc := DefaultThresholds()
 	return Config{
+		Lang:            "ja",
 		Weights:         DefaultWeights(),
 		Thresholds:      sc.Thresholds,
 		PerAxisOverride: sc.PerAxisOverride,
@@ -42,6 +49,11 @@ func DefaultConfig() Config {
 // An empty slice means the config is valid.
 func ValidateConfig(cfg Config) []string {
 	var errs []string
+
+	// Language check
+	if !ValidLang(cfg.Lang) {
+		errs = append(errs, fmt.Sprintf("lang must be \"ja\" or \"en\" (got %q)", cfg.Lang))
+	}
 
 	// Weight range checks
 	weights := []struct {

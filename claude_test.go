@@ -43,6 +43,66 @@ func TestParseClaudeResponse_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestParseClaudeResponse_WithImpactRadius(t *testing.T) {
+	// given
+	raw := `{
+		"axes": {
+			"adr_integrity": {"score": 10, "details": "ok"},
+			"dod_fulfillment": {"score": 0, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "minor",
+		"impact_radius": [
+			{"area": "auth/session.go", "impact": "direct", "detail": "Session validation changed"},
+			{"area": "api/middleware.go", "impact": "indirect", "detail": "Uses auth session"}
+		]
+	}`
+
+	// when
+	resp, err := ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.ImpactRadius) != 2 {
+		t.Fatalf("expected 2 impact entries, got %d", len(resp.ImpactRadius))
+	}
+	if resp.ImpactRadius[0].Area != "auth/session.go" {
+		t.Errorf("expected area 'auth/session.go', got %q", resp.ImpactRadius[0].Area)
+	}
+	if resp.ImpactRadius[0].Impact != "direct" {
+		t.Errorf("expected impact 'direct', got %q", resp.ImpactRadius[0].Impact)
+	}
+	if resp.ImpactRadius[1].Impact != "indirect" {
+		t.Errorf("expected impact 'indirect', got %q", resp.ImpactRadius[1].Impact)
+	}
+}
+
+func TestParseClaudeResponse_WithoutImpactRadius_BackwardCompatible(t *testing.T) {
+	// given: existing JSON format without impact_radius
+	raw := `{
+		"axes": {
+			"adr_integrity": {"score": 5, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "clean"
+	}`
+
+	// when
+	resp, err := ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.ImpactRadius != nil {
+		t.Errorf("expected nil impact_radius for old format, got %v", resp.ImpactRadius)
+	}
+}
+
 func TestBuildDiffCheckPrompt(t *testing.T) {
 	params := DiffCheckParams{
 		PreviousScores: `{"divergence": 0.133}`,
@@ -50,7 +110,7 @@ func TestBuildDiffCheckPrompt(t *testing.T) {
 		RelevantADRs:   "ADR-003: Use JWT for auth",
 		LinkedDoDs:     "Issue #42: Session timeout must be configurable",
 	}
-	prompt, err := BuildDiffCheckPrompt(params)
+	prompt, err := BuildDiffCheckPrompt("ja", params)
 	if err != nil {
 		t.Fatalf("BuildDiffCheckPrompt failed: %v", err)
 	}
@@ -64,6 +124,43 @@ func TestBuildDiffCheckPrompt(t *testing.T) {
 	}
 }
 
+func TestBuildDiffCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
+	// given
+	params := DiffCheckParams{
+		PreviousScores: `{"divergence": 0.1}`,
+		PRDiffs:        "diff --git a/auth.go ...",
+	}
+
+	// when
+	prompt, err := BuildDiffCheckPrompt("ja", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "impact_radius") {
+		t.Error("expected 'impact_radius' in diff check JSON schema")
+	}
+}
+
+func TestBuildFullCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
+	// given
+	params := FullCheckParams{
+		CodebaseStructure: "src/",
+	}
+
+	// when
+	prompt, err := BuildFullCheckPrompt("ja", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "impact_radius") {
+		t.Error("expected 'impact_radius' in full check JSON schema")
+	}
+}
+
 func TestBuildFullCheckPrompt(t *testing.T) {
 	params := FullCheckParams{
 		CodebaseStructure: "src/\n  auth/\n  cart/",
@@ -71,7 +168,7 @@ func TestBuildFullCheckPrompt(t *testing.T) {
 		RecentDoDs:        "Issue #42: Session timeout",
 		DependencyMap:     "auth -> cart: forbidden",
 	}
-	prompt, err := BuildFullCheckPrompt(params)
+	prompt, err := BuildFullCheckPrompt("ja", params)
 	if err != nil {
 		t.Fatalf("BuildFullCheckPrompt failed: %v", err)
 	}
@@ -80,5 +177,61 @@ func TestBuildFullCheckPrompt(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "Codebase Structure") {
 		t.Error("prompt missing 'Codebase Structure' section")
+	}
+}
+
+func TestBuildDiffCheckPrompt_En(t *testing.T) {
+	// given
+	params := DiffCheckParams{
+		PreviousScores: `{"divergence": 0.1}`,
+		PRDiffs:        "diff --git a/auth.go ...",
+	}
+
+	// when
+	prompt, err := BuildDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "Previous State") {
+		t.Error("expected 'Previous State' in en diff check prompt")
+	}
+	if !strings.Contains(prompt, "impact_radius") {
+		t.Error("expected 'impact_radius' in en diff check JSON schema")
+	}
+}
+
+func TestBuildFullCheckPrompt_En(t *testing.T) {
+	// given
+	params := FullCheckParams{
+		CodebaseStructure: "src/",
+	}
+
+	// when
+	prompt, err := BuildFullCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "FULL calibration") {
+		t.Error("expected 'FULL calibration' in en full check prompt")
+	}
+}
+
+func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
+	// given
+	params := DiffCheckParams{
+		PreviousScores: `{"divergence": 0.1}`,
+		PRDiffs:        "diff --git a/auth.go ...",
+	}
+
+	// when
+	_, err := BuildDiffCheckPrompt("fr", params)
+
+	// then
+	if err == nil {
+		t.Error("expected error for unsupported language 'fr'")
 	}
 }

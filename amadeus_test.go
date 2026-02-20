@@ -601,6 +601,69 @@ func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	}
 }
 
+func TestAmadeus_PrintCheckOutput_IncludesImpactRadius(t *testing.T) {
+	// given
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR:        {Score: 10, Details: "ok"},
+			AxisDoD:        {Score: 0, Details: "ok"},
+			AxisDependency: {Score: 0, Details: "ok"},
+			AxisImplicit:   {Score: 0, Details: "ok"},
+		},
+		ImpactRadius: []ImpactEntry{
+			{Area: "auth/session.go", Impact: "direct", Detail: "Session validation changed"},
+			{Area: "api/handler.go", Impact: "indirect", Detail: "Uses auth session"},
+		},
+	}
+
+	// when
+	a.PrintCheckOutput(result, nil, 0.08)
+
+	// then
+	output := dataBuf.String()
+	if !strings.Contains(output, "Impact Radius") {
+		t.Errorf("expected 'Impact Radius' section in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "auth/session.go") {
+		t.Errorf("expected 'auth/session.go' in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "direct") {
+		t.Errorf("expected 'direct' in output, got:\n%s", output)
+	}
+}
+
+func TestAmadeus_PrintCheckOutput_NoImpactRadius(t *testing.T) {
+	// given: no impact radius data
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR: {Score: 10, Details: "ok"},
+		},
+	}
+
+	// when
+	a.PrintCheckOutput(result, nil, 0.08)
+
+	// then: should not show Impact Radius section
+	output := dataBuf.String()
+	if strings.Contains(output, "Impact Radius") {
+		t.Errorf("expected no 'Impact Radius' section when empty, got:\n%s", output)
+	}
+}
+
 func TestAmadeus_PrintLog(t *testing.T) {
 	// given: history and D-Mails
 	dir := t.TempDir()
@@ -868,6 +931,275 @@ func TestRunCheck_DryRun_DoesNotConsumeInbox(t *testing.T) {
 	}
 }
 
+func TestRunCheck_DryRun_FullCheck_IncludesADRsInPrompt(t *testing.T) {
+	// given: a repo with docs/adr/0001-test.md
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	adrDir := filepath.Join(repo.dir, "docs", "adr")
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-test.md"), []byte("# 0001. Use Go for CLI\n\nGo is the best choice.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: full dry-run check
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if !strings.Contains(prompt, "Use Go for CLI") {
+		t.Errorf("expected ADR content in prompt, got:\n%s", prompt)
+	}
+}
+
+func TestRunCheck_DryRun_FullCheck_NoADRs_StillWorks(t *testing.T) {
+	// given: a repo with NO docs/adr/ directory
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   NewStateStore(divRoot),
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: full dry-run check
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then: no error, graceful degradation
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if dataBuf.Len() == 0 {
+		t.Error("expected prompt output, got empty")
+	}
+}
+
+func TestRunCheck_DryRun_DiffCheck_IncludesADRsInPrompt(t *testing.T) {
+	// given: a repo with ADRs and a previous check state (so diff mode triggers)
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	adrDir := filepath.Join(repo.dir, "docs", "adr")
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-auth.md"), []byte("# 0001. JWT Auth\n\nUse JWT.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+	// Save a previous state with current commit so diff mode detects the new PR merges
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Save a previous state with an older commit to trigger shift detection
+	if err := store.SaveLatest(CheckResult{Commit: commit + "~2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a new commit so there's a diff
+	repo.shell(t, "echo 'package main' > /repo/new.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #99 from feature/new")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: diff dry-run check
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if !strings.Contains(prompt, "JWT Auth") {
+		t.Errorf("expected ADR content in diff prompt, got:\n%s", prompt)
+	}
+}
+
+func TestRunCheck_DryRun_DiffCheck_IncludesIssueIDs(t *testing.T) {
+	// given: a repo with a merge commit containing an issue ID
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveLatest(CheckResult{Commit: commit + "~2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a merge commit with an issue ID in the message
+	repo.shell(t, "echo 'package main' > /repo/feature.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #10 from feat/dod-fetch (MY-303)")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when: diff dry-run check
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if !strings.Contains(prompt, "MY-303") {
+		t.Errorf("expected issue ID MY-303 in diff prompt, got:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "Linear MCP") {
+		t.Errorf("expected Linear MCP instruction in diff prompt, got:\n%s", prompt)
+	}
+}
+
+func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_OmitsSection(t *testing.T) {
+	// given: a repo with a merge commit WITHOUT issue ID
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveLatest(CheckResult{Commit: commit + "~2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	repo.shell(t, "echo 'package main' > /repo/plain.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #11 from feat/no-issue-ref")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	if strings.Contains(prompt, "Linked Linear Issues") {
+		t.Errorf("expected no Linked Linear Issues section when no IDs found, got:\n%s", prompt)
+	}
+}
+
+func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_SuppressesDoDs(t *testing.T) {
+	// given: a repo with DoD files committed BEFORE the baseline,
+	// then a merge commit WITHOUT issue IDs after the baseline.
+	// DoDs should not appear in the prompt's LinkedDoDs section.
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create DoD files before the baseline commit
+	repo.shell(t, "mkdir -p /repo/docs/dod")
+	repo.shell(t, "echo '# Sprint 42 DoD' > /repo/docs/dod/sprint-42.md")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "add DoD files")
+
+	store := NewStateStore(divRoot)
+	git := NewGitClient(repo.dir)
+
+	// Set baseline to current commit (DoD files already exist)
+	commit, err := git.CurrentCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveLatest(CheckResult{Commit: commit}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a merge commit without issue IDs after the baseline
+	repo.shell(t, "echo 'package main' > /repo/plain.go")
+	repo.git(t, "add", ".")
+	repo.git(t, "commit", "-m", "Merge pull request #99 from feat/no-issue-ref")
+
+	var dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     git,
+		Logger:  NewLogger(&bytes.Buffer{}, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err = a.RunCheck(context.Background(), CheckOptions{DryRun: true, Quiet: true})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	prompt := dataBuf.String()
+	// DoD content should NOT appear in the LinkedDoDs section
+	// (DoD files exist on disk but no issue IDs were extracted from PR titles)
+	if strings.Contains(prompt, "Sprint 42 DoD") {
+		t.Errorf("expected DoDs to be suppressed when no issue IDs found, but prompt contains DoD content")
+	}
+}
+
 func TestPrintCheckOutput_JSON(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
@@ -913,6 +1245,86 @@ func TestPrintCheckOutput_JSON(t *testing.T) {
 	// should contain dmails
 	if _, ok := parsed["dmails"]; !ok {
 		t.Error("expected 'dmails' key in JSON output")
+	}
+}
+
+func TestPrintCheckOutputJSON_IncludesImpactRadius(t *testing.T) {
+	// given
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR: {Score: 10, Details: "ok"},
+		},
+		ImpactRadius: []ImpactEntry{
+			{Area: "auth/session.go", Impact: "direct", Detail: "Session validation changed"},
+			{Area: "api/handler.go", Impact: "indirect", Detail: "Uses auth session"},
+		},
+	}
+
+	// when
+	if err := a.PrintCheckOutputJSON(result, nil, 0.08); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	ir, ok := parsed["impact_radius"]
+	if !ok {
+		t.Fatal("expected 'impact_radius' key in JSON output")
+	}
+	entries, ok := ir.([]any)
+	if !ok {
+		t.Fatalf("expected impact_radius to be array, got %T", ir)
+	}
+	if len(entries) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(entries))
+	}
+}
+
+func TestPrintCheckOutputJSON_EmptyImpactRadius(t *testing.T) {
+	// given: no impact radius data
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+	result := CheckResult{
+		Divergence: 0.10,
+		Axes: map[Axis]AxisScore{
+			AxisADR: {Score: 10, Details: "ok"},
+		},
+	}
+
+	// when
+	if err := a.PrintCheckOutputJSON(result, nil, 0.08); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: impact_radius should be empty array (not null)
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	ir, ok := parsed["impact_radius"]
+	if !ok {
+		t.Fatal("expected 'impact_radius' key in JSON output")
+	}
+	entries, ok := ir.([]any)
+	if !ok {
+		t.Fatalf("expected impact_radius to be array, got %T", ir)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(entries))
 	}
 }
 
