@@ -38,38 +38,40 @@ func newArchivePruneCommand() *cobra.Command {
 				return fmt.Errorf("find prune candidates: %w", err)
 			}
 
+			errW := cmd.ErrOrStderr()
+
 			if candidates == nil {
-				fmt.Fprintf(os.Stderr, "Archive directory does not exist: %s\n", archiveDir)
+				fmt.Fprintf(errW, "Archive directory does not exist: %s\n", archiveDir)
 				return nil
 			}
 			if len(candidates) == 0 {
-				fmt.Fprintf(os.Stderr, "No files older than %d days in %s\n", days, archiveDir)
+				fmt.Fprintf(errW, "No files older than %d days in %s\n", days, archiveDir)
 				return nil
 			}
 
-			fmt.Fprintf(os.Stderr, "Files to prune in %s (older than %d days):\n", archiveDir, days)
+			fmt.Fprintf(errW, "Files to prune in %s (older than %d days):\n", archiveDir, days)
 			for _, c := range candidates {
-				fmt.Fprintf(os.Stderr, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
+				fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
 			}
 
 			if dryRun {
-				fmt.Fprintf(os.Stderr, "\n(dry-run — no files deleted)\n")
+				fmt.Fprintf(errW, "\n(dry-run — no files deleted)\n")
 				return nil
 			}
 
 			if !yes {
-				fmt.Fprintf(os.Stderr, "\nDelete these %d file(s)? [y/N] ", len(candidates))
-				scanner := bufio.NewScanner(os.Stdin)
+				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", len(candidates))
+				scanner := bufio.NewScanner(cmd.InOrStdin())
 				if !scanner.Scan() {
 					if err := scanner.Err(); err != nil {
 						return fmt.Errorf("read confirmation: %w", err)
 					}
-					fmt.Fprintln(os.Stderr, "Cancelled.")
+					fmt.Fprintln(errW, "Cancelled.")
 					return nil
 				}
 				answer := strings.TrimSpace(scanner.Text())
 				if answer != "y" && answer != "Y" {
-					fmt.Fprintln(os.Stderr, "Cancelled.")
+					fmt.Fprintln(errW, "Cancelled.")
 					return nil
 				}
 			}
@@ -78,7 +80,7 @@ func newArchivePruneCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("prune: %w", err)
 			}
-			fmt.Fprintf(os.Stderr, "Pruned %d file(s).\n", count)
+			fmt.Fprintf(errW, "Pruned %d file(s).\n", count)
 			return nil
 		},
 	}

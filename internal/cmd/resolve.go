@@ -29,7 +29,7 @@ func newResolveCommand() *cobra.Command {
 
 			names := args
 			if len(names) == 0 {
-				stdinNames, err := readNamesFromStdin()
+				stdinNames, err := readNamesFromReader(cmd.InOrStdin())
 				if err != nil {
 					return err
 				}
@@ -133,18 +133,20 @@ func resolveText(ctx context.Context, a *amadeus.Amadeus, names []string, action
 	return firstErr
 }
 
-// readNamesFromStdin reads D-Mail names from stdin when piped (non-TTY).
-// Returns nil if stdin is a terminal.
-func readNamesFromStdin() ([]string, error) {
-	info, err := os.Stdin.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("stat stdin: %w", err)
-	}
-	if info.Mode()&os.ModeCharDevice != 0 {
-		return nil, nil // stdin is a terminal, not a pipe
+// readNamesFromReader reads D-Mail names from r.
+// If r is a terminal (*os.File with ModeCharDevice), returns nil.
+func readNamesFromReader(r io.Reader) ([]string, error) {
+	if f, ok := r.(*os.File); ok {
+		info, err := f.Stat()
+		if err != nil {
+			return nil, fmt.Errorf("stat stdin: %w", err)
+		}
+		if info.Mode()&os.ModeCharDevice != 0 {
+			return nil, nil // terminal, not a pipe
+		}
 	}
 	var names []string
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		name := strings.TrimSpace(scanner.Text())
 		if name != "" {
