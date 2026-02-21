@@ -1410,6 +1410,247 @@ func TestRunCheck_ConsumesInbox(t *testing.T) {
 	}
 }
 
+// --- Full pipeline tests using fake Claude ---
+
+func TestRunCheck_FullPipeline_CreatesDMails(t *testing.T) {
+	// given: a git repo with fake claude returning a response with D-Mails
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(divRoot)
+
+	cannedResponse := `{
+		"axes": {
+			"adr_integrity": {"score": 15, "details": "ADR-003 tension"},
+			"dod_fulfillment": {"score": 20, "details": "Issue #42 gap"},
+			"dependency_integrity": {"score": 10, "details": "auth->cart"},
+			"implicit_constraints": {"score": 5, "details": "naming drift"}
+		},
+		"dmails": [
+			{
+				"description": "ADR-003 needs review",
+				"detail": "Auth module drifted from ADR-003.",
+				"issues": ["MY-100"],
+				"targets": ["auth/session.go"]
+			}
+		],
+		"reasoning": "Moderate divergence detected."
+	}`
+	cleanup := installFakeClaude(cannedResponse)
+	defer cleanup()
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, Quiet: true})
+
+	// then: RunCheck returns DriftError (divergence > 0)
+	var driftErr *DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+	if driftErr.DMails != 1 {
+		t.Errorf("expected 1 D-Mail in DriftError, got %d", driftErr.DMails)
+	}
+
+	// then: D-Mail created in archive
+	allDMails, err := store.LoadAllDMails()
+	if err != nil {
+		t.Fatalf("LoadAllDMails: %v", err)
+	}
+	feedbackDMails := filterDMailsByKind(allDMails, KindFeedback)
+	if len(feedbackDMails) != 1 {
+		t.Fatalf("expected 1 feedback D-Mail, got %d", len(feedbackDMails))
+	}
+	if feedbackDMails[0].Description != "ADR-003 needs review" {
+		t.Errorf("expected description 'ADR-003 needs review', got %q", feedbackDMails[0].Description)
+	}
+	if len(feedbackDMails[0].Issues) != 1 || feedbackDMails[0].Issues[0] != "MY-100" {
+		t.Errorf("expected issues [MY-100], got %v", feedbackDMails[0].Issues)
+	}
+
+	// then: history saved
+	history, err := store.LoadHistory()
+	if err != nil {
+		t.Fatalf("LoadHistory: %v", err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(history))
+	}
+}
+
+func TestRunCheck_ConvergenceTriggered_CreatesDMail(t *testing.T) {
+	// given: pre-existing feedback D-Mails all targeting the same file
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(divRoot)
+
+	// Seed 6 feedback D-Mails targeting "auth/session.go" (>= threshold*2 = HIGH)
+	now := time.Now().UTC()
+	for i := 1; i <= 6; i++ {
+		name := fmt.Sprintf("feedback-%03d", i)
+		if err := store.SaveDMail(DMail{
+			Name:        name,
+			Kind:        KindFeedback,
+			Description: fmt.Sprintf("issue %d", i),
+			Severity:    SeverityHigh,
+			Targets:     []string{"auth/session.go"},
+			Metadata: map[string]string{
+				"created_at": now.Add(-time.Duration(i) * 24 * time.Hour).Format(time.RFC3339),
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Fake claude returns a clean response (no new D-Mails)
+	cleanResponse := `{
+		"axes": {
+			"adr_integrity": {"score": 5, "details": "minor"},
+			"dod_fulfillment": {"score": 0, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "Clean check."
+	}`
+	cleanup := installFakeClaude(cleanResponse)
+	defer cleanup()
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     NewGitClient(repo.dir),
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	_ = a.RunCheck(context.Background(), CheckOptions{Full: true, Quiet: true})
+
+	// then: convergence D-Mail should be created
+	allDMails, err := store.LoadAllDMails()
+	if err != nil {
+		t.Fatalf("LoadAllDMails: %v", err)
+	}
+	convergenceDMails := filterDMailsByKind(allDMails, KindConvergence)
+	if len(convergenceDMails) != 1 {
+		t.Fatalf("expected 1 convergence D-Mail, got %d", len(convergenceDMails))
+	}
+	if convergenceDMails[0].Severity != SeverityHigh {
+		t.Errorf("expected HIGH severity, got %s", convergenceDMails[0].Severity)
+	}
+
+	// then: convergence D-Mail is pending (HIGH severity → needs human approval)
+	pendingDir := filepath.Join(divRoot, "pending")
+	entries, err := os.ReadDir(pendingDir)
+	if err != nil {
+		t.Fatalf("read pending dir: %v", err)
+	}
+	hasPendingConvergence := false
+	for _, e := range entries {
+		if strings.Contains(e.Name(), "convergence") {
+			hasPendingConvergence = true
+			break
+		}
+	}
+	if !hasPendingConvergence {
+		t.Error("expected convergence D-Mail in pending/")
+	}
+}
+
+func TestFullPipeline_ConvergenceDMail_Resolve_CommentPayload(t *testing.T) {
+	// given: a convergence D-Mail in pending with Issues
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	if err := store.SaveDMail(DMail{
+		Name:        "convergence-001",
+		Kind:        KindConvergence,
+		Description: "auth/session.go convergence",
+		Severity:    SeverityHigh,
+		Issues:      []string{"MY-200", "MY-201"},
+		Targets:     []string{"auth/session.go"},
+		Body:        "6 D-Mails converged on auth/session.go",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when: resolve the convergence D-Mail
+	result, err := a.ResolveDMailResult(context.Background(), "convergence-001", "approve", "")
+
+	// then
+	if err != nil {
+		t.Fatalf("ResolveDMailResult: %v", err)
+	}
+	if result.Status != "approved" {
+		t.Errorf("expected status approved, got %s", result.Status)
+	}
+	if len(result.Comments) != 2 {
+		t.Fatalf("expected 2 comment payloads, got %d", len(result.Comments))
+	}
+	if result.Comments[0].IssueID != "MY-200" {
+		t.Errorf("expected MY-200, got %s", result.Comments[0].IssueID)
+	}
+	if result.Comments[0].Resolution != "approved" {
+		t.Errorf("expected resolution 'approved', got %s", result.Comments[0].Resolution)
+	}
+	if !strings.Contains(result.Comments[0].Body, "converged") {
+		t.Errorf("expected body to contain 'converged', got %q", result.Comments[0].Body)
+	}
+
+	// when: mark as commented
+	if err := store.MarkCommented("convergence-001", "MY-200"); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: sync shows only MY-201 as pending
+	dataBuf.Reset()
+	if err := a.PrintSync(); err != nil {
+		t.Fatalf("PrintSync: %v", err)
+	}
+	var syncOut SyncOutput
+	if err := json.Unmarshal(dataBuf.Bytes(), &syncOut); err != nil {
+		t.Fatalf("parse sync output: %v", err)
+	}
+	if len(syncOut.PendingComments) != 1 {
+		t.Fatalf("expected 1 pending comment, got %d", len(syncOut.PendingComments))
+	}
+	if syncOut.PendingComments[0].IssueID != "MY-201" {
+		t.Errorf("expected MY-201, got %s", syncOut.PendingComments[0].IssueID)
+	}
+}
+
+func filterDMailsByKind(dmails []DMail, kind DMailKind) []DMail {
+	var result []DMail
+	for _, d := range dmails {
+		if d.Kind == kind {
+			result = append(result, d)
+		}
+	}
+	return result
+}
+
 func TestPrintLogJSON(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
