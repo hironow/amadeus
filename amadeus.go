@@ -941,6 +941,9 @@ func (a *Amadeus) LinkDMail(name, linearIssueID string) error {
 	if err := a.Store.UpdateDMailArchive(dmail); err != nil {
 		return fmt.Errorf("update archive: %w", err)
 	}
+	if err := a.Store.UpdateDMailDelivery(dmail); err != nil {
+		return fmt.Errorf("update delivery: %w", err)
+	}
 	a.dataOut("D-Mail %s linked to %s.", name, linearIssueID)
 	return nil
 }
@@ -957,6 +960,9 @@ func (a *Amadeus) LinkDMailJSON(name, linearIssueID string) error {
 	dmail.LinearIssueID = linearIssueID
 	if err := a.Store.UpdateDMailArchive(dmail); err != nil {
 		return fmt.Errorf("update archive: %w", err)
+	}
+	if err := a.Store.UpdateDMailDelivery(dmail); err != nil {
+		return fmt.Errorf("update delivery: %w", err)
 	}
 	output := struct {
 		Name          string `json:"name"`

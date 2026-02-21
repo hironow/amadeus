@@ -1668,6 +1668,82 @@ func TestLinkDMailJSON_Success(t *testing.T) {
 	}
 }
 
+func TestLinkDMail_UpdatesOutboxCopy(t *testing.T) {
+	// given: a LOW severity D-Mail (goes to outbox)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-010", Kind: KindFeedback, Description: "outbox test",
+		Severity: SeverityLow,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-010", "MY-300")
+
+	// then: outbox copy should also have the linear_issue_id
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	outboxPath := filepath.Join(root, "outbox", "feedback-010.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("read outbox copy: %v", readErr)
+	}
+	outboxDMail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse outbox copy: %v", parseErr)
+	}
+	if outboxDMail.LinearIssueID != "MY-300" {
+		t.Errorf("expected outbox linear_issue_id MY-300, got %s", outboxDMail.LinearIssueID)
+	}
+}
+
+func TestLinkDMail_UpdatesPendingCopy(t *testing.T) {
+	// given: a HIGH severity D-Mail (goes to pending)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-020", Kind: KindFeedback, Description: "pending test",
+		Severity: SeverityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-020", "MY-301")
+
+	// then: pending copy should also have the linear_issue_id
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	pendingPath := filepath.Join(root, "pending", "feedback-020.md")
+	data, readErr := os.ReadFile(pendingPath)
+	if readErr != nil {
+		t.Fatalf("read pending copy: %v", readErr)
+	}
+	pendingDMail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse pending copy: %v", parseErr)
+	}
+	if pendingDMail.LinearIssueID != "MY-301" {
+		t.Errorf("expected pending linear_issue_id MY-301, got %s", pendingDMail.LinearIssueID)
+	}
+}
+
 func TestPrintSync_OutputJSON(t *testing.T) {
 	// given
 	dir := t.TempDir()

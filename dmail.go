@@ -236,6 +236,25 @@ func (s *StateStore) UpdateDMailArchive(dmail DMail) error {
 	return os.WriteFile(archivePath, data, 0o644)
 }
 
+// UpdateDMailDelivery re-writes the outbox or pending copy of a D-Mail if it exists.
+// This keeps delivery artifacts in sync when archive metadata changes (e.g., LinearIssueID).
+func (s *StateStore) UpdateDMailDelivery(dmail DMail) error {
+	data, err := MarshalDMail(dmail)
+	if err != nil {
+		return fmt.Errorf("marshal dmail: %w", err)
+	}
+	filename := dmail.Name + ".md"
+	for _, dir := range []string{"outbox", "pending"} {
+		p := filepath.Join(s.Root, dir, filename)
+		if _, statErr := os.Stat(p); statErr == nil {
+			if err := os.WriteFile(p, data, 0o644); err != nil {
+				return fmt.Errorf("update %s copy: %w", dir, err)
+			}
+		}
+	}
+	return nil
+}
+
 // LoadUnsyncedDMails returns all archived D-Mails that have no LinearIssueID set.
 func (s *StateStore) LoadUnsyncedDMails() ([]DMail, error) {
 	all, err := s.LoadAllDMails()
