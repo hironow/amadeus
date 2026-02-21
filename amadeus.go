@@ -328,18 +328,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	var convergenceAlerts []ConvergenceAlert
 	if convergenceErr == nil {
 		convergenceAlerts = AnalyzeConvergence(allDMails, a.Config.Convergence, now)
-		convergenceDMails := GenerateConvergenceDMails(convergenceAlerts)
-		for _, cd := range convergenceDMails {
-			cdName, nameErr := a.Store.NextDMailName(KindConvergence)
-			if nameErr != nil {
-				break
-			}
-			cd.Name = cdName
-			if saveErr := a.Store.SaveDMail(cd); saveErr != nil {
-				break
-			}
-			dmails = append(dmails, cd)
+		saved, saveErr := a.saveConvergenceDMails(convergenceAlerts)
+		if saveErr != nil {
+			return saveErr
 		}
+		dmails = append(dmails, saved...)
 	}
 
 	var prNumbers []string
@@ -929,6 +922,25 @@ func (a *Amadeus) PrintLogJSON() error {
 
 // LinkDMail associates a D-Mail with a Linear issue ID.
 // Returns an error if the D-Mail is already linked.
+// saveConvergenceDMails persists convergence D-Mails generated from HIGH severity alerts.
+// Returns the saved D-Mails and any error encountered during naming or writing.
+func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, error) {
+	convergenceDMails := GenerateConvergenceDMails(alerts)
+	var saved []DMail
+	for _, cd := range convergenceDMails {
+		cdName, err := a.Store.NextDMailName(KindConvergence)
+		if err != nil {
+			return saved, fmt.Errorf("convergence dmail name: %w", err)
+		}
+		cd.Name = cdName
+		if err := a.Store.SaveDMail(cd); err != nil {
+			return saved, fmt.Errorf("save convergence dmail %s: %w", cdName, err)
+		}
+		saved = append(saved, cd)
+	}
+	return saved, nil
+}
+
 func (a *Amadeus) LinkDMail(name, linearIssueID string) error {
 	dmail, err := a.Store.LoadDMail(name)
 	if err != nil {

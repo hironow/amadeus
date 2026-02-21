@@ -1744,6 +1744,67 @@ func TestLinkDMail_UpdatesPendingCopy(t *testing.T) {
 	}
 }
 
+func TestSaveConvergenceDMails_ReturnsErrorOnFailure(t *testing.T) {
+	// given: a store whose archive directory is not writable
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	alerts := []ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
+			DMails: []string{"f-001", "f-002", "f-003", "f-004", "f-005", "f-006"}},
+	}
+
+	// break the archive directory so SaveDMail fails
+	archiveDir := filepath.Join(root, "archive")
+	os.RemoveAll(archiveDir)
+	os.WriteFile(archiveDir, []byte("not a dir"), 0o444) // block as a file
+
+	// when
+	_, err := a.saveConvergenceDMails(alerts)
+
+	// then: error should be surfaced, not swallowed
+	if err == nil {
+		t.Fatal("expected error when archive is broken, got nil")
+	}
+}
+
+func TestSaveConvergenceDMails_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	alerts := []ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
+			DMails: []string{"f-001", "f-002", "f-003", "f-004", "f-005", "f-006"}},
+	}
+
+	// when
+	saved, err := a.saveConvergenceDMails(alerts)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(saved) != 1 {
+		t.Fatalf("expected 1 saved D-Mail, got %d", len(saved))
+	}
+	if saved[0].Kind != KindConvergence {
+		t.Errorf("expected kind convergence, got %s", saved[0].Kind)
+	}
+}
+
 func TestPrintSync_OutputJSON(t *testing.T) {
 	// given
 	dir := t.TempDir()
