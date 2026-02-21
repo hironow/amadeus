@@ -74,6 +74,10 @@ vet:
 lint: vet lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
+# Run semgrep with project rules
+semgrep:
+    semgrep --config .semgrep/ --exclude='vendor' .
+
 # Run amadeus doctor (quick smoke test after build)
 doctor: build
     ./amadeus doctor
