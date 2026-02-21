@@ -33,6 +33,9 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 	targets := make(map[string]*targetInfo)
 
 	for _, d := range dmails {
+		if d.Kind == KindConvergence {
+			continue
+		}
 		createdStr, ok := d.Metadata["created_at"]
 		if !ok {
 			continue

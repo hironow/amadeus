@@ -230,3 +230,27 @@ func TestAnalyzeConvergence_NoMetadata(t *testing.T) {
 		t.Errorf("expected 0 alerts (no metadata), got %d", len(alerts))
 	}
 }
+
+func TestAnalyzeConvergence_ExcludesConvergenceDMails(t *testing.T) {
+	// given: 2 feedback D-Mails + 1 convergence D-Mail targeting same area
+	// Without filtering, count=3 would meet threshold=3 and trigger an alert.
+	// With filtering, count=2 should NOT trigger (below threshold).
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []DMail{
+		{Name: "feedback-001", Kind: KindFeedback, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+		{Name: "feedback-002", Kind: KindFeedback, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-20T12:00:00Z"}},
+		{Name: "convergence-001", Kind: KindConvergence, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-21T12:00:00Z", "convergence_for": "feedback-001,feedback-002"}},
+	}
+	cfg := ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := AnalyzeConvergence(dmails, cfg, now)
+
+	// then: convergence D-Mail should be excluded, so only 2 hits (below threshold)
+	if len(alerts) != 0 {
+		t.Errorf("expected 0 alerts (convergence D-Mails excluded), got %d", len(alerts))
+	}
+}
