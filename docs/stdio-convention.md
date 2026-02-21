@@ -10,7 +10,7 @@ Amadeus follows the Unix convention of separating machine-readable data from hum
 | **stderr** | Human-readable progress, logs, errors | `Amadeus.Logger` |
 | **stdin** | Prompt input to Claude CLI subprocess only | `runClaude()` internal |
 
-Amadeus itself does not read from stdin. The CLI is non-interactive.
+The core Amadeus library does not read from stdin. Some CLI commands (such as `resolve` and `archive-prune`) optionally read from stdin for batch input and confirmations.
 
 ## Cobra Wiring
 
