@@ -160,12 +160,22 @@ The auth module violates the JWT requirement specified in ADR-003.
 
 **Resolution sidecar**: D-Mail `.md` files are immutable. Approval/rejection state is tracked separately in `.run/resolutions.json`.
 
+## Install
+
+```bash
+# Homebrew (macOS / Linux)
+brew install hironow/tap/amadeus
+
+# Go install
+go install github.com/hironow/amadeus/cmd/amadeus@latest
+
+# Build from source
+just install
+```
+
 ## Setup
 
 ```bash
-# Build and install
-just install
-
 # Initialize .gate/ with default config
 amadeus init
 
@@ -184,10 +194,16 @@ Amadeus creates `.gate/` with config, state, history, and D-Mail storage automat
 |---------|-------------|
 | `amadeus check` | Execute three-phase divergence check |
 | `amadeus init` | Initialize `.gate/` directory with default config |
+| `amadeus validate` | Validate `.gate/config.yaml` |
 | `amadeus doctor` | Check environment health (git, Claude CLI, config) |
 | `amadeus resolve <name>` | Approve or reject a pending D-Mail |
 | `amadeus log` | Print check history and D-Mail log |
-| `amadeus --version` | Show version and exit |
+| `amadeus archive-prune` | Prune old archived D-Mail files |
+| `amadeus install-hook` | Install git post-merge hook |
+| `amadeus uninstall-hook` | Remove git post-merge hook |
+| `amadeus version` | Print version, commit, and build date |
+| `amadeus update` | Self-update to the latest release |
+| `amadeus docs` | Generate CLI reference in Markdown |
 
 ## Usage
 
@@ -196,44 +212,95 @@ Amadeus creates `.gate/` with config, state, history, and D-Mail storage automat
 amadeus check
 
 # Full calibration (evaluate entire codebase from zero)
-amadeus check --full
+amadeus check -f
 
 # Dry run (build prompt only, skip Claude call)
-amadeus check --dry-run
+amadeus check -n
 
 # Summary-only output
-amadeus check --quiet
+amadeus check -q
 
 # JSON output (machine-readable, stdout)
-amadeus check --json
+amadeus check -j
 
-# Verbose logging
-amadeus check --verbose
-
-# Custom config path
-amadeus check --config /path/to/config.yaml
+# Combine short flags
+amadeus check -v -j -c /path/to/config.yaml
 
 # Approve a pending D-Mail
-amadeus resolve feedback-001 --approve
+amadeus resolve feedback-001 -a
 
 # Reject a pending D-Mail
-amadeus resolve feedback-001 --reject --reason "Not applicable to current sprint"
+amadeus resolve feedback-001 -r --reason "Not applicable to current sprint"
+
+# Prune archived D-Mails older than 90 days (dry run)
+amadeus archive-prune -d 90 -n
 
 # JSON output for scripting
-amadeus log --json | jq '.dmails[] | select(.status == "pending")'
+amadeus log -j | jq '.dmails[] | select(.status == "pending")'
+
+# Version info as JSON
+amadeus version -j
+
+# Check for updates without installing
+amadeus update -C
+
+# Generate CLI docs
+amadeus docs -o docs/cli/
 ```
 
 ## Options
+
+### Global Flags
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--config` | `-c` | `.gate/config.yaml` | Config file path |
 | `--verbose` | `-v` | `false` | Verbose logging |
-| `--dry-run` | | `false` | Build prompt only, skip Claude |
-| `--full` | | `false` | Force full calibration check |
+| `--lang` | `-l` | | Output language (`ja`, `en`) |
+
+### check
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--dry-run` | `-n` | `false` | Build prompt only, skip Claude |
+| `--full` | `-f` | `false` | Force full calibration check |
 | `--quiet` | `-q` | `false` | Summary-only output |
-| `--json` | | `false` | Structured JSON output to stdout |
-| `--version` | | | Show version and exit |
+| `--json` | `-j` | `false` | Structured JSON output to stdout |
+
+### resolve
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--approve` | `-a` | `false` | Approve the D-Mail |
+| `--reject` | `-r` | `false` | Reject the D-Mail |
+| `--reason` | | | Reason for rejection (required with `--reject`) |
+| `--json` | `-j` | `false` | JSON output |
+
+### archive-prune
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--days` | `-d` | `30` | Prune files older than N days |
+| `--dry-run` | `-n` | `false` | Show what would be pruned |
+| `--yes` | `-y` | `false` | Skip confirmation prompt |
+
+### version / doctor / log
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--json` | `-j` | `false` | JSON output |
+
+### update
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--check` | `-C` | `false` | Check for updates without installing |
+
+### docs
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--output` | `-o` | | Output directory for generated docs |
 
 ## Exit Codes
 
@@ -302,31 +369,48 @@ Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.crea
 
 ```bash
 # Task runner (just)
-just build          # Build binary
-just install        # Build and install to /usr/local/bin
-just test           # Run all tests
-just test-v         # Verbose test output
-just test-race      # Tests with race detector
-just cover          # Coverage report
-just cover-html     # Open coverage in browser
-just fmt            # Format code (gofmt)
-just vet            # Run go vet
-just lint           # fmt check + vet + markdown lint
-just lint-md        # Lint markdown files only
-just check          # fmt + vet + test (pre-commit check)
-just doctor         # Build and run amadeus doctor (smoke test)
-just clean          # Clean build artifacts
-just prek-install   # Install prek hooks (pre-commit + pre-push)
-just prek-run       # Run all prek hooks on all files
-just jaeger         # Start Jaeger trace viewer (docker)
-just jaeger-down    # Stop Jaeger
+just build              # Build binary
+just install            # Build and install to /usr/local/bin
+just test               # Run all tests
+just test-v             # Verbose test output
+just test-race          # Tests with race detector
+just cover              # Coverage report
+just cover-html         # Open coverage in browser
+just fmt                # Format code (gofmt)
+just vet                # Run go vet
+just lint               # fmt check + vet + markdown lint
+just lint-md            # Lint markdown files only
+just semgrep            # Run semgrep with project cobra rules
+just check              # fmt + vet + test (pre-commit check)
+just doctor             # Build and run amadeus doctor (smoke test)
+just docs-cli           # Generate CLI reference docs
+just clean              # Clean build artifacts
+just prek-install       # Install prek hooks (pre-commit + pre-push)
+just prek-run           # Run all prek hooks on all files
+just jaeger             # Start Jaeger trace viewer (docker)
+just jaeger-down        # Stop Jaeger
+just release-check      # Validate goreleaser config
+just release-snapshot   # Test release locally (snapshot, no upload)
 ```
 
 ## File Structure
 
 ```
 +-- cmd/amadeus/
-|   +-- main.go              CLI entry point + flag parsing
+|   +-- main.go              CLI entry point
++-- internal/cmd/
+|   +-- root.go              Root command + global flags
+|   +-- check.go             check subcommand
+|   +-- resolve.go           resolve subcommand (stdin pipe support)
+|   +-- archive_prune.go     archive-prune subcommand
+|   +-- version.go           version subcommand (text + JSON)
+|   +-- update.go            Self-update via GitHub releases
+|   +-- docs.go              CLI docs generation (cobra/doc)
+|   +-- doctor.go            doctor subcommand
+|   +-- log.go               log subcommand
+|   +-- init.go              init subcommand
+|   +-- validate.go          validate subcommand
+|   +-- hook.go              install-hook / uninstall-hook
 +-- amadeus.go               Main orchestrator (three-phase pipeline)
 +-- reading_steiner.go       Phase 1: Shift detection (diff + full scan)
 +-- divergence_meter.go      Phase 2: Scoring bridge (Claude -> scores)
@@ -336,6 +420,9 @@ just jaeger-down    # Stop Jaeger
 +-- config.go                Configuration loader (.gate/config.yaml)
 +-- state.go                 State persistence (.gate/)
 +-- git.go                   Git client (merged PRs, diffs, HEAD)
++-- source.go                Source file discovery
++-- issue_id.go              Issue ID extraction from branches/commits
++-- hook.go                  Git hook management
 +-- doctor.go                Environment health checks
 +-- logger.go                Leveled logging
 +-- telemetry.go             OpenTelemetry tracer setup
@@ -343,8 +430,14 @@ just jaeger-down    # Stop Jaeger
 +-- templates/
 |   +-- diff_check.md.tmpl   Diff-based check prompt
 |   +-- full_check.md.tmpl   Full calibration prompt
++-- .semgrep/
+|   +-- cobra.yaml           14 cobra best-practice rules
++-- .goreleaser.yaml         Release configuration
++-- .github/workflows/
+|   +-- release.yaml         Tag-triggered release workflow
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
++-- docs/cli/                Generated CLI reference (Markdown)
 +-- justfile                 Task runner
 ```
 
