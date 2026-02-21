@@ -382,7 +382,7 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 +-- cmd/amadeus/
 |   +-- main.go              CLI entry point
 +-- internal/cmd/
-|   +-- root.go              Root command + global flags
+|   +-- root.go              Root command, global flags, build metadata
 |   +-- check.go             check subcommand
 |   +-- resolve.go           resolve subcommand (stdin pipe support)
 |   +-- archive_prune.go     archive-prune subcommand
@@ -412,8 +412,11 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 +-- telemetry.go             OpenTelemetry tracer setup
 +-- *_test.go                Tests
 +-- templates/
-|   +-- diff_check.md.tmpl   Diff-based check prompt
-|   +-- full_check.md.tmpl   Full calibration prompt
+|   +-- diff_check_en.md.tmpl  Diff-based check prompt (English)
+|   +-- diff_check_ja.md.tmpl  Diff-based check prompt (Japanese)
+|   +-- full_check_en.md.tmpl  Full calibration prompt (English)
+|   +-- full_check_ja.md.tmpl  Full calibration prompt (Japanese)
+|   +-- skills/                Claude Code skill templates
 +-- .semgrep/
 |   +-- cobra.yaml           14 cobra best-practice rules
 +-- .goreleaser.yaml         Release configuration
