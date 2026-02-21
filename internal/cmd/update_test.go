@@ -6,8 +6,7 @@ import (
 
 func TestUpdate_CheckFlagExists(t *testing.T) {
 	// given
-	info := BuildInfo{Version: "1.0.0", Commit: "abc", Date: "2026-01-01"}
-	root := NewRootCommand(info)
+	root := NewRootCommand()
 
 	// then
 	var found bool

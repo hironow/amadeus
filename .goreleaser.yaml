@@ -1,48 +1,73 @@
 version: 2
+
 project_name: amadeus
 
+before:
+  hooks:
+    - go mod tidy
+    - go test ./... -count=1 -short
+
 builds:
-  - id: amadeus
-    main: ./cmd/amadeus
+  - main: ./cmd/amadeus/
     binary: amadeus
     env:
       - CGO_ENABLED=0
     goos:
-      - linux
       - darwin
+      - linux
       - windows
     goarch:
       - amd64
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X github.com/hironow/amadeus/internal/cmd.Version={{.Version}}
+      - -X github.com/hironow/amadeus/internal/cmd.Commit={{.ShortCommit}}
+      - -X github.com/hironow/amadeus/internal/cmd.Date={{.Date}}
 
 archives:
-  - format_overrides:
+  - formats:
+      - tar.gz
+    format_overrides:
       - goos: windows
         format: zip
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
 
 checksum:
   name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - cmd: cosign
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature=${signature}
+      - ${artifact}
+    artifacts: checksum
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
 
 brews:
   - repository:
       owner: hironow
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/hironow/amadeus
+    homepage: "https://github.com/hironow/amadeus"
     description: "Divergence meter for your codebase"
-    license: Apache-2.0
+    license: "Apache-2.0"
     install: |
       bin.install "amadeus"
     test: |
-      system bin/"amadeus", "version"
-
-release:
-  github:
-    owner: hironow
-    name: amadeus
+      system "#{bin}/amadeus", "version"

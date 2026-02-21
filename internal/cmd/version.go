@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newVersionCommand(info BuildInfo) *cobra.Command {
+func newVersionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
@@ -17,9 +17,9 @@ func newVersionCommand(info BuildInfo) *cobra.Command {
 
 			if jsonOut {
 				data, err := json.Marshal(map[string]string{
-					"version": info.Version,
-					"commit":  info.Commit,
-					"date":    info.Date,
+					"version": Version,
+					"commit":  Commit,
+					"date":    Date,
 				})
 				if err != nil {
 					return fmt.Errorf("marshal version info: %w", err)
@@ -29,12 +29,12 @@ func newVersionCommand(info BuildInfo) *cobra.Command {
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "amadeus version %s (commit: %s, built: %s)\n",
-				info.Version, info.Commit, info.Date)
+				Version, Commit, Date)
 			return nil
 		},
 	}
 
-	cmd.Flags().Bool("json", false, "output as JSON")
+	cmd.Flags().BoolP("json", "j", false, "output as JSON")
 
 	return cmd
 }

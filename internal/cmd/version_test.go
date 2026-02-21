@@ -8,8 +8,10 @@ import (
 
 func TestVersion_TextOutput(t *testing.T) {
 	// given
-	info := BuildInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-02-21T00:00:00Z"}
-	root := NewRootCommand(info)
+	origVersion, origCommit, origDate := Version, Commit, Date
+	Version, Commit, Date = "1.2.3", "abc1234", "2026-02-21T00:00:00Z"
+	defer func() { Version, Commit, Date = origVersion, origCommit, origDate }()
+	root := NewRootCommand()
 	var buf bytes.Buffer
 	root.SetOut(&buf)
 	root.SetArgs([]string{"version"})
@@ -29,8 +31,10 @@ func TestVersion_TextOutput(t *testing.T) {
 
 func TestVersion_JSONOutput(t *testing.T) {
 	// given
-	info := BuildInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-02-21T00:00:00Z"}
-	root := NewRootCommand(info)
+	origVersion, origCommit, origDate := Version, Commit, Date
+	Version, Commit, Date = "1.2.3", "abc1234", "2026-02-21T00:00:00Z"
+	defer func() { Version, Commit, Date = origVersion, origCommit, origDate }()
+	root := NewRootCommand()
 	var buf bytes.Buffer
 	root.SetOut(&buf)
 	root.SetArgs([]string{"version", "--json"})

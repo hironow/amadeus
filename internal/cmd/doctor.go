@@ -39,7 +39,7 @@ func newDoctorCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("json", false, "output as JSON")
+	cmd.Flags().BoolP("json", "j", false, "output as JSON")
 
 	return cmd
 }

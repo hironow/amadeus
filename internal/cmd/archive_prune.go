@@ -85,9 +85,9 @@ func newArchivePruneCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Int("days", 30, "prune files older than N days")
-	cmd.Flags().Bool("dry-run", false, "show what would be pruned without deleting")
-	cmd.Flags().Bool("yes", false, "skip confirmation prompt")
+	cmd.Flags().IntP("days", "d", 30, "prune files older than N days")
+	cmd.Flags().BoolP("dry-run", "n", false, "show what would be pruned without deleting")
+	cmd.Flags().BoolP("yes", "y", false, "skip confirmation prompt")
 
 	return cmd
 }

@@ -7,7 +7,7 @@ import (
 
 func TestArchivePrune_NegativeDays(t *testing.T) {
 	// given
-	root := NewRootCommand(BuildInfo{Version: "test"})
+	root := NewRootCommand()
 	root.SetArgs([]string{"archive-prune", "--days", "-5"})
 
 	// when
@@ -24,7 +24,7 @@ func TestArchivePrune_NegativeDays(t *testing.T) {
 
 func TestArchivePrune_ZeroDays(t *testing.T) {
 	// given
-	root := NewRootCommand(BuildInfo{Version: "test"})
+	root := NewRootCommand()
 	root.SetArgs([]string{"archive-prune", "--days", "0"})
 
 	// when

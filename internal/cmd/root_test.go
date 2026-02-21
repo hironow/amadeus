@@ -3,11 +3,13 @@ package cmd
 import (
 	"bytes"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 	// given
-	cmd := NewRootCommand(BuildInfo{Version: "test"})
+	cmd := NewRootCommand()
 
 	// then
 	for _, name := range []string{"config", "verbose", "lang"} {
@@ -28,39 +30,31 @@ func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 }
 
 func TestNewRootCommand_VersionOutput(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-	}{
-		{"double-dash", []string{"--version"}},
-		{"single-dash-compat", []string{"-version"}},
+	// given
+	origVersion := Version
+	Version = "1.2.3"
+	defer func() { Version = origVersion }()
+	cmd := NewRootCommand()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--version"})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// given
-			cmd := NewRootCommand(BuildInfo{Version: "1.2.3"})
-			var buf bytes.Buffer
-			cmd.SetOut(&buf)
-			cmd.SetArgs(NormalizeArgs(cmd, tt.args))
-
-			// when
-			err := cmd.Execute()
-
-			// then
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			got := buf.String()
-			if got != "amadeus version 1.2.3\n" {
-				t.Errorf("expected 'amadeus version 1.2.3\\n', got %q", got)
-			}
-		})
+	got := buf.String()
+	if got != "amadeus version 1.2.3\n" {
+		t.Errorf("expected 'amadeus version 1.2.3\\n', got %q", got)
 	}
 }
 
 func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 	// given
-	cmd := NewRootCommand(BuildInfo{Version: "test"})
+	cmd := NewRootCommand()
 	cmd.SetArgs([]string{})
 
 	// when
@@ -72,44 +66,86 @@ func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 	}
 }
 
-func TestNormalizeArgs(t *testing.T) {
-	root := NewRootCommand(BuildInfo{Version: "test"})
-	tests := []struct {
-		name string
-		in   []string
-		want []string
-	}{
-		{"version-single-dash", []string{"-version"}, []string{"--version"}},
-		{"help-single-dash", []string{"-help"}, []string{"--help"}},
-		{"double-dash-unchanged", []string{"--version"}, []string{"--version"}},
-		{"single-char-shorthand-unchanged", []string{"-v", "-c", "path"}, []string{"-v", "-c", "path"}},
-		{"long-flag-single-dash", []string{"-config", "path"}, []string{"--config", "path"}},
-		{"json-flag-single-dash", []string{"check", "-json"}, []string{"check", "--json"}},
-		{"dry-run-single-dash", []string{"archive-prune", "-dry-run"}, []string{"archive-prune", "--dry-run"}},
-		{"verbose-long-single-dash", []string{"-verbose"}, []string{"--verbose"}},
-		{"mixed", []string{"-version", "check", "-json", "-v"}, []string{"--version", "check", "--json", "-v"}},
-		{"negative-number-unchanged", []string{"archive-prune", "--days", "-10"}, []string{"archive-prune", "--days", "-10"}},
-		{"negative-large-number", []string{"--days", "-365"}, []string{"--days", "-365"}},
-		{"shorthand-equals-unchanged", []string{"-c=custom.yaml"}, []string{"-c=custom.yaml"}},
-		{"shorthand-v-equals", []string{"-v=true"}, []string{"-v=true"}},
-		{"shorthand-l-equals", []string{"-l=ja"}, []string{"-l=ja"}},
-		{"long-flag-equals-normalized", []string{"-config=custom.yaml"}, []string{"--config=custom.yaml"}},
-		{"unknown-dash-token-unchanged", []string{"resolve", "--reason", "-bad"}, []string{"resolve", "--reason", "-bad"}},
-		{"dash-filename-unchanged", []string{"resolve", "-notaflag.yaml"}, []string{"resolve", "-notaflag.yaml"}},
-		{"subcommand-not-normalized", []string{"check"}, []string{"check"}},
-		{"empty", []string{}, []string{}},
+func TestSubcommand_ShortAliases(t *testing.T) {
+	root := NewRootCommand()
+
+	// Build a map of subcommand name → *cobra.Command for easy lookup.
+	subs := map[string]*cobra.Command{}
+	for _, sub := range root.Commands() {
+		subs[sub.Name()] = sub
 	}
+
+	tests := []struct {
+		subcommand string
+		flag       string
+		shorthand  string
+	}{
+		// check
+		{"check", "json", "j"},
+		{"check", "dry-run", "n"},
+		{"check", "full", "f"},
+		{"check", "quiet", "q"},
+		// resolve
+		{"resolve", "approve", "a"},
+		{"resolve", "reject", "r"},
+		{"resolve", "json", "j"},
+		// archive-prune
+		{"archive-prune", "days", "d"},
+		{"archive-prune", "dry-run", "n"},
+		{"archive-prune", "yes", "y"},
+		// version
+		{"version", "json", "j"},
+		// update
+		{"update", "check", "C"},
+		// doctor
+		{"doctor", "json", "j"},
+		// log
+		{"log", "json", "j"},
+	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NormalizeArgs(root, tt.in)
-			if len(got) != len(tt.want) {
-				t.Fatalf("length mismatch: got %d, want %d", len(got), len(tt.want))
+		t.Run(tt.subcommand+"/"+tt.flag, func(t *testing.T) {
+			// given
+			sub, ok := subs[tt.subcommand]
+			if !ok {
+				t.Fatalf("subcommand %q not found", tt.subcommand)
 			}
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("arg[%d]: got %q, want %q", i, got[i], tt.want[i])
-				}
+
+			// then — flag exists
+			f := sub.Flags().Lookup(tt.flag)
+			if f == nil {
+				t.Fatalf("flag --%s not found on %s", tt.flag, tt.subcommand)
+			}
+
+			// then — shorthand matches
+			if f.Shorthand != tt.shorthand {
+				t.Errorf("expected shorthand %q for --%s on %s, got %q",
+					tt.shorthand, tt.flag, tt.subcommand, f.Shorthand)
 			}
 		})
+	}
+}
+
+func TestResolve_ReasonIsLongOnly(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	var resolve *cobra.Command
+	for _, sub := range root.Commands() {
+		if sub.Name() == "resolve" {
+			resolve = sub
+			break
+		}
+	}
+	if resolve == nil {
+		t.Fatal("resolve subcommand not found")
+	}
+
+	// then — --reason has no shorthand
+	f := resolve.Flags().Lookup("reason")
+	if f == nil {
+		t.Fatal("--reason flag not found")
+	}
+	if f.Shorthand != "" {
+		t.Errorf("expected --reason to be long-only, got shorthand %q", f.Shorthand)
 	}
 }

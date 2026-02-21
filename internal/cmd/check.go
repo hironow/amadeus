@@ -68,10 +68,10 @@ func newCheckCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("dry-run", false, "generate prompt only")
-	cmd.Flags().Bool("full", false, "force full calibration check")
+	cmd.Flags().BoolP("dry-run", "n", false, "generate prompt only")
+	cmd.Flags().BoolP("full", "f", false, "force full calibration check")
 	cmd.Flags().BoolP("quiet", "q", false, "summary-only output")
-	cmd.Flags().Bool("json", false, "output as JSON")
+	cmd.Flags().BoolP("json", "j", false, "output as JSON")
 
 	return cmd
 }

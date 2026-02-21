@@ -16,10 +16,7 @@ import (
 var tracer trace.Tracer = noop.NewTracerProvider().Tracer("amadeus")
 
 func InitTracer(serviceName, ver string) func(context.Context) error {
-	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	if endpoint == "" {
-		// No endpoint configured — reset to noop to avoid
-		// accidentally recording spans via a host's global provider.
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
 		tracer = np.Tracer(serviceName)
@@ -28,14 +25,13 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 
 	exp, err := otlptracehttp.New(context.Background())
 	if err != nil {
-		// Exporter creation failed — reset to noop so the CLI is not blocked.
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
 		tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
-	res, err := resource.Merge(
+	res, _ := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -43,9 +39,6 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 			semconv.ServiceVersion(ver),
 		),
 	)
-	if err != nil {
-		res = resource.Default()
-	}
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
