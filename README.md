@@ -197,7 +197,6 @@ Amadeus creates `.gate/` with config, state, history, and D-Mail storage automat
 | `amadeus uninstall-hook` | Remove git post-merge hook |
 | `amadeus version` | Print version, commit, and build date |
 | `amadeus update` | Self-update to the latest release |
-| `amadeus docs` | Generate CLI reference in Markdown |
 
 ## Usage
 
@@ -287,12 +286,6 @@ amadeus update -C
 |------|-------|---------|-------------|
 | `--check` | `-C` | `false` | Check for updates without installing |
 
-### docs
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--output` | `-o` | | Output directory for generated docs |
-
 ## Exit Codes
 
 | Code | Meaning |
@@ -374,7 +367,7 @@ just lint-md            # Lint markdown files only
 just semgrep            # Run semgrep with project cobra rules
 just check              # fmt + vet + test (pre-commit check)
 just doctor             # Build and run amadeus doctor (smoke test)
-just docs-cli           # Generate CLI reference docs
+just docgen             # Generate CLI reference docs
 just clean              # Clean build artifacts
 just prek-install       # Install prek hooks (pre-commit + pre-push)
 just prek-run           # Run all prek hooks on all files
@@ -396,12 +389,13 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 |   +-- archive_prune.go     archive-prune subcommand
 |   +-- version.go           version subcommand (text + JSON)
 |   +-- update.go            Self-update via GitHub releases
-|   +-- docs.go              CLI docs generation (cobra/doc)
 |   +-- doctor.go            doctor subcommand
 |   +-- log.go               log subcommand
 |   +-- init.go              init subcommand
 |   +-- validate.go          validate subcommand
 |   +-- hook.go              install-hook / uninstall-hook
++-- internal/tools/
+|   +-- docgen/main.go       CLI docs generation (standalone tool)
 +-- amadeus.go               Main orchestrator (three-phase pipeline)
 +-- reading_steiner.go       Phase 1: Shift detection (diff + full scan)
 +-- divergence_meter.go      Phase 2: Scoring bridge (Claude -> scores)
