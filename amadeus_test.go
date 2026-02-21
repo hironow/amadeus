@@ -1805,6 +1805,83 @@ func TestSaveConvergenceDMails_Success(t *testing.T) {
 	}
 }
 
+func TestSaveConvergenceDMails_DeduplicatesExisting(t *testing.T) {
+	// given: an existing convergence D-Mail for auth/session.go in archive
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	// Pre-save a convergence D-Mail for the same target
+	if err := store.SaveDMail(DMail{
+		Name:     "convergence-001",
+		Kind:     KindConvergence,
+		Severity: SeverityHigh,
+		Targets:  []string{"auth/session.go"},
+		Metadata: map[string]string{
+			"created_at":      time.Now().UTC().Format(time.RFC3339),
+			"convergence_for": "f-001,f-002,f-003,f-004,f-005,f-006",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// Same alert that would produce a convergence D-Mail for auth/session.go
+	alerts := []ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
+			DMails: []string{"f-001", "f-002", "f-003", "f-004", "f-005", "f-006"}},
+	}
+
+	// when
+	saved, err := a.saveConvergenceDMails(alerts)
+
+	// then: should NOT create a duplicate
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(saved) != 0 {
+		t.Errorf("expected 0 saved D-Mails (deduplicated), got %d", len(saved))
+	}
+}
+
+func TestSaveCheckState_ClearsConvergenceAlerts(t *testing.T) {
+	// given: a previous result with stale convergence alerts
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	previous := CheckResult{
+		Divergence: 0.15,
+		ConvergenceAlerts: []ConvergenceAlert{
+			{Target: "auth/session.go", Count: 3, Window: 14, Severity: SeverityMedium},
+		},
+	}
+
+	// when: saving on no-shift path
+	err := a.SaveCheckState("abc123", previous, time.Now().UTC())
+
+	// then: convergence alerts should be cleared (not carried over stale)
+	if err != nil {
+		t.Fatalf("SaveCheckState failed: %v", err)
+	}
+	loaded, err := store.LoadLatest()
+	if err != nil {
+		t.Fatalf("LoadLatest failed: %v", err)
+	}
+	if len(loaded.ConvergenceAlerts) != 0 {
+		t.Errorf("expected 0 convergence alerts (cleared on no-shift), got %d", len(loaded.ConvergenceAlerts))
+	}
+}
+
 func TestPrintSync_OutputJSON(t *testing.T) {
 	// given
 	dir := t.TempDir()

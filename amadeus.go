@@ -593,6 +593,7 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 	previous.Type = CheckTypeDiff
 	previous.PRsEvaluated = nil
 	previous.DMails = nil
+	previous.ConvergenceAlerts = nil
 	previous.CheckCountSinceFull = a.CheckCount
 	previous.ForceFullNext = a.ForceFullNext
 	if err := a.Store.SaveLatest(previous); err != nil {
@@ -923,11 +924,38 @@ func (a *Amadeus) PrintLogJSON() error {
 // LinkDMail associates a D-Mail with a Linear issue ID.
 // Returns an error if the D-Mail is already linked.
 // saveConvergenceDMails persists convergence D-Mails generated from HIGH severity alerts.
+// Skips alerts whose target already has an existing convergence D-Mail in the archive
+// to prevent duplicate messages on repeated runs.
 // Returns the saved D-Mails and any error encountered during naming or writing.
 func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, error) {
+	// Build set of targets already covered by existing convergence D-Mails
+	coveredTargets := make(map[string]bool)
+	allDMails, err := a.Store.LoadAllDMails()
+	if err == nil {
+		for _, d := range allDMails {
+			if d.Kind == KindConvergence {
+				for _, t := range d.Targets {
+					coveredTargets[t] = true
+				}
+			}
+		}
+	}
+
 	convergenceDMails := GenerateConvergenceDMails(alerts)
 	var saved []DMail
 	for _, cd := range convergenceDMails {
+		// Skip if all targets are already covered
+		allCovered := true
+		for _, t := range cd.Targets {
+			if !coveredTargets[t] {
+				allCovered = false
+				break
+			}
+		}
+		if allCovered {
+			continue
+		}
+
 		cdName, err := a.Store.NextDMailName(KindConvergence)
 		if err != nil {
 			return saved, fmt.Errorf("convergence dmail name: %w", err)
@@ -937,6 +965,10 @@ func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, err
 			return saved, fmt.Errorf("save convergence dmail %s: %w", cdName, err)
 		}
 		saved = append(saved, cd)
+		// Mark newly saved targets as covered
+		for _, t := range cd.Targets {
+			coveredTargets[t] = true
+		}
 	}
 	return saved, nil
 }
