@@ -18,16 +18,14 @@ func init() {
 }
 
 // NormalizeArgs rewrites legacy single-dash long flags for backward compatibility.
-// The old stdlib flag-based CLI accepted -version and -help; cobra/pflag requires --.
+// The old stdlib flag-based CLI accepted -config, -json, etc.; cobra/pflag requires --.
+// Single-character flags like -v, -c are left as-is (valid pflag shorthands).
 func NormalizeArgs(args []string) []string {
 	out := make([]string, len(args))
 	copy(out, args)
 	for i, a := range out {
-		switch a {
-		case "-version":
-			out[i] = "--version"
-		case "-help":
-			out[i] = "--help"
+		if len(a) > 2 && a[0] == '-' && a[1] != '-' {
+			out[i] = "-" + a
 		}
 	}
 	return out

@@ -81,8 +81,13 @@ func TestNormalizeArgs(t *testing.T) {
 		{"version-single-dash", []string{"-version"}, []string{"--version"}},
 		{"help-single-dash", []string{"-help"}, []string{"--help"}},
 		{"double-dash-unchanged", []string{"--version"}, []string{"--version"}},
-		{"other-flags-unchanged", []string{"-v", "--json", "check"}, []string{"-v", "--json", "check"}},
-		{"mixed", []string{"-version", "check", "-help"}, []string{"--version", "check", "--help"}},
+		{"single-char-shorthand-unchanged", []string{"-v", "-c", "path"}, []string{"-v", "-c", "path"}},
+		{"long-flag-single-dash", []string{"-config", "path"}, []string{"--config", "path"}},
+		{"json-flag-single-dash", []string{"check", "-json"}, []string{"check", "--json"}},
+		{"dry-run-single-dash", []string{"archive-prune", "-dry-run"}, []string{"archive-prune", "--dry-run"}},
+		{"verbose-long-single-dash", []string{"-verbose"}, []string{"--verbose"}},
+		{"mixed", []string{"-version", "check", "-json", "-v"}, []string{"--version", "check", "--json", "-v"}},
+		{"subcommand-not-normalized", []string{"check"}, []string{"check"}},
 		{"empty", []string{}, []string{}},
 	}
 	for _, tt := range tests {
