@@ -398,6 +398,13 @@ func (s *StateStore) MoveRejectedToPending(name string) error {
 // ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
 // copies to archive/ (skip if already exists), and removes from inbox/.
 // Returns the parsed D-Mails sorted by name.
+//
+// NOTE: All D-Mail I/O (inbox, outbox, pending, archive) uses synchronous
+// os.ReadDir/ReadFile/WriteFile/Rename — no file-system watcher such as
+// github.com/fsnotify/fsnotify is involved. amadeus is a one-shot CLI
+// invoked by cron or git hooks, so polling at invocation time is sufficient.
+// A watcher would only be warranted if amadeus were daemonised for
+// real-time inbox delivery.
 func (s *StateStore) ScanInbox() ([]DMail, error) {
 	inboxDir := filepath.Join(s.Root, "inbox")
 	entries, err := os.ReadDir(inboxDir)
