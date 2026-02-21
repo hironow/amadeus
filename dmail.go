@@ -45,27 +45,25 @@ const (
 
 // dmailFrontmatter is the YAML frontmatter of a D-Mail file.
 type dmailFrontmatter struct {
-	Name          string            `yaml:"name"`
-	Kind          DMailKind         `yaml:"kind"`
-	Description   string            `yaml:"description"`
-	Issues        []string          `yaml:"issues,omitempty"`
-	Severity      Severity          `yaml:"severity,omitempty"`
-	Targets       []string          `yaml:"targets,omitempty"`
-	LinearIssueID string            `yaml:"linear_issue_id,omitempty"`
-	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Name        string            `yaml:"name"`
+	Kind        DMailKind         `yaml:"kind"`
+	Description string            `yaml:"description"`
+	Issues      []string          `yaml:"issues,omitempty"`
+	Severity    Severity          `yaml:"severity,omitempty"`
+	Targets     []string          `yaml:"targets,omitempty"`
+	Metadata    map[string]string `yaml:"metadata,omitempty"`
 }
 
 // DMail is the correction routing message using YAML frontmatter + Markdown body.
 type DMail struct {
-	Name          string            `yaml:"name"`
-	Kind          DMailKind         `yaml:"kind"`
-	Description   string            `yaml:"description"`
-	Issues        []string          `yaml:"issues,omitempty"`
-	Severity      Severity          `yaml:"severity,omitempty"`
-	Targets       []string          `yaml:"targets,omitempty"`
-	LinearIssueID string            `yaml:"linear_issue_id,omitempty"`
-	Metadata      map[string]string `yaml:"metadata,omitempty"`
-	Body          string            `yaml:"-"`
+	Name        string            `yaml:"name"`
+	Kind        DMailKind         `yaml:"kind"`
+	Description string            `yaml:"description"`
+	Issues      []string          `yaml:"issues,omitempty"`
+	Severity    Severity          `yaml:"severity,omitempty"`
+	Targets     []string          `yaml:"targets,omitempty"`
+	Metadata    map[string]string `yaml:"metadata,omitempty"`
+	Body        string            `yaml:"-"`
 }
 
 // ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
@@ -88,29 +86,27 @@ func ParseDMail(data []byte) (DMail, error) {
 	}
 
 	return DMail{
-		Name:          fm.Name,
-		Kind:          fm.Kind,
-		Description:   fm.Description,
-		Issues:        fm.Issues,
-		Severity:      NormalizeSeverity(fm.Severity),
-		Targets:       fm.Targets,
-		LinearIssueID: fm.LinearIssueID,
-		Metadata:      fm.Metadata,
-		Body:          strings.TrimLeft(bodyPart, "\n"),
+		Name:        fm.Name,
+		Kind:        fm.Kind,
+		Description: fm.Description,
+		Issues:      fm.Issues,
+		Severity:    NormalizeSeverity(fm.Severity),
+		Targets:     fm.Targets,
+		Metadata:    fm.Metadata,
+		Body:        strings.TrimLeft(bodyPart, "\n"),
 	}, nil
 }
 
 // MarshalDMail serializes a DMail to YAML frontmatter + Markdown format.
 func MarshalDMail(dmail DMail) ([]byte, error) {
 	fm := dmailFrontmatter{
-		Name:          dmail.Name,
-		Kind:          dmail.Kind,
-		Description:   dmail.Description,
-		Issues:        dmail.Issues,
-		Severity:      dmail.Severity,
-		Targets:       dmail.Targets,
-		LinearIssueID: dmail.LinearIssueID,
-		Metadata:      dmail.Metadata,
+		Name:        dmail.Name,
+		Kind:        dmail.Kind,
+		Description: dmail.Description,
+		Issues:      dmail.Issues,
+		Severity:    dmail.Severity,
+		Targets:     dmail.Targets,
+		Metadata:    dmail.Metadata,
 	}
 	yamlData, err := yaml.Marshal(fm)
 	if err != nil {
@@ -223,55 +219,6 @@ func (s *StateStore) LoadAllDMails() ([]DMail, error) {
 		return dmails[i].Name < dmails[j].Name
 	})
 	return dmails, nil
-}
-
-// UpdateDMailArchive re-writes a D-Mail's archive file with updated frontmatter.
-// Used to persist metadata changes (e.g., LinearIssueID) without altering the body.
-func (s *StateStore) UpdateDMailArchive(dmail DMail) error {
-	data, err := MarshalDMail(dmail)
-	if err != nil {
-		return fmt.Errorf("marshal dmail: %w", err)
-	}
-	archivePath := filepath.Join(s.Root, "archive", dmail.Name+".md")
-	return os.WriteFile(archivePath, data, 0o644)
-}
-
-// UpdateDMailDelivery re-writes the outbox or pending copy of a D-Mail if it exists.
-// This keeps delivery artifacts in sync when archive metadata changes (e.g., LinearIssueID).
-func (s *StateStore) UpdateDMailDelivery(dmail DMail) error {
-	data, err := MarshalDMail(dmail)
-	if err != nil {
-		return fmt.Errorf("marshal dmail: %w", err)
-	}
-	filename := dmail.Name + ".md"
-	for _, dir := range []string{"outbox", "pending"} {
-		p := filepath.Join(s.Root, dir, filename)
-		if _, statErr := os.Stat(p); statErr != nil {
-			if errors.Is(statErr, fs.ErrNotExist) {
-				continue
-			}
-			return fmt.Errorf("stat %s copy: %w", dir, statErr)
-		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
-			return fmt.Errorf("update %s copy: %w", dir, err)
-		}
-	}
-	return nil
-}
-
-// LoadUnsyncedDMails returns all archived D-Mails that have no LinearIssueID set.
-func (s *StateStore) LoadUnsyncedDMails() ([]DMail, error) {
-	all, err := s.LoadAllDMails()
-	if err != nil {
-		return nil, err
-	}
-	var unsynced []DMail
-	for _, d := range all {
-		if d.LinearIssueID == "" {
-			unsynced = append(unsynced, d)
-		}
-	}
-	return unsynced, nil
 }
 
 // ErrNoResolution is returned when no resolution exists for a given D-Mail name.

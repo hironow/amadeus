@@ -192,8 +192,8 @@ Amadeus creates `.gate/` with config, state, history, and D-Mail storage automat
 | `amadeus doctor` | Check environment health (git, Claude CLI, config) |
 | `amadeus resolve <name>` | Approve or reject a pending D-Mail |
 | `amadeus log` | Print check history and D-Mail log |
-| `amadeus sync` | Show unsynced D-Mails and pending comments (JSON) |
-| `amadeus link <name> <id>` | Link a D-Mail to a Linear issue |
+| `amadeus sync` | Show pending D-Mail × Issue comments (JSON) |
+| `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
 | `amadeus archive-prune` | Prune old archived D-Mail files |
 | `amadeus install-hook` | Install git post-merge hook |
 | `amadeus uninstall-hook` | Remove git post-merge hook |
@@ -227,14 +227,14 @@ amadeus resolve feedback-001 -a
 # Reject a pending D-Mail
 amadeus resolve feedback-001 -r --reason "Not applicable to current sprint"
 
-# Show unsynced D-Mails and pending comments
+# Show pending D-Mail × Issue comments
 amadeus sync
 
-# Link a D-Mail to a Linear issue
-amadeus link feedback-001 MY-250
+# Mark a D-Mail × Issue pair as commented
+amadeus mark-commented feedback-001 MY-250
 
-# Link with JSON output
-amadeus link feedback-001 MY-250 -j
+# Mark-commented with JSON output
+amadeus mark-commented feedback-001 MY-250 -j
 
 # Prune archived D-Mails older than 90 days (dry run)
 amadeus archive-prune -d 90 -n
@@ -404,7 +404,7 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 |   +-- init.go              init subcommand
 |   +-- validate.go          validate subcommand
 |   +-- sync.go              sync subcommand (JSON output)
-|   +-- link.go              link subcommand (D-Mail → Linear)
+|   +-- mark_commented.go    mark-commented subcommand (sync state)
 |   +-- hook.go              install-hook / uninstall-hook
 +-- internal/tools/
 |   +-- docgen/main.go       CLI docs generation (standalone tool)

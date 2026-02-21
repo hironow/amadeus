@@ -896,25 +896,6 @@ Body text.
 	}
 }
 
-func TestParseDMail_WithLinearIssueID(t *testing.T) {
-	raw := `---
-name: "feedback-001"
-kind: feedback
-description: "linked dmail"
-linear_issue_id: MY-250
----
-
-Body text.
-`
-	dmail, err := ParseDMail([]byte(raw))
-	if err != nil {
-		t.Fatalf("ParseDMail failed: %v", err)
-	}
-	if dmail.LinearIssueID != "MY-250" {
-		t.Errorf("expected linear_issue_id 'MY-250', got %s", dmail.LinearIssueID)
-	}
-}
-
 func TestMarshalDMail_Targets_RoundTrip(t *testing.T) {
 	original := DMail{
 		Name:        "feedback-001",
@@ -940,29 +921,7 @@ func TestMarshalDMail_Targets_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestMarshalDMail_LinearIssueID_RoundTrip(t *testing.T) {
-	original := DMail{
-		Name:          "feedback-001",
-		Kind:          KindFeedback,
-		Description:   "linked",
-		LinearIssueID: "MY-250",
-		Body:          "Details\n",
-	}
-
-	data, err := MarshalDMail(original)
-	if err != nil {
-		t.Fatalf("MarshalDMail failed: %v", err)
-	}
-	parsed, err := ParseDMail(data)
-	if err != nil {
-		t.Fatalf("ParseDMail round-trip failed: %v", err)
-	}
-	if parsed.LinearIssueID != "MY-250" {
-		t.Errorf("expected linear_issue_id 'MY-250', got %s", parsed.LinearIssueID)
-	}
-}
-
-func TestMarshalDMail_OmitsEmptyTargetsAndLinearIssueID(t *testing.T) {
+func TestMarshalDMail_OmitsEmptyTargets(t *testing.T) {
 	original := DMail{
 		Name:        "feedback-001",
 		Kind:        KindFeedback,
@@ -976,64 +935,6 @@ func TestMarshalDMail_OmitsEmptyTargetsAndLinearIssueID(t *testing.T) {
 	content := string(data)
 	if strings.Contains(content, "targets") {
 		t.Errorf("expected no 'targets' in output, got:\n%s", content)
-	}
-	if strings.Contains(content, "linear_issue_id") {
-		t.Errorf("expected no 'linear_issue_id' in output, got:\n%s", content)
-	}
-}
-
-func TestLoadUnsyncedDMails_FiltersUnlinked(t *testing.T) {
-	// given: two D-Mails, one with LinearIssueID set, one without
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	if err := store.SaveDMail(DMail{
-		Name: "feedback-001", Kind: KindFeedback,
-		Description: "unlinked", Severity: SeverityLow,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SaveDMail(DMail{
-		Name: "feedback-002", Kind: KindFeedback,
-		Description: "linked", Severity: SeverityLow,
-		LinearIssueID: "MY-250",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// when
-	unsynced, err := store.LoadUnsyncedDMails()
-
-	// then: only the unlinked D-Mail should appear
-	if err != nil {
-		t.Fatalf("LoadUnsyncedDMails failed: %v", err)
-	}
-	if len(unsynced) != 1 {
-		t.Fatalf("expected 1 unsynced, got %d", len(unsynced))
-	}
-	if unsynced[0].Name != "feedback-001" {
-		t.Errorf("expected feedback-001, got %s", unsynced[0].Name)
-	}
-}
-
-func TestLoadUnsyncedDMails_EmptyArchive(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	unsynced, err := store.LoadUnsyncedDMails()
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if len(unsynced) != 0 {
-		t.Errorf("expected 0, got %d", len(unsynced))
 	}
 }
 

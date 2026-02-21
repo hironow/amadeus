@@ -700,31 +700,46 @@ func (a *Amadeus) ResolveDMail(ctx context.Context, name string, action string, 
 	}
 	a.dataOut("D-Mail %s %s.", name, action+"d")
 	a.dataOut("%s → %sd at %s", dmail.Description, action, resolution.ResolvedAt.Format(time.RFC3339))
+	if len(dmail.Issues) > 0 {
+		a.dataOut("Comment targets: %s", strings.Join(dmail.Issues, ", "))
+	}
 	return nil
 }
 
 // ResolveOutput is the JSON-serializable result of resolving a D-Mail.
 type ResolveOutput struct {
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	Action     string `json:"action"`
-	ResolvedAt string `json:"resolved_at"`
+	Name       string           `json:"name"`
+	Status     string           `json:"status"`
+	Action     string           `json:"action"`
+	ResolvedAt string           `json:"resolved_at"`
+	Comments   []CommentPayload `json:"comments,omitempty"`
 }
 
 // ResolveDMailResult resolves a D-Mail and returns the result as a struct.
 // Use this for batch operations where the caller aggregates results.
 func (a *Amadeus) ResolveDMailResult(ctx context.Context, name string, action string, reason string) (ResolveOutput, error) {
-	_, resolution, span, err := a.resolveDMailCore(ctx, name, action, reason)
+	dmail, resolution, span, err := a.resolveDMailCore(ctx, name, action, reason)
 	defer span.End()
 	if err != nil {
 		return ResolveOutput{}, err
 	}
-	return ResolveOutput{
+	out := ResolveOutput{
 		Name:       name,
 		Status:     resolution.Status,
 		Action:     action,
 		ResolvedAt: resolution.ResolvedAt.Format(time.RFC3339),
-	}, nil
+	}
+	for _, issueID := range dmail.Issues {
+		out.Comments = append(out.Comments, CommentPayload{
+			IssueID:     issueID,
+			DMail:       name,
+			Description: dmail.Description,
+			Body:        dmail.Body,
+			Resolution:  resolution.Status,
+			Reason:      resolution.Reason,
+		})
+	}
+	return out, nil
 }
 
 // ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
@@ -972,64 +987,14 @@ func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, err
 	return saved, nil
 }
 
-func (a *Amadeus) LinkDMail(name, linearIssueID string) error {
-	dmail, err := a.Store.LoadDMail(name)
-	if err != nil {
-		return err
-	}
-	if dmail.LinearIssueID != "" {
-		return fmt.Errorf("D-Mail %s is already linked to %s", name, dmail.LinearIssueID)
-	}
-	dmail.LinearIssueID = linearIssueID
-	if err := a.Store.UpdateDMailArchive(dmail); err != nil {
-		return fmt.Errorf("update archive: %w", err)
-	}
-	if err := a.Store.UpdateDMailDelivery(dmail); err != nil {
-		return fmt.Errorf("update delivery: %w", err)
-	}
-	a.dataOut("D-Mail %s linked to %s.", name, linearIssueID)
-	return nil
-}
-
-// LinkDMailJSON links a D-Mail and writes the result as JSON to DataOut.
-func (a *Amadeus) LinkDMailJSON(name, linearIssueID string) error {
-	dmail, err := a.Store.LoadDMail(name)
-	if err != nil {
-		return err
-	}
-	if dmail.LinearIssueID != "" {
-		return fmt.Errorf("D-Mail %s is already linked to %s", name, dmail.LinearIssueID)
-	}
-	dmail.LinearIssueID = linearIssueID
-	if err := a.Store.UpdateDMailArchive(dmail); err != nil {
-		return fmt.Errorf("update archive: %w", err)
-	}
-	if err := a.Store.UpdateDMailDelivery(dmail); err != nil {
-		return fmt.Errorf("update delivery: %w", err)
-	}
-	output := struct {
-		Name          string `json:"name"`
-		LinearIssueID string `json:"linear_issue_id"`
-		Status        string `json:"status"`
-	}{
-		Name:          name,
-		LinearIssueID: linearIssueID,
-		Status:        "linked",
-	}
-	return a.writeDataJSON(output)
-}
-
 // MarkCommented records that a D-Mail has been posted as a Linear comment.
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
 	return a.Store.MarkCommented(dmailName, issueID)
 }
 
 // PrintSync builds and outputs the sync status as JSON to DataOut.
+// Lists D-Mail × Issue pairs that have not yet been posted as comments.
 func (a *Amadeus) PrintSync() error {
-	unsynced, err := a.Store.LoadUnsyncedDMails()
-	if err != nil {
-		return fmt.Errorf("load unsynced: %w", err)
-	}
 	syncState, err := a.Store.LoadSyncState()
 	if err != nil {
 		return fmt.Errorf("load sync state: %w", err)
@@ -1043,46 +1008,33 @@ func (a *Amadeus) PrintSync() error {
 		return fmt.Errorf("load all dmails: %w", err)
 	}
 
-	var unsyncedViews []SyncDMailView
-	for _, d := range unsynced {
-		unsyncedViews = append(unsyncedViews, SyncDMailView{
-			Name:        d.Name,
-			Kind:        string(d.Kind),
-			Description: d.Description,
-			Severity:    string(d.Severity),
-			Targets:     d.Targets,
-			Body:        d.Body,
-		})
-	}
-	if unsyncedViews == nil {
-		unsyncedViews = []SyncDMailView{}
-	}
-
 	var pendingComments []PendingComment
 	for _, d := range allDMails {
-		if d.LinearIssueID == "" {
-			continue
-		}
-		if _, commented := syncState.CommentedDMails[d.Name]; commented {
+		if len(d.Issues) == 0 {
 			continue
 		}
 		status := string(RouteDMail(d.Severity))
 		if res, ok := resolutions[d.Name]; ok {
 			status = res.Status
 		}
-		pendingComments = append(pendingComments, PendingComment{
-			DMail:       d.Name,
-			IssueID:     d.LinearIssueID,
-			Status:      status,
-			Description: d.Description,
-		})
+		for _, issueID := range d.Issues {
+			key := d.Name + ":" + issueID
+			if _, commented := syncState.CommentedDMails[key]; commented {
+				continue
+			}
+			pendingComments = append(pendingComments, PendingComment{
+				DMail:       d.Name,
+				IssueID:     issueID,
+				Status:      status,
+				Description: d.Description,
+			})
+		}
 	}
 	if pendingComments == nil {
 		pendingComments = []PendingComment{}
 	}
 
 	output := SyncOutput{
-		Unsynced:        unsyncedViews,
 		PendingComments: pendingComments,
 	}
 	return a.writeDataJSON(output)

@@ -45,9 +45,9 @@ func TestSyncState_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSyncState failed: %v", err)
 	}
-	record, ok := state.CommentedDMails["feedback-001"]
+	record, ok := state.CommentedDMails["feedback-001:MY-250"]
 	if !ok {
-		t.Fatal("expected feedback-001 in CommentedDMails")
+		t.Fatal("expected feedback-001:MY-250 in CommentedDMails")
 	}
 	if record.IssueID != "MY-250" {
 		t.Errorf("expected issue_id MY-250, got %s", record.IssueID)
