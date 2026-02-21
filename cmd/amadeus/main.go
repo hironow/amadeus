@@ -29,7 +29,7 @@ func run() int {
 		Date:    date,
 	}
 	root := cmd.NewRootCommand(info)
-	root.SetArgs(cmd.NormalizeArgs(os.Args[1:]))
+	root.SetArgs(cmd.NormalizeArgs(root, os.Args[1:]))
 	err := root.ExecuteContext(context.Background())
 	code := amadeus.ExitCode(err)
 	if code == 1 {

@@ -41,7 +41,7 @@ func TestNewRootCommand_VersionOutput(t *testing.T) {
 			cmd := NewRootCommand(BuildInfo{Version: "1.2.3"})
 			var buf bytes.Buffer
 			cmd.SetOut(&buf)
-			cmd.SetArgs(NormalizeArgs(tt.args))
+			cmd.SetArgs(NormalizeArgs(cmd, tt.args))
 
 			// when
 			err := cmd.Execute()
@@ -73,6 +73,7 @@ func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 }
 
 func TestNormalizeArgs(t *testing.T) {
+	root := NewRootCommand(BuildInfo{Version: "test"})
 	tests := []struct {
 		name string
 		in   []string
@@ -93,12 +94,14 @@ func TestNormalizeArgs(t *testing.T) {
 		{"shorthand-v-equals", []string{"-v=true"}, []string{"-v=true"}},
 		{"shorthand-l-equals", []string{"-l=ja"}, []string{"-l=ja"}},
 		{"long-flag-equals-normalized", []string{"-config=custom.yaml"}, []string{"--config=custom.yaml"}},
+		{"unknown-dash-token-unchanged", []string{"resolve", "--reason", "-bad"}, []string{"resolve", "--reason", "-bad"}},
+		{"dash-filename-unchanged", []string{"resolve", "-notaflag.yaml"}, []string{"resolve", "-notaflag.yaml"}},
 		{"subcommand-not-normalized", []string{"check"}, []string{"check"}},
 		{"empty", []string{}, []string{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NormalizeArgs(tt.in)
+			got := NormalizeArgs(root, tt.in)
 			if len(got) != len(tt.want) {
 				t.Fatalf("length mismatch: got %d, want %d", len(got), len(tt.want))
 			}
