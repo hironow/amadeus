@@ -90,10 +90,10 @@ func newResolveCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("approve", false, "approve the D-Mail")
-	cmd.Flags().Bool("reject", false, "reject the D-Mail")
+	cmd.Flags().BoolP("approve", "a", false, "approve the D-Mail")
+	cmd.Flags().BoolP("reject", "r", false, "reject the D-Mail")
 	cmd.Flags().String("reason", "", "reason for rejection")
-	cmd.Flags().Bool("json", false, "output as JSON")
+	cmd.Flags().BoolP("json", "j", false, "output as JSON")
 
 	return cmd
 }

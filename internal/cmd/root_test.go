@@ -3,6 +3,8 @@ package cmd
 import (
 	"bytes"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
@@ -58,5 +60,91 @@ func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 	// then
 	if err == nil {
 		t.Fatal("expected error when no subcommand provided, got nil")
+	}
+}
+
+func TestSubcommand_ShortAliases(t *testing.T) {
+	root := NewRootCommand(BuildInfo{Version: "test"})
+
+	// Build a map of subcommand name → *cobra.Command for easy lookup.
+	subs := map[string]*cobra.Command{}
+	for _, sub := range root.Commands() {
+		subs[sub.Name()] = sub
+	}
+
+	tests := []struct {
+		subcommand string
+		flag       string
+		shorthand  string
+	}{
+		// check
+		{"check", "json", "j"},
+		{"check", "dry-run", "n"},
+		{"check", "full", "f"},
+		{"check", "quiet", "q"},
+		// resolve
+		{"resolve", "approve", "a"},
+		{"resolve", "reject", "r"},
+		{"resolve", "json", "j"},
+		// archive-prune
+		{"archive-prune", "days", "d"},
+		{"archive-prune", "dry-run", "n"},
+		{"archive-prune", "yes", "y"},
+		// version
+		{"version", "json", "j"},
+		// update
+		{"update", "check", "C"},
+		// doctor
+		{"doctor", "json", "j"},
+		// log
+		{"log", "json", "j"},
+		// docs (existing)
+		{"docs", "output", "o"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.subcommand+"/"+tt.flag, func(t *testing.T) {
+			// given
+			sub, ok := subs[tt.subcommand]
+			if !ok {
+				t.Fatalf("subcommand %q not found", tt.subcommand)
+			}
+
+			// then — flag exists
+			f := sub.Flags().Lookup(tt.flag)
+			if f == nil {
+				t.Fatalf("flag --%s not found on %s", tt.flag, tt.subcommand)
+			}
+
+			// then — shorthand matches
+			if f.Shorthand != tt.shorthand {
+				t.Errorf("expected shorthand %q for --%s on %s, got %q",
+					tt.shorthand, tt.flag, tt.subcommand, f.Shorthand)
+			}
+		})
+	}
+}
+
+func TestResolve_ReasonIsLongOnly(t *testing.T) {
+	// given
+	root := NewRootCommand(BuildInfo{Version: "test"})
+	var resolve *cobra.Command
+	for _, sub := range root.Commands() {
+		if sub.Name() == "resolve" {
+			resolve = sub
+			break
+		}
+	}
+	if resolve == nil {
+		t.Fatal("resolve subcommand not found")
+	}
+
+	// then — --reason has no shorthand
+	f := resolve.Flags().Lookup("reason")
+	if f == nil {
+		t.Fatal("--reason flag not found")
+	}
+	if f.Shorthand != "" {
+		t.Errorf("expected --reason to be long-only, got shorthand %q", f.Shorthand)
 	}
 }

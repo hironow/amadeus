@@ -66,7 +66,7 @@ func newUpdateCommand(info BuildInfo) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("check", false, "check for updates without installing")
+	cmd.Flags().BoolP("check", "C", false, "check for updates without installing")
 
 	return cmd
 }
