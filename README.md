@@ -168,9 +168,6 @@ brew install hironow/tap/amadeus
 
 # Go install
 go install github.com/hironow/amadeus/cmd/amadeus@latest
-
-# Build from source
-just install
 ```
 
 ## Setup
@@ -243,9 +240,6 @@ amadeus version -j
 
 # Check for updates without installing
 amadeus update -C
-
-# Generate CLI docs
-amadeus docs -o docs/cli/
 ```
 
 ## Options
