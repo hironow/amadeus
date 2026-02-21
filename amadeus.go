@@ -698,8 +698,8 @@ func (a *Amadeus) ResolveDMail(ctx context.Context, name string, action string, 
 	if err != nil {
 		return err
 	}
-	a.dataOut("D-Mail %s %s.", name, action+"d")
-	a.dataOut("%s → %sd at %s", dmail.Description, action, resolution.ResolvedAt.Format(time.RFC3339))
+	a.dataOut("D-Mail %s %s.", name, resolution.Status)
+	a.dataOut("%s → %s at %s", dmail.Description, resolution.Status, resolution.ResolvedAt.Format(time.RFC3339))
 	if len(dmail.Issues) > 0 {
 		a.dataOut("Comment targets: %s", strings.Join(dmail.Issues, ", "))
 	}
@@ -987,7 +987,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, err
 	return saved, nil
 }
 
-// MarkCommented records that a D-Mail has been posted as a Linear comment.
+// MarkCommented records that a D-Mail × Issue pair has been posted as a comment.
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
 	return a.Store.MarkCommented(dmailName, issueID)
 }
