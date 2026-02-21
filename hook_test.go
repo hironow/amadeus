@@ -1,6 +1,8 @@
 package amadeus
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,7 +146,7 @@ func TestUninstallHook_RemovesFileWhenAmadeusOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(gitDir, "hooks", "post-merge")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(gitDir, "hooks", "post-merge")); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("hook file should have been removed")
 	}
 }

@@ -1,0 +1,240 @@
+rules:
+  # ==========================================================================
+  # cobra / pflag best practices
+  # 4 tools (phonewave, sightjack, paintress, amadeus) cross-review findings
+  # Ref: MY-329 consensus + PR #3, #7, #12, #14 review summaries
+  # ==========================================================================
+
+  # --- I/O abstraction rules (cobra testability) ---
+
+  # Rule 1: fmt.Print* in cobra command — use cmd.OutOrStdout()
+  # Source: amadeus #2-3, sightjack cross-check
+  - id: cobra-no-fmt-print-in-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で fmt.Print/Println/Printf を直接呼ばないでください。
+      cmd.OutOrStdout() を使用して fmt.Fprint/Fprintln/Fprintf に書き換えてください。
+      テスト時に cmd.SetOut(buf) で出力をキャプチャできなくなります。
+      例: fmt.Println(x) → fmt.Fprintln(cmd.OutOrStdout(), x)
+    severity: WARNING
+    pattern-either:
+      - patterns:
+          - pattern: fmt.Print(...)
+          - pattern-inside: |
+              func($CMD *cobra.Command, $ARGS []string) error {
+                ...
+              }
+      - patterns:
+          - pattern: fmt.Println(...)
+          - pattern-inside: |
+              func($CMD *cobra.Command, $ARGS []string) error {
+                ...
+              }
+      - patterns:
+          - pattern: fmt.Printf(...)
+          - pattern-inside: |
+              func($CMD *cobra.Command, $ARGS []string) error {
+                ...
+              }
+
+  # Rule 2: os.Stdout in cobra command — use cmd.OutOrStdout()
+  # Source: amadeus #3 (DataOut: os.Stdout), sightjack cross-check Round 2
+  - id: cobra-no-os-stdout-in-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で os.Stdout を直接参照しないでください。
+      cmd.OutOrStdout() を使用してください。
+      テスト時に cmd.SetOut(buf) で出力先を差し替えられなくなります。
+    severity: WARNING
+    patterns:
+      - pattern: os.Stdout
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 3: os.Stderr in cobra command — use cmd.ErrOrStderr()
+  # Source: amadeus #4-5, paintress cross-check
+  - id: cobra-no-os-stderr-in-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で os.Stderr を直接参照しないでください。
+      cmd.ErrOrStderr() を使用してください。
+      テスト時に cmd.SetErr(buf) で stderr 出力をキャプチャできなくなります。
+    severity: WARNING
+    patterns:
+      - pattern: os.Stderr
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 4: os.Stdin in cobra command — use cmd.InOrStdin()
+  # Source: paintress #3, amadeus cross-check Round 2
+  - id: cobra-no-os-stdin-in-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で os.Stdin を直接使用しないでください。
+      cmd.InOrStdin() を使用してください。
+      テスト時に cmd.SetIn(strings.NewReader(...)) で差し替えられなくなります。
+    severity: WARNING
+    patterns:
+      - pattern: os.Stdin
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # --- Context and lifecycle rules ---
+
+  # Rule 5: context.Background() in cobra command — use cmd.Context()
+  # Source: amadeus #1, paintress #2
+  - id: cobra-no-context-background-in-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で context.Background() を使用しないでください。
+      cmd.Context() を使用してください。
+      ExecuteContext() で渡された context のキャンセルシグナルが伝播しなくなります。
+    severity: ERROR
+    patterns:
+      - pattern: context.Background()
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 6: os.Exit in cobra command — return error instead
+  # Source: paintress #8-9 (exit code loss)
+  - id: cobra-no-os-exit-in-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で os.Exit() を呼ばないでください。
+      error を return して main() で exit code を制御してください。
+      os.Exit は defer を実行せず、cobra のエラーハンドリングをバイパスします。
+    severity: ERROR
+    patterns:
+      - pattern: os.Exit(...)
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 7: signal.Notify without signal.Stop — goroutine leak
+  # Source: paintress #1
+  - id: signal-notify-without-stop
+    languages: [go]
+    message: |
+      signal.Notify を呼んだ後に signal.Stop を defer していません。
+      goroutine リークの原因になります。
+      defer signal.Stop(ch) を追加してください。
+    severity: ERROR
+    patterns:
+      - pattern: |
+          signal.Notify($CH, ...)
+      - pattern-not-inside: |
+          signal.Notify($CH, ...)
+          ...
+          defer signal.Stop($CH)
+      - pattern-not-inside: |
+          signal.Notify($CH, ...)
+          ...
+          signal.Stop($CH)
+
+  # --- cobra global state rules ---
+
+  # Rule 8: cobra.EnableTraverseRunHooks in constructor — use init()
+  # Source: sightjack #2, paintress/phonewave cross-check
+  - id: cobra-traverse-hooks-in-init
+    languages: [go]
+    message: |
+      cobra.EnableTraverseRunHooks はグローバル変数です。
+      関数内ではなく init() で設定してください。
+      NewRootCommand() 内で設定するとテストで副作用が発生します。
+    severity: WARNING
+    patterns:
+      - pattern: cobra.EnableTraverseRunHooks = true
+      - pattern-not-inside: |
+          func init() {
+            ...
+          }
+
+  # Rule 9: cobra.OnFinalize without sync.Once — global accumulation
+  # Source: phonewave #1, sightjack #1
+  - id: cobra-onfinalize-needs-once
+    languages: [go]
+    message: |
+      cobra.OnFinalize() はグローバルに蓄積されます。
+      NewRootCommand() がテストや docgen で複数回呼ばれると
+      コールバックが累積します。sync.Once で囲んでください。
+    severity: WARNING
+    patterns:
+      - pattern: cobra.OnFinalize(...)
+      - pattern-not-inside: |
+          $ONCE.Do(func() {
+            ...
+          })
+
+  # --- Safety and correctness rules ---
+
+  # Rule 10: semver.MustParse — panics on invalid version
+  # Source: phonewave #5, sightjack #5
+  - id: semver-must-parse-panic
+    languages: [go]
+    message: |
+      semver.MustParse() は無効なバージョン文字列で panic します。
+      開発ビルド ("dev") やコミットハッシュが渡される可能性がある場合は、
+      semver.NewVersion() でエラーハンドリングしてください。
+    severity: ERROR
+    pattern: semver.MustParse($VERSION)
+
+  # Rule 11: os.IsNotExist — use errors.Is(err, fs.ErrNotExist)
+  # Source: amadeus #6
+  - id: prefer-errors-is-for-not-exist
+    languages: [go]
+    message: |
+      os.IsNotExist() は wrapped error をアンラップしません。
+      errors.Is(err, fs.ErrNotExist) を使用してください（Go 1.13+）。
+      注: os.Stat の直戻り値には os.IsNotExist でも問題ありませんが、
+      fmt.Errorf("%w", err) 等で wrap された場合に検出できなくなります。
+    severity: WARNING
+    pattern: os.IsNotExist(...)
+
+  # Rule 12: /dev/tty hard fail — needs fallback for Windows/CI
+  # Source: sightjack #11
+  - id: devtty-hard-fail-needs-fallback
+    languages: [go]
+    message: |
+      /dev/tty エラー時に即 return しています。Windows/CI 環境では常に失敗します。
+      cmd.InOrStdin() へフォールバックしてください。
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $TTY, $ERR := os.Open("/dev/tty")
+          if $ERR != nil {
+            return ...
+          }
+
+  # --- Readability rules ---
+
+  # Rule 13: Raw nanosecond duration literals
+  # Source: phonewave #2
+  - id: raw-nanosecond-duration
+    languages: [go]
+    message: |
+      生のナノ秒リテラルは可読性が低いです。
+      time.Second, time.Minute 等の定数を使用してください。
+      例: 5_000_000_000 → 5 * time.Second
+    severity: WARNING
+    pattern-regex: '(?<!["\x60])\b\d{9,}\b(?!["\x60])'
+
+  # Rule 14: SilenceErrors without error output
+  # Source: phonewave #3
+  - id: cobra-silence-errors-without-output
+    languages: [go]
+    message: |
+      SilenceErrors: true を設定すると cobra がエラーを表示しなくなります。
+      main() で err を os.Stderr に出力してください。
+      fmt.Fprintf(os.Stderr, "Error: %v\n", err) を追加するか、
+      SilenceErrors を使わず SilenceUsage のみ設定してください。
+    severity: WARNING
+    pattern-regex: 'SilenceErrors:\s*true'

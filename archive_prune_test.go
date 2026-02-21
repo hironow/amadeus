@@ -1,6 +1,8 @@
 package amadeus
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -172,10 +174,10 @@ func TestPruneFiles_DeletesFiles(t *testing.T) {
 	if count != 2 {
 		t.Errorf("expected 2 deleted, got %d", count)
 	}
-	if _, err := os.Stat(f1); !os.IsNotExist(err) {
+	if _, err := os.Stat(f1); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected %s to be deleted", f1)
 	}
-	if _, err := os.Stat(f2); !os.IsNotExist(err) {
+	if _, err := os.Stat(f2); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected %s to be deleted", f2)
 	}
 }

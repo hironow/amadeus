@@ -1,0 +1,48 @@
+version: 2
+project_name: amadeus
+
+builds:
+  - id: amadeus
+    main: ./cmd/amadeus
+    binary: amadeus
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+brews:
+  - repository:
+      owner: hironow
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/hironow/amadeus
+    description: "Divergence meter for your codebase"
+    license: Apache-2.0
+    install: |
+      bin.install "amadeus"
+    test: |
+      system bin/"amadeus", "version"
+
+release:
+  github:
+    owner: hironow
+    name: amadeus
