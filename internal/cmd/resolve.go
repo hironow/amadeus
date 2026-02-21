@@ -80,10 +80,11 @@ func newResolveCommand() *cobra.Command {
 			ctx := cmd.Context()
 
 			w := cmd.OutOrStdout()
+			errW := cmd.ErrOrStderr()
 			if jsonOut {
-				return resolveJSON(w, ctx, a, names, action, reason)
+				return resolveJSON(w, errW, ctx, a, names, action, reason)
 			}
-			return resolveText(ctx, a, names, action, reason)
+			return resolveText(errW, ctx, a, names, action, reason)
 		},
 	}
 
@@ -95,13 +96,13 @@ func newResolveCommand() *cobra.Command {
 	return cmd
 }
 
-func resolveJSON(w io.Writer, ctx context.Context, a *amadeus.Amadeus, names []string, action, reason string) error {
+func resolveJSON(w, errW io.Writer, ctx context.Context, a *amadeus.Amadeus, names []string, action, reason string) error {
 	var results []amadeus.ResolveOutput
 	var firstErr error
 	for _, name := range names {
 		result, resolveErr := a.ResolveDMailResult(ctx, name, action, reason)
 		if resolveErr != nil {
-			fmt.Fprintf(os.Stderr, "error: %s: %v\n", name, resolveErr)
+			fmt.Fprintf(errW, "error: %s: %v\n", name, resolveErr)
 			if firstErr == nil {
 				firstErr = resolveErr
 			}
@@ -120,11 +121,11 @@ func resolveJSON(w io.Writer, ctx context.Context, a *amadeus.Amadeus, names []s
 	return firstErr
 }
 
-func resolveText(ctx context.Context, a *amadeus.Amadeus, names []string, action, reason string) error {
+func resolveText(errW io.Writer, ctx context.Context, a *amadeus.Amadeus, names []string, action, reason string) error {
 	var firstErr error
 	for _, name := range names {
 		if resolveErr := a.ResolveDMail(ctx, name, action, reason); resolveErr != nil {
-			fmt.Fprintf(os.Stderr, "error: %s: %v\n", name, resolveErr)
+			fmt.Fprintf(errW, "error: %s: %v\n", name, resolveErr)
 			if firstErr == nil {
 				firstErr = resolveErr
 			}

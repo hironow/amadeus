@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,8 +29,7 @@ func newDoctorCommand() *cobra.Command {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
 
-			ctx := context.Background()
-			results := amadeus.RunDoctor(ctx, configPath, repoRoot)
+			results := amadeus.RunDoctor(cmd.Context(), configPath, repoRoot)
 
 			w := cmd.OutOrStdout()
 			if jsonOut {
