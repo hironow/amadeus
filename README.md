@@ -176,9 +176,6 @@ go install github.com/hironow/amadeus/cmd/amadeus@latest
 # Initialize .gate/ with default config
 amadeus init
 
-# Check environment health
-amadeus doctor
-
 # Run divergence check
 amadeus check
 ```
