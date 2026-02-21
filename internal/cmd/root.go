@@ -15,6 +15,22 @@ func init() {
 	cobra.EnableTraverseRunHooks = true
 }
 
+// NormalizeArgs rewrites legacy single-dash long flags for backward compatibility.
+// The old stdlib flag-based CLI accepted -version and -help; cobra/pflag requires --.
+func NormalizeArgs(args []string) []string {
+	out := make([]string, len(args))
+	copy(out, args)
+	for i, a := range out {
+		switch a {
+		case "-version":
+			out[i] = "--version"
+		case "-help":
+			out[i] = "--help"
+		}
+	}
+	return out
+}
+
 // NewRootCommand creates the root cobra command for amadeus.
 func NewRootCommand(info BuildInfo) *cobra.Command {
 	cmd := &cobra.Command{
