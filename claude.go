@@ -74,9 +74,13 @@ func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
 	return resp, nil
 }
 
-// runClaude executes the Claude CLI with the given prompt via stdin and returns raw output.
+// runClaude is a package-level function variable for executing the Claude CLI.
+// Tests can replace this to inject a fake implementation.
+var runClaude = defaultRunClaude
+
+// defaultRunClaude executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
-func runClaude(ctx context.Context, prompt string) ([]byte, error) {
+func defaultRunClaude(ctx context.Context, prompt string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "claude",
 		"--model", "opus",
 		"--output-format", "json",
