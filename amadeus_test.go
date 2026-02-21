@@ -1569,6 +1569,381 @@ func TestResolveDMail_JSON(t *testing.T) {
 	}
 }
 
+func TestLinkDMail_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback, Description: "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	loaded, err := store.LoadDMail("feedback-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.LinearIssueID != "MY-250" {
+		t.Errorf("expected linear_issue_id MY-250, got %s", loaded.LinearIssueID)
+	}
+	if !strings.Contains(dataBuf.String(), "linked") {
+		t.Errorf("expected 'linked' in output, got: %s", dataBuf.String())
+	}
+}
+
+func TestLinkDMail_AlreadyLinked(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback, Description: "test",
+		LinearIssueID: "MY-250",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-001", "MY-999")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for already-linked D-Mail")
+	}
+	if !strings.Contains(err.Error(), "already linked") {
+		t.Errorf("expected 'already linked' in error, got: %v", err)
+	}
+}
+
+func TestLinkDMailJSON_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback, Description: "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMailJSON("feedback-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMailJSON failed: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if parsed["status"] != "linked" {
+		t.Errorf("expected status 'linked', got %v", parsed["status"])
+	}
+	if parsed["linear_issue_id"] != "MY-250" {
+		t.Errorf("expected linear_issue_id 'MY-250', got %v", parsed["linear_issue_id"])
+	}
+}
+
+func TestLinkDMail_UpdatesOutboxCopy(t *testing.T) {
+	// given: a LOW severity D-Mail (goes to outbox)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-010", Kind: KindFeedback, Description: "outbox test",
+		Severity: SeverityLow,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-010", "MY-300")
+
+	// then: outbox copy should also have the linear_issue_id
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	outboxPath := filepath.Join(root, "outbox", "feedback-010.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("read outbox copy: %v", readErr)
+	}
+	outboxDMail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse outbox copy: %v", parseErr)
+	}
+	if outboxDMail.LinearIssueID != "MY-300" {
+		t.Errorf("expected outbox linear_issue_id MY-300, got %s", outboxDMail.LinearIssueID)
+	}
+}
+
+func TestLinkDMail_UpdatesPendingCopy(t *testing.T) {
+	// given: a HIGH severity D-Mail (goes to pending)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-020", Kind: KindFeedback, Description: "pending test",
+		Severity: SeverityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-020", "MY-301")
+
+	// then: pending copy should also have the linear_issue_id
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	pendingPath := filepath.Join(root, "pending", "feedback-020.md")
+	data, readErr := os.ReadFile(pendingPath)
+	if readErr != nil {
+		t.Fatalf("read pending copy: %v", readErr)
+	}
+	pendingDMail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse pending copy: %v", parseErr)
+	}
+	if pendingDMail.LinearIssueID != "MY-301" {
+		t.Errorf("expected pending linear_issue_id MY-301, got %s", pendingDMail.LinearIssueID)
+	}
+}
+
+func TestSaveConvergenceDMails_ReturnsErrorOnFailure(t *testing.T) {
+	// given: a store whose archive directory is not writable
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	alerts := []ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
+			DMails: []string{"f-001", "f-002", "f-003", "f-004", "f-005", "f-006"}},
+	}
+
+	// break the archive directory so SaveDMail fails
+	archiveDir := filepath.Join(root, "archive")
+	os.RemoveAll(archiveDir)
+	os.WriteFile(archiveDir, []byte("not a dir"), 0o444) // block as a file
+
+	// when
+	_, err := a.saveConvergenceDMails(alerts)
+
+	// then: error should be surfaced, not swallowed
+	if err == nil {
+		t.Fatal("expected error when archive is broken, got nil")
+	}
+}
+
+func TestSaveConvergenceDMails_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	alerts := []ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
+			DMails: []string{"f-001", "f-002", "f-003", "f-004", "f-005", "f-006"}},
+	}
+
+	// when
+	saved, err := a.saveConvergenceDMails(alerts)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(saved) != 1 {
+		t.Fatalf("expected 1 saved D-Mail, got %d", len(saved))
+	}
+	if saved[0].Kind != KindConvergence {
+		t.Errorf("expected kind convergence, got %s", saved[0].Kind)
+	}
+}
+
+func TestSaveConvergenceDMails_DeduplicatesExisting(t *testing.T) {
+	// given: an existing convergence D-Mail for auth/session.go in archive
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	// Pre-save a convergence D-Mail for the same target
+	if err := store.SaveDMail(DMail{
+		Name:     "convergence-001",
+		Kind:     KindConvergence,
+		Severity: SeverityHigh,
+		Targets:  []string{"auth/session.go"},
+		Metadata: map[string]string{
+			"created_at":      time.Now().UTC().Format(time.RFC3339),
+			"convergence_for": "f-001,f-002,f-003,f-004,f-005,f-006",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// Same alert that would produce a convergence D-Mail for auth/session.go
+	alerts := []ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
+			DMails: []string{"f-001", "f-002", "f-003", "f-004", "f-005", "f-006"}},
+	}
+
+	// when
+	saved, err := a.saveConvergenceDMails(alerts)
+
+	// then: should NOT create a duplicate
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(saved) != 0 {
+		t.Errorf("expected 0 saved D-Mails (deduplicated), got %d", len(saved))
+	}
+}
+
+func TestSaveCheckState_ClearsConvergenceAlerts(t *testing.T) {
+	// given: a previous result with stale convergence alerts
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	previous := CheckResult{
+		Divergence: 0.15,
+		ConvergenceAlerts: []ConvergenceAlert{
+			{Target: "auth/session.go", Count: 3, Window: 14, Severity: SeverityMedium},
+		},
+	}
+
+	// when: saving on no-shift path
+	err := a.SaveCheckState("abc123", previous, time.Now().UTC())
+
+	// then: convergence alerts should be cleared (not carried over stale)
+	if err != nil {
+		t.Fatalf("SaveCheckState failed: %v", err)
+	}
+	loaded, err := store.LoadLatest()
+	if err != nil {
+		t.Fatalf("LoadLatest failed: %v", err)
+	}
+	if len(loaded.ConvergenceAlerts) != 0 {
+		t.Errorf("expected 0 convergence alerts (cleared on no-shift), got %d", len(loaded.ConvergenceAlerts))
+	}
+}
+
+func TestPrintSync_OutputJSON(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// D-Mail without link (unsynced)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback,
+		Description: "unlinked", Severity: SeverityLow,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// D-Mail with link but not commented (pending comment)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-002", Kind: KindFeedback,
+		Description: "linked", Severity: SeverityLow,
+		LinearIssueID: "MY-250",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// D-Mail with link and already commented (should not appear)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-003", Kind: KindFeedback,
+		Description: "commented", Severity: SeverityLow,
+		LinearIssueID: "MY-251",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkCommented("feedback-003", "MY-251"); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintSync()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintSync failed: %v", err)
+	}
+
+	var output SyncOutput
+	if err := json.Unmarshal(dataBuf.Bytes(), &output); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if len(output.Unsynced) != 1 {
+		t.Errorf("expected 1 unsynced, got %d", len(output.Unsynced))
+	}
+	if len(output.PendingComments) != 1 {
+		t.Errorf("expected 1 pending comment, got %d", len(output.PendingComments))
+	}
+	if output.PendingComments[0].DMail != "feedback-002" {
+		t.Errorf("expected feedback-002, got %s", output.PendingComments[0].DMail)
+	}
+}
+
 func TestPrintLog_ShowsConsumed(t *testing.T) {
 	// given
 	dir := t.TempDir()

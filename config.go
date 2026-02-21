@@ -15,13 +15,20 @@ func ValidLang(lang string) bool {
 	return lang == "ja" || lang == "en"
 }
 
+// ConvergenceConfig controls the world-line convergence detection parameters.
+type ConvergenceConfig struct {
+	WindowDays int `yaml:"window_days"`
+	Threshold  int `yaml:"threshold"`
+}
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
-	Lang            string          `yaml:"lang"`
-	Weights         Weights         `yaml:"weights"`
-	Thresholds      Thresholds      `yaml:"thresholds"`
-	PerAxisOverride PerAxisOverride `yaml:"per_axis_override"`
-	FullCheck       FullCheckConfig `yaml:"full_check"`
+	Lang            string            `yaml:"lang"`
+	Weights         Weights           `yaml:"weights"`
+	Thresholds      Thresholds        `yaml:"thresholds"`
+	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
+	FullCheck       FullCheckConfig   `yaml:"full_check"`
+	Convergence     ConvergenceConfig `yaml:"convergence"`
 }
 
 // FullCheckConfig controls the full scan strategy.
@@ -41,6 +48,10 @@ func DefaultConfig() Config {
 		FullCheck: FullCheckConfig{
 			Interval:         10,
 			OnDivergenceJump: 0.15,
+		},
+		Convergence: ConvergenceConfig{
+			WindowDays: 14,
+			Threshold:  3,
 		},
 	}
 }
@@ -97,6 +108,14 @@ func ValidateConfig(cfg Config) []string {
 		if o.value < 0 || o.value > 100 {
 			errs = append(errs, fmt.Sprintf("per_axis_override.%s must be between 0 and 100 (got %d)", o.name, o.value))
 		}
+	}
+
+	// Convergence config
+	if cfg.Convergence.WindowDays <= 0 {
+		errs = append(errs, fmt.Sprintf("convergence.window_days must be positive (got %d)", cfg.Convergence.WindowDays))
+	}
+	if cfg.Convergence.Threshold <= 0 {
+		errs = append(errs, fmt.Sprintf("convergence.threshold must be positive (got %d)", cfg.Convergence.Threshold))
 	}
 
 	// Full check config

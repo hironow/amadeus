@@ -22,8 +22,10 @@ amadeus [flags]
 * [amadeus doctor](amadeus_doctor.md)	 - Run health checks
 * [amadeus init](amadeus_init.md)	 - Initialize .gate directory
 * [amadeus install-hook](amadeus_install-hook.md)	 - Install post-merge git hook
+* [amadeus link](amadeus_link.md)	 - Link a D-Mail to a Linear issue
 * [amadeus log](amadeus_log.md)	 - Show divergence log
 * [amadeus resolve](amadeus_resolve.md)	 - Resolve D-Mail items
+* [amadeus sync](amadeus_sync.md)	 - Show D-Mail sync status (JSON)
 * [amadeus uninstall-hook](amadeus_uninstall-hook.md)	 - Remove post-merge git hook
 * [amadeus update](amadeus_update.md)	 - Update amadeus to the latest version
 * [amadeus validate](amadeus_validate.md)	 - Validate config file
