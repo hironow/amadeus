@@ -44,6 +44,9 @@ const (
 )
 
 // dmailFrontmatter is the YAML frontmatter of a D-Mail file.
+// NOTE(MY-346): linear_issue_id was intentionally removed without migration.
+// Existing D-Mail files with linear_issue_id will lose that field on parse.
+// This is acceptable because amadeus is pre-release and no production .gate/ state exists.
 type dmailFrontmatter struct {
 	Name        string            `yaml:"name"`
 	Kind        DMailKind         `yaml:"kind"`

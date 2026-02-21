@@ -78,6 +78,9 @@ type CommentPayload struct {
 
 // MarkCommented records that a D-Mail has been posted as a comment to an issue.
 // The key is "dmailName:issueID" to support multiple issues per D-Mail.
+// NOTE(MY-346): Key format changed from "dmailName" to "dmailName:issueID" without migration.
+// Existing sync.json with old keys will cause those D-Mails to reappear as pending.
+// This is acceptable because amadeus is pre-release and no production .gate/ state exists.
 func (s *StateStore) MarkCommented(dmailName, issueID string) error {
 	state, err := s.LoadSyncState()
 	if err != nil {
