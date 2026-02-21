@@ -18,6 +18,8 @@ func init() {
 }
 
 // NewRootCommand creates the root cobra command for amadeus.
+// NOTE: NormalizeArgs (single-dash long-flag compat) was intentionally removed per MY-334.
+// Only POSIX (-f) and GNU (--flag) forms are supported. See MY-335 for rationale.
 func NewRootCommand(info BuildInfo) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "amadeus",

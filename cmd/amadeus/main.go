@@ -29,6 +29,8 @@ func run() int {
 		Date:    date,
 	}
 	root := cmd.NewRootCommand(info)
+	// NOTE: No NormalizeArgs — single-dash long flags (e.g. -config) are intentionally
+	// unsupported per MY-334 POSIX-compliant flags policy. Use --config or -c instead.
 	err := root.ExecuteContext(context.Background())
 	code := amadeus.ExitCode(err)
 	if code == 1 {
