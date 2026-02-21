@@ -24,7 +24,7 @@ func NormalizeArgs(args []string) []string {
 	out := make([]string, len(args))
 	copy(out, args)
 	for i, a := range out {
-		if len(a) > 2 && a[0] == '-' && a[1] != '-' && (a[1] < '0' || a[1] > '9') {
+		if len(a) > 2 && a[0] == '-' && a[1] != '-' && (a[1] < '0' || a[1] > '9') && a[2] != '=' {
 			out[i] = "-" + a
 		}
 	}

@@ -89,6 +89,10 @@ func TestNormalizeArgs(t *testing.T) {
 		{"mixed", []string{"-version", "check", "-json", "-v"}, []string{"--version", "check", "--json", "-v"}},
 		{"negative-number-unchanged", []string{"archive-prune", "--days", "-10"}, []string{"archive-prune", "--days", "-10"}},
 		{"negative-large-number", []string{"--days", "-365"}, []string{"--days", "-365"}},
+		{"shorthand-equals-unchanged", []string{"-c=custom.yaml"}, []string{"-c=custom.yaml"}},
+		{"shorthand-v-equals", []string{"-v=true"}, []string{"-v=true"}},
+		{"shorthand-l-equals", []string{"-l=ja"}, []string{"-l=ja"}},
+		{"long-flag-equals-normalized", []string{"-config=custom.yaml"}, []string{"--config=custom.yaml"}},
 		{"subcommand-not-normalized", []string{"check"}, []string{"check"}},
 		{"empty", []string{}, []string{}},
 	}
