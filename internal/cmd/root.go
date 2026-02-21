@@ -6,12 +6,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// BuildInfo holds version metadata injected at build time via ldflags.
-type BuildInfo struct {
-	Version string
-	Commit  string
-	Date    string
-}
+// Version, Commit, Date are set at build time via -ldflags.
+var (
+	Version = "dev"
+	Commit  = "none"
+	Date    = "unknown"
+)
 
 func init() {
 	cobra.EnableTraverseRunHooks = true
@@ -20,13 +20,13 @@ func init() {
 // NewRootCommand creates the root cobra command for amadeus.
 // NOTE: NormalizeArgs (single-dash long-flag compat) was intentionally removed per MY-334.
 // Only POSIX (-f) and GNU (--flag) forms are supported. See MY-335 for rationale.
-func NewRootCommand(info BuildInfo) *cobra.Command {
+func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "amadeus",
 		Short:         "Divergence meter for your codebase",
 		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
 		SilenceUsage:  true,
-		Version:       info.Version,
+		Version:       Version,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("no subcommand specified. Run 'amadeus help' for usage")
 		},
@@ -46,8 +46,8 @@ func NewRootCommand(info BuildInfo) *cobra.Command {
 		newCheckCommand(),
 		newResolveCommand(),
 		newArchivePruneCommand(),
-		newVersionCommand(info),
-		newUpdateCommand(info),
+		newVersionCommand(),
+		newUpdateCommand(),
 	)
 
 	return cmd

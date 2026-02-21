@@ -10,7 +10,7 @@ import (
 
 const repoSlug = "hironow/amadeus"
 
-func newUpdateCommand(info BuildInfo) *cobra.Command {
+func newUpdateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update amadeus to the latest version",
@@ -41,14 +41,14 @@ func newUpdateCommand(info BuildInfo) *cobra.Command {
 				return nil
 			}
 
-			if isUpToDate(info.Version, latest.Version()) {
-				fmt.Fprintf(cmd.OutOrStdout(), "already up to date (%s)\n", info.Version)
+			if isUpToDate(Version, latest.Version()) {
+				fmt.Fprintf(cmd.OutOrStdout(), "already up to date (%s)\n", Version)
 				return nil
 			}
 
 			if checkOnly {
 				fmt.Fprintf(cmd.OutOrStdout(), "new version available: %s (current: %s)\n",
-					latest.Version(), info.Version)
+					latest.Version(), Version)
 				return nil
 			}
 

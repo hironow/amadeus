@@ -9,7 +9,7 @@ import (
 
 func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 	// given
-	cmd := NewRootCommand(BuildInfo{Version: "test"})
+	cmd := NewRootCommand()
 
 	// then
 	for _, name := range []string{"config", "verbose", "lang"} {
@@ -31,7 +31,10 @@ func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 
 func TestNewRootCommand_VersionOutput(t *testing.T) {
 	// given
-	cmd := NewRootCommand(BuildInfo{Version: "1.2.3"})
+	origVersion := Version
+	Version = "1.2.3"
+	defer func() { Version = origVersion }()
+	cmd := NewRootCommand()
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
 	cmd.SetArgs([]string{"--version"})
@@ -51,7 +54,7 @@ func TestNewRootCommand_VersionOutput(t *testing.T) {
 
 func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 	// given
-	cmd := NewRootCommand(BuildInfo{Version: "test"})
+	cmd := NewRootCommand()
 	cmd.SetArgs([]string{})
 
 	// when
@@ -64,7 +67,7 @@ func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 }
 
 func TestSubcommand_ShortAliases(t *testing.T) {
-	root := NewRootCommand(BuildInfo{Version: "test"})
+	root := NewRootCommand()
 
 	// Build a map of subcommand name → *cobra.Command for easy lookup.
 	subs := map[string]*cobra.Command{}
@@ -125,7 +128,7 @@ func TestSubcommand_ShortAliases(t *testing.T) {
 
 func TestResolve_ReasonIsLongOnly(t *testing.T) {
 	// given
-	root := NewRootCommand(BuildInfo{Version: "test"})
+	root := NewRootCommand()
 	var resolve *cobra.Command
 	for _, sub := range root.Commands() {
 		if sub.Name() == "resolve" {

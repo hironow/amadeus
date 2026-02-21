@@ -38,7 +38,7 @@ lint-md:
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X main.version={{VERSION}} -X main.commit={{COMMIT}} -X main.date={{DATE}}" -o {{TOOL}} ./cmd/{{TOOL}}/
+    go build -ldflags "-X github.com/hironow/{{TOOL}}/internal/cmd.Version={{VERSION}} -X github.com/hironow/{{TOOL}}/internal/cmd.Commit={{COMMIT}} -X github.com/hironow/{{TOOL}}/internal/cmd.Date={{DATE}}" -o {{TOOL}} ./cmd/{{TOOL}}/
 
 # Build and install to /usr/local/bin
 install: build

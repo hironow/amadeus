@@ -21,9 +21,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.ShortCommit}}
-      - -X main.date={{.Date}}
+      - -X github.com/hironow/amadeus/internal/cmd.Version={{.Version}}
+      - -X github.com/hironow/amadeus/internal/cmd.Commit={{.ShortCommit}}
+      - -X github.com/hironow/amadeus/internal/cmd.Date={{.Date}}
 
 archives:
   - formats:

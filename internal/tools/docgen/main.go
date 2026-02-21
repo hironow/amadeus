@@ -18,7 +18,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	rootCmd := cmd.NewRootCommand(cmd.BuildInfo{Version: "dev"})
+	rootCmd := cmd.NewRootCommand()
 	rootCmd.DisableAutoGenTag = true
 
 	if err := doc.GenMarkdownTree(rootCmd, outDir); err != nil {
