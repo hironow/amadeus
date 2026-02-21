@@ -87,6 +87,8 @@ func TestNormalizeArgs(t *testing.T) {
 		{"dry-run-single-dash", []string{"archive-prune", "-dry-run"}, []string{"archive-prune", "--dry-run"}},
 		{"verbose-long-single-dash", []string{"-verbose"}, []string{"--verbose"}},
 		{"mixed", []string{"-version", "check", "-json", "-v"}, []string{"--version", "check", "--json", "-v"}},
+		{"negative-number-unchanged", []string{"archive-prune", "--days", "-10"}, []string{"archive-prune", "--days", "-10"}},
+		{"negative-large-number", []string{"--days", "-365"}, []string{"--days", "-365"}},
 		{"subcommand-not-normalized", []string{"check"}, []string{"check"}},
 		{"empty", []string{}, []string{}},
 	}
