@@ -37,7 +37,7 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/hironow/amadeus
     description: "Divergence meter for your codebase"
-    license: MIT
+    license: Apache-2.0
     install: |
       bin.install "amadeus"
     test: |
