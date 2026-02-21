@@ -16,7 +16,12 @@ var (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	shutdown := amadeus.InitTracer("amadeus", version)
+	defer shutdown(context.Background())
 
 	info := cmd.BuildInfo{
 		Version: version,
@@ -31,6 +36,5 @@ func main() {
 	} else if code == 2 {
 		fmt.Fprintf(os.Stderr, "drift detected: %v\n", err)
 	}
-	shutdown(context.Background())
-	os.Exit(code)
+	return code
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,8 +79,9 @@ func newResolveCommand() *cobra.Command {
 
 			ctx := context.Background()
 
+			w := cmd.OutOrStdout()
 			if jsonOut {
-				return resolveJSON(ctx, a, names, action, reason)
+				return resolveJSON(w, ctx, a, names, action, reason)
 			}
 			return resolveText(ctx, a, names, action, reason)
 		},
@@ -93,7 +95,7 @@ func newResolveCommand() *cobra.Command {
 	return cmd
 }
 
-func resolveJSON(ctx context.Context, a *amadeus.Amadeus, names []string, action, reason string) error {
+func resolveJSON(w io.Writer, ctx context.Context, a *amadeus.Amadeus, names []string, action, reason string) error {
 	var results []amadeus.ResolveOutput
 	var firstErr error
 	for _, name := range names {
@@ -114,7 +116,7 @@ func resolveJSON(ctx context.Context, a *amadeus.Amadeus, names []string, action
 	if err != nil {
 		return fmt.Errorf("marshal resolve results: %w", err)
 	}
-	fmt.Fprintln(os.Stdout, string(data))
+	fmt.Fprintln(w, string(data))
 	return firstErr
 }
 
