@@ -1,6 +1,7 @@
 package amadeus
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -233,5 +234,49 @@ func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("expected error for unsupported language 'fr'")
+	}
+}
+
+// installFakeClaude replaces runClaude with a fake that returns canned JSON.
+// Returns a cleanup function that restores the original.
+func installFakeClaude(response string) func() {
+	orig := runClaude
+	runClaude = func(_ context.Context, _ string) ([]byte, error) {
+		return []byte(response), nil
+	}
+	return func() { runClaude = orig }
+}
+
+func TestRunClaude_FakeInstallation(t *testing.T) {
+	// given
+	canned := `{
+		"axes": {
+			"adr_integrity": {"score": 10, "details": "test"},
+			"dod_fulfillment": {"score": 0, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "fake response"
+	}`
+	cleanup := installFakeClaude(canned)
+	defer cleanup()
+
+	// when
+	raw, err := runClaude(context.Background(), "test prompt")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, err := ParseClaudeResponse(raw)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if resp.Axes[AxisADR].Score != 10 {
+		t.Errorf("expected ADR score 10, got %d", resp.Axes[AxisADR].Score)
+	}
+	if resp.Reasoning != "fake response" {
+		t.Errorf("expected reasoning 'fake response', got %q", resp.Reasoning)
 	}
 }

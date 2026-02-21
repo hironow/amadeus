@@ -1,15 +1,19 @@
-## amadeus link
+## amadeus mark-commented
 
-Link a D-Mail to a Linear issue
+Record that a D-Mail has been posted as a comment
+
+### Synopsis
+
+Mark a D-Mail × Issue pair as commented in the sync state.
 
 ```
-amadeus link <dmail-name> <linear-issue-id> [flags]
+amadeus mark-commented <dmail-name> <issue-id> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for link
+  -h, --help   help for mark-commented
   -j, --json   output as JSON
 ```
 
