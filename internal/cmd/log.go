@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -25,7 +27,7 @@ func newLogCommand() *cobra.Command {
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
 
-			if _, err := os.Stat(divRoot); os.IsNotExist(err) {
+			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
 

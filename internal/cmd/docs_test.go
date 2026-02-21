@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,13 +25,13 @@ func TestDocs_GeneratesMarkdown(t *testing.T) {
 
 	// root doc should exist
 	rootDoc := filepath.Join(outDir, "amadeus.md")
-	if _, err := os.Stat(rootDoc); os.IsNotExist(err) {
+	if _, err := os.Stat(rootDoc); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected amadeus.md to be generated")
 	}
 
 	// at least one subcommand doc should exist
 	versionDoc := filepath.Join(outDir, "amadeus_version.md")
-	if _, err := os.Stat(versionDoc); os.IsNotExist(err) {
+	if _, err := os.Stat(versionDoc); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected amadeus_version.md to be generated")
 	}
 }
@@ -49,7 +51,7 @@ func TestDocs_CreatesOutputDirectory(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	rootDoc := filepath.Join(outDir, "amadeus.md")
-	if _, err := os.Stat(rootDoc); os.IsNotExist(err) {
+	if _, err := os.Stat(rootDoc); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected amadeus.md to be generated in auto-created directory")
 	}
 }

@@ -1,6 +1,8 @@
 package amadeus
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -296,7 +298,7 @@ func TestInitGateDir_MigratesLegacyState(t *testing.T) {
 	}
 
 	// then: legacy state/ directory should be removed
-	if _, err := os.Stat(legacyDir); !os.IsNotExist(err) {
+	if _, err := os.Stat(legacyDir); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected legacy state/ directory to be removed, but it still exists")
 	}
 }
