@@ -1569,6 +1569,167 @@ func TestResolveDMail_JSON(t *testing.T) {
 	}
 }
 
+func TestLinkDMail_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback, Description: "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMail failed: %v", err)
+	}
+	loaded, err := store.LoadDMail("feedback-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.LinearIssueID != "MY-250" {
+		t.Errorf("expected linear_issue_id MY-250, got %s", loaded.LinearIssueID)
+	}
+	if !strings.Contains(dataBuf.String(), "linked") {
+		t.Errorf("expected 'linked' in output, got: %s", dataBuf.String())
+	}
+}
+
+func TestLinkDMail_AlreadyLinked(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback, Description: "test",
+		LinearIssueID: "MY-250",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMail("feedback-001", "MY-999")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for already-linked D-Mail")
+	}
+	if !strings.Contains(err.Error(), "already linked") {
+		t.Errorf("expected 'already linked' in error, got: %v", err)
+	}
+}
+
+func TestLinkDMailJSON_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback, Description: "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.LinkDMailJSON("feedback-001", "MY-250")
+
+	// then
+	if err != nil {
+		t.Fatalf("LinkDMailJSON failed: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if parsed["status"] != "linked" {
+		t.Errorf("expected status 'linked', got %v", parsed["status"])
+	}
+	if parsed["linear_issue_id"] != "MY-250" {
+		t.Errorf("expected linear_issue_id 'MY-250', got %v", parsed["linear_issue_id"])
+	}
+}
+
+func TestPrintSync_OutputJSON(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// D-Mail without link (unsynced)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-001", Kind: KindFeedback,
+		Description: "unlinked", Severity: SeverityLow,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// D-Mail with link but not commented (pending comment)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-002", Kind: KindFeedback,
+		Description: "linked", Severity: SeverityLow,
+		LinearIssueID: "MY-250",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// D-Mail with link and already commented (should not appear)
+	if err := store.SaveDMail(DMail{
+		Name: "feedback-003", Kind: KindFeedback,
+		Description: "commented", Severity: SeverityLow,
+		LinearIssueID: "MY-251",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkCommented("feedback-003", "MY-251"); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintSync()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintSync failed: %v", err)
+	}
+
+	var output SyncOutput
+	if err := json.Unmarshal(dataBuf.Bytes(), &output); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if len(output.Unsynced) != 1 {
+		t.Errorf("expected 1 unsynced, got %d", len(output.Unsynced))
+	}
+	if len(output.PendingComments) != 1 {
+		t.Errorf("expected 1 pending comment, got %d", len(output.PendingComments))
+	}
+	if output.PendingComments[0].DMail != "feedback-002" {
+		t.Errorf("expected feedback-002, got %s", output.PendingComments[0].DMail)
+	}
+}
+
 func TestPrintLog_ShowsConsumed(t *testing.T) {
 	// given
 	dir := t.TempDir()

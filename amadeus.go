@@ -305,6 +305,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			Description: candidate.Description,
 			Issues:      candidate.Issues,
 			Severity:    meterResult.Divergence.Severity,
+			Targets:     candidate.Targets,
 			Metadata: map[string]string{
 				"created_at": now.Format(time.RFC3339),
 			},
@@ -321,6 +322,25 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		dmails = append(dmails, dmail)
 	}
 	span3.End()
+
+	// Phase 4: World Line Convergence detection
+	allDMails, convergenceErr := a.Store.LoadAllDMails()
+	var convergenceAlerts []ConvergenceAlert
+	if convergenceErr == nil {
+		convergenceAlerts = AnalyzeConvergence(allDMails, a.Config.Convergence, now)
+		convergenceDMails := GenerateConvergenceDMails(convergenceAlerts)
+		for _, cd := range convergenceDMails {
+			cdName, nameErr := a.Store.NextDMailName(KindConvergence)
+			if nameErr != nil {
+				break
+			}
+			cd.Name = cdName
+			if saveErr := a.Store.SaveDMail(cd); saveErr != nil {
+				break
+			}
+			dmails = append(dmails, cd)
+		}
+	}
 
 	var prNumbers []string
 	for _, pr := range report.MergedPRs {
@@ -346,6 +366,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		ImpactRadius:        meterResult.ImpactRadius,
 		PRsEvaluated:        prNumbers,
 		DMails:              dmailNames,
+		ConvergenceAlerts:   convergenceAlerts,
 		CheckCountSinceFull: a.CheckCount,
 		ForceFullNext:       a.ForceFullNext,
 	}
@@ -465,22 +486,41 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 			a.dataOut("%d pending. Run `amadeus resolve <name> --approve` or `--reject`", pending)
 		}
 	}
+
+	if len(result.ConvergenceAlerts) > 0 {
+		a.dataOut("")
+		a.dataOut("Convergence Alerts:")
+		for _, alert := range result.ConvergenceAlerts {
+			a.dataOut("  [%s] %s — %d hits in %d days (%d D-Mails)",
+				strings.ToUpper(string(alert.Severity)),
+				alert.Target,
+				alert.Count,
+				alert.Window,
+				len(alert.DMails))
+		}
+	}
 }
 
 // PrintCheckOutputJSON writes the check result as JSON to DataOut.
 func (a *Amadeus) PrintCheckOutputJSON(result CheckResult, dmails []DMail, previousDivergence float64) error {
+	convergenceAlerts := result.ConvergenceAlerts
+	if convergenceAlerts == nil {
+		convergenceAlerts = []ConvergenceAlert{}
+	}
 	output := struct {
-		Divergence   float64            `json:"divergence"`
-		Delta        float64            `json:"delta"`
-		Axes         map[Axis]AxisScore `json:"axes"`
-		ImpactRadius []ImpactEntry      `json:"impact_radius"`
-		DMails       []DMail            `json:"dmails"`
+		Divergence        float64            `json:"divergence"`
+		Delta             float64            `json:"delta"`
+		Axes              map[Axis]AxisScore `json:"axes"`
+		ImpactRadius      []ImpactEntry      `json:"impact_radius"`
+		DMails            []DMail            `json:"dmails"`
+		ConvergenceAlerts []ConvergenceAlert `json:"convergence_alerts"`
 	}{
-		Divergence:   result.Divergence,
-		Delta:        result.Divergence - previousDivergence,
-		Axes:         result.Axes,
-		ImpactRadius: result.ImpactRadius,
-		DMails:       dmails,
+		Divergence:        result.Divergence,
+		Delta:             result.Divergence - previousDivergence,
+		Axes:              result.Axes,
+		ImpactRadius:      result.ImpactRadius,
+		DMails:            dmails,
+		ConvergenceAlerts: convergenceAlerts,
 	}
 	if output.DMails == nil {
 		output.DMails = []DMail{}
@@ -509,12 +549,18 @@ func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, prev
 		pendingStr = fmt.Sprintf(" (%d pending)", pending)
 	}
 
-	a.dataOut("%s (%s) %d %s%s",
+	convergenceStr := ""
+	if len(result.ConvergenceAlerts) > 0 {
+		convergenceStr = fmt.Sprintf(" %d convergence", len(result.ConvergenceAlerts))
+	}
+
+	a.dataOut("%s (%s) %d %s%s%s",
 		FormatDivergence(result.Divergence*100),
 		FormatDelta(result.Divergence, previousDivergence),
 		len(dmails),
 		dmailLabel,
-		pendingStr)
+		pendingStr,
+		convergenceStr)
 }
 
 // ShouldPromoteToFull returns true when the absolute divergence change between
@@ -768,6 +814,21 @@ func (a *Amadeus) PrintLog() error {
 		}
 	}
 
+	// Convergence alerts from current archive
+	convergenceAlerts := AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
+	if len(convergenceAlerts) > 0 {
+		a.dataOut("")
+		a.dataOut("Convergence Alerts:")
+		for _, alert := range convergenceAlerts {
+			a.dataOut("  [%s] %s — %d hits in %d days (%d D-Mails)",
+				strings.ToUpper(string(alert.Severity)),
+				alert.Target,
+				alert.Count,
+				alert.Window,
+				len(alert.DMails))
+		}
+	}
+
 	consumed, err := a.Store.LoadConsumed()
 	if err != nil {
 		return fmt.Errorf("load consumed: %w", err)
@@ -847,14 +908,133 @@ func (a *Amadeus) PrintLogJSON() error {
 		}
 	}
 
+	convergenceAlerts := AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
+	if convergenceAlerts == nil {
+		convergenceAlerts = []ConvergenceAlert{}
+	}
+
 	output := struct {
-		History  []CheckResult    `json:"history"`
-		DMails   []dmailJSONView  `json:"dmails"`
-		Consumed []ConsumedRecord `json:"consumed"`
+		History           []CheckResult      `json:"history"`
+		DMails            []dmailJSONView    `json:"dmails"`
+		Consumed          []ConsumedRecord   `json:"consumed"`
+		ConvergenceAlerts []ConvergenceAlert `json:"convergence_alerts"`
 	}{
-		History:  history,
-		DMails:   views,
-		Consumed: consumed,
+		History:           history,
+		DMails:            views,
+		Consumed:          consumed,
+		ConvergenceAlerts: convergenceAlerts,
+	}
+	return a.writeDataJSON(output)
+}
+
+// LinkDMail associates a D-Mail with a Linear issue ID.
+// Returns an error if the D-Mail is already linked.
+func (a *Amadeus) LinkDMail(name, linearIssueID string) error {
+	dmail, err := a.Store.LoadDMail(name)
+	if err != nil {
+		return err
+	}
+	if dmail.LinearIssueID != "" {
+		return fmt.Errorf("D-Mail %s is already linked to %s", name, dmail.LinearIssueID)
+	}
+	dmail.LinearIssueID = linearIssueID
+	if err := a.Store.UpdateDMailArchive(dmail); err != nil {
+		return fmt.Errorf("update archive: %w", err)
+	}
+	a.dataOut("D-Mail %s linked to %s.", name, linearIssueID)
+	return nil
+}
+
+// LinkDMailJSON links a D-Mail and writes the result as JSON to DataOut.
+func (a *Amadeus) LinkDMailJSON(name, linearIssueID string) error {
+	dmail, err := a.Store.LoadDMail(name)
+	if err != nil {
+		return err
+	}
+	if dmail.LinearIssueID != "" {
+		return fmt.Errorf("D-Mail %s is already linked to %s", name, dmail.LinearIssueID)
+	}
+	dmail.LinearIssueID = linearIssueID
+	if err := a.Store.UpdateDMailArchive(dmail); err != nil {
+		return fmt.Errorf("update archive: %w", err)
+	}
+	output := struct {
+		Name          string `json:"name"`
+		LinearIssueID string `json:"linear_issue_id"`
+		Status        string `json:"status"`
+	}{
+		Name:          name,
+		LinearIssueID: linearIssueID,
+		Status:        "linked",
+	}
+	return a.writeDataJSON(output)
+}
+
+// MarkCommented records that a D-Mail has been posted as a Linear comment.
+func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
+	return a.Store.MarkCommented(dmailName, issueID)
+}
+
+// PrintSync builds and outputs the sync status as JSON to DataOut.
+func (a *Amadeus) PrintSync() error {
+	unsynced, err := a.Store.LoadUnsyncedDMails()
+	if err != nil {
+		return fmt.Errorf("load unsynced: %w", err)
+	}
+	syncState, err := a.Store.LoadSyncState()
+	if err != nil {
+		return fmt.Errorf("load sync state: %w", err)
+	}
+	resolutions, err := a.Store.LoadResolutions()
+	if err != nil {
+		return fmt.Errorf("load resolutions: %w", err)
+	}
+	allDMails, err := a.Store.LoadAllDMails()
+	if err != nil {
+		return fmt.Errorf("load all dmails: %w", err)
+	}
+
+	var unsyncedViews []SyncDMailView
+	for _, d := range unsynced {
+		unsyncedViews = append(unsyncedViews, SyncDMailView{
+			Name:        d.Name,
+			Kind:        string(d.Kind),
+			Description: d.Description,
+			Severity:    string(d.Severity),
+			Targets:     d.Targets,
+			Body:        d.Body,
+		})
+	}
+	if unsyncedViews == nil {
+		unsyncedViews = []SyncDMailView{}
+	}
+
+	var pendingComments []PendingComment
+	for _, d := range allDMails {
+		if d.LinearIssueID == "" {
+			continue
+		}
+		if _, commented := syncState.CommentedDMails[d.Name]; commented {
+			continue
+		}
+		status := string(RouteDMail(d.Severity))
+		if res, ok := resolutions[d.Name]; ok {
+			status = res.Status
+		}
+		pendingComments = append(pendingComments, PendingComment{
+			DMail:       d.Name,
+			IssueID:     d.LinearIssueID,
+			Status:      status,
+			Description: d.Description,
+		})
+	}
+	if pendingComments == nil {
+		pendingComments = []PendingComment{}
+	}
+
+	output := SyncOutput{
+		Unsynced:        unsyncedViews,
+		PendingComments: pendingComments,
 	}
 	return a.writeDataJSON(output)
 }

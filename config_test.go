@@ -247,6 +247,48 @@ func TestDefaultConfig_LangIsJa(t *testing.T) {
 	}
 }
 
+func TestValidateConfig_ConvergenceWindowDaysZero(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Convergence.WindowDays = 0
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "convergence.window_days") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected validation error mentioning 'convergence.window_days', got: %v", errs)
+	}
+}
+
+func TestValidateConfig_ConvergenceThresholdZero(t *testing.T) {
+	// given
+	cfg := DefaultConfig()
+	cfg.Convergence.Threshold = 0
+
+	// when
+	errs := ValidateConfig(cfg)
+
+	// then
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "convergence.threshold") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected validation error mentioning 'convergence.threshold', got: %v", errs)
+	}
+}
+
 func TestValidateConfig_InvalidLang(t *testing.T) {
 	// given
 	cfg := DefaultConfig()
