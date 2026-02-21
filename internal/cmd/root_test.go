@@ -58,6 +58,20 @@ func TestNewRootCommand_VersionOutput(t *testing.T) {
 	}
 }
 
+func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
+	// given
+	cmd := NewRootCommand(BuildInfo{Version: "test"})
+	cmd.SetArgs([]string{})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error when no subcommand provided, got nil")
+	}
+}
+
 func TestNormalizeArgs(t *testing.T) {
 	tests := []struct {
 		name string

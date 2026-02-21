@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -39,6 +41,9 @@ func NewRootCommand(info BuildInfo) *cobra.Command {
 		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
 		SilenceUsage:  true,
 		Version:       info.Version,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fmt.Errorf("no subcommand specified. Run 'amadeus help' for usage")
+		},
 	}
 
 	cmd.PersistentFlags().StringP("config", "c", "", "config file path")
