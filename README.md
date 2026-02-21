@@ -366,7 +366,6 @@ just lint               # fmt check + vet + markdown lint
 just lint-md            # Lint markdown files only
 just semgrep            # Run semgrep with project cobra rules
 just check              # fmt + vet + test (pre-commit check)
-just doctor             # Build and run amadeus doctor (smoke test)
 just docgen             # Generate CLI reference docs
 just clean              # Clean build artifacts
 just prek-install       # Install prek hooks (pre-commit + pre-push)
