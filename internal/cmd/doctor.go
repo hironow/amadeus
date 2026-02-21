@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -32,10 +33,11 @@ func newDoctorCommand() *cobra.Command {
 			ctx := context.Background()
 			results := amadeus.RunDoctor(ctx, configPath, repoRoot)
 
+			w := cmd.OutOrStdout()
 			if jsonOut {
-				return printDoctorJSON(results)
+				return printDoctorJSON(w, results)
 			}
-			return printDoctorText(results)
+			return printDoctorText(w, results)
 		},
 	}
 
@@ -50,7 +52,7 @@ type jsonCheck struct {
 	Message string `json:"message"`
 }
 
-func printDoctorJSON(results []amadeus.DoctorCheckResult) error {
+func printDoctorJSON(w io.Writer, results []amadeus.DoctorCheckResult) error {
 	checks := make([]jsonCheck, len(results))
 	hasFail := false
 	for i, r := range results {
@@ -65,17 +67,17 @@ func printDoctorJSON(results []amadeus.DoctorCheckResult) error {
 	if err != nil {
 		return fmt.Errorf("marshal doctor checks: %w", err)
 	}
-	fmt.Fprintln(os.Stdout, string(data))
+	fmt.Fprintln(w, string(data))
 	if hasFail {
 		return fmt.Errorf("some checks failed")
 	}
 	return nil
 }
 
-func printDoctorText(results []amadeus.DoctorCheckResult) error {
+func printDoctorText(w io.Writer, results []amadeus.DoctorCheckResult) error {
 	hasFail := false
 	for _, r := range results {
-		fmt.Printf("  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
 		if r.Status == amadeus.CheckFail {
 			hasFail = true
 		}

@@ -38,7 +38,7 @@ func newValidateCommand() *cobra.Command {
 				}
 				return fmt.Errorf("%d validation error(s)", len(errs))
 			}
-			fmt.Printf("  [OK] %s is valid\n", configPath)
+			fmt.Fprintf(cmd.OutOrStdout(), "  [OK] %s is valid\n", configPath)
 			return nil
 		},
 	}

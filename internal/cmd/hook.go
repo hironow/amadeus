@@ -24,7 +24,7 @@ func newInstallHookCommand() *cobra.Command {
 			if err := amadeus.InstallHook(gitDir); err != nil {
 				return err
 			}
-			fmt.Printf("  Installed post-merge hook in %s\n", filepath.Join(gitDir, "hooks", "post-merge"))
+			fmt.Fprintf(cmd.OutOrStdout(), "  Installed post-merge hook in %s\n", filepath.Join(gitDir, "hooks", "post-merge"))
 			return nil
 		},
 	}
@@ -43,7 +43,7 @@ func newUninstallHookCommand() *cobra.Command {
 			if err := amadeus.UninstallHook(gitDir); err != nil {
 				return err
 			}
-			fmt.Println("  Removed amadeus post-merge hook")
+			fmt.Fprintln(cmd.OutOrStdout(), "  Removed amadeus post-merge hook")
 			return nil
 		},
 	}
