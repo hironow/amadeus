@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -25,7 +27,10 @@ func newValidateCommand() *cobra.Command {
 				configPath = filepath.Join(repoRoot, ".gate", "config.yaml")
 			}
 			if _, err := os.Stat(configPath); err != nil {
-				return fmt.Errorf("config not found: %s", configPath)
+				if errors.Is(err, fs.ErrNotExist) {
+					return fmt.Errorf("config not found: %s", configPath)
+				}
+				return fmt.Errorf("stat config: %w", err)
 			}
 			cfg, err := amadeus.LoadConfig(configPath)
 			if err != nil {
@@ -34,7 +39,7 @@ func newValidateCommand() *cobra.Command {
 			errs := amadeus.ValidateConfig(cfg)
 			if len(errs) > 0 {
 				for _, e := range errs {
-					fmt.Fprintf(os.Stderr, "  [FAIL] %s\n", e)
+					fmt.Fprintf(cmd.ErrOrStderr(), "  [FAIL] %s\n", e)
 				}
 				return fmt.Errorf("%d validation error(s)", len(errs))
 			}

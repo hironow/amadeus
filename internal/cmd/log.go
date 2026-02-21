@@ -37,12 +37,12 @@ func newLogCommand() *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			logger := amadeus.NewLogger(os.Stderr, verbose)
+			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 			a := &amadeus.Amadeus{
 				Config:  cfg,
 				Store:   amadeus.NewStateStore(divRoot),
 				Logger:  logger,
-				DataOut: os.Stdout,
+				DataOut: cmd.OutOrStdout(),
 			}
 			if jsonOut {
 				return a.PrintLogJSON()

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,17 +49,17 @@ func newCheckCommand() *cobra.Command {
 				cfg.Lang = lang
 			}
 
-			logger := amadeus.NewLogger(os.Stderr, verbose)
+			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 
 			a := &amadeus.Amadeus{
 				Config:  cfg,
 				Store:   amadeus.NewStateStore(divRoot),
 				Git:     amadeus.NewGitClient(repoRoot),
 				Logger:  logger,
-				DataOut: os.Stdout,
+				DataOut: cmd.OutOrStdout(),
 			}
 
-			return a.RunCheck(context.Background(), amadeus.CheckOptions{
+			return a.RunCheck(cmd.Context(), amadeus.CheckOptions{
 				Full:   full,
 				DryRun: dryRun,
 				Quiet:  quiet,

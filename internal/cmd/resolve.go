@@ -64,12 +64,12 @@ func newResolveCommand() *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			logger := amadeus.NewLogger(os.Stderr, verbose)
+			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 			a := &amadeus.Amadeus{
 				Config:  cfg,
 				Store:   amadeus.NewStateStore(divRoot),
 				Logger:  logger,
-				DataOut: os.Stdout,
+				DataOut: cmd.OutOrStdout(),
 			}
 
 			action := "approve"
@@ -77,7 +77,7 @@ func newResolveCommand() *cobra.Command {
 				action = "reject"
 			}
 
-			ctx := context.Background()
+			ctx := cmd.Context()
 
 			w := cmd.OutOrStdout()
 			if jsonOut {
@@ -138,7 +138,7 @@ func resolveText(ctx context.Context, a *amadeus.Amadeus, names []string, action
 func readNamesFromStdin() ([]string, error) {
 	info, err := os.Stdin.Stat()
 	if err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("stat stdin: %w", err)
 	}
 	if info.Mode()&os.ModeCharDevice != 0 {
 		return nil, nil // stdin is a terminal, not a pipe
