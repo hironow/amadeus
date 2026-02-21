@@ -18,7 +18,11 @@ type Logger struct {
 }
 
 // NewLogger creates a Logger that writes human-readable progress to out.
+// If out is nil, it defaults to io.Discard.
 func NewLogger(out io.Writer, verbose bool) *Logger {
+	if out == nil {
+		out = io.Discard
+	}
 	return &Logger{out: out, verbose: verbose}
 }
 
