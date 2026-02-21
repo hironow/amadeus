@@ -30,6 +30,9 @@ func newSyncCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
+			if err := amadeus.InitGateDir(divRoot); err != nil {
+				return fmt.Errorf("init gate dir: %w", err)
+			}
 
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")

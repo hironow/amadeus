@@ -246,10 +246,14 @@ func (s *StateStore) UpdateDMailDelivery(dmail DMail) error {
 	filename := dmail.Name + ".md"
 	for _, dir := range []string{"outbox", "pending"} {
 		p := filepath.Join(s.Root, dir, filename)
-		if _, statErr := os.Stat(p); statErr == nil {
-			if err := os.WriteFile(p, data, 0o644); err != nil {
-				return fmt.Errorf("update %s copy: %w", dir, err)
+		if _, statErr := os.Stat(p); statErr != nil {
+			if errors.Is(statErr, fs.ErrNotExist) {
+				continue
 			}
+			return fmt.Errorf("stat %s copy: %w", dir, statErr)
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			return fmt.Errorf("update %s copy: %w", dir, err)
 		}
 	}
 	return nil

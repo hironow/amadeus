@@ -45,7 +45,11 @@ func (s *StateStore) LoadSyncState() (SyncState, error) {
 
 // SaveSyncState writes the sync state to .run/sync.json.
 func (s *StateStore) SaveSyncState(state SyncState) error {
-	return s.writeJSON(filepath.Join(s.Root, ".run", "sync.json"), state)
+	path := filepath.Join(s.Root, ".run", "sync.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return s.writeJSON(path, state)
 }
 
 // SyncDMailView is a JSON view of a D-Mail for sync output (issue not yet created).

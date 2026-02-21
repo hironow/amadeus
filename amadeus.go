@@ -923,7 +923,6 @@ func (a *Amadeus) PrintLogJSON() error {
 
 // LinkDMail associates a D-Mail with a Linear issue ID.
 // Returns an error if the D-Mail is already linked.
-// saveConvergenceDMails persists convergence D-Mails generated from HIGH severity alerts.
 // Skips alerts whose target already has an existing convergence D-Mail in the archive
 // to prevent duplicate messages on repeated runs.
 // Returns the saved D-Mails and any error encountered during naming or writing.
