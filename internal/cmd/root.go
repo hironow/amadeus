@@ -48,7 +48,6 @@ func NewRootCommand(info BuildInfo) *cobra.Command {
 		newArchivePruneCommand(),
 		newVersionCommand(info),
 		newUpdateCommand(info),
-		newDocsCommand(),
 	)
 
 	return cmd

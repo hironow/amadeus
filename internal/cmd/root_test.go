@@ -98,8 +98,6 @@ func TestSubcommand_ShortAliases(t *testing.T) {
 		{"doctor", "json", "j"},
 		// log
 		{"log", "json", "j"},
-		// docs (existing)
-		{"docs", "output", "o"},
 	}
 
 	for _, tt := range tests {

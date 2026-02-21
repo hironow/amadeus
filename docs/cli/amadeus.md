@@ -19,7 +19,6 @@ amadeus [flags]
 
 * [amadeus archive-prune](amadeus_archive-prune.md)	 - Prune old archived files
 * [amadeus check](amadeus_check.md)	 - Run divergence check
-* [amadeus completion](amadeus_completion.md)	 - Generate the autocompletion script for the specified shell
 * [amadeus doctor](amadeus_doctor.md)	 - Run health checks
 * [amadeus init](amadeus_init.md)	 - Initialize .gate directory
 * [amadeus install-hook](amadeus_install-hook.md)	 - Install post-merge git hook
