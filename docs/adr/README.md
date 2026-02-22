@@ -7,20 +7,20 @@ amadeus の設計判断を記録する ADR ディレクトリ。
 共通 ADR は [phonewave `docs/adr/`](https://github.com/hironow/phonewave/tree/main/docs/adr) が canonical source。
 amadeus では 0001-0005 を欠番扱いとし、以下を参照のみとする。
 
-| # | Decision | Canonical | Linear |
-|---|----------|-----------|--------|
-| 0001 | cobra CLI Framework Adoption | phonewave `0001-cobra-cli-framework.md` | MY-329 |
-| 0002 | stdio Convention (stdout=data, stderr=logs) | phonewave `0002-stdio-convention.md` | MY-339 |
-| 0003 | OpenTelemetry noop-default + OTLP HTTP | phonewave `0003-opentelemetry-noop-default.md` | MY-363 |
-| 0004 | D-Mail Schema v1 Specification | phonewave `0004-dmail-schema-v1.md` | MY-352, MY-353 |
-| 0005 | fsnotify-based File Watch Daemon | phonewave `0005-fsnotify-daemon-design.md` | MY-363 |
+| # | Decision | Linear |
+|---|----------|--------|
+| [0001](https://github.com/hironow/phonewave/blob/main/docs/adr/0001-cobra-cli-framework.md) | cobra CLI Framework Adoption | MY-329 |
+| [0002](https://github.com/hironow/phonewave/blob/main/docs/adr/0002-stdio-convention.md) | stdio Convention (stdout=data, stderr=logs) | MY-339 |
+| [0003](https://github.com/hironow/phonewave/blob/main/docs/adr/0003-opentelemetry-noop-default.md) | OpenTelemetry noop-default + OTLP HTTP | MY-363 |
+| [0004](https://github.com/hironow/phonewave/blob/main/docs/adr/0004-dmail-schema-v1.md) | D-Mail Schema v1 Specification | MY-352, MY-353 |
+| [0005](https://github.com/hironow/phonewave/blob/main/docs/adr/0005-fsnotify-daemon-design.md) | fsnotify-based File Watch Daemon | MY-363 |
 
 ## amadeus ADR (0006~)
 
-| # | Decision | File |
-|---|----------|------|
-| 0006 | Integrity Verification Pipeline | [0006-integrity-verification-pipeline.md](0006-integrity-verification-pipeline.md) |
-| 0007 | Four-Axis Divergence Scoring | [0007-four-axis-divergence-scoring.md](0007-four-axis-divergence-scoring.md) |
-| 0008 | Claude Code as Judgment Engine | [0008-claude-code-judgment-engine.md](0008-claude-code-judgment-engine.md) |
-| 0009 | World Line Convergence Detection | [0009-world-line-convergence-detection.md](0009-world-line-convergence-detection.md) |
-| 0010 | Gate Directory Structure | [0010-gate-directory-structure.md](0010-gate-directory-structure.md) |
+| # | Decision | Linear |
+|---|----------|--------|
+| [0006](0006-integrity-verification-pipeline.md) | Integrity Verification Pipeline | MY-366 |
+| [0007](0007-four-axis-divergence-scoring.md) | Four-Axis Divergence Scoring | MY-366 |
+| [0008](0008-claude-code-judgment-engine.md) | Claude Code as Judgment Engine | MY-366 |
+| [0009](0009-world-line-convergence-detection.md) | World Line Convergence Detection | MY-366 |
+| [0010](0010-gate-directory-structure.md) | Gate Directory Structure | MY-366 |
