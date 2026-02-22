@@ -441,7 +441,7 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 }
 
 func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
-	// given: a D-Mail missing severity (schema v1 violation)
+	// given: a D-Mail missing required kind (schema v1 violation)
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
 	if err := InitGateDir(root); err != nil {
