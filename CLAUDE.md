@@ -11,6 +11,7 @@
 - Library: root package `amadeus` (check, validate, dmail, hook, telemetry, logger)
 - OTel: `telemetry.go` (noop default + OTLP HTTP exporter)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
+- ADR: `docs/adr/` (0006~ amadeus-specific; 0001-0005 phonewave canonical)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
 - Release: `.goreleaser.yaml`
 - E2E: `tests/e2e/compose-e2e.yaml`
