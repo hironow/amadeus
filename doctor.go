@@ -223,7 +223,10 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	// 6. SKILL.md files
 	results = append(results, checkSkillMD(repoRoot))
 
-	// 7. Linear MCP (skip if claude unavailable)
+	// 7. D-Mail schema v1 validation
+	results = append(results, checkDMailSchema(filepath.Join(repoRoot, ".gate")))
+
+	// 8. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != CheckOK {
 		results = append(results, DoctorCheckResult{
 			Name:    "Linear MCP",
@@ -242,6 +245,64 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	}
 
 	return results
+}
+
+// checkDMailSchema validates all D-Mails in archive/ conform to schema v1.
+func checkDMailSchema(gateRoot string) DoctorCheckResult {
+	archiveDir := filepath.Join(gateRoot, "archive")
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		// No archive directory — nothing to validate
+		return DoctorCheckResult{
+			Name:    "D-Mail Schema",
+			Status:  CheckOK,
+			Message: "no archive directory",
+		}
+	}
+
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		return DoctorCheckResult{
+			Name:    "D-Mail Schema",
+			Status:  CheckOK,
+			Message: "no D-Mails in archive",
+		}
+	}
+
+	var invalid []string
+	for _, name := range mdFiles {
+		data, readErr := os.ReadFile(filepath.Join(archiveDir, name))
+		if readErr != nil {
+			invalid = append(invalid, fmt.Sprintf("%s: read error", name))
+			continue
+		}
+		dmail, parseErr := ParseDMail(data)
+		if parseErr != nil {
+			invalid = append(invalid, fmt.Sprintf("%s: %v", name, parseErr))
+			continue
+		}
+		if errs := ValidateDMail(dmail); len(errs) > 0 {
+			invalid = append(invalid, fmt.Sprintf("%s: %s", name, strings.Join(errs, "; ")))
+		}
+	}
+
+	if len(invalid) > 0 {
+		return DoctorCheckResult{
+			Name:    "D-Mail Schema",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%d/%d invalid: %s", len(invalid), len(mdFiles), strings.Join(invalid, ", ")),
+		}
+	}
+	return DoctorCheckResult{
+		Name:    "D-Mail Schema",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%d D-Mail(s) valid", len(mdFiles)),
+	}
 }
 
 // checkConfig validates that config.yaml exists and can be loaded.

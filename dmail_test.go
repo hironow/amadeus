@@ -961,6 +961,116 @@ func TestScanInbox_SkipsNonMD(t *testing.T) {
 	}
 }
 
+func TestValidateDMail_Valid(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation detected",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateDMail_AllKinds(t *testing.T) {
+	for _, kind := range []DMailKind{KindFeedback, KindSpecification, KindReport, KindConvergence} {
+		dmail := DMail{
+			Name:        "test-001",
+			Kind:        kind,
+			Description: "test",
+			Severity:    SeverityLow,
+		}
+		errs := ValidateDMail(dmail)
+		if len(errs) != 0 {
+			t.Errorf("kind %s: expected no errors, got %v", kind, errs)
+		}
+	}
+}
+
+func TestValidateDMail_MissingName(t *testing.T) {
+	dmail := DMail{
+		Kind:        KindFeedback,
+		Description: "test",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing name")
+	}
+}
+
+func TestValidateDMail_MissingKind(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Description: "test",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing kind")
+	}
+}
+
+func TestValidateDMail_InvalidKind(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        DMailKind("invalid"),
+		Description: "test",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for invalid kind")
+	}
+}
+
+func TestValidateDMail_MissingDescription(t *testing.T) {
+	dmail := DMail{
+		Name:     "feedback-001",
+		Kind:     KindFeedback,
+		Severity: SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing description")
+	}
+}
+
+func TestValidateDMail_MissingSeverity(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "test",
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing severity")
+	}
+}
+
+func TestValidateDMail_InvalidSeverity(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "test",
+		Severity:    Severity("critical"),
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for invalid severity")
+	}
+}
+
+func TestValidateDMail_MultipleErrors(t *testing.T) {
+	dmail := DMail{}
+	errs := ValidateDMail(dmail)
+	if len(errs) < 3 {
+		t.Errorf("expected at least 3 errors for empty DMail, got %d: %v", len(errs), errs)
+	}
+}
+
 // Helper functions for tests
 
 func statDir(path string) (interface{ IsDir() bool }, error) {

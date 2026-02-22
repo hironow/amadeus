@@ -69,6 +69,44 @@ type DMail struct {
 	Body        string            `yaml:"-"`
 }
 
+// validKinds is the set of valid DMailKind values per schema v1.
+var validKinds = map[DMailKind]bool{
+	KindFeedback:      true,
+	KindSpecification: true,
+	KindReport:        true,
+	KindConvergence:   true,
+}
+
+// validSeverities is the set of valid Severity values per schema v1.
+var validSeverities = map[Severity]bool{
+	SeverityLow:    true,
+	SeverityMedium: true,
+	SeverityHigh:   true,
+}
+
+// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
+// Returns a list of validation errors (empty if valid).
+func ValidateDMail(dmail DMail) []string {
+	var errs []string
+	if dmail.Name == "" {
+		errs = append(errs, "name is required")
+	}
+	if dmail.Kind == "" {
+		errs = append(errs, "kind is required")
+	} else if !validKinds[dmail.Kind] {
+		errs = append(errs, fmt.Sprintf("invalid kind: %q", dmail.Kind))
+	}
+	if dmail.Description == "" {
+		errs = append(errs, "description is required")
+	}
+	if dmail.Severity == "" {
+		errs = append(errs, "severity is required")
+	} else if !validSeverities[dmail.Severity] {
+		errs = append(errs, fmt.Sprintf("invalid severity: %q", dmail.Severity))
+	}
+	return errs
+}
+
 // ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
 func ParseDMail(data []byte) (DMail, error) {
 	str := string(data)
