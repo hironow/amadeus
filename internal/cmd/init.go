@@ -23,7 +23,7 @@ func newInitCommand() *cobra.Command {
 			if err := amadeus.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "  Initialized %s\n", divRoot)
+			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)
 			return nil
 		},
 	}
