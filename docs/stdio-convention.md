@@ -25,6 +25,7 @@ a := &amadeus.Amadeus{
 ```
 
 Rules:
+
 - Use `cmd.OutOrStdout()` for `DataOut` — never `os.Stdout` directly
 - Use `cmd.ErrOrStderr()` for `Logger` — never `os.Stderr` directly
 - This enables cobra's `cmd.SetOut()` / `cmd.SetErr()` for testing

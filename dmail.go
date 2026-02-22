@@ -69,6 +69,42 @@ type DMail struct {
 	Body        string            `yaml:"-"`
 }
 
+// validKinds is the set of valid DMailKind values per schema v1.
+var validKinds = map[DMailKind]bool{
+	KindFeedback:      true,
+	KindSpecification: true,
+	KindReport:        true,
+	KindConvergence:   true,
+}
+
+// validSeverities is the set of valid Severity values per schema v1.
+var validSeverities = map[Severity]bool{
+	SeverityLow:    true,
+	SeverityMedium: true,
+	SeverityHigh:   true,
+}
+
+// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
+// Returns a list of validation errors (empty if valid).
+func ValidateDMail(dmail DMail) []string {
+	var errs []string
+	if dmail.Name == "" {
+		errs = append(errs, "name is required")
+	}
+	if dmail.Kind == "" {
+		errs = append(errs, "kind is required")
+	} else if !validKinds[dmail.Kind] {
+		errs = append(errs, fmt.Sprintf("invalid kind: %q", dmail.Kind))
+	}
+	if dmail.Description == "" {
+		errs = append(errs, "description is required")
+	}
+	if dmail.Severity != "" && !validSeverities[dmail.Severity] {
+		errs = append(errs, fmt.Sprintf("invalid severity: %q", dmail.Severity))
+	}
+	return errs
+}
+
 // ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
 func ParseDMail(data []byte) (DMail, error) {
 	str := string(data)
@@ -130,12 +166,11 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// RouteDMail applies severity-based status mapping.
-// HIGH severity requires human approval (pending); all others are auto-sent.
-func RouteDMail(severity Severity) DMailStatus {
-	if severity == SeverityHigh {
-		return DMailPending
-	}
+// RouteDMail returns the routing status for a D-Mail.
+// All D-Mails are now auto-sent directly to outbox (MY-359).
+// Deprecated: sender-side gating via pending/ is removed. Receiver-side tools
+// (sightjack, paintress) handle their own approval workflows.
+func RouteDMail(_ Severity) DMailStatus {
 	return DMailSent
 }
 
@@ -161,10 +196,9 @@ func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
 	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// SaveDMail writes a D-Mail to archive/ and either outbox/ or pending/.
+// SaveDMail writes a D-Mail to archive/ and outbox/.
 // Archive is always written first so the permanent record exists even if
-// the second write fails. HIGH severity D-Mails go to pending/ for human
-// approval; all others go directly to outbox/ for courier delivery.
+// the second write fails. All D-Mails go directly to outbox/ (MY-359).
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	data, err := MarshalDMail(dmail)
 	if err != nil {
@@ -175,18 +209,20 @@ func (s *StateStore) SaveDMail(dmail DMail) error {
 	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
 		return fmt.Errorf("write archive: %w", err)
 	}
-	if RouteDMail(dmail.Severity) == DMailPending {
-		pendingPath := filepath.Join(s.Root, "pending", filename)
-		if err := os.WriteFile(pendingPath, data, 0o644); err != nil {
-			return fmt.Errorf("write pending: %w", err)
-		}
-		return nil
-	}
 	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
 		return fmt.Errorf("write outbox: %w", err)
 	}
 	return nil
+}
+
+// IsPending checks if a D-Mail has a file in the pending/ directory.
+// After MY-359, SaveDMail no longer writes to pending/. This method
+// exists to support resolving legacy pending items.
+func (s *StateStore) IsPending(name string) bool {
+	path := filepath.Join(s.Root, "pending", name+".md")
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // LoadDMail reads a single D-Mail by name from the archive/ directory.

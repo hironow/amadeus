@@ -448,7 +448,7 @@ func TestInitGateDir_CreatesSkillMDFiles(t *testing.T) {
 		t.Fatalf("InitGateDir failed: %v", err)
 	}
 
-	// then: dmail-sendable/SKILL.md should exist with produces: [feedback]
+	// then: dmail-sendable/SKILL.md should exist with metadata format
 	sendablePath := filepath.Join(root, "skills", "dmail-sendable", "SKILL.md")
 	sendableData, err := os.ReadFile(sendablePath)
 	if err != nil {
@@ -458,14 +458,23 @@ func TestInitGateDir_CreatesSkillMDFiles(t *testing.T) {
 	if !strings.Contains(sendableContent, "name: dmail-sendable") {
 		t.Errorf("expected SKILL.md to contain 'name: dmail-sendable', got:\n%s", sendableContent)
 	}
+	if !strings.Contains(sendableContent, "license: Apache-2.0") {
+		t.Errorf("expected SKILL.md to contain 'license: Apache-2.0', got:\n%s", sendableContent)
+	}
+	if !strings.Contains(sendableContent, "dmail-schema-version:") {
+		t.Errorf("expected SKILL.md to contain 'dmail-schema-version:', got:\n%s", sendableContent)
+	}
 	if !strings.Contains(sendableContent, "produces:") {
 		t.Errorf("expected SKILL.md to contain 'produces:', got:\n%s", sendableContent)
 	}
-	if !strings.Contains(sendableContent, "- feedback") {
-		t.Errorf("expected SKILL.md to contain '- feedback', got:\n%s", sendableContent)
+	if !strings.Contains(sendableContent, "kind: feedback") {
+		t.Errorf("expected SKILL.md to contain 'kind: feedback', got:\n%s", sendableContent)
+	}
+	if !strings.Contains(sendableContent, "kind: convergence") {
+		t.Errorf("expected SKILL.md to contain 'kind: convergence', got:\n%s", sendableContent)
 	}
 
-	// then: dmail-readable/SKILL.md should exist with consumes: [report]
+	// then: dmail-readable/SKILL.md should exist with metadata format
 	readablePath := filepath.Join(root, "skills", "dmail-readable", "SKILL.md")
 	readableData, err := os.ReadFile(readablePath)
 	if err != nil {
@@ -475,11 +484,14 @@ func TestInitGateDir_CreatesSkillMDFiles(t *testing.T) {
 	if !strings.Contains(readableContent, "name: dmail-readable") {
 		t.Errorf("expected SKILL.md to contain 'name: dmail-readable', got:\n%s", readableContent)
 	}
+	if !strings.Contains(readableContent, "license: Apache-2.0") {
+		t.Errorf("expected SKILL.md to contain 'license: Apache-2.0', got:\n%s", readableContent)
+	}
 	if !strings.Contains(readableContent, "consumes:") {
 		t.Errorf("expected SKILL.md to contain 'consumes:', got:\n%s", readableContent)
 	}
-	if !strings.Contains(readableContent, "- report") {
-		t.Errorf("expected SKILL.md to contain '- report', got:\n%s", readableContent)
+	if !strings.Contains(readableContent, "kind: report") {
+		t.Errorf("expected SKILL.md to contain 'kind: report', got:\n%s", readableContent)
 	}
 }
 

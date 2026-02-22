@@ -235,9 +235,13 @@ func TestMovePendingToRejected_CreatesDirectoryOnDemand(t *testing.T) {
 		Kind:     KindFeedback,
 		Severity: SeverityHigh,
 	}
+	// SaveDMail writes to archive + outbox (MY-359: not pending)
 	if err := store.SaveDMail(dmail); err != nil {
 		t.Fatal(err)
 	}
+	// Manually place in pending for this test
+	data, _ := MarshalDMail(dmail)
+	os.WriteFile(filepath.Join(root, "pending", "feedback-001.md"), data, 0o644)
 	// Remove rejected/ to simulate pre-update repo
 	if err := os.Remove(filepath.Join(root, "rejected")); err != nil {
 		t.Fatal(err)
@@ -326,7 +330,8 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 	}
 }
 
-func TestSaveDMail_HighSeverity_WritesToPending(t *testing.T) {
+func TestSaveDMail_HighSeverity_WritesToOutbox(t *testing.T) {
+	// MY-359: all D-Mails go to outbox, never to pending
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
 	if err := InitGateDir(root); err != nil {
@@ -344,18 +349,18 @@ func TestSaveDMail_HighSeverity_WritesToPending(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// then: file exists in archive/ and pending/ (NOT outbox/)
+	// then: file exists in archive/ and outbox/ (NOT pending/)
 	archivePath := filepath.Join(root, "archive", "feedback-001.md")
-	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
 	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
+	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("expected file in archive: %v", err)
 	}
-	if _, err := os.Stat(pendingPath); err != nil {
-		t.Errorf("expected file in pending: %v", err)
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("expected file in outbox: %v", err)
 	}
-	if _, err := os.Stat(outboxPath); err == nil {
-		t.Error("expected file NOT in outbox for HIGH severity")
+	if _, err := os.Stat(pendingPath); err == nil {
+		t.Error("expected file NOT in pending for HIGH severity (MY-359)")
 	}
 }
 
@@ -521,21 +526,13 @@ func TestLoadAllDMails_Empty(t *testing.T) {
 	}
 }
 
-func TestRouteDMail_SeverityMapping(t *testing.T) {
-	tests := []struct {
-		name     string
-		severity Severity
-		expected DMailStatus
-	}{
-		{"low auto-sent", SeverityLow, DMailSent},
-		{"medium auto-sent", SeverityMedium, DMailSent},
-		{"high pending", SeverityHigh, DMailPending},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			status := RouteDMail(tt.severity)
-			if status != tt.expected {
-				t.Errorf("expected status %s, got %s", tt.expected, status)
+func TestRouteDMail_AllSeveritiesReturnSent(t *testing.T) {
+	// MY-359: all D-Mails go directly to outbox (no sender-side gating)
+	for _, severity := range []Severity{SeverityLow, SeverityMedium, SeverityHigh} {
+		t.Run(string(severity), func(t *testing.T) {
+			status := RouteDMail(severity)
+			if status != DMailSent {
+				t.Errorf("expected DMailSent for %s, got %s", severity, status)
 			}
 		})
 	}
@@ -958,6 +955,145 @@ func TestScanInbox_SkipsNonMD(t *testing.T) {
 	}
 	if len(dmails) != 0 {
 		t.Fatalf("expected 0, got %d", len(dmails))
+	}
+}
+
+func TestIsPending_True(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	// Manually place a file in pending/
+	os.WriteFile(filepath.Join(root, "pending", "feedback-001.md"), []byte("test"), 0o644)
+
+	if !store.IsPending("feedback-001") {
+		t.Error("expected IsPending to return true")
+	}
+}
+
+func TestIsPending_False(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	if store.IsPending("feedback-999") {
+		t.Error("expected IsPending to return false for non-existent file")
+	}
+}
+
+func TestValidateDMail_Valid(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR violation detected",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateDMail_AllKinds(t *testing.T) {
+	for _, kind := range []DMailKind{KindFeedback, KindSpecification, KindReport, KindConvergence} {
+		dmail := DMail{
+			Name:        "test-001",
+			Kind:        kind,
+			Description: "test",
+			Severity:    SeverityLow,
+		}
+		errs := ValidateDMail(dmail)
+		if len(errs) != 0 {
+			t.Errorf("kind %s: expected no errors, got %v", kind, errs)
+		}
+	}
+}
+
+func TestValidateDMail_MissingName(t *testing.T) {
+	dmail := DMail{
+		Kind:        KindFeedback,
+		Description: "test",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing name")
+	}
+}
+
+func TestValidateDMail_MissingKind(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Description: "test",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing kind")
+	}
+}
+
+func TestValidateDMail_InvalidKind(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        DMailKind("invalid"),
+		Description: "test",
+		Severity:    SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for invalid kind")
+	}
+}
+
+func TestValidateDMail_MissingDescription(t *testing.T) {
+	dmail := DMail{
+		Name:     "feedback-001",
+		Kind:     KindFeedback,
+		Severity: SeverityHigh,
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing description")
+	}
+}
+
+func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
+	// severity is optional — inbox reports from external tools may omit it
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "test",
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for missing severity, got %v", errs)
+	}
+}
+
+func TestValidateDMail_InvalidSeverity(t *testing.T) {
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "test",
+		Severity:    Severity("critical"),
+	}
+	errs := ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for invalid severity")
+	}
+}
+
+func TestValidateDMail_MultipleErrors(t *testing.T) {
+	dmail := DMail{}
+	errs := ValidateDMail(dmail)
+	if len(errs) < 3 {
+		t.Errorf("expected at least 3 errors for empty DMail, got %d: %v", len(errs), errs)
 	}
 }
 

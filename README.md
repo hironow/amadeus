@@ -79,11 +79,11 @@ D-Mails are routed based on severity, determined by the weighted divergence scor
 ```
 low    (score <= 0.25) -> Auto-sent
 medium (score <= 0.50) -> Auto-sent with elevated priority
-high   (score >  0.50) -> Held as pending, requires human approval
+high   (score >  0.50) -> Auto-sent (receiver handles approval)
 ```
 
-- **`amadeus resolve <name> --approve`** — approve a pending D-Mail
-- **`amadeus resolve <name> --reject --reason "..."`** — reject with reason
+All D-Mails go directly to `outbox/` + `archive/`. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
+
 - Per-axis overrides can force high severity for critical axes (e.g., ADR integrity > 60 always high)
 
 ## Architecture
@@ -104,7 +104,7 @@ amadeus check
     |
     |  Phase 3: D-Mail
     |  +-- Generate D-Mails from Claude candidates
-    |  +-- Route by severity (auto-send or hold for approval)
+    |  +-- Route by severity (all auto-sent to outbox)
     |  +-- Dual-write to outbox/ + archive/
     |
     v
@@ -113,7 +113,6 @@ amadeus check
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
     |   +-- baseline.json     <- Full calibration baseline
-    |   +-- resolutions.json  <- D-Mail approval/rejection state
     +-- history/              <- Historical check results
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
@@ -158,7 +157,7 @@ The auth module violates the JWT requirement specified in ADR-003.
 | `specification` | Paintress (designer) | Updated baseline expectations |
 | `report` | Sightjack (implementer) | Implementation status reports |
 
-**Resolution sidecar**: D-Mail `.md` files are immutable. Approval/rejection state is tracked separately in `.run/resolutions.json`.
+D-Mail `.md` files are immutable once written.
 
 ## Install
 
@@ -190,9 +189,8 @@ Amadeus creates `.gate/` with config, state, history, and D-Mail storage automat
 | `amadeus init` | Initialize `.gate/` directory with default config |
 | `amadeus validate` | Validate `.gate/config.yaml` |
 | `amadeus doctor` | Check environment health (git, Claude CLI, config) |
-| `amadeus resolve <name>` | Approve or reject a pending D-Mail |
 | `amadeus log` | Print check history and D-Mail log |
-| `amadeus sync` | Show pending D-Mail × Issue comments (JSON) |
+| `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
 | `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
 | `amadeus archive-prune` | Prune old archived D-Mail files |
 | `amadeus install-hook` | Install git post-merge hook |
@@ -221,13 +219,7 @@ amadeus check -j
 # Combine short flags
 amadeus check -v -j -c /path/to/config.yaml
 
-# Approve a pending D-Mail
-amadeus resolve feedback-001 -a
-
-# Reject a pending D-Mail
-amadeus resolve feedback-001 -r --reason "Not applicable to current sprint"
-
-# Show pending D-Mail × Issue comments
+# Show D-Mail × Issue comment sync status
 amadeus sync
 
 # Mark a D-Mail × Issue pair as commented
@@ -240,7 +232,7 @@ amadeus mark-commented feedback-001 MY-250 -j
 amadeus archive-prune -d 90 -n
 
 # JSON output for scripting
-amadeus log -j | jq '.dmails[] | select(.status == "pending")'
+amadeus log -j | jq '.dmails[] | select(.severity == "high")'
 
 # Version info as JSON
 amadeus version -j
@@ -267,15 +259,6 @@ amadeus update -C
 | `--full` | `-f` | `false` | Force full calibration check |
 | `--quiet` | `-q` | `false` | Summary-only output |
 | `--json` | `-j` | `false` | Structured JSON output to stdout |
-
-### resolve
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--approve` | `-a` | `false` | Approve the D-Mail |
-| `--reject` | `-r` | `false` | Reject the D-Mail |
-| `--reason` | | | Reason for rejection (required with `--reject`) |
-| `--json` | `-j` | `false` | JSON output |
 
 ### archive-prune
 
@@ -356,9 +339,9 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
 just jaeger-down
 ```
 
-Spans cover: `amadeus.check` (root), `reading_steiner`, `divergence_meter`, `dmail`, `amadeus.resolve`, and `amadeus.doctor`.
+Spans cover: `amadeus.check` (root), `reading_steiner`, `divergence_meter`, `dmail`, and `amadeus.doctor`.
 
-Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.created`, `dmail.resolved`, `doctor.check`.
+Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.created`, `doctor.check`.
 
 ## Development
 
@@ -395,7 +378,6 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 +-- internal/cmd/
 |   +-- root.go              Root command, global flags, build metadata
 |   +-- check.go             check subcommand
-|   +-- resolve.go           resolve subcommand (stdin pipe support)
 |   +-- archive_prune.go     archive-prune subcommand
 |   +-- version.go           version subcommand (text + JSON)
 |   +-- update.go            Self-update via GitHub releases
@@ -413,7 +395,7 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 +-- divergence_meter.go      Phase 2: Scoring bridge (Claude -> scores)
 +-- claude.go                Claude CLI integration + prompt rendering
 +-- scoring.go               Divergence scoring (weights, thresholds, severity)
-+-- dmail.go                 D-Mail model (YAML+MD format, resolution sidecar)
++-- dmail.go                 D-Mail model (YAML+MD format)
 +-- config.go                Configuration loader (.gate/config.yaml)
 +-- state.go                 State persistence (.gate/)
 +-- sync.go                  Sync state tracking (Linear comment status)

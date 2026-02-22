@@ -26,14 +26,9 @@ This document describes what each directory/file does, who creates it, and how i
     *.md
   outbox/               # outgoing d-mails (feedback, auto-sent)
     *.md
-  pending/              # HIGH severity d-mails awaiting human approval
-    *.md
-  rejected/             # d-mails rejected by human
-    *.md
   .run/                 # ephemeral runtime data
     latest.json         # latest check result (baseline for next diff)
     baseline.json       # latest full check result (calibration)
-    resolutions.json    # D-Mail approval/rejection decisions
     consumed.json       # processed inbox D-Mails log
 ```
 
@@ -45,8 +40,6 @@ This document describes what each directory/file does, who creates it, and how i
 .run/
 outbox/
 inbox/
-pending/
-rejected/
 ```
 
 | Path | Git Status | Reason |
@@ -55,11 +48,9 @@ rejected/
 | `history/` | Tracked | Audit trail of check results over time |
 | `archive/` | Tracked | Permanent immutable record of all D-Mails |
 | `skills/` | Tracked | Agent capability manifests for phonewave discovery |
-| `.run/` | Ignored | Ephemeral runtime state (latest, baseline, resolutions) |
+| `.run/` | Ignored | Ephemeral runtime state (latest, baseline) |
 | `outbox/` | Ignored | Transient; courier picks up and delivers |
 | `inbox/` | Ignored | Transient; consumed and archived on check |
-| `pending/` | Ignored | Transient; moved to outbox/ or rejected/ on resolve |
-| `rejected/` | Ignored | Transient; human rejection decisions (audit via resolutions.json) |
 
 ## Check Pipeline Data Flow
 
@@ -80,8 +71,7 @@ The `amadeus check` command reads state, evaluates divergence, and routes D-Mail
 |--------|------|--------|
 | Updated scores | `.run/latest.json` | `StateStore.SaveLatest()` |
 | History record | `history/{timestamp}.json` | `StateStore.SaveHistory()` |
-| LOW/MED D-Mail | `archive/` + `outbox/` | `StateStore.SaveDMail()` |
-| HIGH D-Mail | `archive/` + `pending/` | `StateStore.SaveDMail()` |
+| D-Mail (all severities) | `archive/` + `outbox/` | `StateStore.SaveDMail()` |
 | Consumed log | `.run/consumed.json` | `StateStore.SaveConsumed()` |
 
 ## D-Mail Lifecycle
@@ -99,26 +89,13 @@ The `amadeus check` command reads state, evaluates divergence, and routes D-Mail
      |                      | (check runs, D-Mail generated)
      |                      |                              |
      |                      | SaveDMail():                 |
-     |                      |   LOW/MED -> archive/ + outbox/
-     |                      |   HIGH    -> archive/ + pending/
+     |                      |   all -> archive/ + outbox/  |
      |                      |                              |
      |                      |              reads outbox/   |
      |                      |----------------------------->|
 ```
 
-### Resolve Flow (HIGH severity only)
-
-```
-pending/feedback-001.md
-     |
-     |-- amadeus resolve --approve -->  outbox/feedback-001.md
-     |                                  + .run/resolutions.json updated
-     |
-     |-- amadeus resolve --reject  -->  rejected/feedback-001.md
-                                        + .run/resolutions.json updated
-```
-
-Transactional guarantee: file moves before resolution is persisted. On `SaveResolution` failure, the move is rolled back to `pending/`.
+All D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
 
 ## D-Mail File Format
 
@@ -158,22 +135,15 @@ service, violating the dependency direction defined in ADR-003.
 | `history/{ts}.json` | `StateStore.SaveHistory` | After each check |
 | `.run/latest.json` | `StateStore.SaveLatest` | After each check |
 | `.run/baseline.json` | `StateStore.SaveBaseline` | After each full check |
-| `.run/resolutions.json` | `StateStore.SaveResolution` | On `amadeus resolve` |
 | `.run/consumed.json` | `StateStore.SaveConsumed` | On inbox consumption during check |
 | `archive/*.md` | `StateStore.SaveDMail` + `ScanInbox` | D-Mail creation or inbox consumption |
-| `outbox/*.md` | `StateStore.SaveDMail` + `MovePendingToOutbox` | LOW/MED D-Mail or approve |
-| `pending/*.md` | `StateStore.SaveDMail` | HIGH severity D-Mail creation |
-| `rejected/*.md` | `MovePendingToRejected` | On `amadeus resolve --reject` |
+| `outbox/*.md` | `StateStore.SaveDMail` | D-Mail creation (all severities) |
 | `inbox/*.md` | External tool (courier) | Before check |
 
 ## File Movements
 
 | Operation | From | To | Function |
 |-----------|------|----|----------|
-| Approve | `pending/{name}.md` | `outbox/{name}.md` | `MovePendingToOutbox` |
-| Reject | `pending/{name}.md` | `rejected/{name}.md` | `MovePendingToRejected` |
-| Rollback approve | `outbox/{name}.md` | `pending/{name}.md` | `MoveOutboxToPending` |
-| Rollback reject | `rejected/{name}.md` | `pending/{name}.md` | `MoveRejectedToPending` |
 | Inbox consume | `inbox/{name}.md` | (deleted after copy to archive) | `ScanInbox` |
 
 ## Git Hook

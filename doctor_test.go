@@ -212,12 +212,12 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := RunDoctor(ctx, configPath, dir)
 
-	// then: should have 7 results
-	if len(results) != 7 {
-		t.Fatalf("expected 7 results, got %d", len(results))
+	// then: should have 8 results
+	if len(results) != 8 {
+		t.Fatalf("expected 8 results, got %d", len(results))
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "D-Mail Schema", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -252,15 +252,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "amadeus.doctor" {
 			found = true
-			// Should have 7 doctor.check events (one per check)
+			// Should have 8 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 7 {
-				t.Errorf("expected 7 doctor.check events, got %d", eventCount)
+			if eventCount != 8 {
+				t.Errorf("expected 8 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -340,13 +340,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := RunDoctor(ctx, configPath, dir)
 
-	// then: should have 7 results (added SKILL.md check)
-	if len(results) != 7 {
+	// then: should have 8 results
+	if len(results) != 8 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 7 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 8 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -396,5 +396,99 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	}
 	if !strings.Contains(mcpResult.Message, "claude not available") {
 		t.Errorf("expected 'claude not available' in message, got: %s", mcpResult.Message)
+	}
+}
+
+func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
+	// given: .gate/ with empty archive
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	result := checkDMailSchema(root)
+
+	// then: skip — no D-Mails to validate
+	if result.Status != CheckSkip {
+		t.Errorf("expected CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckDMailSchema_ValidDMails(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+	store.SaveDMail(DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "test",
+		Severity:    SeverityHigh,
+	})
+
+	// when
+	result := checkDMailSchema(root)
+
+	// then
+	if result.Status != CheckOK {
+		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
+	// given: a D-Mail missing required kind (schema v1 violation)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	content := []byte("---\nname: feedback-001\ndescription: test\n---\n\nbody\n")
+	os.WriteFile(filepath.Join(root, "archive", "feedback-001.md"), content, 0o644)
+
+	// when
+	result := checkDMailSchema(root)
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail for invalid D-Mail, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckDMailSchema_NoGateDir(t *testing.T) {
+	// given: no .gate/ at all
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+
+	// when
+	result := checkDMailSchema(root)
+
+	// then: skip — archive doesn't exist yet
+	if result.Status != CheckSkip {
+		t.Errorf("expected CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
+	// given: archive/ exists but is not readable
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	archiveDir := filepath.Join(root, "archive")
+	os.Chmod(archiveDir, 0o000)
+	defer os.Chmod(archiveDir, 0o755)
+
+	// when
+	result := checkDMailSchema(root)
+
+	// then: FAIL — permission error should not be masked
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail for permission error, got %v: %s", result.Status, result.Message)
 	}
 }
