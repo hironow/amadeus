@@ -1783,6 +1783,113 @@ func TestPrintLogJSON_IncludesResolutionStatus(t *testing.T) {
 	}
 }
 
+func TestPrintLog_LegacyPendingShowsPendingStatus(t *testing.T) {
+	// given: a D-Mail that exists in both archive and pending (legacy state)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	// Add a history entry so the D-Mails section is exercised
+	if err := store.SaveHistory(CheckResult{
+		CheckedAt: time.Date(2026, 2, 20, 10, 0, 0, 0, time.UTC),
+		Commit:    "aaa", Type: CheckTypeFull, Divergence: 0.1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dmail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "ADR-003 violation",
+		Severity:    SeverityHigh,
+	}
+	if err := store.SaveDMail(dmail); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate legacy state: file also in pending/
+	placePending(t, root, dmail)
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintLog()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLog failed: %v", err)
+	}
+	output := dataBuf.String()
+	if !strings.Contains(output, "pending") {
+		t.Errorf("expected 'pending' status for legacy pending D-Mail, got:\n%s", output)
+	}
+}
+
+func TestPrintLogJSON_LegacyPendingShowsPendingStatus(t *testing.T) {
+	// given: a D-Mail in archive + pending (legacy), another only in archive (sent)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(root)
+
+	pendingDMail := DMail{
+		Name:        "feedback-001",
+		Kind:        KindFeedback,
+		Description: "legacy pending",
+		Severity:    SeverityHigh,
+	}
+	sentDMail := DMail{
+		Name:        "feedback-002",
+		Kind:        KindFeedback,
+		Description: "normally sent",
+		Severity:    SeverityLow,
+	}
+	for _, d := range []DMail{pendingDMail, sentDMail} {
+		if err := store.SaveDMail(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Only feedback-001 has a legacy pending file
+	placePending(t, root, pendingDMail)
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+
+	// when
+	err := a.PrintLogJSON()
+
+	// then
+	if err != nil {
+		t.Fatalf("PrintLogJSON failed: %v", err)
+	}
+
+	var parsed struct {
+		DMails []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"dmails"`
+	}
+	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
+	}
+	if len(parsed.DMails) != 2 {
+		t.Fatalf("expected 2 dmails, got %d", len(parsed.DMails))
+	}
+	// feedback-001: legacy pending file exists → "pending"
+	if parsed.DMails[0].Status != "pending" {
+		t.Errorf("feedback-001: expected status 'pending', got %q", parsed.DMails[0].Status)
+	}
+	// feedback-002: no pending file → "sent"
+	if parsed.DMails[1].Status != "sent" {
+		t.Errorf("feedback-002: expected status 'sent', got %q", parsed.DMails[1].Status)
+	}
+}
+
 func TestResolveDMail_JSON(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")

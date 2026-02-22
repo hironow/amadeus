@@ -787,7 +787,10 @@ func (a *Amadeus) PrintLog() error {
 			default:
 				severityTag = "[LOW] "
 			}
-			status := string(RouteDMail(d.Severity))
+			status := string(DMailSent)
+			if a.Store.IsPending(d.Name) {
+				status = string(DMailPending)
+			}
 			if res, ok := resolutions[d.Name]; ok {
 				status = res.Status
 			}
@@ -872,7 +875,10 @@ func (a *Amadeus) PrintLogJSON() error {
 
 	views := make([]dmailJSONView, len(dmails))
 	for i, d := range dmails {
-		status := string(RouteDMail(d.Severity))
+		status := string(DMailSent)
+		if a.Store.IsPending(d.Name) {
+			status = string(DMailPending)
+		}
 		var resolvedAt *time.Time
 		var reason string
 		if res, ok := resolutions[d.Name]; ok {
@@ -989,7 +995,10 @@ func (a *Amadeus) PrintSync() error {
 		if len(d.Issues) == 0 {
 			continue
 		}
-		status := string(RouteDMail(d.Severity))
+		status := string(DMailSent)
+		if a.Store.IsPending(d.Name) {
+			status = string(DMailPending)
+		}
 		if res, ok := resolutions[d.Name]; ok {
 			status = res.Status
 		}
