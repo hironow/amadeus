@@ -1,4 +1,4 @@
-# Architecture Decision Records — amadeus
+# Architecture Decision Records
 
 ## Shared ADRs (canonical: phonewave)
 
