@@ -257,7 +257,7 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 		if errors.Is(err, fs.ErrNotExist) {
 			return DoctorCheckResult{
 				Name:    "D-Mail Schema",
-				Status:  CheckOK,
+				Status:  CheckSkip,
 				Message: "no archive directory",
 			}
 		}
@@ -277,7 +277,7 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 	if len(mdFiles) == 0 {
 		return DoctorCheckResult{
 			Name:    "D-Mail Schema",
-			Status:  CheckOK,
+			Status:  CheckSkip,
 			Message: "no D-Mails in archive",
 		}
 	}

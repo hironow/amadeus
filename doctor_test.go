@@ -410,9 +410,9 @@ func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
 	// when
 	result := checkDMailSchema(root)
 
-	// then: OK with skip message
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK for empty archive, got %v: %s", result.Status, result.Message)
+	// then: skip — no D-Mails to validate
+	if result.Status != CheckSkip {
+		t.Errorf("expected CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -467,9 +467,9 @@ func TestCheckDMailSchema_NoGateDir(t *testing.T) {
 	// when
 	result := checkDMailSchema(root)
 
-	// then: OK — directory simply doesn't exist yet
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK for missing .gate, got %v: %s", result.Status, result.Message)
+	// then: skip — archive doesn't exist yet
+	if result.Status != CheckSkip {
+		t.Errorf("expected CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
 	}
 }
 
