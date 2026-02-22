@@ -447,7 +447,7 @@ func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	content := []byte("---\nname: feedback-001\nkind: feedback\ndescription: test\n---\n\nbody\n")
+	content := []byte("---\nname: feedback-001\ndescription: test\n---\n\nbody\n")
 	os.WriteFile(filepath.Join(root, "archive", "feedback-001.md"), content, 0o644)
 
 	// when

@@ -1038,15 +1038,16 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 	}
 }
 
-func TestValidateDMail_MissingSeverity(t *testing.T) {
+func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
+	// severity is optional — inbox reports from external tools may omit it
 	dmail := DMail{
 		Name:        "feedback-001",
 		Kind:        KindFeedback,
 		Description: "test",
 	}
 	errs := ValidateDMail(dmail)
-	if len(errs) == 0 {
-		t.Error("expected error for missing severity")
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for missing severity, got %v", errs)
 	}
 }
 

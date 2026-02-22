@@ -99,9 +99,7 @@ func ValidateDMail(dmail DMail) []string {
 	if dmail.Description == "" {
 		errs = append(errs, "description is required")
 	}
-	if dmail.Severity == "" {
-		errs = append(errs, "severity is required")
-	} else if !validSeverities[dmail.Severity] {
+	if dmail.Severity != "" && !validSeverities[dmail.Severity] {
 		errs = append(errs, fmt.Sprintf("invalid severity: %q", dmail.Severity))
 	}
 	return errs
