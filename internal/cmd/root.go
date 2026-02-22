@@ -44,7 +44,6 @@ func NewRootCommand() *cobra.Command {
 		newLogCommand(),
 		newDoctorCommand(),
 		newCheckCommand(),
-		newResolveCommand(),
 		newSyncCommand(),
 		newMarkCommentedCommand(),
 		newArchivePruneCommand(),

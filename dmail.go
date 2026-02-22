@@ -33,14 +33,8 @@ const (
 type DMailStatus string
 
 const (
-	// DMailPending indicates a D-Mail awaiting human approval.
-	DMailPending DMailStatus = "pending"
 	// DMailSent indicates a D-Mail that has been auto-sent.
 	DMailSent DMailStatus = "sent"
-	// DMailApproved indicates a D-Mail approved by a human.
-	DMailApproved DMailStatus = "approved"
-	// DMailRejected indicates a D-Mail rejected by a human.
-	DMailRejected DMailStatus = "rejected"
 )
 
 // dmailFrontmatter is the YAML frontmatter of a D-Mail file.
@@ -166,14 +160,6 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// RouteDMail returns the routing status for a D-Mail.
-// All D-Mails are now auto-sent directly to outbox (MY-359).
-// Deprecated: sender-side gating via pending/ is removed. Receiver-side tools
-// (sightjack, paintress) handle their own approval workflows.
-func RouteDMail(_ Severity) DMailStatus {
-	return DMailSent
-}
-
 // NextDMailName returns the next sequential D-Mail name by scanning existing
 // .md files in the archive/ directory.
 func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
@@ -216,15 +202,6 @@ func (s *StateStore) SaveDMail(dmail DMail) error {
 	return nil
 }
 
-// IsPending checks if a D-Mail has a file in the pending/ directory.
-// After MY-359, SaveDMail no longer writes to pending/. This method
-// exists to support resolving legacy pending items.
-func (s *StateStore) IsPending(name string) bool {
-	path := filepath.Join(s.Root, "pending", name+".md")
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 // LoadDMail reads a single D-Mail by name from the archive/ directory.
 func (s *StateStore) LoadDMail(name string) (DMail, error) {
 	path := filepath.Join(s.Root, "archive", name+".md")
@@ -258,59 +235,6 @@ func (s *StateStore) LoadAllDMails() ([]DMail, error) {
 		return dmails[i].Name < dmails[j].Name
 	})
 	return dmails, nil
-}
-
-// ErrNoResolution is returned when no resolution exists for a given D-Mail name.
-var ErrNoResolution = errors.New("no resolution found")
-
-// Resolution tracks the approval state of a D-Mail, stored as a sidecar file
-// in .run/resolutions.json. The D-Mail .md file itself is immutable.
-type Resolution struct {
-	Name       string     `json:"name"`
-	Status     string     `json:"status"`
-	Action     string     `json:"action,omitempty"`
-	Reason     string     `json:"reason,omitempty"`
-	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
-}
-
-// LoadResolutions reads all resolutions from .run/resolutions.json.
-func (s *StateStore) LoadResolutions() (map[string]Resolution, error) {
-	path := filepath.Join(s.Root, ".run", "resolutions.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return make(map[string]Resolution), nil
-		}
-		return nil, err
-	}
-	var resolutions map[string]Resolution
-	if err := json.Unmarshal(data, &resolutions); err != nil {
-		return nil, err
-	}
-	return resolutions, nil
-}
-
-// LoadResolution reads a single resolution by D-Mail name.
-func (s *StateStore) LoadResolution(name string) (Resolution, error) {
-	resolutions, err := s.LoadResolutions()
-	if err != nil {
-		return Resolution{}, err
-	}
-	res, ok := resolutions[name]
-	if !ok {
-		return Resolution{}, fmt.Errorf("%w: %s", ErrNoResolution, name)
-	}
-	return res, nil
-}
-
-// SaveResolution writes or updates a resolution in .run/resolutions.json.
-func (s *StateStore) SaveResolution(res Resolution) error {
-	resolutions, err := s.LoadResolutions()
-	if err != nil {
-		return err
-	}
-	resolutions[res.Name] = res
-	return s.writeJSON(filepath.Join(s.Root, ".run", "resolutions.json"), resolutions)
 }
 
 // ConsumedRecord tracks a processed inbox D-Mail.
@@ -348,48 +272,11 @@ func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
 	return s.writeJSON(filepath.Join(s.Root, ".run", "consumed.json"), existing)
 }
 
-// MovePendingToOutbox moves a D-Mail from pending/ to outbox/ for courier delivery.
-func (s *StateStore) MovePendingToOutbox(name string) error {
-	filename := name + ".md"
-	src := filepath.Join(s.Root, "pending", filename)
-	dst := filepath.Join(s.Root, "outbox", filename)
-	return os.Rename(src, dst)
-}
-
-// MovePendingToRejected moves a D-Mail from pending/ to rejected/.
-// Creates the rejected/ directory on demand for pre-update installations.
-func (s *StateStore) MovePendingToRejected(name string) error {
-	filename := name + ".md"
-	src := filepath.Join(s.Root, "pending", filename)
-	rejectedDir := filepath.Join(s.Root, "rejected")
-	if err := os.MkdirAll(rejectedDir, 0o755); err != nil {
-		return err
-	}
-	dst := filepath.Join(rejectedDir, filename)
-	return os.Rename(src, dst)
-}
-
-// MoveOutboxToPending moves a D-Mail from outbox/ back to pending/ (rollback).
-func (s *StateStore) MoveOutboxToPending(name string) error {
-	filename := name + ".md"
-	src := filepath.Join(s.Root, "outbox", filename)
-	dst := filepath.Join(s.Root, "pending", filename)
-	return os.Rename(src, dst)
-}
-
-// MoveRejectedToPending moves a D-Mail from rejected/ back to pending/ (rollback).
-func (s *StateStore) MoveRejectedToPending(name string) error {
-	filename := name + ".md"
-	src := filepath.Join(s.Root, "rejected", filename)
-	dst := filepath.Join(s.Root, "pending", filename)
-	return os.Rename(src, dst)
-}
-
 // ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
 // copies to archive/ (skip if already exists), and removes from inbox/.
 // Returns the parsed D-Mails sorted by name.
 //
-// NOTE: All D-Mail I/O (inbox, outbox, pending, archive) uses synchronous
+// NOTE: All D-Mail I/O (inbox, outbox, archive) uses synchronous
 // os.ReadDir/ReadFile/WriteFile/Rename — no file-system watcher such as
 // github.com/fsnotify/fsnotify is involved. amadeus is a one-shot CLI
 // invoked by cron or git hooks, so polling at invocation time is sufficient.

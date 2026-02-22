@@ -395,7 +395,7 @@ func TestInitGateDir_SkipsGitignoreAppendIfAlreadyPresent(t *testing.T) {
 
 	// given: existing .gitignore that already has all required entries
 	gitignorePath := filepath.Join(root, ".gitignore")
-	original := "*.log\n.run/\noutbox/\ninbox/\npending/\nrejected/\ntemp/\n"
+	original := "*.log\n.run/\noutbox/\ninbox/\ntemp/\n"
 	os.WriteFile(gitignorePath, []byte(original), 0o644)
 
 	// when

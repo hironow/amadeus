@@ -37,7 +37,7 @@ func TestE2E_Help(t *testing.T) {
 	if err != nil {
 		t.Fatalf("--help: %v", err)
 	}
-	for _, sub := range []string{"init", "check", "resolve", "sync", "doctor", "log", "validate", "mark-commented", "archive-prune", "version"} {
+	for _, sub := range []string{"init", "check", "sync", "doctor", "log", "validate", "mark-commented", "archive-prune", "version"} {
 		if !strings.Contains(stdout, sub) {
 			t.Errorf("expected %q in help output", sub)
 		}
@@ -62,7 +62,7 @@ func TestE2E_Init(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Verify .gate structure
-	for _, sub := range []string{".run", "history", "outbox", "inbox", "archive", "pending", "rejected"} {
+	for _, sub := range []string{".run", "history", "outbox", "inbox", "archive"} {
 		assertFileExists(t, dir+"/.gate/"+sub)
 	}
 	assertFileExists(t, dir+"/.gate/config.yaml")

@@ -184,7 +184,7 @@ func TestInitGateDir_CreatesNewStructure(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	for _, sub := range []string{"outbox", "inbox", "archive", "pending", "rejected"} {
+	for _, sub := range []string{"outbox", "inbox", "archive"} {
 		path := filepath.Join(root, sub)
 		info, err := statDir(path)
 		if err != nil {
@@ -213,50 +213,6 @@ func TestInitGateDir_GitignoreContainsOutboxInbox(t *testing.T) {
 	}
 	if !strings.Contains(content, "inbox/") {
 		t.Errorf("expected .gitignore to contain 'inbox/', got: %s", content)
-	}
-	if !strings.Contains(content, "pending/") {
-		t.Errorf("expected .gitignore to contain 'pending/', got: %s", content)
-	}
-	if !strings.Contains(content, "rejected/") {
-		t.Errorf("expected .gitignore to contain 'rejected/', got: %s", content)
-	}
-}
-
-func TestMovePendingToRejected_CreatesDirectoryOnDemand(t *testing.T) {
-	// given: a repo where rejected/ does not exist (pre-update installation)
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:     "feedback-001",
-		Kind:     KindFeedback,
-		Severity: SeverityHigh,
-	}
-	// SaveDMail writes to archive + outbox (MY-359: not pending)
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	// Manually place in pending for this test
-	data, _ := MarshalDMail(dmail)
-	os.WriteFile(filepath.Join(root, "pending", "feedback-001.md"), data, 0o644)
-	// Remove rejected/ to simulate pre-update repo
-	if err := os.Remove(filepath.Join(root, "rejected")); err != nil {
-		t.Fatal(err)
-	}
-
-	// when: move to rejected
-	err := store.MovePendingToRejected("feedback-001")
-
-	// then: should succeed (directory created on demand)
-	if err != nil {
-		t.Fatalf("MovePendingToRejected failed on missing dir: %v", err)
-	}
-	rejectedPath := filepath.Join(root, "rejected", "feedback-001.md")
-	if _, statErr := os.Stat(rejectedPath); statErr != nil {
-		t.Errorf("expected file in rejected/: %v", statErr)
 	}
 }
 
@@ -331,7 +287,6 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 }
 
 func TestSaveDMail_HighSeverity_WritesToOutbox(t *testing.T) {
-	// MY-359: all D-Mails go to outbox, never to pending
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
 	if err := InitGateDir(root); err != nil {
@@ -349,18 +304,14 @@ func TestSaveDMail_HighSeverity_WritesToOutbox(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// then: file exists in archive/ and outbox/ (NOT pending/)
+	// then: file exists in archive/ and outbox/
 	archivePath := filepath.Join(root, "archive", "feedback-001.md")
 	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
-	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("expected file in archive: %v", err)
 	}
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("expected file in outbox: %v", err)
-	}
-	if _, err := os.Stat(pendingPath); err == nil {
-		t.Error("expected file NOT in pending for HIGH severity (MY-359)")
 	}
 }
 
@@ -382,18 +333,14 @@ func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// then: file exists in archive/ and outbox/ (NOT pending/)
+	// then: file exists in archive/ and outbox/
 	archivePath := filepath.Join(root, "archive", "feedback-001.md")
 	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
-	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("expected file in archive: %v", err)
 	}
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("expected file in outbox: %v", err)
-	}
-	if _, err := os.Stat(pendingPath); err == nil {
-		t.Error("expected file NOT in pending for LOW severity")
 	}
 }
 
@@ -523,91 +470,6 @@ func TestLoadAllDMails_Empty(t *testing.T) {
 	}
 	if len(dmails) != 0 {
 		t.Errorf("expected 0, got %d", len(dmails))
-	}
-}
-
-func TestRouteDMail_AllSeveritiesReturnSent(t *testing.T) {
-	// MY-359: all D-Mails go directly to outbox (no sender-side gating)
-	for _, severity := range []Severity{SeverityLow, SeverityMedium, SeverityHigh} {
-		t.Run(string(severity), func(t *testing.T) {
-			status := RouteDMail(severity)
-			if status != DMailSent {
-				t.Errorf("expected DMailSent for %s, got %s", severity, status)
-			}
-		})
-	}
-}
-
-func TestLoadResolution_NotFound_ReturnsSentinelError(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	_, err := store.LoadResolution("feedback-999")
-	if err == nil {
-		t.Fatal("expected error for non-existent resolution")
-	}
-	if !errors.Is(err, ErrNoResolution) {
-		t.Errorf("expected ErrNoResolution, got: %v", err)
-	}
-}
-
-func TestLoadResolutions_CorruptedJSON_ReturnsError(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-
-	// Write corrupted JSON to resolutions.json
-	runDir := filepath.Join(root, ".run")
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(runDir, "resolutions.json"), []byte("{invalid json"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	store := NewStateStore(root)
-	_, err := store.LoadResolutions()
-	if err == nil {
-		t.Fatal("expected error for corrupted JSON")
-	}
-	// Must NOT be ErrNoResolution — it's a real parse error
-	if errors.Is(err, ErrNoResolution) {
-		t.Error("corrupted JSON should not return ErrNoResolution")
-	}
-}
-
-func TestSaveResolution_RoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	res := Resolution{
-		Name:   "feedback-001",
-		Status: "approved",
-		Action: "approve",
-	}
-	if err := store.SaveResolution(res); err != nil {
-		t.Fatal(err)
-	}
-
-	loaded, err := store.LoadResolution("feedback-001")
-	if err != nil {
-		t.Fatalf("LoadResolution failed: %v", err)
-	}
-	if loaded.Status != "approved" {
-		t.Errorf("expected status approved, got %s", loaded.Status)
-	}
-	if loaded.Action != "approve" {
-		t.Errorf("expected action approve, got %s", loaded.Action)
 	}
 }
 
@@ -955,34 +817,6 @@ func TestScanInbox_SkipsNonMD(t *testing.T) {
 	}
 	if len(dmails) != 0 {
 		t.Fatalf("expected 0, got %d", len(dmails))
-	}
-}
-
-func TestIsPending_True(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	// Manually place a file in pending/
-	os.WriteFile(filepath.Join(root, "pending", "feedback-001.md"), []byte("test"), 0o644)
-
-	if !store.IsPending("feedback-001") {
-		t.Error("expected IsPending to return true")
-	}
-}
-
-func TestIsPending_False(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	if store.IsPending("feedback-999") {
-		t.Error("expected IsPending to return false for non-existent file")
 	}
 }
 

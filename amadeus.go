@@ -577,156 +577,6 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 	return a.Store.SaveHistory(previous)
 }
 
-// resolveDMailCore performs the common resolution logic: load D-Mail from archive,
-// validate eligibility, create Resolution sidecar entry, save.
-// The D-Mail .md file itself is immutable; only the Resolution sidecar is updated.
-func (a *Amadeus) resolveDMailCore(ctx context.Context, name, action, reason string) (DMail, Resolution, trace.Span, error) {
-	_, span := tracer.Start(ctx, "amadeus.resolve",
-		trace.WithAttributes(
-			attribute.String("dmail.name", name),
-			attribute.String("resolve.action", action),
-		))
-
-	dmail, err := a.Store.LoadDMail(name)
-	if err != nil {
-		return DMail{}, Resolution{}, span, err
-	}
-
-	// Check if already resolved.
-	// Distinguish "not found" (ok to proceed) from read/parse errors (must surface).
-	existing, err := a.Store.LoadResolution(name)
-	if err == nil && existing.Status != "" {
-		return DMail{}, Resolution{}, span, fmt.Errorf("D-Mail %s is already %s", name, existing.Status)
-	}
-	if err != nil && !errors.Is(err, ErrNoResolution) {
-		return DMail{}, Resolution{}, span, fmt.Errorf("load resolution: %w", err)
-	}
-
-	// Check if D-Mail is pending (file-based check for legacy pending items).
-	// After MY-359, SaveDMail no longer writes to pending/.
-	if !a.Store.IsPending(name) {
-		return DMail{}, Resolution{}, span, fmt.Errorf("D-Mail %s is not pending", name)
-	}
-
-	now := time.Now().UTC()
-	var resolution Resolution
-
-	switch action {
-	case "approve":
-		resolution = Resolution{
-			Name:       name,
-			Status:     string(DMailApproved),
-			Action:     action,
-			ResolvedAt: &now,
-		}
-	case "reject":
-		if reason == "" {
-			return DMail{}, Resolution{}, span, fmt.Errorf("reject reason is required")
-		}
-		resolution = Resolution{
-			Name:       name,
-			Status:     string(DMailRejected),
-			Action:     action,
-			Reason:     reason,
-			ResolvedAt: &now,
-		}
-	default:
-		return DMail{}, Resolution{}, span, fmt.Errorf("unknown action: %s (use --approve or --reject)", action)
-	}
-
-	// Move file from pending/ before persisting resolution.
-	// If move fails, no resolution is saved — avoids orphan resolution
-	// that would block future resolve attempts.
-	// If SaveResolution fails after move, roll back the move to keep
-	// the pending file in place for a future retry.
-	switch action {
-	case "approve":
-		if err := a.Store.MovePendingToOutbox(name); err != nil {
-			return DMail{}, Resolution{}, span, fmt.Errorf("move to outbox: %w", err)
-		}
-		if err := a.Store.SaveResolution(resolution); err != nil {
-			_ = a.Store.MoveOutboxToPending(name) // best-effort rollback
-			return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
-		}
-	case "reject":
-		if err := a.Store.MovePendingToRejected(name); err != nil {
-			return DMail{}, Resolution{}, span, fmt.Errorf("move to rejected: %w", err)
-		}
-		if err := a.Store.SaveResolution(resolution); err != nil {
-			_ = a.Store.MoveRejectedToPending(name) // best-effort rollback
-			return DMail{}, Resolution{}, span, fmt.Errorf("save resolution: %w", err)
-		}
-	}
-
-	span.AddEvent("dmail.resolved", trace.WithAttributes(
-		attribute.String("dmail.name", name),
-		attribute.String("dmail.status", resolution.Status),
-	))
-
-	return dmail, resolution, span, nil
-}
-
-// ResolveDMail updates a pending D-Mail to approved or rejected status.
-// action must be "approve" or "reject". reason is required for reject.
-func (a *Amadeus) ResolveDMail(ctx context.Context, name string, action string, reason string) error {
-	dmail, resolution, span, err := a.resolveDMailCore(ctx, name, action, reason)
-	defer span.End()
-	if err != nil {
-		return err
-	}
-	a.dataOut("D-Mail %s %s.", name, resolution.Status)
-	a.dataOut("%s → %s at %s", dmail.Description, resolution.Status, resolution.ResolvedAt.Format(time.RFC3339))
-	if len(dmail.Issues) > 0 {
-		a.dataOut("Comment targets: %s", strings.Join(dmail.Issues, ", "))
-	}
-	return nil
-}
-
-// ResolveOutput is the JSON-serializable result of resolving a D-Mail.
-type ResolveOutput struct {
-	Name       string           `json:"name"`
-	Status     string           `json:"status"`
-	Action     string           `json:"action"`
-	ResolvedAt string           `json:"resolved_at"`
-	Comments   []CommentPayload `json:"comments,omitempty"`
-}
-
-// ResolveDMailResult resolves a D-Mail and returns the result as a struct.
-// Use this for batch operations where the caller aggregates results.
-func (a *Amadeus) ResolveDMailResult(ctx context.Context, name string, action string, reason string) (ResolveOutput, error) {
-	dmail, resolution, span, err := a.resolveDMailCore(ctx, name, action, reason)
-	defer span.End()
-	if err != nil {
-		return ResolveOutput{}, err
-	}
-	out := ResolveOutput{
-		Name:       name,
-		Status:     resolution.Status,
-		Action:     action,
-		ResolvedAt: resolution.ResolvedAt.Format(time.RFC3339),
-	}
-	for _, issueID := range dmail.Issues {
-		out.Comments = append(out.Comments, CommentPayload{
-			IssueID:     issueID,
-			DMail:       name,
-			Description: dmail.Description,
-			Body:        dmail.Body,
-			Resolution:  resolution.Status,
-			Reason:      resolution.Reason,
-		})
-	}
-	return out, nil
-}
-
-// ResolveDMailJSON resolves a D-Mail and writes the result as JSON to DataOut.
-func (a *Amadeus) ResolveDMailJSON(ctx context.Context, name string, action string, reason string) error {
-	result, err := a.ResolveDMailResult(ctx, name, action, reason)
-	if err != nil {
-		return err
-	}
-	return a.writeDataJSON(result)
-}
-
 // PrintLog renders the history and D-Mail log to DataOut.
 func (a *Amadeus) PrintLog() error {
 	history, err := a.Store.LoadHistory()
@@ -771,10 +621,6 @@ func (a *Amadeus) PrintLog() error {
 	}
 
 	if len(dmails) > 0 {
-		resolutions, err := a.Store.LoadResolutions()
-		if err != nil {
-			return fmt.Errorf("load resolutions: %w", err)
-		}
 		a.dataOut("")
 		a.dataOut("D-Mails:")
 		for _, d := range dmails {
@@ -787,17 +633,10 @@ func (a *Amadeus) PrintLog() error {
 			default:
 				severityTag = "[LOW] "
 			}
-			status := string(DMailSent)
-			if a.Store.IsPending(d.Name) {
-				status = string(DMailPending)
-			}
-			if res, ok := resolutions[d.Name]; ok {
-				status = res.Status
-			}
 			a.dataOut("  %s  %s %-10s %s",
 				d.Name,
 				severityTag,
-				status,
+				string(DMailSent),
 				d.Description)
 		}
 	}
@@ -835,7 +674,7 @@ func (a *Amadeus) PrintLog() error {
 	return nil
 }
 
-// dmailJSONView is a JSON-specific view that merges a DMail with its Resolution status.
+// dmailJSONView is a JSON-specific view of a D-Mail with status.
 type dmailJSONView struct {
 	Name        string            `json:"name"`
 	Kind        DMailKind         `json:"kind"`
@@ -844,8 +683,6 @@ type dmailJSONView struct {
 	Severity    Severity          `json:"severity,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 	Status      string            `json:"status"`
-	ResolvedAt  *time.Time        `json:"resolved_at,omitempty"`
-	Reason      string            `json:"reason,omitempty"`
 }
 
 // PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
@@ -857,10 +694,6 @@ func (a *Amadeus) PrintLogJSON() error {
 	dmails, err := a.Store.LoadAllDMails()
 	if err != nil {
 		return fmt.Errorf("load dmails: %w", err)
-	}
-	resolutions, err := a.Store.LoadResolutions()
-	if err != nil {
-		return fmt.Errorf("load resolutions: %w", err)
 	}
 	consumed, err := a.Store.LoadConsumed()
 	if err != nil {
@@ -875,17 +708,6 @@ func (a *Amadeus) PrintLogJSON() error {
 
 	views := make([]dmailJSONView, len(dmails))
 	for i, d := range dmails {
-		status := string(DMailSent)
-		if a.Store.IsPending(d.Name) {
-			status = string(DMailPending)
-		}
-		var resolvedAt *time.Time
-		var reason string
-		if res, ok := resolutions[d.Name]; ok {
-			status = res.Status
-			resolvedAt = res.ResolvedAt
-			reason = res.Reason
-		}
 		views[i] = dmailJSONView{
 			Name:        d.Name,
 			Kind:        d.Kind,
@@ -893,9 +715,7 @@ func (a *Amadeus) PrintLogJSON() error {
 			Issues:      d.Issues,
 			Severity:    d.Severity,
 			Metadata:    d.Metadata,
-			Status:      status,
-			ResolvedAt:  resolvedAt,
-			Reason:      reason,
+			Status:      string(DMailSent),
 		}
 	}
 
@@ -981,10 +801,6 @@ func (a *Amadeus) PrintSync() error {
 	if err != nil {
 		return fmt.Errorf("load sync state: %w", err)
 	}
-	resolutions, err := a.Store.LoadResolutions()
-	if err != nil {
-		return fmt.Errorf("load resolutions: %w", err)
-	}
 	allDMails, err := a.Store.LoadAllDMails()
 	if err != nil {
 		return fmt.Errorf("load all dmails: %w", err)
@@ -995,13 +811,6 @@ func (a *Amadeus) PrintSync() error {
 		if len(d.Issues) == 0 {
 			continue
 		}
-		status := string(DMailSent)
-		if a.Store.IsPending(d.Name) {
-			status = string(DMailPending)
-		}
-		if res, ok := resolutions[d.Name]; ok {
-			status = res.Status
-		}
 		for _, issueID := range d.Issues {
 			key := d.Name + ":" + issueID
 			if _, commented := syncState.CommentedDMails[key]; commented {
@@ -1010,7 +819,7 @@ func (a *Amadeus) PrintSync() error {
 			pendingComments = append(pendingComments, PendingComment{
 				DMail:       d.Name,
 				IssueID:     issueID,
-				Status:      status,
+				Status:      string(DMailSent),
 				Description: d.Description,
 			})
 		}
