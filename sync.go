@@ -65,17 +65,6 @@ type SyncOutput struct {
 	PendingComments []PendingComment `json:"pending_comments"`
 }
 
-// CommentPayload is the JSON payload that Claude Code uses to post a D-Mail
-// resolution as a comment to a Linear issue via MCP.
-type CommentPayload struct {
-	IssueID     string `json:"issue_id"`
-	DMail       string `json:"dmail"`
-	Description string `json:"description"`
-	Body        string `json:"body"`
-	Resolution  string `json:"resolution"`
-	Reason      string `json:"reason,omitempty"`
-}
-
 // MarkCommented records that a D-Mail has been posted as a comment to an issue.
 // The key is "dmailName:issueID" to support multiple issues per D-Mail.
 // NOTE(MY-346): Key format changed from "dmailName" to "dmailName:issueID" without migration.

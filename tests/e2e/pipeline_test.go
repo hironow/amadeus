@@ -12,134 +12,6 @@ import (
 	"time"
 )
 
-// TestE2E_FullPipeline exercises the complete amadeus workflow:
-// init → check → resolve → sync → mark-commented → sync (empty)
-func TestE2E_FullPipeline(t *testing.T) {
-	dir := initTestRepo(t)
-	cfg := defaultTestConfig()
-	// Set thresholds so fullCalibrationResponse triggers HIGH severity
-	cfg["thresholds"] = map[string]any{
-		"low_max":    0.05,
-		"medium_max": 0.10,
-	}
-	writeConfig(t, dir, cfg)
-
-	// Step 1: Run check → generates D-Mails (exit code 2)
-	checkStdout, _, err := runCmd(t, dir, "check", "--full", "--json")
-	assertExitCode(t, err, 2)
-
-	var checkResult struct {
-		DMails []struct {
-			Name   string   `json:"name"`
-			Issues []string `json:"issues"`
-		} `json:"dmails"`
-	}
-	parseJSONOutput(t, checkStdout, &checkResult)
-
-	if len(checkResult.DMails) == 0 {
-		t.Fatal("expected D-Mails from full calibration")
-	}
-
-	dmailName := checkResult.DMails[0].Name
-	t.Logf("Generated D-Mail: %s", dmailName)
-
-	// D-Mail should be in pending/ (HIGH severity)
-	assertFileExists(t, filepath.Join(dir, ".gate", "pending", dmailName+".md"))
-
-	// Step 2: Sync → should show pending comments
-	syncStdout, _, err := runCmd(t, dir, "sync")
-	if err != nil {
-		t.Fatalf("sync: %v", err)
-	}
-
-	var syncResult struct {
-		PendingComments []struct {
-			DMail   string `json:"dmail"`
-			IssueID string `json:"issue_id"`
-		} `json:"pending_comments"`
-	}
-	parseJSONOutput(t, syncStdout, &syncResult)
-
-	if len(syncResult.PendingComments) == 0 {
-		t.Fatal("expected pending comments before resolve")
-	}
-
-	// Step 3: Resolve → approve with JSON output (includes CommentPayload)
-	resolveStdout, _, err := runCmd(t, dir, "resolve", dmailName, "--approve", "--json")
-	if err != nil {
-		t.Fatalf("resolve: %v", err)
-	}
-
-	var resolveResults []struct {
-		Name     string `json:"name"`
-		Status   string `json:"status"`
-		Comments []struct {
-			IssueID string `json:"issue_id"`
-			DMail   string `json:"dmail"`
-		} `json:"comments"`
-	}
-	parseJSONOutput(t, resolveStdout, &resolveResults)
-
-	if len(resolveResults) != 1 {
-		t.Fatalf("expected 1 resolve result, got %d", len(resolveResults))
-	}
-	if resolveResults[0].Status != "approved" {
-		t.Errorf("expected approved, got %s", resolveResults[0].Status)
-	}
-
-	// Step 4: mark-commented for each issue
-	for _, comment := range resolveResults[0].Comments {
-		_, _, err := runCmd(t, dir, "mark-commented", comment.DMail, comment.IssueID)
-		if err != nil {
-			t.Fatalf("mark-commented %s %s: %v", comment.DMail, comment.IssueID, err)
-		}
-	}
-
-	// Step 5: Sync → should now be empty
-	syncStdout2, _, err := runCmd(t, dir, "sync")
-	if err != nil {
-		t.Fatalf("sync after mark-commented: %v", err)
-	}
-
-	var syncResult2 struct {
-		PendingComments []any `json:"pending_comments"`
-	}
-	parseJSONOutput(t, syncStdout2, &syncResult2)
-
-	if len(syncResult2.PendingComments) != 0 {
-		t.Errorf("expected 0 pending comments after marking all, got %d", len(syncResult2.PendingComments))
-	}
-
-	// Step 6: Log → should show history and D-Mails
-	logStdout, _, err := runCmd(t, dir, "log", "--json")
-	if err != nil {
-		t.Fatalf("log: %v", err)
-	}
-
-	var logResult struct {
-		History []any `json:"history"`
-		DMails  []struct {
-			Name   string `json:"name"`
-			Status string `json:"status"`
-		} `json:"dmails"`
-	}
-	parseJSONOutput(t, logStdout, &logResult)
-
-	if len(logResult.History) == 0 {
-		t.Error("expected history entries")
-	}
-	if len(logResult.DMails) == 0 {
-		t.Error("expected D-Mail entries in log")
-	}
-
-	// Verify the D-Mail shows as approved
-	for _, d := range logResult.DMails {
-		if d.Name == dmailName && d.Status != "approved" {
-			t.Errorf("expected D-Mail %s status=approved in log, got %s", dmailName, d.Status)
-		}
-	}
-}
-
 // TestE2E_Pipeline_Convergence exercises convergence detection with seeded D-Mails.
 func TestE2E_Pipeline_Convergence(t *testing.T) {
 	dir := initTestRepo(t)
@@ -217,65 +89,6 @@ func TestE2E_Pipeline_Convergence(t *testing.T) {
 	}
 }
 
-// TestE2E_Pipeline_RejectAndLog exercises reject flow with reason tracking.
-func TestE2E_Pipeline_RejectAndLog(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
-
-	seedDMails(t, dir, []seedDMailSpec{{
-		Name:        "feedback-001",
-		Kind:        "feedback",
-		Description: "Not relevant",
-		Severity:    "high",
-		Issues:      []string{"MY-999"},
-	}})
-
-	// Reject with reason
-	runCmd(t, dir, "resolve", "feedback-001", "--reject", "--reason", "False positive")
-
-	// Verify rejected/ directory
-	assertFileExists(t, filepath.Join(dir, ".gate", "rejected", "feedback-001.md"))
-	assertFileNotExists(t, filepath.Join(dir, ".gate", "pending", "feedback-001.md"))
-
-	// Log should show rejected status
-	stdout, _, _ := runCmd(t, dir, "log", "--json")
-	var logResult struct {
-		DMails []struct {
-			Name   string `json:"name"`
-			Status string `json:"status"`
-			Reason string `json:"reason"`
-		} `json:"dmails"`
-	}
-	parseJSONOutput(t, stdout, &logResult)
-
-	for _, d := range logResult.DMails {
-		if d.Name == "feedback-001" {
-			if d.Status != "rejected" {
-				t.Errorf("expected status=rejected, got %s", d.Status)
-			}
-			if d.Reason != "False positive" {
-				t.Errorf("expected reason='False positive', got %s", d.Reason)
-			}
-		}
-	}
-
-	// Sync should still show pending comment (rejected D-Mail still has issues)
-	syncStdout, _, _ := runCmd(t, dir, "sync")
-	var syncResult struct {
-		PendingComments []struct {
-			Status string `json:"status"`
-		} `json:"pending_comments"`
-	}
-	parseJSONOutput(t, syncStdout, &syncResult)
-
-	if len(syncResult.PendingComments) != 1 {
-		t.Errorf("expected 1 pending comment for rejected D-Mail, got %d", len(syncResult.PendingComments))
-	}
-	if syncResult.PendingComments[0].Status != "rejected" {
-		t.Errorf("expected pending comment status=rejected, got %s", syncResult.PendingComments[0].Status)
-	}
-}
-
 // TestE2E_Pipeline_HookInstallUninstall tests git hook lifecycle.
 func TestE2E_Pipeline_HookInstallUninstall(t *testing.T) {
 	dir := initTestRepo(t)
@@ -341,7 +154,6 @@ func TestE2E_Pipeline_GateNotFound(t *testing.T) {
 
 	// These commands should fail without .gate/
 	for _, cmd := range [][]string{
-		{"resolve", "x", "--approve"},
 		{"sync"},
 		{"log"},
 		{"mark-commented", "x", "y"},

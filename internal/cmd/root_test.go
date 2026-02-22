@@ -85,10 +85,6 @@ func TestSubcommand_ShortAliases(t *testing.T) {
 		{"check", "dry-run", "n"},
 		{"check", "full", "f"},
 		{"check", "quiet", "q"},
-		// resolve
-		{"resolve", "approve", "a"},
-		{"resolve", "reject", "r"},
-		{"resolve", "json", "j"},
 		// archive-prune
 		{"archive-prune", "days", "d"},
 		{"archive-prune", "dry-run", "n"},
@@ -123,29 +119,5 @@ func TestSubcommand_ShortAliases(t *testing.T) {
 					tt.shorthand, tt.flag, tt.subcommand, f.Shorthand)
 			}
 		})
-	}
-}
-
-func TestResolve_ReasonIsLongOnly(t *testing.T) {
-	// given
-	root := NewRootCommand()
-	var resolve *cobra.Command
-	for _, sub := range root.Commands() {
-		if sub.Name() == "resolve" {
-			resolve = sub
-			break
-		}
-	}
-	if resolve == nil {
-		t.Fatal("resolve subcommand not found")
-	}
-
-	// then — --reason has no shorthand
-	f := resolve.Flags().Lookup("reason")
-	if f == nil {
-		t.Fatal("--reason flag not found")
-	}
-	if f.Shorthand != "" {
-		t.Errorf("expected --reason to be long-only, got shorthand %q", f.Shorthand)
 	}
 }

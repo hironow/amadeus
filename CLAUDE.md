@@ -8,7 +8,7 @@
 
 - Entry: `cmd/amadeus/main.go` (InitTracer defer + ExitCode with exit 2 for drift)
 - CLI: `internal/cmd/` (cobra v1.10.2, `NewRootCommand()` exported for testability)
-- Library: root package `amadeus` (check, validate, dmail, resolve, hook, telemetry, logger)
+- Library: root package `amadeus` (check, validate, dmail, hook, telemetry, logger)
 - OTel: `telemetry.go` (noop default + OTLP HTTP exporter)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)

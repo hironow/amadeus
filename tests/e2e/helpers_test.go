@@ -250,7 +250,7 @@ func assertExitCode(t *testing.T, err error, expected int) {
 	}
 }
 
-// seedDMails writes multiple D-Mail files to archive/ and pending/ (for high severity).
+// seedDMails writes multiple D-Mail files to archive/.
 func seedDMails(t *testing.T, dir string, dmails []seedDMailSpec) {
 	t.Helper()
 	for _, spec := range dmails {
@@ -274,9 +274,6 @@ func seedDMails(t *testing.T, dir string, dmails []seedDMailSpec) {
 			body = fmt.Sprintf("Detail for %s.\n", spec.Name)
 		}
 		writeDMail(t, dir, "archive", spec.Name, fm, body)
-		if spec.Severity == "high" {
-			writeDMail(t, dir, "pending", spec.Name, fm, body)
-		}
 	}
 }
 

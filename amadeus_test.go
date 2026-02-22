@@ -280,289 +280,6 @@ func TestAmadeus_ShouldPromoteToFull_ExactThreshold(t *testing.T) {
 	}
 }
 
-func TestResolveDMail_Approve(t *testing.T) {
-	// given: a legacy pending D-Mail (manually placed in pending/)
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
-
-	// then
-	if err != nil {
-		t.Fatalf("ResolveDMail failed: %v", err)
-	}
-	res, err := store.LoadResolution("feedback-001")
-	if err != nil {
-		t.Fatalf("expected resolution to exist: %v", err)
-	}
-	if res.Status != string(DMailApproved) {
-		t.Errorf("expected status approved, got %s", res.Status)
-	}
-	if res.ResolvedAt == nil {
-		t.Error("expected ResolvedAt to be set")
-	}
-	if res.Action != "approve" {
-		t.Errorf("expected action approve, got %s", res.Action)
-	}
-	// confirmation should go to DataOut, not Logger
-	if logBuf.Len() != 0 {
-		t.Errorf("expected no stderr output, got: %s", logBuf.String())
-	}
-	if !strings.Contains(dataBuf.String(), "approved") {
-		t.Errorf("expected 'approved' in DataOut, got: %s", dataBuf.String())
-	}
-	// then: file moved from pending/ to outbox/
-	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
-	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
-	if _, err := os.Stat(pendingPath); err == nil {
-		t.Error("expected file removed from pending/")
-	}
-	if _, err := os.Stat(outboxPath); err != nil {
-		t.Errorf("expected file in outbox after approve: %v", err)
-	}
-}
-
-func TestResolveDMail_Reject(t *testing.T) {
-	// given: a legacy pending D-Mail
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.ResolveDMail(context.Background(), "feedback-001", "reject", "false positive")
-
-	// then
-	if err != nil {
-		t.Fatalf("ResolveDMail failed: %v", err)
-	}
-	res, err := store.LoadResolution("feedback-001")
-	if err != nil {
-		t.Fatalf("expected resolution to exist: %v", err)
-	}
-	if res.Status != string(DMailRejected) {
-		t.Errorf("expected status rejected, got %s", res.Status)
-	}
-	if res.Reason != "false positive" {
-		t.Errorf("expected reason 'false positive', got %s", res.Reason)
-	}
-	// then: file moved from pending/ to rejected/
-	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
-	rejectedPath := filepath.Join(root, "rejected", "feedback-001.md")
-	if _, err := os.Stat(pendingPath); err == nil {
-		t.Error("expected file removed from pending/")
-	}
-	if _, err := os.Stat(rejectedPath); err != nil {
-		t.Errorf("expected file in rejected after reject: %v", err)
-	}
-}
-
-func TestResolveDMail_AlreadyResolved(t *testing.T) {
-	// given: a D-Mail that already has a resolution
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	now := time.Now().UTC()
-	if err := store.SaveResolution(Resolution{
-		Name:       "feedback-001",
-		Status:     string(DMailApproved),
-		Action:     "approve",
-		ResolvedAt: &now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.ResolveDMail(context.Background(), "feedback-001", "reject", "oops")
-
-	// then: should error
-	if err == nil {
-		t.Error("expected error when resolving already-resolved D-Mail")
-	}
-}
-
-func TestResolveDMail_NotFound(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.ResolveDMail(context.Background(), "feedback-999", "approve", "")
-
-	// then
-	if err == nil {
-		t.Error("expected error for non-existent D-Mail")
-	}
-}
-
-func TestResolveDMail_RejectEmptyReason(t *testing.T) {
-	// given: a legacy pending D-Mail
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.ResolveDMail(context.Background(), "feedback-001", "reject", "")
-
-	// then
-	if err == nil {
-		t.Fatal("expected error for reject with empty reason")
-	}
-	if !strings.Contains(err.Error(), "reason") {
-		t.Errorf("expected error to mention 'reason', got: %v", err)
-	}
-	// Resolution should not exist (not persisted)
-	_, resErr := store.LoadResolution("feedback-001")
-	if resErr == nil {
-		t.Error("expected no resolution to exist after failed reject")
-	}
-}
-
-func TestResolveDMail_NoPendingFile_NoOrphanResolution(t *testing.T) {
-	// given: a D-Mail in archive but NOT in pending/ (MY-359 default)
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	// No pending file — this is the default after MY-359
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when: resolve should fail because no pending file exists
-	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
-
-	// then: error expected
-	if err == nil {
-		t.Fatal("expected error when pending file is missing")
-	}
-	// then: resolution must NOT be persisted (no orphan resolution)
-	_, resErr := store.LoadResolution("feedback-001")
-	if resErr == nil {
-		t.Error("expected no resolution to exist after failure — orphan resolution detected")
-	}
-}
-
-func TestResolveDMail_SaveFailure_RollsBackMove(t *testing.T) {
-	// given: a legacy pending D-Mail
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-	// Simulate SaveResolution failure by making .run/ directory read-only
-	runDir := filepath.Join(root, ".run")
-	if err := os.Chmod(runDir, 0o555); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(runDir, 0o755) })
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when: resolve should fail at SaveResolution
-	err := a.ResolveDMail(context.Background(), "feedback-001", "approve", "")
-
-	// then: error expected
-	if err == nil {
-		t.Fatal("expected error when SaveResolution fails")
-	}
-	// then: file should be rolled back to pending/ (not stuck in outbox/)
-	pendingPath := filepath.Join(root, "pending", "feedback-001.md")
-	outboxPath := filepath.Join(root, "outbox", "feedback-001.md")
-	if _, statErr := os.Stat(pendingPath); statErr != nil {
-		t.Errorf("expected file back in pending/ after rollback: %v", statErr)
-	}
-	if _, statErr := os.Stat(outboxPath); statErr == nil {
-		t.Error("expected file NOT in outbox/ after rollback")
-	}
-}
-
 func TestAmadeus_PrintCheckOutput(t *testing.T) {
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
@@ -1569,90 +1286,6 @@ func TestRunCheck_ConvergenceTriggered_CreatesDMail(t *testing.T) {
 	}
 }
 
-func TestFullPipeline_ConvergenceDMail_Resolve_CommentPayload(t *testing.T) {
-	// given: a legacy pending convergence D-Mail with Issues
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	cd := DMail{
-		Name:        "convergence-001",
-		Kind:        KindConvergence,
-		Description: "auth/session.go convergence",
-		Severity:    SeverityHigh,
-		Issues:      []string{"MY-200", "MY-201"},
-		Targets:     []string{"auth/session.go"},
-		Body:        "6 D-Mails converged on auth/session.go",
-	}
-	if err := store.SaveDMail(cd); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, cd)
-
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when: resolve the convergence D-Mail
-	result, err := a.ResolveDMailResult(context.Background(), "convergence-001", "approve", "")
-
-	// then
-	if err != nil {
-		t.Fatalf("ResolveDMailResult: %v", err)
-	}
-	if result.Status != "approved" {
-		t.Errorf("expected status approved, got %s", result.Status)
-	}
-	if len(result.Comments) != 2 {
-		t.Fatalf("expected 2 comment payloads, got %d", len(result.Comments))
-	}
-	if result.Comments[0].IssueID != "MY-200" {
-		t.Errorf("expected MY-200, got %s", result.Comments[0].IssueID)
-	}
-	if result.Comments[0].Resolution != "approved" {
-		t.Errorf("expected resolution 'approved', got %s", result.Comments[0].Resolution)
-	}
-	if !strings.Contains(result.Comments[0].Body, "converged") {
-		t.Errorf("expected body to contain 'converged', got %q", result.Comments[0].Body)
-	}
-
-	// when: mark as commented
-	if err := store.MarkCommented("convergence-001", "MY-200"); err != nil {
-		t.Fatal(err)
-	}
-
-	// then: sync shows only MY-201 as pending
-	dataBuf.Reset()
-	if err := a.PrintSync(); err != nil {
-		t.Fatalf("PrintSync: %v", err)
-	}
-	var syncOut SyncOutput
-	if err := json.Unmarshal(dataBuf.Bytes(), &syncOut); err != nil {
-		t.Fatalf("parse sync output: %v", err)
-	}
-	if len(syncOut.PendingComments) != 1 {
-		t.Fatalf("expected 1 pending comment, got %d", len(syncOut.PendingComments))
-	}
-	if syncOut.PendingComments[0].IssueID != "MY-201" {
-		t.Errorf("expected MY-201, got %s", syncOut.PendingComments[0].IssueID)
-	}
-}
-
-// placePending writes a D-Mail file to pending/ for resolve tests.
-// After MY-359, SaveDMail no longer writes to pending/.
-func placePending(t *testing.T, root string, dmail DMail) {
-	t.Helper()
-	data, err := MarshalDMail(dmail)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "pending", dmail.Name+".md"), data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func filterDMailsByKind(dmails []DMail, kind DMailKind) []DMail {
 	var result []DMail
 	for _, d := range dmails {
@@ -1706,7 +1339,7 @@ func TestPrintLogJSON(t *testing.T) {
 	}
 }
 
-func TestPrintLogJSON_IncludesResolutionStatus(t *testing.T) {
+func TestPrintLogJSON_AllDMailsShowSentStatus(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
 	if err := InitGateDir(root); err != nil {
@@ -1714,160 +1347,32 @@ func TestPrintLogJSON_IncludesResolutionStatus(t *testing.T) {
 	}
 	store := NewStateStore(root)
 
-	// given: two D-Mails — one pending (high severity, no resolution), one approved
-	if err := store.SaveDMail(DMail{
-		Name: "feedback-001", Kind: KindFeedback,
-		Description: "pending dmail", Severity: SeverityHigh,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SaveDMail(DMail{
-		Name: "feedback-002", Kind: KindFeedback,
-		Description: "approved dmail", Severity: SeverityHigh,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	now := time.Now().UTC()
-	if err := store.SaveResolution(Resolution{
-		Name: "feedback-002", Status: "approved", Action: "approve", ResolvedAt: &now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	// A low-severity D-Mail (auto-sent, no resolution)
-	if err := store.SaveDMail(DMail{
-		Name: "feedback-003", Kind: KindFeedback,
-		Description: "low sev dmail", Severity: SeverityLow,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.PrintLogJSON()
-
-	// then
-	if err != nil {
-		t.Fatalf("PrintLogJSON failed: %v", err)
-	}
-
-	var parsed struct {
-		DMails []struct {
-			Name       string  `json:"name"`
-			Status     string  `json:"status"`
-			ResolvedAt *string `json:"resolved_at,omitempty"`
-		} `json:"dmails"`
-	}
-	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
-		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
-	}
-	if len(parsed.DMails) != 3 {
-		t.Fatalf("expected 3 dmails, got %d", len(parsed.DMails))
-	}
-
-	// feedback-001: high severity, no resolution → sent (MY-359: all severities auto-sent)
-	if parsed.DMails[0].Status != "sent" {
-		t.Errorf("feedback-001: expected status 'sent', got %q", parsed.DMails[0].Status)
-	}
-	// feedback-002: high severity, approved resolution
-	if parsed.DMails[1].Status != "approved" {
-		t.Errorf("feedback-002: expected status 'approved', got %q", parsed.DMails[1].Status)
-	}
-	if parsed.DMails[1].ResolvedAt == nil {
-		t.Error("feedback-002: expected resolved_at to be set")
-	}
-	// feedback-003: low severity, no resolution → sent
-	if parsed.DMails[2].Status != "sent" {
-		t.Errorf("feedback-003: expected status 'sent', got %q", parsed.DMails[2].Status)
-	}
-}
-
-func TestPrintLog_LegacyPendingShowsPendingStatus(t *testing.T) {
-	// given: a D-Mail that exists in both archive and pending (legacy state)
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	// Add a history entry so the D-Mails section is exercised
-	if err := store.SaveHistory(CheckResult{
-		CheckedAt: time.Date(2026, 2, 20, 10, 0, 0, 0, time.UTC),
-		Commit:    "aaa", Type: CheckTypeFull, Divergence: 0.1,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR-003 violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	// Simulate legacy state: file also in pending/
-	placePending(t, root, dmail)
-
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.PrintLog()
-
-	// then
-	if err != nil {
-		t.Fatalf("PrintLog failed: %v", err)
-	}
-	output := dataBuf.String()
-	if !strings.Contains(output, "pending") {
-		t.Errorf("expected 'pending' status for legacy pending D-Mail, got:\n%s", output)
-	}
-}
-
-func TestPrintLogJSON_LegacyPendingShowsPendingStatus(t *testing.T) {
-	// given: a D-Mail in archive + pending (legacy), another only in archive (sent)
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	pendingDMail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "legacy pending",
-		Severity:    SeverityHigh,
-	}
-	sentDMail := DMail{
-		Name:        "feedback-002",
-		Kind:        KindFeedback,
-		Description: "normally sent",
-		Severity:    SeverityLow,
-	}
-	for _, d := range []DMail{pendingDMail, sentDMail} {
-		if err := store.SaveDMail(d); err != nil {
+	// given: D-Mails of various severities
+	for _, spec := range []struct {
+		name     string
+		severity Severity
+	}{
+		{"feedback-001", SeverityHigh},
+		{"feedback-002", SeverityMedium},
+		{"feedback-003", SeverityLow},
+	} {
+		if err := store.SaveDMail(DMail{
+			Name: spec.name, Kind: KindFeedback,
+			Description: spec.name + " dmail", Severity: spec.severity,
+		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// Only feedback-001 has a legacy pending file
-	placePending(t, root, pendingDMail)
 
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.PrintLogJSON()
-
-	// then
-	if err != nil {
+	if err := a.PrintLogJSON(); err != nil {
 		t.Fatalf("PrintLogJSON failed: %v", err)
 	}
 
+	// then: all D-Mails have status "sent"
 	var parsed struct {
 		DMails []struct {
 			Name   string `json:"name"`
@@ -1877,56 +1382,13 @@ func TestPrintLogJSON_LegacyPendingShowsPendingStatus(t *testing.T) {
 	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
 		t.Fatalf("invalid JSON: %v\noutput: %s", err, dataBuf.String())
 	}
-	if len(parsed.DMails) != 2 {
-		t.Fatalf("expected 2 dmails, got %d", len(parsed.DMails))
+	if len(parsed.DMails) != 3 {
+		t.Fatalf("expected 3 dmails, got %d", len(parsed.DMails))
 	}
-	// feedback-001: legacy pending file exists → "pending"
-	if parsed.DMails[0].Status != "pending" {
-		t.Errorf("feedback-001: expected status 'pending', got %q", parsed.DMails[0].Status)
-	}
-	// feedback-002: no pending file → "sent"
-	if parsed.DMails[1].Status != "sent" {
-		t.Errorf("feedback-002: expected status 'sent', got %q", parsed.DMails[1].Status)
-	}
-}
-
-func TestResolveDMail_JSON(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "ADR violation",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	err := a.ResolveDMailJSON(context.Background(), "feedback-001", "approve", "")
-
-	// then
-	if err != nil {
-		t.Fatalf("ResolveDMailJSON failed: %v", err)
-	}
-	var parsed map[string]any
-	if err := json.Unmarshal(dataBuf.Bytes(), &parsed); err != nil {
-		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, dataBuf.String())
-	}
-	if parsed["name"] != "feedback-001" {
-		t.Errorf("expected name 'feedback-001', got %v", parsed["name"])
-	}
-	if parsed["status"] != "approved" {
-		t.Errorf("expected status 'approved', got %v", parsed["status"])
+	for _, d := range parsed.DMails {
+		if d.Status != "sent" {
+			t.Errorf("%s: expected status 'sent', got %q", d.Name, d.Status)
+		}
 	}
 }
 
@@ -2124,88 +1586,6 @@ func TestPrintSync_OutputJSON(t *testing.T) {
 	}
 	if output.PendingComments[0].DMail != "feedback-002" {
 		t.Errorf("expected feedback-002, got %s", output.PendingComments[0].DMail)
-	}
-}
-
-func TestResolveDMailResult_WithIssues_IncludesComments(t *testing.T) {
-	// given: a legacy pending D-Mail with Issues
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-010",
-		Kind:        KindFeedback,
-		Description: "needs comment",
-		Severity:    SeverityHigh,
-		Issues:      []string{"MY-310", "MY-311"},
-		Body:        "Some body text",
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	result, err := a.ResolveDMailResult(context.Background(), "feedback-010", "approve", "")
-
-	// then
-	if err != nil {
-		t.Fatalf("ResolveDMailResult failed: %v", err)
-	}
-	if len(result.Comments) != 2 {
-		t.Fatalf("expected 2 comments, got %d", len(result.Comments))
-	}
-	if result.Comments[0].IssueID != "MY-310" {
-		t.Errorf("expected MY-310, got %s", result.Comments[0].IssueID)
-	}
-	if result.Comments[1].IssueID != "MY-311" {
-		t.Errorf("expected MY-311, got %s", result.Comments[1].IssueID)
-	}
-	if result.Comments[0].Resolution != "approved" {
-		t.Errorf("expected resolution 'approved', got %s", result.Comments[0].Resolution)
-	}
-	if !strings.Contains(result.Comments[0].Body, "Some body text") {
-		t.Errorf("expected body to contain 'Some body text', got %q", result.Comments[0].Body)
-	}
-}
-
-func TestResolveDMailResult_NoIssues_NoComments(t *testing.T) {
-	// given: a legacy pending D-Mail without Issues
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-	dmail := DMail{
-		Name:        "feedback-011",
-		Kind:        KindFeedback,
-		Description: "no issues",
-		Severity:    SeverityHigh,
-	}
-	if err := store.SaveDMail(dmail); err != nil {
-		t.Fatal(err)
-	}
-	placePending(t, root, dmail)
-
-	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
-
-	// when
-	result, err := a.ResolveDMailResult(context.Background(), "feedback-011", "approve", "")
-
-	// then
-	if err != nil {
-		t.Fatalf("ResolveDMailResult failed: %v", err)
-	}
-	if len(result.Comments) != 0 {
-		t.Errorf("expected 0 comments, got %d", len(result.Comments))
 	}
 }
 

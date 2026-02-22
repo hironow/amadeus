@@ -201,31 +201,3 @@ func TestE2E_MarkCommented_ErrorTooManyArgs(t *testing.T) {
 		t.Fatal("expected error for too many args")
 	}
 }
-
-func TestE2E_Sync_IncludesResolutionStatus(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
-
-	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "Test", Severity: "high", Issues: []string{"MY-100"}},
-	})
-
-	// Resolve the D-Mail
-	runCmd(t, dir, "resolve", "feedback-001", "--approve")
-
-	// Sync should show status as "approved"
-	stdout, _, _ := runCmd(t, dir, "sync")
-	var result struct {
-		PendingComments []struct {
-			Status string `json:"status"`
-		} `json:"pending_comments"`
-	}
-	parseJSONOutput(t, stdout, &result)
-
-	if len(result.PendingComments) != 1 {
-		t.Fatalf("expected 1 pending comment, got %d", len(result.PendingComments))
-	}
-	if result.PendingComments[0].Status != "approved" {
-		t.Errorf("expected status=approved, got %s", result.PendingComments[0].Status)
-	}
-}
