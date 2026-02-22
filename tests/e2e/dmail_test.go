@@ -13,7 +13,7 @@ import (
 
 // --- D-Mail Severity Routing ---
 
-func TestE2E_DMail_HighSeverity_GoesToPending(t *testing.T) {
+func TestE2E_DMail_HighSeverity_GoesToOutbox(t *testing.T) {
 	dir := initTestRepo(t)
 	cfg := defaultTestConfig()
 	cfg["thresholds"] = map[string]any{
@@ -25,11 +25,11 @@ func TestE2E_DMail_HighSeverity_GoesToPending(t *testing.T) {
 	_, _, err := runCmd(t, dir, "check", "--full", "--json")
 	assertExitCode(t, err, 2)
 
-	pendingFiles := listDir(t, filepath.Join(dir, ".gate", "pending"))
+	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
 	archiveFiles := listDir(t, filepath.Join(dir, ".gate", "archive"))
 
-	if len(pendingFiles) == 0 {
-		t.Error("HIGH severity D-Mail should be in pending/")
+	if len(outboxFiles) == 0 {
+		t.Error("HIGH severity D-Mail should be in outbox/")
 	}
 	if len(archiveFiles) == 0 {
 		t.Error("D-Mail should always be in archive/")
@@ -49,13 +49,9 @@ func TestE2E_DMail_LowSeverity_GoesToOutbox(t *testing.T) {
 	assertExitCode(t, err, 2)
 
 	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
-	pendingFiles := listDir(t, filepath.Join(dir, ".gate", "pending"))
 
 	if len(outboxFiles) == 0 {
 		t.Error("LOW severity D-Mail should be in outbox/")
-	}
-	if len(pendingFiles) != 0 {
-		t.Error("LOW severity D-Mail should NOT be in pending/")
 	}
 }
 

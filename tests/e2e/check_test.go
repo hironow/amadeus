@@ -172,10 +172,10 @@ func TestE2E_Check_SeverityRouting_High(t *testing.T) {
 	_, _, err := runCmd(t, dir, "check", "--full", "--json")
 	assertExitCode(t, err, 2)
 
-	// HIGH severity D-Mails should be in pending/
-	pendingFiles := listDir(t, filepath.Join(dir, ".gate", "pending"))
-	if len(pendingFiles) == 0 {
-		t.Error("expected D-Mail files in pending/ (HIGH severity)")
+	// HIGH severity D-Mails should be in outbox/ (all severities auto-sent)
+	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
+	if len(outboxFiles) == 0 {
+		t.Error("expected D-Mail files in outbox/ (HIGH severity)")
 	}
 }
 
@@ -196,12 +196,6 @@ func TestE2E_Check_SeverityRouting_Low(t *testing.T) {
 	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
 	if len(outboxFiles) == 0 {
 		t.Error("expected D-Mail files in outbox/ (LOW severity auto-sent)")
-	}
-
-	// Nothing in pending/
-	pendingFiles := listDir(t, filepath.Join(dir, ".gate", "pending"))
-	if len(pendingFiles) != 0 {
-		t.Errorf("expected no files in pending/ for LOW severity, got %d", len(pendingFiles))
 	}
 }
 
