@@ -2,7 +2,9 @@ package amadeus
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -252,11 +254,17 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 	archiveDir := filepath.Join(gateRoot, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
-		// No archive directory — nothing to validate
+		if errors.Is(err, fs.ErrNotExist) {
+			return DoctorCheckResult{
+				Name:    "D-Mail Schema",
+				Status:  CheckOK,
+				Message: "no archive directory",
+			}
+		}
 		return DoctorCheckResult{
 			Name:    "D-Mail Schema",
-			Status:  CheckOK,
-			Message: "no archive directory",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("read archive: %v", err),
 		}
 	}
 

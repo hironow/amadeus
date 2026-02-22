@@ -467,8 +467,28 @@ func TestCheckDMailSchema_NoGateDir(t *testing.T) {
 	// when
 	result := checkDMailSchema(root)
 
-	// then: skip, not fail
+	// then: OK — directory simply doesn't exist yet
 	if result.Status != CheckOK {
 		t.Errorf("expected CheckOK for missing .gate, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
+	// given: archive/ exists but is not readable
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	archiveDir := filepath.Join(root, "archive")
+	os.Chmod(archiveDir, 0o000)
+	defer os.Chmod(archiveDir, 0o755)
+
+	// when
+	result := checkDMailSchema(root)
+
+	// then: FAIL — permission error should not be masked
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail for permission error, got %v: %s", result.Status, result.Message)
 	}
 }
