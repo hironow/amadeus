@@ -110,6 +110,20 @@ release-check:
 release-snapshot:
     goreleaser release --snapshot --clean
 
+# Build and run E2E tests in Docker
+test-e2e:
+    docker compose -f tests/e2e/compose-e2e.yaml build
+    docker compose -f tests/e2e/compose-e2e.yaml run --rm e2e go test -tags e2e ./tests/e2e/ -count=1 -v -timeout=600s
+
+# Interactive shell inside E2E container
+test-e2e-shell:
+    docker compose -f tests/e2e/compose-e2e.yaml build
+    docker compose -f tests/e2e/compose-e2e.yaml run --rm -it e2e /bin/sh
+
+# Clean E2E containers and volumes
+test-e2e-down:
+    docker compose -f tests/e2e/compose-e2e.yaml down --rmi local --volumes
+
 # Clean build artifacts
 clean:
     rm -f {{TOOL}} coverage.out
