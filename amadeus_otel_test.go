@@ -216,6 +216,9 @@ func TestResolveDMail_CreatesSpan(t *testing.T) {
 		Body:        "detail",
 	}
 	store.SaveDMail(dmail)
+	// Place in pending for resolve eligibility (MY-359: SaveDMail no longer writes to pending)
+	data, _ := MarshalDMail(dmail)
+	os.WriteFile(filepath.Join(divRoot, "pending", "feedback-001.md"), data, 0o644)
 
 	a := &Amadeus{
 		Config:  DefaultConfig(),

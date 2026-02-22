@@ -166,12 +166,11 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// RouteDMail applies severity-based status mapping.
-// HIGH severity requires human approval (pending); all others are auto-sent.
-func RouteDMail(severity Severity) DMailStatus {
-	if severity == SeverityHigh {
-		return DMailPending
-	}
+// RouteDMail returns the routing status for a D-Mail.
+// All D-Mails are now auto-sent directly to outbox (MY-359).
+// Deprecated: sender-side gating via pending/ is removed. Receiver-side tools
+// (sightjack, paintress) handle their own approval workflows.
+func RouteDMail(_ Severity) DMailStatus {
 	return DMailSent
 }
 
@@ -197,10 +196,9 @@ func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
 	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// SaveDMail writes a D-Mail to archive/ and either outbox/ or pending/.
+// SaveDMail writes a D-Mail to archive/ and outbox/.
 // Archive is always written first so the permanent record exists even if
-// the second write fails. HIGH severity D-Mails go to pending/ for human
-// approval; all others go directly to outbox/ for courier delivery.
+// the second write fails. All D-Mails go directly to outbox/ (MY-359).
 func (s *StateStore) SaveDMail(dmail DMail) error {
 	data, err := MarshalDMail(dmail)
 	if err != nil {
@@ -211,18 +209,20 @@ func (s *StateStore) SaveDMail(dmail DMail) error {
 	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
 		return fmt.Errorf("write archive: %w", err)
 	}
-	if RouteDMail(dmail.Severity) == DMailPending {
-		pendingPath := filepath.Join(s.Root, "pending", filename)
-		if err := os.WriteFile(pendingPath, data, 0o644); err != nil {
-			return fmt.Errorf("write pending: %w", err)
-		}
-		return nil
-	}
 	outboxPath := filepath.Join(s.Root, "outbox", filename)
 	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
 		return fmt.Errorf("write outbox: %w", err)
 	}
 	return nil
+}
+
+// IsPending checks if a D-Mail has a file in the pending/ directory.
+// After MY-359, SaveDMail no longer writes to pending/. This method
+// exists to support resolving legacy pending items.
+func (s *StateStore) IsPending(name string) bool {
+	path := filepath.Join(s.Root, "pending", name+".md")
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // LoadDMail reads a single D-Mail by name from the archive/ directory.

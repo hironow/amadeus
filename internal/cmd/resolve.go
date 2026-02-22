@@ -22,6 +22,7 @@ func newResolveCommand() *cobra.Command {
 		Short: "Resolve D-Mail items",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: 'amadeus resolve' is deprecated (MY-359). All D-Mails now go directly to outbox.")
 			approve, _ := cmd.Flags().GetBool("approve")
 			reject, _ := cmd.Flags().GetBool("reject")
 			reason, _ := cmd.Flags().GetString("reason")

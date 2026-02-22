@@ -452,31 +452,18 @@ func (a *Amadeus) PrintCheckOutput(result CheckResult, dmails []DMail, previousD
 	if len(dmails) > 0 {
 		a.dataOut("")
 		a.dataOut("D-Mails:")
-		pending := 0
 		for _, d := range dmails {
 			var prefix string
-			routeStatus := RouteDMail(d.Severity)
 			switch d.Severity {
 			case SeverityHigh:
 				prefix = "[HIGH]"
-				if routeStatus == DMailPending {
-					pending++
-				}
 			case SeverityMedium:
 				prefix = "[MED] "
 			default:
 				prefix = "[LOW] "
 			}
-			status := "sent"
-			if routeStatus == DMailPending {
-				status = "awaiting approval"
-			}
-			a.dataOut("  %s %s %s → %s",
-				prefix, d.Name, d.Description, status)
-		}
-		if pending > 0 {
-			a.dataOut("")
-			a.dataOut("%d pending. Run `amadeus resolve <name> --approve` or `--reject`", pending)
+			a.dataOut("  %s %s %s → sent",
+				prefix, d.Name, d.Description)
 		}
 	}
 
@@ -526,20 +513,9 @@ func (a *Amadeus) PrintCheckOutputJSON(result CheckResult, dmails []DMail, previ
 
 // PrintCheckOutputQuiet renders a single-line summary for --quiet mode.
 func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, previousDivergence float64) {
-	pending := 0
-	for _, d := range dmails {
-		if RouteDMail(d.Severity) == DMailPending {
-			pending++
-		}
-	}
 	dmailLabel := "D-Mails"
 	if len(dmails) == 1 {
 		dmailLabel = "D-Mail"
-	}
-
-	pendingStr := ""
-	if pending > 0 {
-		pendingStr = fmt.Sprintf(" (%d pending)", pending)
 	}
 
 	convergenceStr := ""
@@ -547,12 +523,11 @@ func (a *Amadeus) PrintCheckOutputQuiet(result CheckResult, dmails []DMail, prev
 		convergenceStr = fmt.Sprintf(" %d convergence", len(result.ConvergenceAlerts))
 	}
 
-	a.dataOut("%s (%s) %d %s%s%s",
+	a.dataOut("%s (%s) %d %s%s",
 		FormatDivergence(result.Divergence*100),
 		FormatDelta(result.Divergence, previousDivergence),
 		len(dmails),
 		dmailLabel,
-		pendingStr,
 		convergenceStr)
 }
 
@@ -627,9 +602,10 @@ func (a *Amadeus) resolveDMailCore(ctx context.Context, name, action, reason str
 		return DMail{}, Resolution{}, span, fmt.Errorf("load resolution: %w", err)
 	}
 
-	// Only HIGH severity DMails are pending (eligible for resolution)
-	if RouteDMail(dmail.Severity) != DMailPending {
-		return DMail{}, Resolution{}, span, fmt.Errorf("D-Mail %s is not pending (severity: %s)", name, dmail.Severity)
+	// Check if D-Mail is pending (file-based check for legacy pending items).
+	// After MY-359, SaveDMail no longer writes to pending/.
+	if !a.Store.IsPending(name) {
+		return DMail{}, Resolution{}, span, fmt.Errorf("D-Mail %s is not pending", name)
 	}
 
 	now := time.Now().UTC()
