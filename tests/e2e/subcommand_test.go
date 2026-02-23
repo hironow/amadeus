@@ -84,12 +84,12 @@ func TestE2E_Validate_ValidConfig(t *testing.T) {
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
-	stdout, _, err := runCmd(t, dir, "validate")
+	_, stderr, err := runCmd(t, dir, "validate")
 	if err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-	if !strings.Contains(stdout, "[OK]") {
-		t.Errorf("expected [OK] in output, got: %s", stdout)
+	if !strings.Contains(stderr, "[OK]") {
+		t.Errorf("expected [OK] in stderr, got: %s", stderr)
 	}
 }
 
@@ -115,11 +115,11 @@ func TestE2E_Doctor(t *testing.T) {
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
-	stdout, _, err := runCmd(t, dir, "doctor")
-	// doctor may pass or fail depending on environment, but should produce output
+	_, stderr, err := runCmd(t, dir, "doctor")
+	// doctor may pass or fail depending on environment, but should produce output on stderr
 	_ = err
-	if stdout == "" {
-		t.Error("expected doctor output")
+	if stderr == "" {
+		t.Error("expected doctor output on stderr")
 	}
 }
 
