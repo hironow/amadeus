@@ -1152,14 +1152,12 @@ func TestRunCheck_FullPipeline_CreatesDMails(t *testing.T) {
 		],
 		"reasoning": "Moderate divergence detected."
 	}`
-	cleanup := installFakeClaude(cannedResponse)
-	defer cleanup()
-
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
 		Config:  DefaultConfig(),
 		Store:   store,
 		Git:     NewGitClient(repo.dir),
+		Claude:  &fakeClaudeRunner{response: cannedResponse},
 		Logger:  NewLogger(&logBuf, false),
 		DataOut: &dataBuf,
 	}
@@ -1240,14 +1238,12 @@ func TestRunCheck_ConvergenceTriggered_CreatesDMail(t *testing.T) {
 		"dmails": [],
 		"reasoning": "Clean check."
 	}`
-	cleanup := installFakeClaude(cleanResponse)
-	defer cleanup()
-
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
 		Config:  DefaultConfig(),
 		Store:   store,
 		Git:     NewGitClient(repo.dir),
+		Claude:  &fakeClaudeRunner{response: cleanResponse},
 		Logger:  NewLogger(&logBuf, false),
 		DataOut: &dataBuf,
 	}
