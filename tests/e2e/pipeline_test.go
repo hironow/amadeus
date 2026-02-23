@@ -94,22 +94,22 @@ func TestE2E_Pipeline_HookInstallUninstall(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Install hook
-	stdout, _, err := runCmd(t, dir, "install-hook")
+	_, stderr, err := runCmd(t, dir, "install-hook")
 	if err != nil {
-		t.Fatalf("install-hook: %v\nstdout: %s", err, stdout)
+		t.Fatalf("install-hook: %v\nstderr: %s", err, stderr)
 	}
-	if !strings.Contains(stdout, "Installed") {
-		t.Errorf("expected 'Installed' in output, got: %s", stdout)
+	if !strings.Contains(stderr, "Installed") {
+		t.Errorf("expected 'Installed' in stderr, got: %s", stderr)
 	}
 	assertFileExists(t, filepath.Join(dir, ".git", "hooks", "post-merge"))
 
 	// Uninstall hook
-	stdout, _, err = runCmd(t, dir, "uninstall-hook")
+	_, stderr, err = runCmd(t, dir, "uninstall-hook")
 	if err != nil {
 		t.Fatalf("uninstall-hook: %v", err)
 	}
-	if !strings.Contains(stdout, "Removed") {
-		t.Errorf("expected 'Removed' in output, got: %s", stdout)
+	if !strings.Contains(stderr, "Removed") {
+		t.Errorf("expected 'Removed' in stderr, got: %s", stderr)
 	}
 	assertFileNotExists(t, filepath.Join(dir, ".git", "hooks", "post-merge"))
 }

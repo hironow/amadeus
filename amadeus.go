@@ -70,10 +70,12 @@ func (a *Amadeus) ShouldFullCheck(forceFlag bool) bool {
 	return a.CheckCount >= a.Config.FullCheck.Interval
 }
 
-// RunCheck executes the three-phase divergence check pipeline:
+// RunCheck executes the five-phase divergence check pipeline:
+//   - Phase 0: Inbox consumption (scan inbound D-Mails)
 //   - Phase 1: ReadingSteiner detects shifts (diff or full scan)
 //   - Phase 2: Claude evaluates divergence, DivergenceMeter scores it
 //   - Phase 3: D-Mail generation and routing
+//   - Phase 4: World Line Convergence detection
 func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	ctx, span := tracer.Start(ctx, "amadeus.check",
 		trace.WithAttributes(

@@ -31,11 +31,10 @@ func newDoctorCommand() *cobra.Command {
 
 			results := amadeus.RunDoctor(cmd.Context(), configPath, repoRoot)
 
-			w := cmd.OutOrStdout()
 			if jsonOut {
-				return printDoctorJSON(w, results)
+				return printDoctorJSON(cmd.OutOrStdout(), results)
 			}
-			return printDoctorText(w, results)
+			return printDoctorText(cmd.ErrOrStderr(), results)
 		},
 	}
 

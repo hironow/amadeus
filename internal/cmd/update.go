@@ -37,17 +37,17 @@ func newUpdateCommand() *cobra.Command {
 				return fmt.Errorf("detect latest version: %w", err)
 			}
 			if !found {
-				fmt.Fprintln(cmd.OutOrStdout(), "no release found")
+				fmt.Fprintln(cmd.ErrOrStderr(), "no release found")
 				return nil
 			}
 
 			if isUpToDate(Version, latest.Version()) {
-				fmt.Fprintf(cmd.OutOrStdout(), "already up to date (%s)\n", Version)
+				fmt.Fprintf(cmd.ErrOrStderr(), "already up to date (%s)\n", Version)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.OutOrStdout(), "new version available: %s (current: %s)\n",
+				fmt.Fprintf(cmd.ErrOrStderr(), "new version available: %s (current: %s)\n",
 					latest.Version(), Version)
 				return nil
 			}
@@ -61,7 +61,7 @@ func newUpdateCommand() *cobra.Command {
 				return fmt.Errorf("update binary: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "updated to %s\n", latest.Version())
+			fmt.Fprintf(cmd.ErrOrStderr(), "updated to %s\n", latest.Version())
 			return nil
 		},
 	}
