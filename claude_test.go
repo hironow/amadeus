@@ -237,17 +237,36 @@ func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 	}
 }
 
-// installFakeClaude replaces runClaude with a fake that returns canned JSON.
-// Returns a cleanup function that restores the original.
-func installFakeClaude(response string) func() {
-	orig := runClaude
-	runClaude = func(_ context.Context, _ string) ([]byte, error) {
-		return []byte(response), nil
-	}
-	return func() { runClaude = orig }
+// fakeClaudeRunner returns a canned response for testing.
+type fakeClaudeRunner struct {
+	response string
 }
 
-func TestRunClaude_FakeInstallation(t *testing.T) {
+func (f *fakeClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
+	return []byte(f.response), nil
+}
+
+// errorClaudeRunner always returns the configured error.
+type errorClaudeRunner struct {
+	err error
+}
+
+func (e *errorClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
+	return nil, e.err
+}
+
+// capturingClaudeRunner records prompts and returns a canned response.
+type capturingClaudeRunner struct {
+	calls    []string
+	response string
+}
+
+func (c *capturingClaudeRunner) Run(_ context.Context, prompt string) ([]byte, error) {
+	c.calls = append(c.calls, prompt)
+	return []byte(c.response), nil
+}
+
+func TestFakeClaudeRunner(t *testing.T) {
 	// given
 	canned := `{
 		"axes": {
@@ -259,11 +278,10 @@ func TestRunClaude_FakeInstallation(t *testing.T) {
 		"dmails": [],
 		"reasoning": "fake response"
 	}`
-	cleanup := installFakeClaude(canned)
-	defer cleanup()
+	fake := &fakeClaudeRunner{response: canned}
 
 	// when
-	raw, err := runClaude(context.Background(), "test prompt")
+	raw, err := fake.Run(context.Background(), "test prompt")
 
 	// then
 	if err != nil {

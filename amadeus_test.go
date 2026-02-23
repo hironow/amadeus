@@ -1152,14 +1152,12 @@ func TestRunCheck_FullPipeline_CreatesDMails(t *testing.T) {
 		],
 		"reasoning": "Moderate divergence detected."
 	}`
-	cleanup := installFakeClaude(cannedResponse)
-	defer cleanup()
-
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
 		Config:  DefaultConfig(),
 		Store:   store,
 		Git:     NewGitClient(repo.dir),
+		Claude:  &fakeClaudeRunner{response: cannedResponse},
 		Logger:  NewLogger(&logBuf, false),
 		DataOut: &dataBuf,
 	}
@@ -1240,14 +1238,12 @@ func TestRunCheck_ConvergenceTriggered_CreatesDMail(t *testing.T) {
 		"dmails": [],
 		"reasoning": "Clean check."
 	}`
-	cleanup := installFakeClaude(cleanResponse)
-	defer cleanup()
-
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
 		Config:  DefaultConfig(),
 		Store:   store,
 		Git:     NewGitClient(repo.dir),
+		Claude:  &fakeClaudeRunner{response: cleanResponse},
 		Logger:  NewLogger(&logBuf, false),
 		DataOut: &dataBuf,
 	}
@@ -1745,5 +1741,83 @@ func TestPrintLogJSON_IncludesConsumed(t *testing.T) {
 	}
 	if !strings.Contains(output, "report-001") {
 		t.Errorf("expected 'report-001' in JSON output, got:\n%s", output)
+	}
+}
+
+// --- ClaudeRunner interface tests (MY-376) ---
+
+func TestClaudeRunnerNilFallback(t *testing.T) {
+	// given: Amadeus without Claude field set
+	a := &Amadeus{Config: DefaultConfig()}
+
+	// when
+	runner := a.claudeRunner()
+
+	// then: returns a non-nil ClaudeRunner via fallback
+	if runner == nil {
+		t.Fatal("expected non-nil ClaudeRunner from nil fallback")
+	}
+}
+
+func TestRunCheck_ClaudeError_Propagates(t *testing.T) {
+	// given: a git repo with Claude that returns an error
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(divRoot)
+
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     NewGitClient(repo.dir),
+		Claude:  &errorClaudeRunner{err: fmt.Errorf("claude unavailable")},
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, Quiet: true})
+
+	// then: error propagates
+	if err == nil {
+		t.Fatal("expected error from RunCheck when Claude fails")
+	}
+	if !strings.Contains(err.Error(), "claude unavailable") {
+		t.Errorf("expected 'claude unavailable' in error, got: %v", err)
+	}
+}
+
+func TestRunCheck_DryRun_SkipsClaude(t *testing.T) {
+	// given: a git repo with a capturing Claude runner
+	repo := setupTestRepo(t)
+	divRoot := filepath.Join(repo.dir, ".gate")
+	if err := InitGateDir(divRoot); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStateStore(divRoot)
+
+	capturing := &capturingClaudeRunner{response: `{}`}
+	var logBuf, dataBuf bytes.Buffer
+	a := &Amadeus{
+		Config:  DefaultConfig(),
+		Store:   store,
+		Git:     NewGitClient(repo.dir),
+		Claude:  capturing,
+		Logger:  NewLogger(&logBuf, false),
+		DataOut: &dataBuf,
+	}
+
+	// when
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+
+	// then: no error and Claude was never called
+	if err != nil {
+		t.Fatalf("expected no error from RunCheck in DryRun, got: %v", err)
+	}
+	if len(capturing.calls) != 0 {
+		t.Errorf("expected 0 Claude calls in DryRun, got %d", len(capturing.calls))
 	}
 }
