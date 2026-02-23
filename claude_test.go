@@ -246,6 +246,26 @@ func (f *fakeClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
 	return []byte(f.response), nil
 }
 
+// errorClaudeRunner always returns the configured error.
+type errorClaudeRunner struct {
+	err error
+}
+
+func (e *errorClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
+	return nil, e.err
+}
+
+// capturingClaudeRunner records prompts and returns a canned response.
+type capturingClaudeRunner struct {
+	calls    []string
+	response string
+}
+
+func (c *capturingClaudeRunner) Run(_ context.Context, prompt string) ([]byte, error) {
+	c.calls = append(c.calls, prompt)
+	return []byte(c.response), nil
+}
+
 func TestFakeClaudeRunner(t *testing.T) {
 	// given
 	canned := `{
