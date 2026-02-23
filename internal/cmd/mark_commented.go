@@ -54,7 +54,7 @@ func newMarkCommentedCommand() *cobra.Command {
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(out)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Marked %s:%s as commented.\n", dmailName, issueID)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Marked %s:%s as commented.\n", dmailName, issueID)
 			return nil
 		},
 	}

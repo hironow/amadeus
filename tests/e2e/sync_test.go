@@ -83,15 +83,15 @@ func TestE2E_MarkCommented_Text(t *testing.T) {
 		{Name: "feedback-001", Kind: "feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
-	stdout, _, err := runCmd(t, dir, "mark-commented", "feedback-001", "MY-100")
+	_, stderr, err := runCmd(t, dir, "mark-commented", "feedback-001", "MY-100")
 	if err != nil {
-		t.Fatalf("mark-commented: %v\nstdout: %s", err, stdout)
+		t.Fatalf("mark-commented: %v\nstderr: %s", err, stderr)
 	}
-	if !strings.Contains(stdout, "feedback-001:MY-100") {
-		t.Errorf("expected 'feedback-001:MY-100' in output, got: %s", stdout)
+	if !strings.Contains(stderr, "feedback-001:MY-100") {
+		t.Errorf("expected 'feedback-001:MY-100' in stderr, got: %s", stderr)
 	}
-	if !strings.Contains(stdout, "commented") {
-		t.Errorf("expected 'commented' in output, got: %s", stdout)
+	if !strings.Contains(stderr, "commented") {
+		t.Errorf("expected 'commented' in stderr, got: %s", stderr)
 	}
 }
 
