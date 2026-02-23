@@ -46,19 +46,19 @@ type Amadeus struct {
 	Config        Config
 	Store         *StateStore
 	Git           *GitClient
-	Claude        ClaudeRunner // nil falls back to defaultClaudeRunner
+	Claude        ClaudeRunner // nil falls back to the default Claude runner
 	Logger        *Logger
 	DataOut       io.Writer // machine-readable output (stdout); Logger is for human progress (stderr)
 	CheckCount    int       // number of diff checks since last full check
 	ForceFullNext bool      // set when a divergence jump defers a full scan to the next run
 }
 
-// claudeRunner returns the configured ClaudeRunner, falling back to defaultClaudeRunner if nil.
+// claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
 func (a *Amadeus) claudeRunner() ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
-	return &defaultClaudeRunner{}
+	return DefaultClaudeRunner()
 }
 
 // CheckOptions controls how RunCheck operates.

@@ -1753,12 +1753,9 @@ func TestClaudeRunnerNilFallback(t *testing.T) {
 	// when
 	runner := a.claudeRunner()
 
-	// then: returns defaultClaudeRunner (not nil)
+	// then: returns a non-nil ClaudeRunner via fallback
 	if runner == nil {
 		t.Fatal("expected non-nil ClaudeRunner from nil fallback")
-	}
-	if _, ok := runner.(*defaultClaudeRunner); !ok {
-		t.Errorf("expected *defaultClaudeRunner, got %T", runner)
 	}
 }
 
@@ -1814,9 +1811,12 @@ func TestRunCheck_DryRun_SkipsClaude(t *testing.T) {
 	}
 
 	// when
-	_ = a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
+	err := a.RunCheck(context.Background(), CheckOptions{Full: true, DryRun: true, Quiet: true})
 
-	// then: Claude was never called
+	// then: no error and Claude was never called
+	if err != nil {
+		t.Fatalf("expected no error from RunCheck in DryRun, got: %v", err)
+	}
 	if len(capturing.calls) != 0 {
 		t.Errorf("expected 0 Claude calls in DryRun, got %d", len(capturing.calls))
 	}
