@@ -1,0 +1,124 @@
+rules:
+  # ==========================================================================
+  # ADR enforcement rules
+  # docs/adr/ (0000-0010) のうち Go コードで静的検知できるものをカバー
+  # 対象外: ADR 0000 (governance), ADR 0004 (data format)
+  # ==========================================================================
+
+  # --- ADR 0001: cobra CLI conventions ---
+
+  # Rule 1: cobra.Command with Run instead of RunE
+  # Source: ADR 0001 — "All commands use RunE"
+  - id: adr0001-cobra-run-without-rune
+    languages: [go]
+    message: |
+      cobra.Command で Run フィールドを使用しないでください。
+      RunE を使用して error を返すようにしてください。
+      Run は error を返せないため、main() での exit code 制御ができなくなります。
+      Ref: docs/adr/0001-cobra-cli-framework.md
+    severity: ERROR
+    pattern: |
+      &cobra.Command{
+        ...,
+        Run: $FUNC,
+        ...,
+      }
+
+  # --- ADR 0003: OTel noop-default ---
+
+  # Rule 2: otel.SetTracerProvider outside InitTracer
+  # Source: ADR 0003 — centralized tracer initialization
+  - id: adr0003-otel-set-tracer-provider-outside-init
+    languages: [go]
+    message: |
+      otel.SetTracerProvider() は InitTracer() 内でのみ呼び出してください。
+      TracerProvider の設定を分散させると noop デフォルトの保証が崩れます。
+      Ref: docs/adr/0003-otel-noop-default-tracer.md
+    severity: WARNING
+    patterns:
+      - pattern: otel.SetTracerProvider(...)
+      - pattern-not-inside: |
+          func InitTracer(...) $RET {
+            ...
+          }
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # --- ADR 0005: fsnotify daemon ---
+
+  # Rule 3: fsnotify.NewWatcher without defer Close
+  # Source: ADR 0005 — watcher lifecycle management
+  - id: adr0005-fsnotify-watcher-without-close
+    languages: [go]
+    message: |
+      fsnotify.NewWatcher() の後に defer $W.Close() がありません。
+      watcher のファイルディスクリプタがリークします。
+      同一関数内で defer watcher.Close() を呼び出すか、
+      struct に保存して別途 Close する場合は nosemgrep を付与してください。
+      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $W, $ERR := fsnotify.NewWatcher()
+      - pattern-not-inside: |
+          $W, $_ := fsnotify.NewWatcher()
+          ...
+          defer $W.Close()
+
+  # Rule 4: String concatenation for file paths
+  # Source: ADR 0005 + Go convention — use filepath.Join
+  - id: adr0005-string-concat-file-path
+    languages: [go]
+    message: |
+      文字列連結 (+ "/" +) でファイルパスを構築しないでください。
+      filepath.Join() を使用してください。
+      OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
+      マップキーや表示用ラベルの場合は nosemgrep を付与してください。
+      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+    severity: WARNING
+    pattern-regex: '\+\s*"/"\s*\+'
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # --- ADR 0003: OTel noop-default (continued) ---
+
+  # Rule 5: otel.SetMeterProvider outside InitTracer
+  # Source: ADR 0003 — centralized provider initialization
+  - id: adr0003-otel-set-meter-provider-outside-init
+    languages: [go]
+    message: |
+      otel.SetMeterProvider() は InitTracer() 内でのみ呼び出してください。
+      MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
+      TracerProvider と同様に集中管理してください。
+      Ref: docs/adr/0003-otel-noop-default-tracer.md
+    severity: WARNING
+    patterns:
+      - pattern: otel.SetMeterProvider(...)
+      - pattern-not-inside: |
+          func InitTracer(...) $RET {
+            ...
+          }
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # --- ADR 0005: fsnotify daemon (continued) ---
+
+  # Rule 6: mutex Lock without defer Unlock
+  # Source: ADR 0005 — thread-safe daemon operations
+  - id: adr0005-mutex-lock-without-defer-unlock
+    languages: [go]
+    message: |
+      $M.Lock() の直後に defer $M.Unlock() がありません。
+      Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
+      条件付き Unlock が必要な場合は nosemgrep を付与してください。
+      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+    severity: ERROR
+    patterns:
+      - pattern: $M.Lock()
+      - pattern-not-inside: |
+          $M.Lock()
+          ...
+          defer $M.Unlock()
