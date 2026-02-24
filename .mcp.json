@@ -3,6 +3,10 @@
     "jaeger": {
       "type": "http",
       "url": "http://localhost:16687/mcp"
+    },
+    "linear-server": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
     }
   }
 }
