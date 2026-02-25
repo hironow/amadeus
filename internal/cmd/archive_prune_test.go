@@ -88,6 +88,62 @@ func TestArchivePrune_PrunesEventFiles(t *testing.T) {
 	}
 }
 
+func TestArchivePrune_FailsWhenEventRecordFails(t *testing.T) {
+	// given: archive with an old file, events dir is read-only so Append fails
+	tmpDir := t.TempDir()
+	archiveDir := filepath.Join(tmpDir, ".gate", "archive")
+	eventsDir := filepath.Join(tmpDir, ".gate", "events")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an old archive file that will be pruned
+	oldFile := filepath.Join(archiveDir, "feedback-001.md")
+	if err := os.WriteFile(oldFile, []byte("---\nname: feedback-001\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-31 * 24 * time.Hour)
+	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make events dir read-only so event Append fails
+	if err := os.Chmod(eventsDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(eventsDir, 0o755) //nolint: restore for cleanup
+
+	// when
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint: restore working dir
+
+	root := NewRootCommand()
+	var stderr bytes.Buffer
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"archive-prune", "--days", "30", "--yes"})
+
+	err := root.Execute()
+
+	// then: command should return error because event recording failed
+	if err == nil {
+		t.Fatal("expected error when event recording fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "archive.pruned event") {
+		t.Errorf("expected 'archive.pruned event' in error, got: %v", err)
+	}
+
+	// Old file should still have been deleted (deletion happens before event recording)
+	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
+		t.Error("expected old archive file to be deleted despite event recording failure")
+	}
+}
+
 func TestArchivePrune_ZeroDays(t *testing.T) {
 	// given
 	root := NewRootCommand()

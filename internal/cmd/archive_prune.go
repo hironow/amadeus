@@ -112,7 +112,9 @@ func newArchivePruneCommand() *cobra.Command {
 				totalCount += count
 			}
 
-			// Emit archive.pruned event (store filenames only for portability)
+			// Emit archive.pruned event (store filenames only for portability).
+			// This MUST succeed: without the event, a future rebuild would replay
+			// historical dmail.generated events and recreate the pruned files.
 			var paths []string
 			for _, c := range allCandidates {
 				paths = append(paths, filepath.Base(c.Path))
@@ -123,9 +125,10 @@ func newArchivePruneCommand() *cobra.Command {
 				Count: totalCount,
 			}, time.Now().UTC())
 			if evErr != nil {
-				fmt.Fprintf(errW, "warning: failed to create archive.pruned event: %v\n", evErr)
-			} else if appendErr := eventStore.Append(ev); appendErr != nil {
-				fmt.Fprintf(errW, "warning: failed to record archive.pruned event: %v\n", appendErr)
+				return fmt.Errorf("pruned %d file(s) but failed to create archive.pruned event: %w", totalCount, evErr)
+			}
+			if appendErr := eventStore.Append(ev); appendErr != nil {
+				return fmt.Errorf("pruned %d file(s) but failed to record archive.pruned event: %w", totalCount, appendErr)
 			}
 
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)
