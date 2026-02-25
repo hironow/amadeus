@@ -32,7 +32,7 @@ func newValidateCommand() *cobra.Command {
 				}
 				return fmt.Errorf("stat config: %w", err)
 			}
-			cfg, err := amadeus.LoadConfig(configPath)
+			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}

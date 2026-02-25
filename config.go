@@ -1,13 +1,8 @@
 package amadeus
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"math"
-	"os"
-
-	"gopkg.in/yaml.v3"
 )
 
 // ValidLang reports whether lang is a supported language code.
@@ -129,19 +124,3 @@ func ValidateConfig(cfg Config) []string {
 	return errs
 }
 
-// LoadConfig reads a YAML configuration file from path.
-// If the file does not exist, it returns DefaultConfig with no error.
-func LoadConfig(path string) (Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return DefaultConfig(), nil
-		}
-		return Config{}, err
-	}
-	cfg := DefaultConfig()
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, err
-	}
-	return cfg, nil
-}

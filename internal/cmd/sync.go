@@ -37,7 +37,7 @@ func newSyncCommand() *cobra.Command {
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
-			cfg, err := amadeus.LoadConfig(configPath)
+			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}

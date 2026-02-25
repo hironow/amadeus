@@ -12,6 +12,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"gopkg.in/yaml.v3"
 )
 
 // CheckStatus represents the outcome of a single doctor check.
@@ -350,8 +351,6 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 }
 
 // checkConfig validates that config.yaml exists and can be loaded.
-// Checks file existence explicitly because LoadConfig returns DefaultConfig
-// (no error) for missing files, but doctor should flag a missing config.
 func checkConfig(path string) DoctorCheckResult {
 	if _, err := os.Stat(path); err != nil {
 		return DoctorCheckResult{
@@ -360,8 +359,16 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
-	cfg, err := LoadConfig(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
+		return DoctorCheckResult{
+			Name:    "Config",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s: %v", path, err),
+		}
+	}
+	cfg := DefaultConfig()
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return DoctorCheckResult{
 			Name:    "Config",
 			Status:  CheckFail,
