@@ -280,6 +280,40 @@ func TestProjector_ApplyArchivePruned(t *testing.T) {
 	}
 }
 
+func TestProjector_ApplyArchivePruned_IgnoresEventFiles(t *testing.T) {
+	// given: archive.pruned event references a .jsonl file
+	p, dir := newTestProjector(t)
+	now := time.Now().UTC()
+
+	// Create an event file that should NOT be deleted by projection
+	eventsDir := filepath.Join(dir, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	eventFile := filepath.Join(eventsDir, "2026-02-20.jsonl")
+	if err := os.WriteFile(eventFile, []byte(`{"id":"x"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ev, err := NewEvent(EventArchivePruned, ArchivePrunedData{
+		Paths: []string{"2026-02-20.jsonl"}, Count: 1,
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	if err := p.Apply(ev); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+
+	// then: event file must NOT be deleted — projection handlers must not
+	// mutate the event store (source of truth)
+	if _, err := os.Stat(eventFile); err != nil {
+		t.Errorf("event file was deleted by projection handler: %v", err)
+	}
+}
+
 func TestProjector_Rebuild(t *testing.T) {
 	// given
 	p, dir := newTestProjector(t)

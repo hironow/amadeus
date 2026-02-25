@@ -144,20 +144,18 @@ func (p *Projector) applyArchivePruned(event Event) error {
 		return fmt.Errorf("unmarshal ArchivePrunedData: %w", err)
 	}
 	archiveDir := filepath.Join(p.Store.Root, "archive")
-	eventsDir := filepath.Join(p.Store.Root, "events")
 	for _, name := range data.Paths {
 		// Reject path traversal: only allow plain filenames
 		if strings.Contains(name, "/") || strings.Contains(name, "\\") || name == ".." {
 			continue
 		}
-		// Route by extension to the correct directory
-		var target string
+		// Only delete archive/ files. Event files (.jsonl) are the source of
+		// truth and must never be deleted by a projection handler — the CLI
+		// archive-prune command handles event file deletion directly.
 		if strings.HasSuffix(name, ".jsonl") {
-			target = filepath.Join(eventsDir, name)
-		} else {
-			target = filepath.Join(archiveDir, name)
+			continue
 		}
-		os.Remove(target)
+		os.Remove(filepath.Join(archiveDir, name))
 	}
 	return nil
 }
