@@ -105,6 +105,15 @@ func (a *Amadeus) autoRebuildIfNeeded() error {
 	if len(events) == 0 {
 		return nil // no events to replay
 	}
+	// Inbox-consumed events contain only metadata, not the full D-Mail content.
+	// Rebuild clears archive/ and outbox/, so inbox-sourced D-Mails would be
+	// permanently lost. Skip auto-rebuild and recommend explicit rebuild.
+	for _, ev := range events {
+		if ev.Type == EventInboxConsumed {
+			a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
+			return nil
+		}
+	}
 	a.Logger.Info("projections missing, rebuilding from %d event(s)", len(events))
 	if err := a.Projector.Rebuild(events); err != nil {
 		return fmt.Errorf("auto-rebuild: %w", err)
@@ -143,8 +152,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		))
 	defer span.End()
 
-	if err := a.autoRebuildIfNeeded(); err != nil {
-		return fmt.Errorf("auto-rebuild: %w", err)
+	// Auto-rebuild is a state-mutating operation (clears and rewrites projection
+	// directories), so it must be skipped in dry-run mode.
+	if !opts.DryRun {
+		if err := a.autoRebuildIfNeeded(); err != nil {
+			return fmt.Errorf("auto-rebuild: %w", err)
+		}
 	}
 
 	previous, err := a.Store.LoadLatest()

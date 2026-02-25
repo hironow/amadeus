@@ -2001,6 +2001,78 @@ func TestAmadeus_AutoRebuild_SkipsWhenNoEventStore(t *testing.T) {
 	}
 }
 
+func TestAmadeus_AutoRebuild_SkipsWhenInboxEventsExist(t *testing.T) {
+	// given: events include InboxConsumed, latest.json is missing, archive has inbox D-Mail
+	dir := t.TempDir()
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	eventsDir := filepath.Join(root, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
+
+	// CheckCompleted event
+	ev1, err := NewEvent(EventCheckCompleted, CheckCompletedData{
+		Result: CheckResult{CheckedAt: now, Commit: "aaa", Divergence: 0.2},
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// InboxConsumed event (metadata only — D-Mail content is NOT in the event)
+	ev2, err := NewEvent(EventInboxConsumed, InboxConsumedData{
+		Name: "report-001", Kind: KindReport, Source: "report-001.md",
+	}, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eventStore := &FileEventStore{Dir: eventsDir}
+	if err := eventStore.Append(ev1, ev2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Place an inbox-sourced D-Mail in archive/ (simulates ScanInbox at runtime)
+	archiveDir := filepath.Join(root, "archive")
+	inboxDMail := filepath.Join(archiveDir, "report-001.md")
+	os.WriteFile(inboxDMail, []byte("---\nname: report-001\nkind: report\n---\nImportant report\n"), 0o644)
+
+	// Remove latest.json to trigger rebuild condition
+	os.Remove(filepath.Join(root, ".run", "latest.json"))
+
+	store := NewProjectionStore(root)
+	a := &Amadeus{
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    eventStore,
+		Projector: &Projector{Store: store},
+		Logger:    NewLogger(io.Discard, false),
+	}
+
+	// when
+	if err := a.autoRebuildIfNeeded(); err != nil {
+		t.Fatalf("autoRebuildIfNeeded: %v", err)
+	}
+
+	// then: inbox D-Mail in archive/ must NOT be destroyed
+	if _, err := os.Stat(inboxDMail); err != nil {
+		t.Errorf("inbox D-Mail was destroyed by auto-rebuild: %v", err)
+	}
+
+	// then: latest.json should NOT be restored (rebuild was skipped)
+	latest, err := store.LoadLatest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !latest.CheckedAt.IsZero() {
+		t.Error("expected latest to remain empty (rebuild should have been skipped)")
+	}
+}
+
 func TestEmit_ReturnsErrorWhenBothNil(t *testing.T) {
 	// given: Amadeus with neither Events nor Projector
 	a := &Amadeus{Config: DefaultConfig()}
