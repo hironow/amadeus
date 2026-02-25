@@ -264,6 +264,41 @@ func TestNewEvent_AssignsIDAndTimestamp(t *testing.T) {
 	}
 }
 
+func TestFileEventStore_LoadAllPreservesInsertionOrderForSameTimestamp(t *testing.T) {
+	// given: two events with the same timestamp, appended in order
+	dir := t.TempDir()
+	store := &FileEventStore{Dir: dir}
+	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
+
+	ev1, _ := NewEvent(EventCheckCompleted, CheckCompletedData{
+		Result: CheckResult{Commit: "first"},
+	}, now)
+	ev2, _ := NewEvent(EventBaselineUpdated, BaselineUpdatedData{
+		Commit: "first", Divergence: 0.1,
+	}, now)
+
+	if err := store.Append(ev1, ev2); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	events, err := store.LoadAll()
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	// then: insertion order must be preserved (check.completed before baseline.updated)
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	if events[0].Type != EventCheckCompleted {
+		t.Errorf("events[0].Type = %q, want %q (insertion order broken)", events[0].Type, EventCheckCompleted)
+	}
+	if events[1].Type != EventBaselineUpdated {
+		t.Errorf("events[1].Type = %q, want %q (insertion order broken)", events[1].Type, EventBaselineUpdated)
+	}
+}
+
 func TestNewEvent_UniqueIDs(t *testing.T) {
 	// given
 	now := time.Now().UTC()

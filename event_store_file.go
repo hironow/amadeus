@@ -125,7 +125,10 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]Event, error) {
 		f.Close()
 	}
 
-	sort.Slice(events, func(i, j int) bool {
+	// Stable sort preserves insertion order for events with equal timestamps.
+	// This is critical: RunCheck emits check.completed and baseline.updated
+	// with the same timestamp, and replay must apply them in emit order.
+	sort.SliceStable(events, func(i, j int) bool {
 		return events[i].Timestamp.Before(events[j].Timestamp)
 	})
 	return events, nil

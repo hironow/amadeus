@@ -38,14 +38,20 @@ func (p *Projector) Apply(event Event) error {
 }
 
 // Rebuild replays all events to regenerate projections from scratch.
+// All projection directories (.run/, archive/, outbox/) are cleared before replay
+// so that rebuilt state exactly reflects the event stream.
+// NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed
+// because inbox.consumed events contain only metadata, not the full D-Mail content.
 func (p *Projector) Rebuild(events []Event) error {
-	// Clear transient projection files and ensure directory exists
-	runDir := p.Store.runDir()
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		return fmt.Errorf("create run dir %s: %w", runDir, err)
-	}
-	for _, name := range []string{"latest.json", "baseline.json", "sync.json", "consumed.json"} {
-		os.Remove(filepath.Join(runDir, name))
+	// Clear all projection directories
+	for _, sub := range []string{".run", "archive", "outbox"} {
+		dir := filepath.Join(p.Store.Root, sub)
+		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("clear %s: %w", sub, err)
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", sub, err)
+		}
 	}
 
 	for _, ev := range events {

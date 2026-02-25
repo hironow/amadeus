@@ -45,8 +45,8 @@ func ExitCode(err error) int {
 type Amadeus struct {
 	Config        Config
 	Store         *ProjectionStore
-	Events        EventStore // nil disables event sourcing (backward-compatible)
-	Projector     *Projector // nil disables projection updates via events
+	Events        EventStore // nil skips event persistence (Projector still required for writes)
+	Projector     *Projector // nil skips projection updates (Events still required for writes)
 	Git           *GitClient
 	Claude        ClaudeRunner // nil falls back to the default Claude runner
 	Logger        *Logger
@@ -64,8 +64,12 @@ func (a *Amadeus) claudeRunner() ClaudeRunner {
 }
 
 // emit appends events to the event store and applies them to projections.
-// If EventStore or Projector is nil, the corresponding step is skipped.
+// At least one of Events or Projector must be non-nil; otherwise emit returns
+// an error to prevent silent data loss.
 func (a *Amadeus) emit(events ...Event) error {
+	if a.Events == nil && a.Projector == nil {
+		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
+	}
 	if a.Events != nil {
 		if err := a.Events.Append(events...); err != nil {
 			return fmt.Errorf("append events: %w", err)

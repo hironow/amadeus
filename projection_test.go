@@ -356,3 +356,39 @@ func TestProjector_Rebuild(t *testing.T) {
 		t.Errorf("consumed count = %d, want 1", len(consumed))
 	}
 }
+
+func TestProjector_Rebuild_RemovesStaleDMails(t *testing.T) {
+	// given: a stale D-Mail exists in archive/ before rebuild
+	p, dir := newTestProjector(t)
+	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
+
+	archiveDir := filepath.Join(dir, "archive")
+	staleFile := filepath.Join(archiveDir, "feedback-stale.md")
+	os.WriteFile(staleFile, []byte("---\nname: feedback-stale\n---\n"), 0o644)
+
+	// Only one event — generates feedback-001, NOT feedback-stale
+	ev, _ := NewEvent(EventDMailGenerated, DMailGeneratedData{
+		DMail: DMail{
+			Name:        "feedback-001",
+			Kind:        KindFeedback,
+			Description: "current",
+			Body:        "body",
+		},
+	}, now)
+
+	// when
+	if err := p.Rebuild([]Event{ev}); err != nil {
+		t.Fatalf("Rebuild: %v", err)
+	}
+
+	// then: stale file should be gone
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Error("expected stale D-Mail to be removed by rebuild")
+	}
+
+	// then: event-sourced D-Mail should exist
+	currentFile := filepath.Join(archiveDir, "feedback-001.md")
+	if _, err := os.Stat(currentFile); err != nil {
+		t.Errorf("expected feedback-001.md to exist: %v", err)
+	}
+}

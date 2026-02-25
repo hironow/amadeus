@@ -2000,3 +2000,23 @@ func TestAmadeus_AutoRebuild_SkipsWhenNoEventStore(t *testing.T) {
 		t.Fatalf("autoRebuildIfNeeded with nil Events: %v", err)
 	}
 }
+
+func TestEmit_ReturnsErrorWhenBothNil(t *testing.T) {
+	// given: Amadeus with neither Events nor Projector
+	a := &Amadeus{Config: DefaultConfig()}
+
+	ev, err := NewEvent(EventCheckCompleted, CheckCompletedData{
+		Result: CheckResult{Commit: "abc"},
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	emitErr := a.emit(ev)
+
+	// then: should return error, not silently succeed
+	if emitErr == nil {
+		t.Error("expected error when both Events and Projector are nil")
+	}
+}
