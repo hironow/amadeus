@@ -13,7 +13,9 @@ func newRebuildCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rebuild",
 		Short: "Rebuild projections from event store",
-		Long:  "Replays all events from .gate/events/ to regenerate .run/ projection files and archive/ D-Mails from scratch.",
+		Long: "Replays all events from .gate/events/ to regenerate .run/ projection files and archive/ D-Mails from scratch.\n" +
+			"NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed because\n" +
+			"inbox.consumed events contain only metadata, not the full D-Mail content.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verbose, _ := cmd.Flags().GetBool("verbose")

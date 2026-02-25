@@ -3,6 +3,7 @@ package amadeus
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -57,7 +58,7 @@ func ValidateEvent(e Event) error {
 		errs = append(errs, "Data must not be empty")
 	}
 	if len(errs) > 0 {
-		return errors.New("invalid event: " + errs[0])
+		return errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
 	return nil
 }

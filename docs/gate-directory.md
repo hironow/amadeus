@@ -72,13 +72,18 @@ All state mutations flow through the `emit()` method, which appends events to th
 
 ### Rebuild
 
-All `.run/` projections and `archive/` D-Mails can be regenerated from events:
+`.run/` projections and `dmail.generated` D-Mails in `archive/` can be regenerated from events:
 
 ```bash
 amadeus rebuild
 ```
 
+**Limitations:**
+- Inbox-sourced D-Mails (`inbox.consumed` events) contain only metadata, not the full D-Mail content. These files in `archive/` are NOT reconstructed by rebuild.
+- `archive.pruned` events may also reference `events/*.jsonl` files for event log pruning.
+
 Auto-rebuild triggers when `.run/latest.json` is missing but events exist.
+Auto-rebuild is skipped when `inbox.consumed` events are present (to avoid losing inbox D-Mails) and in `--dry-run` mode.
 
 ## Check Pipeline Data Flow
 

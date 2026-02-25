@@ -252,8 +252,12 @@ func TestProjector_ApplyArchivePruned(t *testing.T) {
 	archiveDir := filepath.Join(dir, "archive")
 	f1 := filepath.Join(archiveDir, "feedback-001.md")
 	f2 := filepath.Join(archiveDir, "feedback-002.md")
-	os.WriteFile(f1, []byte("---\nname: feedback-001\n---\n"), 0o644)
-	os.WriteFile(f2, []byte("---\nname: feedback-002\n---\n"), 0o644)
+	if err := os.WriteFile(f1, []byte("---\nname: feedback-001\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f2, []byte("---\nname: feedback-002\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	ev, err := NewEvent(EventArchivePruned, ArchivePrunedData{
 		Paths: []string{"feedback-001.md", "feedback-002.md"}, Count: 2,
@@ -364,7 +368,9 @@ func TestProjector_Rebuild_RemovesStaleDMails(t *testing.T) {
 
 	archiveDir := filepath.Join(dir, "archive")
 	staleFile := filepath.Join(archiveDir, "feedback-stale.md")
-	os.WriteFile(staleFile, []byte("---\nname: feedback-stale\n---\n"), 0o644)
+	if err := os.WriteFile(staleFile, []byte("---\nname: feedback-stale\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Only one event — generates feedback-001, NOT feedback-stale
 	ev, _ := NewEvent(EventDMailGenerated, DMailGeneratedData{
