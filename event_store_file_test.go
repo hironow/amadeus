@@ -181,6 +181,63 @@ func TestFileEventStore_LoadAllChronologicalOrder(t *testing.T) {
 	}
 }
 
+func TestFileEventStore_AppendRejectsInvalidEvent(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := &FileEventStore{Dir: dir}
+	invalidEvent := Event{} // all fields empty
+
+	// when
+	err := store.Append(invalidEvent)
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid event")
+	}
+
+	// verify nothing was written
+	entries, readErr := os.ReadDir(dir)
+	if readErr != nil {
+		t.Fatalf("read dir: %v", readErr)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".jsonl" {
+			t.Errorf("unexpected event file created: %s", e.Name())
+		}
+	}
+}
+
+func TestFileEventStore_AppendRejectsBatchWithOneInvalid(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := &FileEventStore{Dir: dir}
+	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
+
+	validEvent, _ := NewEvent(EventCheckCompleted, CheckCompletedData{
+		Result: CheckResult{Commit: "aaa"},
+	}, now)
+	invalidEvent := Event{Type: EventDMailGenerated} // missing ID, Timestamp, Data
+
+	// when: batch with one valid and one invalid
+	err := store.Append(validEvent, invalidEvent)
+
+	// then: entire batch rejected
+	if err == nil {
+		t.Error("expected error when batch contains invalid event")
+	}
+
+	// verify nothing was written
+	entries, readErr := os.ReadDir(dir)
+	if readErr != nil {
+		t.Fatalf("read dir: %v", readErr)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".jsonl" {
+			t.Errorf("unexpected event file created: %s", e.Name())
+		}
+	}
+}
+
 func TestNewEvent_AssignsIDAndTimestamp(t *testing.T) {
 	// given
 	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)

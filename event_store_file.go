@@ -20,7 +20,14 @@ type FileEventStore struct {
 }
 
 // Append persists events as JSONL lines to the daily file based on each event's timestamp.
+// All events are validated before any writes occur; if any event is invalid, the entire batch is rejected.
 func (s *FileEventStore) Append(events ...Event) error {
+	for _, ev := range events {
+		if err := ValidateEvent(ev); err != nil {
+			return fmt.Errorf("validate event %s: %w", ev.ID, err)
+		}
+	}
+
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return fmt.Errorf("create event store dir: %w", err)
 	}
@@ -48,6 +55,10 @@ func (s *FileEventStore) Append(events ...Event) error {
 				f.Close()
 				return fmt.Errorf("write event %s: %w", ev.ID, err)
 			}
+		}
+		if err := f.Sync(); err != nil {
+			f.Close()
+			return fmt.Errorf("fsync event file %s: %w", date, err)
 		}
 		if err := f.Close(); err != nil {
 			return fmt.Errorf("close event file %s: %w", date, err)
