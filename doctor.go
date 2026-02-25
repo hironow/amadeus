@@ -225,10 +225,13 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	// 6. SKILL.md files
 	results = append(results, checkSkillMD(repoRoot))
 
-	// 7. D-Mail schema v1 validation
+	// 7. Event Store integrity
+	results = append(results, checkEventStore(filepath.Join(repoRoot, ".gate")))
+
+	// 8. D-Mail schema v1 validation
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, ".gate")))
 
-	// 8. Linear MCP (skip if claude unavailable)
+	// 9. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != CheckOK {
 		results = append(results, DoctorCheckResult{
 			Name:    "Linear MCP",
@@ -247,6 +250,39 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	}
 
 	return results
+}
+
+// checkEventStore verifies events/ directory exists and all JSONL files are parseable.
+func checkEventStore(gateRoot string) DoctorCheckResult {
+	eventsDir := filepath.Join(gateRoot, "events")
+	if _, err := os.Stat(eventsDir); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return DoctorCheckResult{
+				Name:    "Event Store",
+				Status:  CheckSkip,
+				Message: "no events directory — run 'amadeus init'",
+			}
+		}
+		return DoctorCheckResult{
+			Name:    "Event Store",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("stat events: %v", err),
+		}
+	}
+	store := &FileEventStore{Dir: eventsDir}
+	events, err := store.LoadAll()
+	if err != nil {
+		return DoctorCheckResult{
+			Name:    "Event Store",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("parse error: %v", err),
+		}
+	}
+	return DoctorCheckResult{
+		Name:    "Event Store",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%d event(s) loaded", len(events)),
+	}
 }
 
 // checkDMailSchema validates all D-Mails in archive/ conform to schema v1.

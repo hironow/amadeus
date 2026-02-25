@@ -9,10 +9,10 @@ This document describes what each directory/file does, who creates it, and how i
 .gate/
   .gitignore            # auto-managed by InitGateDir
   config.yaml           # weights, thresholds, full check interval
-  history/
-    2026-02-20T143005.json    # timestamped check result
-    2026-02-20T143005_1.json  # collision suffix if same second
+  events/               # append-only event log (JSONL, daily rotation)
+    2026-02-25.jsonl
     ...
+  history/              # legacy (no longer written to; see ADR-0011)
   archive/              # permanent immutable D-Mail records
     feedback-001.md
     feedback-002.md
@@ -26,10 +26,11 @@ This document describes what each directory/file does, who creates it, and how i
     *.md
   outbox/               # outgoing d-mails (feedback, auto-sent)
     *.md
-  .run/                 # ephemeral runtime data
-    latest.json         # latest check result (baseline for next diff)
-    baseline.json       # latest full check result (calibration)
-    consumed.json       # processed inbox D-Mails log
+  .run/                 # ephemeral runtime projections
+    latest.json         # projected from check.completed events
+    baseline.json       # projected from baseline.updated events
+    sync.json           # projected from dmail.commented events
+    consumed.json       # projected from inbox.consumed events
 ```
 
 ## Git Tracking Rules
@@ -45,12 +46,44 @@ inbox/
 | Path | Git Status | Reason |
 |------|-----------|--------|
 | `config.yaml` | Tracked | Project-level scoring configuration |
-| `history/` | Tracked | Audit trail of check results over time |
+| `events/` | Tracked | Append-only event log (single source of truth) |
 | `archive/` | Tracked | Permanent immutable record of all D-Mails |
 | `skills/` | Tracked | Agent capability manifests for phonewave discovery |
-| `.run/` | Ignored | Ephemeral runtime state (latest, baseline) |
+| `.run/` | Ignored | Ephemeral projections (rebuildable from events) |
 | `outbox/` | Ignored | Transient; courier picks up and delivers |
 | `inbox/` | Ignored | Transient; consumed and archived on check |
+
+## Event Sourcing Architecture
+
+All state mutations flow through the `emit()` method, which appends events to the event store and applies them to projections.
+
+### Event Types
+
+| Event Type | Projection Target | Description |
+|---|---|---|
+| `check.completed` | `.run/latest.json` | Divergence check result |
+| `baseline.updated` | `.run/baseline.json` | Full calibration baseline |
+| `force_full_next.set` | `.run/latest.json` | Deferred full scan flag |
+| `dmail.generated` | `archive/` + `outbox/` | D-Mail creation |
+| `inbox.consumed` | `.run/consumed.json` | Inbox D-Mail processed |
+| `dmail.commented` | `.run/sync.json` | D-Mail posted as comment |
+| `convergence.detected` | (informational only) | Convergence alert |
+| `archive.pruned` | `archive/` (file removal) | Archive cleanup |
+
+### Rebuild
+
+`.run/` projections and `dmail.generated` D-Mails in `archive/` can be regenerated from events:
+
+```bash
+amadeus rebuild
+```
+
+**Limitations:**
+- Inbox-sourced D-Mails (`inbox.consumed` events) contain only metadata, not the full D-Mail content. These files in `archive/` are NOT reconstructed by rebuild.
+- `archive.pruned` events may also reference `events/*.jsonl` files for event log pruning.
+
+Auto-rebuild triggers when `.run/latest.json` is missing but events exist.
+Auto-rebuild is skipped when `inbox.consumed` events are present (to avoid losing inbox D-Mails) and in `--dry-run` mode.
 
 ## Check Pipeline Data Flow
 
@@ -60,19 +93,19 @@ The `amadeus check` command reads state, evaluates divergence, and routes D-Mail
 
 | Source | Path | Reader |
 |--------|------|--------|
-| Previous scores | `.run/latest.json` | `StateStore.LoadLatest()` |
-| Calibration baseline | `.run/baseline.json` | `StateStore.LoadBaseline()` |
+| Previous scores | `.run/latest.json` | `ProjectionStore.LoadLatest()` |
+| Calibration baseline | `.run/baseline.json` | `ProjectionStore.LoadBaseline()` |
 | Scoring config | `config.yaml` | `LoadConfig()` |
-| Inbox D-Mails | `inbox/*.md` | `StateStore.ScanInbox()` |
+| Inbox D-Mails | `inbox/*.md` | `ProjectionStore.ScanInbox()` |
 
-### Output Destinations
+### Output Events
 
-| Output | Path | Writer |
-|--------|------|--------|
-| Updated scores | `.run/latest.json` | `StateStore.SaveLatest()` |
-| History record | `history/{timestamp}.json` | `StateStore.SaveHistory()` |
-| D-Mail (all severities) | `archive/` + `outbox/` | `StateStore.SaveDMail()` |
-| Consumed log | `.run/consumed.json` | `StateStore.SaveConsumed()` |
+| Event | Triggered By | Projection |
+|-------|-------------|------------|
+| `check.completed` | Check finalization | `.run/latest.json` |
+| `baseline.updated` | Full check or shift detection | `.run/baseline.json` |
+| `dmail.generated` | Divergence above threshold | `archive/` + `outbox/` |
+| `inbox.consumed` | Inbox scan | `.run/consumed.json` |
 
 ## D-Mail Lifecycle
 
@@ -84,11 +117,11 @@ The `amadeus check` command reads state, evaluates divergence, and routes D-Mail
      |                      | ScanInbox()                  |
      |                      |   parse -> archive/ (copy)   |
      |                      |   remove from inbox/         |
-     |                      |   SaveConsumed()             |
+     |                      |   emit(inbox.consumed)       |
      |                      |                              |
      |                      | (check runs, D-Mail generated)
      |                      |                              |
-     |                      | SaveDMail():                 |
+     |                      | emit(dmail.generated):       |
      |                      |   all -> archive/ + outbox/  |
      |                      |                              |
      |                      |              reads outbox/   |
@@ -132,12 +165,13 @@ service, violating the dependency direction defined in ADR-003.
 | `.gitignore` | `InitGateDir` | Init (appends missing entries on upgrade) |
 | `config.yaml` | `InitGateDir` | Init (only if absent) |
 | `skills/*/SKILL.md` | `InitGateDir` | Init (from `embed.FS` templates, only if absent) |
-| `history/{ts}.json` | `StateStore.SaveHistory` | After each check |
-| `.run/latest.json` | `StateStore.SaveLatest` | After each check |
-| `.run/baseline.json` | `StateStore.SaveBaseline` | After each full check |
-| `.run/consumed.json` | `StateStore.SaveConsumed` | On inbox consumption during check |
-| `archive/*.md` | `StateStore.SaveDMail` + `ScanInbox` | D-Mail creation or inbox consumption |
-| `outbox/*.md` | `StateStore.SaveDMail` | D-Mail creation (all severities) |
+| `events/*.jsonl` | `FileEventStore.Append` | On each state mutation via `emit()` |
+| `.run/latest.json` | `Projector.Apply` | After `check.completed` event |
+| `.run/baseline.json` | `Projector.Apply` | After `baseline.updated` event |
+| `.run/consumed.json` | `Projector.Apply` | After `inbox.consumed` event |
+| `.run/sync.json` | `Projector.Apply` | After `dmail.commented` event |
+| `archive/*.md` | `Projector.Apply` + `ScanInbox` | D-Mail creation or inbox consumption |
+| `outbox/*.md` | `Projector.Apply` | D-Mail creation (all severities) |
 | `inbox/*.md` | External tool (courier) | Before check |
 
 ## File Movements

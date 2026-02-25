@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -162,7 +163,7 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 
 // NextDMailName returns the next sequential D-Mail name by scanning existing
 // .md files in the archive/ directory.
-func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
+func (s *ProjectionStore) NextDMailName(kind DMailKind) (string, error) {
 	archiveDir := filepath.Join(s.Root, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
@@ -185,7 +186,7 @@ func (s *StateStore) NextDMailName(kind DMailKind) (string, error) {
 // SaveDMail writes a D-Mail to archive/ and outbox/.
 // Archive is always written first so the permanent record exists even if
 // the second write fails. All D-Mails go directly to outbox/ (MY-359).
-func (s *StateStore) SaveDMail(dmail DMail) error {
+func (s *ProjectionStore) SaveDMail(dmail DMail) error {
 	data, err := MarshalDMail(dmail)
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
@@ -202,8 +203,23 @@ func (s *StateStore) SaveDMail(dmail DMail) error {
 	return nil
 }
 
+// SaveDMailToArchive writes a D-Mail to archive/ only, skipping outbox/.
+// Used during rebuild to avoid re-queuing historical D-Mails for delivery.
+func (s *ProjectionStore) SaveDMailToArchive(dmail DMail) error {
+	data, err := MarshalDMail(dmail)
+	if err != nil {
+		return fmt.Errorf("marshal dmail: %w", err)
+	}
+	filename := dmail.Name + ".md"
+	archivePath := filepath.Join(s.Root, "archive", filename)
+	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+		return fmt.Errorf("write archive: %w", err)
+	}
+	return nil
+}
+
 // LoadDMail reads a single D-Mail by name from the archive/ directory.
-func (s *StateStore) LoadDMail(name string) (DMail, error) {
+func (s *ProjectionStore) LoadDMail(name string) (DMail, error) {
 	path := filepath.Join(s.Root, "archive", name+".md")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -213,7 +229,7 @@ func (s *StateStore) LoadDMail(name string) (DMail, error) {
 }
 
 // LoadAllDMails reads all D-Mails from the archive/ directory, sorted by name ascending.
-func (s *StateStore) LoadAllDMails() ([]DMail, error) {
+func (s *ProjectionStore) LoadAllDMails() ([]DMail, error) {
 	archiveDir := filepath.Join(s.Root, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
@@ -246,7 +262,7 @@ type ConsumedRecord struct {
 }
 
 // LoadConsumed reads all consumed records from .run/consumed.json.
-func (s *StateStore) LoadConsumed() ([]ConsumedRecord, error) {
+func (s *ProjectionStore) LoadConsumed() ([]ConsumedRecord, error) {
 	path := filepath.Join(s.Root, ".run", "consumed.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -263,7 +279,7 @@ func (s *StateStore) LoadConsumed() ([]ConsumedRecord, error) {
 }
 
 // SaveConsumed appends consumed records to .run/consumed.json.
-func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
+func (s *ProjectionStore) SaveConsumed(records []ConsumedRecord) error {
 	existing, err := s.LoadConsumed()
 	if err != nil {
 		return err
@@ -282,7 +298,7 @@ func (s *StateStore) SaveConsumed(records []ConsumedRecord) error {
 // invoked by cron or git hooks, so polling at invocation time is sufficient.
 // A watcher would only be warranted if amadeus were daemonised for
 // real-time inbox delivery.
-func (s *StateStore) ScanInbox() ([]DMail, error) {
+func (s *ProjectionStore) ScanInbox() ([]DMail, error) {
 	inboxDir := filepath.Join(s.Root, "inbox")
 	entries, err := os.ReadDir(inboxDir)
 	if err != nil {
@@ -327,4 +343,26 @@ func (s *StateStore) ScanInbox() ([]DMail, error) {
 		return dmails[i].Name < dmails[j].Name
 	})
 	return dmails, nil
+}
+
+var issueIDPattern = regexp.MustCompile(`[A-Z]+-\d+`)
+
+// ExtractIssueIDs scans texts for Linear Issue IDs (e.g. "MY-302", "AM-123")
+// and returns a unique, sorted list.
+func ExtractIssueIDs(texts ...string) []string {
+	seen := make(map[string]bool)
+	for _, text := range texts {
+		for _, id := range issueIDPattern.FindAllString(text, -1) {
+			seen[id] = true
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }

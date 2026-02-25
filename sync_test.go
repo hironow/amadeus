@@ -12,7 +12,7 @@ func TestLoadSyncState_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when
 	state, err := store.LoadSyncState()
@@ -33,7 +33,7 @@ func TestSyncState_RoundTrip(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when: mark a D-Mail as commented
 	if err := store.MarkCommented("feedback-001", "MY-250"); err != nil {
@@ -67,7 +67,7 @@ func TestMarkCommented_Appends(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when: mark two different D-Mails
 	if err := store.MarkCommented("feedback-001", "MY-250"); err != nil {

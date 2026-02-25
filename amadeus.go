@@ -44,7 +44,9 @@ func ExitCode(err error) int {
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
 	Config        Config
-	Store         *StateStore
+	Store         *ProjectionStore
+	Events        EventStore // nil skips event persistence (Projector still required for writes)
+	Projector     *Projector // nil skips projection updates (Events still required for writes)
 	Git           *GitClient
 	Claude        ClaudeRunner // nil falls back to the default Claude runner
 	Logger        *Logger
@@ -59,6 +61,68 @@ func (a *Amadeus) claudeRunner() ClaudeRunner {
 		return a.Claude
 	}
 	return DefaultClaudeRunner()
+}
+
+// emit appends events to the event store and applies them to projections.
+// At least one of Events or Projector must be non-nil; otherwise emit returns
+// an error to prevent silent data loss.
+func (a *Amadeus) emit(events ...Event) error {
+	if a.Events == nil && a.Projector == nil {
+		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
+	}
+	if a.Events != nil {
+		if err := a.Events.Append(events...); err != nil {
+			return fmt.Errorf("append events: %w", err)
+		}
+	}
+	if a.Projector != nil {
+		for _, ev := range events {
+			if err := a.Projector.Apply(ev); err != nil {
+				return fmt.Errorf("apply event %s: %w", ev.Type, err)
+			}
+		}
+	}
+	return nil
+}
+
+// autoRebuildIfNeeded checks if projections are missing but events exist,
+// and rebuilds projections from the event store if so.
+func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
+	if a.Events == nil || a.Projector == nil {
+		return nil
+	}
+	latest, err := a.Store.LoadLatest()
+	if err != nil {
+		return fmt.Errorf("check latest for auto-rebuild: %w", err)
+	}
+	if !latest.CheckedAt.IsZero() {
+		return nil // projections exist, no rebuild needed
+	}
+	events, err := a.Events.LoadAll()
+	if err != nil {
+		return fmt.Errorf("load events for auto-rebuild: %w", err)
+	}
+	if len(events) == 0 {
+		return nil // no events to replay
+	}
+	// Inbox-consumed events contain only metadata, not the full D-Mail content.
+	// Rebuild clears archive/ and outbox/, so inbox-sourced D-Mails would be
+	// permanently lost. Skip auto-rebuild and recommend explicit rebuild.
+	for _, ev := range events {
+		if ev.Type == EventInboxConsumed {
+			if !quiet {
+				a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
+			}
+			return nil
+		}
+	}
+	if !quiet {
+		a.Logger.Info("projections missing, rebuilding from %d event(s)", len(events))
+	}
+	if err := a.Projector.Rebuild(events); err != nil {
+		return fmt.Errorf("auto-rebuild: %w", err)
+	}
+	return nil
 }
 
 // CheckOptions controls how RunCheck operates.
@@ -92,6 +156,14 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		))
 	defer span.End()
 
+	// Auto-rebuild is a state-mutating operation (clears and rewrites projection
+	// directories), so it must be skipped in dry-run mode.
+	if !opts.DryRun {
+		if err := a.autoRebuildIfNeeded(opts.Quiet); err != nil {
+			return fmt.Errorf("auto-rebuild: %w", err)
+		}
+	}
+
 	previous, err := a.Store.LoadLatest()
 	if err != nil {
 		return fmt.Errorf("load previous state: %w", err)
@@ -115,17 +187,18 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 				attribute.Int("inbox.count", len(consumed)),
 			))
 			now := time.Now().UTC()
-			var records []ConsumedRecord
 			for _, d := range consumed {
-				records = append(records, ConsumedRecord{
-					Name:       d.Name,
-					Kind:       d.Kind,
-					ConsumedAt: now,
-					Source:     d.Name + ".md",
-				})
-			}
-			if err := a.Store.SaveConsumed(records); err != nil {
-				return fmt.Errorf("save consumed: %w", err)
+				ev, evErr := NewEvent(EventInboxConsumed, InboxConsumedData{
+					Name:   d.Name,
+					Kind:   d.Kind,
+					Source: d.Name + ".md",
+				}, now)
+				if evErr != nil {
+					return fmt.Errorf("create inbox event: %w", evErr)
+				}
+				if err := a.emit(ev); err != nil {
+					return fmt.Errorf("emit inbox consumed: %w", err)
+				}
 			}
 		}
 	}
@@ -292,7 +365,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			a.Logger.Info("Divergence jump detected (%.2f → %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
-		a.FlagForceFullNext()
+		if err := a.FlagForceFullNext(previous.Divergence, meterResult.Divergence.Value); err != nil {
+			return fmt.Errorf("flag force full next: %w", err)
+		}
 	}
 	span2.End()
 
@@ -322,9 +397,14 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			},
 			Body: candidate.Detail,
 		}
-		if err := a.Store.SaveDMail(dmail); err != nil {
+		ev, evErr := NewEvent(EventDMailGenerated, DMailGeneratedData{DMail: dmail}, now)
+		if evErr != nil {
 			span3.End()
-			return fmt.Errorf("phase 3 (save dmail): %w", err)
+			return fmt.Errorf("phase 3 (create event): %w", evErr)
+		}
+		if err := a.emit(ev); err != nil {
+			span3.End()
+			return fmt.Errorf("phase 3 (emit dmail): %w", err)
 		}
 		span3.AddEvent("dmail.created", trace.WithAttributes(
 			attribute.String("dmail.name", dmail.Name),
@@ -339,6 +419,17 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	var convergenceAlerts []ConvergenceAlert
 	if convergenceErr == nil {
 		convergenceAlerts = AnalyzeConvergence(allDMails, a.Config.Convergence, now)
+		for _, alert := range convergenceAlerts {
+			cev, cerr := NewEvent(EventConvergenceDetected, ConvergenceDetectedData{
+				Alert: alert,
+			}, now)
+			if cerr != nil {
+				return fmt.Errorf("phase 4 (create convergence event): %w", cerr)
+			}
+			if err := a.emit(cev); err != nil {
+				return fmt.Errorf("phase 4 (emit convergence event): %w", err)
+			}
+		}
 		saved, saveErr := a.saveConvergenceDMails(convergenceAlerts)
 		if saveErr != nil {
 			return saveErr
@@ -375,16 +466,23 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		ForceFullNext:       a.ForceFullNext,
 	}
 
-	if err := a.Store.SaveLatest(result); err != nil {
-		return fmt.Errorf("save latest: %w", err)
+	checkEv, evErr := NewEvent(EventCheckCompleted, CheckCompletedData{Result: result}, now)
+	if evErr != nil {
+		return fmt.Errorf("create check event: %w", evErr)
+	}
+	if err := a.emit(checkEv); err != nil {
+		return fmt.Errorf("emit check completed: %w", err)
 	}
 	if fullCheck {
-		if err := a.Store.SaveBaseline(result); err != nil {
-			return fmt.Errorf("save baseline: %w", err)
+		baselineEv, bErr := NewEvent(EventBaselineUpdated, BaselineUpdatedData{
+			Commit: currentCommit, Divergence: result.Divergence,
+		}, now)
+		if bErr != nil {
+			return fmt.Errorf("create baseline event: %w", bErr)
 		}
-	}
-	if err := a.Store.SaveHistory(result); err != nil {
-		return fmt.Errorf("save history: %w", err)
+		if err := a.emit(baselineEv); err != nil {
+			return fmt.Errorf("emit baseline updated: %w", err)
+		}
 	}
 
 	if opts.JSON {
@@ -565,12 +663,20 @@ func (a *Amadeus) AdvanceCheckCount(fullCheck bool) {
 
 // FlagForceFullNext marks that the next check should be a full scan.
 // Called when a divergence jump is detected, deferring recalibration to the next run.
-func (a *Amadeus) FlagForceFullNext() {
+func (a *Amadeus) FlagForceFullNext(previousDivergence, currentDivergence float64) error {
 	a.ForceFullNext = true
+	ev, err := NewEvent(EventForceFullNextSet, ForceFullNextSetData{
+		PreviousDivergence: previousDivergence,
+		CurrentDivergence:  currentDivergence,
+	}, time.Now().UTC())
+	if err != nil {
+		return fmt.Errorf("create force_full_next event: %w", err)
+	}
+	return a.emit(ev)
 }
 
 // SaveCheckState persists an updated CheckResult preserving prior divergence data.
-// Updates CheckedAt and appends to history so every check run is auditable.
+// Emits a check.completed event so every check run is recorded in the event store.
 // Used on the early-return path when no significant shift is detected,
 // and also to persist ForceFullNext when a divergence jump defers a full scan.
 func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt time.Time) error {
@@ -582,15 +688,43 @@ func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt 
 	previous.ConvergenceAlerts = nil
 	previous.CheckCountSinceFull = a.CheckCount
 	previous.ForceFullNext = a.ForceFullNext
-	if err := a.Store.SaveLatest(previous); err != nil {
-		return err
+	ev, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: previous}, checkedAt)
+	if err != nil {
+		return fmt.Errorf("create check event: %w", err)
 	}
-	return a.Store.SaveHistory(previous)
+	return a.emit(ev)
+}
+
+// loadCheckHistory returns CheckResults extracted from the event store.
+func (a *Amadeus) loadCheckHistory() ([]CheckResult, error) {
+	if a.Events == nil {
+		return nil, nil
+	}
+	events, err := a.Events.LoadAll()
+	if err != nil {
+		return nil, fmt.Errorf("load events: %w", err)
+	}
+	var results []CheckResult
+	for _, ev := range events {
+		if ev.Type != EventCheckCompleted {
+			continue
+		}
+		var data CheckCompletedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			return nil, fmt.Errorf("unmarshal check event %s: %w", ev.ID, err)
+		}
+		results = append(results, data.Result)
+	}
+	// Events are chronological; history is newest-first
+	for i, j := 0, len(results)-1; i < j; i, j = i+1, j-1 {
+		results[i], results[j] = results[j], results[i]
+	}
+	return results, nil
 }
 
 // PrintLog renders the history and D-Mail log to DataOut.
 func (a *Amadeus) PrintLog() error {
-	history, err := a.Store.LoadHistory()
+	history, err := a.loadCheckHistory()
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}
@@ -698,7 +832,7 @@ type dmailJSONView struct {
 
 // PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
 func (a *Amadeus) PrintLogJSON() error {
-	history, err := a.Store.LoadHistory()
+	history, err := a.loadCheckHistory()
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}
@@ -788,8 +922,12 @@ func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, err
 			return saved, fmt.Errorf("convergence dmail name: %w", err)
 		}
 		cd.Name = cdName
-		if err := a.Store.SaveDMail(cd); err != nil {
-			return saved, fmt.Errorf("save convergence dmail %s: %w", cdName, err)
+		ev, evErr := NewEvent(EventDMailGenerated, DMailGeneratedData{DMail: cd}, time.Now().UTC())
+		if evErr != nil {
+			return saved, fmt.Errorf("create convergence event: %w", evErr)
+		}
+		if err := a.emit(ev); err != nil {
+			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}
 		saved = append(saved, cd)
 		// Mark newly saved targets as covered
@@ -802,7 +940,14 @@ func (a *Amadeus) saveConvergenceDMails(alerts []ConvergenceAlert) ([]DMail, err
 
 // MarkCommented records that a D-Mail × Issue pair has been posted as a comment.
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
-	return a.Store.MarkCommented(dmailName, issueID)
+	now := time.Now().UTC()
+	ev, err := NewEvent(EventDMailCommented, DMailCommentedData{
+		DMail: dmailName, IssueID: issueID,
+	}, now)
+	if err != nil {
+		return fmt.Errorf("create comment event: %w", err)
+	}
+	return a.emit(ev)
 }
 
 // PrintSync builds and outputs the sync status as JSON to DataOut.

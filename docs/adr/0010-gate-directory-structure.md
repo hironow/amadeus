@@ -1,7 +1,7 @@
 # 0010. Gate Directory Structure
 
 **Date:** 2026-02-23
-**Status:** Accepted
+**Status:** Accepted — partially superseded by [0011](0011-event-sourcing.md) (`history/` replaced by `events/`)
 
 ## Context
 

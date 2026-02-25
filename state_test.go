@@ -17,7 +17,7 @@ func TestInitGateDir_CreatesStructure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitGateDir failed: %v", err)
 	}
-	for _, sub := range []string{".run", "history", "outbox", "inbox", "archive"} {
+	for _, sub := range []string{".run", "events", "outbox", "inbox", "archive"} {
 		path := filepath.Join(root, sub)
 		info, err := os.Stat(path)
 		if err != nil {
@@ -62,12 +62,9 @@ func TestSaveAndLoadCheckResult(t *testing.T) {
 		},
 		PRsEvaluated: []string{"#120", "#122"},
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	if err := store.SaveLatest(result); err != nil {
 		t.Fatalf("SaveLatest failed: %v", err)
-	}
-	if err := store.SaveHistory(result); err != nil {
-		t.Fatalf("SaveHistory failed: %v", err)
 	}
 	loaded, err := store.LoadLatest()
 	if err != nil {
@@ -78,183 +75,6 @@ func TestSaveAndLoadCheckResult(t *testing.T) {
 	}
 	if loaded.Divergence != 0.145 {
 		t.Errorf("expected divergence 0.145, got %f", loaded.Divergence)
-	}
-}
-
-func TestSaveHistory_SecondPrecision(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	// given: two results 30 seconds apart within the same minute
-	r1 := CheckResult{
-		CheckedAt:  time.Date(2026, 2, 19, 14, 30, 0, 0, time.UTC),
-		Commit:     "aaa",
-		Divergence: 0.10,
-	}
-	r2 := CheckResult{
-		CheckedAt:  time.Date(2026, 2, 19, 14, 30, 30, 0, time.UTC),
-		Commit:     "bbb",
-		Divergence: 0.20,
-	}
-
-	// when
-	if err := store.SaveHistory(r1); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SaveHistory(r2); err != nil {
-		t.Fatal(err)
-	}
-
-	// then: both files must exist (not overwritten)
-	entries, err := os.ReadDir(filepath.Join(root, "history"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 2 {
-		names := make([]string, len(entries))
-		for i, e := range entries {
-			names[i] = e.Name()
-		}
-		t.Errorf("expected 2 history files, got %d: %v", len(entries), names)
-	}
-}
-
-func TestSaveHistory_SameSecond_NoClobber(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	// given: two results at the exact same second
-	ts := time.Date(2026, 2, 19, 14, 30, 0, 0, time.UTC)
-	r1 := CheckResult{CheckedAt: ts, Commit: "aaa", Divergence: 0.10}
-	r2 := CheckResult{CheckedAt: ts, Commit: "bbb", Divergence: 0.20}
-
-	// when
-	if err := store.SaveHistory(r1); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SaveHistory(r2); err != nil {
-		t.Fatal(err)
-	}
-
-	// then: both files must exist (not overwritten)
-	entries, err := os.ReadDir(filepath.Join(root, "history"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 2 {
-		names := make([]string, len(entries))
-		for i, e := range entries {
-			names[i] = e.Name()
-		}
-		t.Errorf("expected 2 history files, got %d: %v", len(entries), names)
-	}
-}
-
-func TestSaveHistory_UnreadableDir_ReturnsError(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	// given: history directory with no read/execute permission
-	histDir := filepath.Join(root, "history")
-	if err := os.Chmod(histDir, 0o000); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(histDir, 0o755) })
-
-	// when: SaveHistory is called
-	r := CheckResult{
-		CheckedAt: time.Date(2026, 2, 20, 14, 0, 0, 0, time.UTC),
-		Commit:    "aaa",
-	}
-	err := store.SaveHistory(r)
-
-	// then: should return an error, not loop forever
-	if err == nil {
-		t.Error("expected error when history directory is unreadable")
-	}
-}
-
-func TestLoadHistory_MultipleEntries(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	// given: three history entries at different times
-	r1 := CheckResult{
-		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
-		Commit:     "aaa",
-		Type:       CheckTypeFull,
-		Divergence: 0.10,
-	}
-	r2 := CheckResult{
-		CheckedAt:  time.Date(2026, 2, 20, 12, 0, 0, 0, time.UTC),
-		Commit:     "bbb",
-		Type:       CheckTypeDiff,
-		Divergence: 0.13,
-	}
-	r3 := CheckResult{
-		CheckedAt:  time.Date(2026, 2, 20, 14, 30, 0, 0, time.UTC),
-		Commit:     "ccc",
-		Type:       CheckTypeDiff,
-		Divergence: 0.15,
-	}
-	for _, r := range []CheckResult{r1, r2, r3} {
-		if err := store.SaveHistory(r); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// when
-	history, err := store.LoadHistory()
-
-	// then
-	if err != nil {
-		t.Fatalf("LoadHistory failed: %v", err)
-	}
-	if len(history) != 3 {
-		t.Fatalf("expected 3 entries, got %d", len(history))
-	}
-	// sorted newest first (descending)
-	if history[0].Commit != "ccc" {
-		t.Errorf("expected newest first (ccc), got %s", history[0].Commit)
-	}
-	if history[2].Commit != "aaa" {
-		t.Errorf("expected oldest last (aaa), got %s", history[2].Commit)
-	}
-}
-
-func TestLoadHistory_EmptyDir(t *testing.T) {
-	dir := t.TempDir()
-	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
-	store := NewStateStore(root)
-
-	// when
-	history, err := store.LoadHistory()
-
-	// then
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if len(history) != 0 {
-		t.Errorf("expected 0 entries, got %d", len(history))
 	}
 }
 
@@ -532,7 +352,7 @@ func TestLoadLatest_NoFile_ReturnsEmpty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	result, err := store.LoadLatest()
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)

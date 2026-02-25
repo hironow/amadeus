@@ -222,7 +222,7 @@ func TestNextDMailName_EmptyArchive(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	name, err := store.NextDMailName(KindFeedback)
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestNextDMailName_Sequential(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -264,7 +264,7 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -292,7 +292,7 @@ func TestSaveDMail_HighSeverity_WritesToOutbox(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -321,7 +321,7 @@ func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -350,7 +350,7 @@ func TestSaveDMail_Format(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -378,7 +378,7 @@ func TestLoadDMail_Exists(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -415,7 +415,7 @@ func TestLoadDMail_NotFound(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	_, err := store.LoadDMail("feedback-999")
 	if err == nil {
@@ -429,7 +429,7 @@ func TestLoadAllDMails_Multiple(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	for _, d := range []DMail{
 		{Name: "feedback-002", Kind: KindFeedback, Description: "second"},
@@ -462,7 +462,7 @@ func TestLoadAllDMails_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmails, err := store.LoadAllDMails()
 	if err != nil {
@@ -480,7 +480,7 @@ func TestSaveConsumed_RoundTrip(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	records := []ConsumedRecord{
@@ -516,7 +516,7 @@ func TestLoadConsumed_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when
 	loaded, err := store.LoadConsumed()
@@ -537,7 +537,7 @@ func TestSaveConsumed_Appends(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	now := time.Now().UTC().Truncate(time.Second)
 
 	first := []ConsumedRecord{{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"}}
@@ -568,7 +568,7 @@ func TestScanInbox_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when
 	dmails, err := store.ScanInbox()
@@ -589,7 +589,7 @@ func TestScanInbox_SingleReport(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// Drop a report into inbox/
 	content := []byte("---\nname: report-001\nkind: report\ndescription: test report\n---\n\nReport body.\n")
@@ -634,7 +634,7 @@ func TestScanInbox_MultipleReports(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	for _, name := range []string{"report-001", "report-002", "report-003"} {
 		content := fmt.Sprintf("---\nname: %s\nkind: report\ndescription: test\n---\n\nbody\n", name)
@@ -675,7 +675,7 @@ func TestScanInbox_InvalidFile(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	os.WriteFile(filepath.Join(root, "inbox", "bad.md"), []byte("not valid frontmatter"), 0o644)
 
@@ -698,7 +698,7 @@ func TestScanInbox_AlreadyInArchive(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	content := []byte("---\nname: report-001\nkind: report\ndescription: original\n---\n\nOriginal body.\n")
 	os.WriteFile(filepath.Join(root, "archive", "report-001.md"), content, 0o644)
@@ -804,7 +804,7 @@ func TestScanInbox_SkipsNonMD(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	os.WriteFile(filepath.Join(root, "inbox", "readme.txt"), []byte("ignore me"), 0o644)
 
@@ -943,4 +943,148 @@ func readGitignore(root string) ([]byte, error) {
 
 func readArchiveFile(root, filename string) ([]byte, error) {
 	return os.ReadFile(filepath.Join(root, "archive", filename))
+}
+
+func TestExtractIssueIDs_SingleID(t *testing.T) {
+	// given
+	text := "feat: add CollectADRs for reading ADR markdown files (MY-302)"
+
+	// when
+	ids := ExtractIssueIDs(text)
+
+	// then
+	if len(ids) != 1 {
+		t.Fatalf("expected 1 ID, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "MY-302" {
+		t.Errorf("expected MY-302, got %s", ids[0])
+	}
+}
+
+func TestExtractIssueIDs_MultipleIDsInOneText(t *testing.T) {
+	// given
+	text := "fix: resolve MY-241 and MY-302 conflicts"
+
+	// when
+	ids := ExtractIssueIDs(text)
+
+	// then
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "MY-241" || ids[1] != "MY-302" {
+		t.Errorf("expected [MY-241 MY-302], got %v", ids)
+	}
+}
+
+func TestExtractIssueIDs_DeduplicatesAcrossTexts(t *testing.T) {
+	// given
+	text1 := "feat: implement MY-302"
+	text2 := "test: verify MY-302 behavior"
+
+	// when
+	ids := ExtractIssueIDs(text1, text2)
+
+	// then
+	if len(ids) != 1 {
+		t.Fatalf("expected 1 unique ID, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "MY-302" {
+		t.Errorf("expected MY-302, got %s", ids[0])
+	}
+}
+
+func TestExtractIssueIDs_NoIDs(t *testing.T) {
+	// given
+	text := "refactor: clean up code style"
+
+	// when
+	ids := ExtractIssueIDs(text)
+
+	// then
+	if len(ids) != 0 {
+		t.Errorf("expected empty, got %v", ids)
+	}
+}
+
+func TestExtractIssueIDs_EmptyInput(t *testing.T) {
+	// when
+	ids := ExtractIssueIDs()
+
+	// then
+	if len(ids) != 0 {
+		t.Errorf("expected empty, got %v", ids)
+	}
+}
+
+func TestExtractIssueIDs_SortedOutput(t *testing.T) {
+	// given
+	text := "MY-305 then MY-241 then MY-302"
+
+	// when
+	ids := ExtractIssueIDs(text)
+
+	// then
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 IDs, got %d: %v", len(ids), ids)
+	}
+	sorted := strings.Join(ids, ",")
+	if sorted != "MY-241,MY-302,MY-305" {
+		t.Errorf("expected sorted order, got %s", sorted)
+	}
+}
+
+func TestExtractIssueIDs_MultipleTexts(t *testing.T) {
+	// given
+	titles := []string{
+		"80254a3 feat: CLI improvements (#5)",
+		"514dd3e feat: inject ADR/DoD/DepMap (MY-302)",
+		"abc1234 fix: resolve issue (MY-241)",
+	}
+
+	// when
+	ids := ExtractIssueIDs(titles...)
+
+	// then
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "MY-241" || ids[1] != "MY-302" {
+		t.Errorf("expected [MY-241 MY-302], got %v", ids)
+	}
+}
+
+func TestExtractIssueIDs_NonMyPrefix(t *testing.T) {
+	// given: other Linear project keys
+	text := "fix: resolve AM-123 and OPS-45 issues"
+
+	// when
+	ids := ExtractIssueIDs(text)
+
+	// then
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "AM-123" || ids[1] != "OPS-45" {
+		t.Errorf("expected [AM-123 OPS-45], got %v", ids)
+	}
+}
+
+func TestExtractIssueIDs_MixedPrefixes(t *testing.T) {
+	// given
+	titles := []string{
+		"feat: implement MY-302",
+		"fix: resolve AM-99 conflict",
+	}
+
+	// when
+	ids := ExtractIssueIDs(titles...)
+
+	// then
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "AM-99" || ids[1] != "MY-302" {
+		t.Errorf("expected [AM-99 MY-302], got %v", ids)
+	}
 }

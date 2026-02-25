@@ -40,7 +40,7 @@ func newTestAmadeus(t *testing.T, repoRoot string) *Amadeus {
 		t.Fatal(err)
 	}
 	cfg := DefaultConfig()
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 	logger := NewLogger(&bytes.Buffer{}, false)
 	git := NewGitClient(repoRoot)
 	return &Amadeus{Config: cfg, Store: store, Git: git, Logger: logger, DataOut: &bytes.Buffer{}}

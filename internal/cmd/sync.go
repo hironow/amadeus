@@ -43,11 +43,14 @@ func newSyncCommand() *cobra.Command {
 			}
 
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			store := amadeus.NewProjectionStore(divRoot)
 			a := &amadeus.Amadeus{
-				Config:  cfg,
-				Store:   amadeus.NewStateStore(divRoot),
-				Logger:  logger,
-				DataOut: cmd.OutOrStdout(),
+				Config:    cfg,
+				Store:     store,
+				Events:    &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")},
+				Projector: &amadeus.Projector{Store: store},
+				Logger:    logger,
+				DataOut:   cmd.OutOrStdout(),
 			}
 			return a.PrintSync()
 		},
