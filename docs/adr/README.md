@@ -12,6 +12,14 @@
 | [0004](https://github.com/hironow/phonewave/blob/main/docs/adr/0004-dmail-schema-v1.md) | D-Mail Schema v1 Specification | MY-352, MY-353 |
 | [0005](https://github.com/hironow/phonewave/blob/main/docs/adr/0005-fsnotify-daemon-design.md) | fsnotify-based File Watch Daemon | — |
 
+## Extended Shared ADRs (S-series, canonical: phonewave)
+
+| # | Decision |
+|---|----------|
+| [S0001](https://github.com/hironow/phonewave/blob/main/docs/adr/S0001-logger-root-package-exception.md) | Logger as root package exception |
+| [S0002](https://github.com/hironow/phonewave/blob/main/docs/adr/S0002-event-sourcing-jsonl-pattern.md) | JSONL append-only event sourcing pattern |
+| [S0003](https://github.com/hironow/phonewave/blob/main/docs/adr/S0003-three-way-approval-contract.md) | Three-way approval contract |
+
 ## amadeus-specific ADRs
 
 | # | Decision | Linear |
@@ -25,3 +33,4 @@
 | [0012](0012-root-package-file-consolidation.md) | Root Package File Consolidation | — |
 | [0013](0013-event-validation-and-lifecycle.md) | Event Validation and Lifecycle Management | — |
 | [0014](0014-flat-package-architecture.md) | Flat Package Architecture Decision | — |
+| [0015](0015-load-config-to-cmd.md) | Move LoadConfig to internal/cmd | — |
