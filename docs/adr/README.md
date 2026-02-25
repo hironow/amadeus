@@ -22,3 +22,6 @@
 | [0009](0009-world-line-convergence-detection.md) | World Line Convergence Detection | MY-366 |
 | [0010](0010-gate-directory-structure.md) | Gate Directory Structure | MY-366 |
 | [0011](0011-event-sourcing.md) | Event Sourcing for State Management | — |
+| [0012](0012-root-package-file-consolidation.md) | Root Package File Consolidation | — |
+| [0013](0013-event-validation-and-lifecycle.md) | Event Validation and Lifecycle Management | — |
+| [0014](0014-flat-package-architecture.md) | Flat Package Architecture Decision | — |
