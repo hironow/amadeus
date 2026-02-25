@@ -87,7 +87,7 @@ func (a *Amadeus) emit(events ...Event) error {
 
 // autoRebuildIfNeeded checks if projections are missing but events exist,
 // and rebuilds projections from the event store if so.
-func (a *Amadeus) autoRebuildIfNeeded() error {
+func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	if a.Events == nil || a.Projector == nil {
 		return nil
 	}
@@ -110,11 +110,15 @@ func (a *Amadeus) autoRebuildIfNeeded() error {
 	// permanently lost. Skip auto-rebuild and recommend explicit rebuild.
 	for _, ev := range events {
 		if ev.Type == EventInboxConsumed {
-			a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
+			if !quiet {
+				a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
+			}
 			return nil
 		}
 	}
-	a.Logger.Info("projections missing, rebuilding from %d event(s)", len(events))
+	if !quiet {
+		a.Logger.Info("projections missing, rebuilding from %d event(s)", len(events))
+	}
 	if err := a.Projector.Rebuild(events); err != nil {
 		return fmt.Errorf("auto-rebuild: %w", err)
 	}
@@ -155,7 +159,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	// Auto-rebuild is a state-mutating operation (clears and rewrites projection
 	// directories), so it must be skipped in dry-run mode.
 	if !opts.DryRun {
-		if err := a.autoRebuildIfNeeded(); err != nil {
+		if err := a.autoRebuildIfNeeded(opts.Quiet); err != nil {
 			return fmt.Errorf("auto-rebuild: %w", err)
 		}
 	}
@@ -672,7 +676,7 @@ func (a *Amadeus) FlagForceFullNext(previousDivergence, currentDivergence float6
 }
 
 // SaveCheckState persists an updated CheckResult preserving prior divergence data.
-// Updates CheckedAt and appends to history so every check run is auditable.
+// Emits a check.completed event so every check run is recorded in the event store.
 // Used on the early-return path when no significant shift is detected,
 // and also to persist ForceFullNext when a divergence jump defers a full scan.
 func (a *Amadeus) SaveCheckState(commit string, previous CheckResult, checkedAt time.Time) error {

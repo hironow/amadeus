@@ -203,6 +203,21 @@ func (s *ProjectionStore) SaveDMail(dmail DMail) error {
 	return nil
 }
 
+// SaveDMailToArchive writes a D-Mail to archive/ only, skipping outbox/.
+// Used during rebuild to avoid re-queuing historical D-Mails for delivery.
+func (s *ProjectionStore) SaveDMailToArchive(dmail DMail) error {
+	data, err := MarshalDMail(dmail)
+	if err != nil {
+		return fmt.Errorf("marshal dmail: %w", err)
+	}
+	filename := dmail.Name + ".md"
+	archivePath := filepath.Join(s.Root, "archive", filename)
+	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+		return fmt.Errorf("write archive: %w", err)
+	}
+	return nil
+}
+
 // LoadDMail reads a single D-Mail by name from the archive/ directory.
 func (s *ProjectionStore) LoadDMail(name string) (DMail, error) {
 	path := filepath.Join(s.Root, "archive", name+".md")

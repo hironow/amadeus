@@ -10,7 +10,8 @@ import (
 
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
-	Store *ProjectionStore
+	Store      *ProjectionStore
+	rebuilding bool // true during Rebuild to skip outbox writes
 }
 
 // Apply processes a single event and updates the relevant projections.
@@ -53,6 +54,9 @@ func (p *Projector) Rebuild(events []Event) error {
 			return fmt.Errorf("create %s: %w", sub, err)
 		}
 	}
+
+	p.rebuilding = true
+	defer func() { p.rebuilding = false }()
 
 	for _, ev := range events {
 		if err := p.Apply(ev); err != nil {
@@ -98,6 +102,11 @@ func (p *Projector) applyDMailGenerated(event Event) error {
 	var data DMailGeneratedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailGeneratedData: %w", err)
+	}
+	// During rebuild, only write to archive/ (permanent record).
+	// Skip outbox/ to avoid re-queuing historical D-Mails for delivery.
+	if p.rebuilding {
+		return p.Store.SaveDMailToArchive(data.DMail)
 	}
 	return p.Store.SaveDMail(data.DMail)
 }

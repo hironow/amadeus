@@ -395,6 +395,38 @@ func TestProjector_Rebuild(t *testing.T) {
 	}
 }
 
+func TestProjector_Rebuild_DoesNotRepopulateOutbox(t *testing.T) {
+	// given: rebuild replays dmail.generated events
+	p, dir := newTestProjector(t)
+	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
+
+	ev, _ := NewEvent(EventDMailGenerated, DMailGeneratedData{
+		DMail: DMail{
+			Name:        "feedback-001",
+			Kind:        KindFeedback,
+			Description: "rebuild outbox test",
+			Body:        "detail",
+		},
+	}, now)
+
+	// when
+	if err := p.Rebuild([]Event{ev}); err != nil {
+		t.Fatalf("Rebuild: %v", err)
+	}
+
+	// then: archive/ should have the D-Mail (permanent record)
+	archivePath := filepath.Join(dir, "archive", "feedback-001.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file not created: %v", err)
+	}
+
+	// then: outbox/ must be empty — rebuild must NOT re-queue historical D-Mails
+	outboxPath := filepath.Join(dir, "outbox", "feedback-001.md")
+	if _, err := os.Stat(outboxPath); !os.IsNotExist(err) {
+		t.Error("rebuild should not repopulate outbox/ (would cause duplicate delivery)")
+	}
+}
+
 func TestProjector_Rebuild_RemovesStaleDMails(t *testing.T) {
 	// given: a stale D-Mail exists in archive/ before rebuild
 	p, dir := newTestProjector(t)

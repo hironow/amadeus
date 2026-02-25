@@ -1919,7 +1919,7 @@ func TestAmadeus_AutoRebuild_RestoresProjectionsFromEvents(t *testing.T) {
 	}
 
 	// when
-	if err := a.autoRebuildIfNeeded(); err != nil {
+	if err := a.autoRebuildIfNeeded(false); err != nil {
 		t.Fatalf("autoRebuildIfNeeded: %v", err)
 	}
 
@@ -1964,7 +1964,7 @@ func TestAmadeus_AutoRebuild_SkipsWhenLatestExists(t *testing.T) {
 	}
 
 	// when
-	if err := a.autoRebuildIfNeeded(); err != nil {
+	if err := a.autoRebuildIfNeeded(false); err != nil {
 		t.Fatalf("autoRebuildIfNeeded: %v", err)
 	}
 
@@ -1996,7 +1996,7 @@ func TestAmadeus_AutoRebuild_SkipsWhenNoEventStore(t *testing.T) {
 	}
 
 	// when: should not panic or error
-	if err := a.autoRebuildIfNeeded(); err != nil {
+	if err := a.autoRebuildIfNeeded(false); err != nil {
 		t.Fatalf("autoRebuildIfNeeded with nil Events: %v", err)
 	}
 }
@@ -2054,7 +2054,7 @@ func TestAmadeus_AutoRebuild_SkipsWhenInboxEventsExist(t *testing.T) {
 	}
 
 	// when
-	if err := a.autoRebuildIfNeeded(); err != nil {
+	if err := a.autoRebuildIfNeeded(false); err != nil {
 		t.Fatalf("autoRebuildIfNeeded: %v", err)
 	}
 
