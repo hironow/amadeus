@@ -51,12 +51,17 @@ func newCheckCommand() *cobra.Command {
 
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 
+			store := amadeus.NewProjectionStore(divRoot)
+			eventStore := &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")}
+
 			a := &amadeus.Amadeus{
-				Config:  cfg,
-				Store:   amadeus.NewStateStore(divRoot),
-				Git:     amadeus.NewGitClient(repoRoot),
-				Logger:  logger,
-				DataOut: cmd.OutOrStdout(),
+				Config:    cfg,
+				Store:     store,
+				Events:    eventStore,
+				Projector: &amadeus.Projector{Store: store},
+				Git:       amadeus.NewGitClient(repoRoot),
+				Logger:    logger,
+				DataOut:   cmd.OutOrStdout(),
 			}
 
 			return a.RunCheck(cmd.Context(), amadeus.CheckOptions{

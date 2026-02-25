@@ -21,3 +21,4 @@
 | [0008](0008-claude-code-judgment-engine.md) | Claude Code as Judgment Engine | MY-366 |
 | [0009](0009-world-line-convergence-detection.md) | World Line Convergence Detection | MY-366 |
 | [0010](0010-gate-directory-structure.md) | Gate Directory Structure | MY-366 |
+| [0011](0011-event-sourcing.md) | Event Sourcing for State Management | — |

@@ -222,7 +222,7 @@ func TestNextDMailName_EmptyArchive(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	name, err := store.NextDMailName(KindFeedback)
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestNextDMailName_Sequential(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -264,7 +264,7 @@ func TestSaveDMail_DualWrite(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -292,7 +292,7 @@ func TestSaveDMail_HighSeverity_WritesToOutbox(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -321,7 +321,7 @@ func TestSaveDMail_LowSeverity_WritesToOutbox(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -350,7 +350,7 @@ func TestSaveDMail_Format(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -378,7 +378,7 @@ func TestLoadDMail_Exists(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmail := DMail{
 		Name:        "feedback-001",
@@ -415,7 +415,7 @@ func TestLoadDMail_NotFound(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	_, err := store.LoadDMail("feedback-999")
 	if err == nil {
@@ -429,7 +429,7 @@ func TestLoadAllDMails_Multiple(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	for _, d := range []DMail{
 		{Name: "feedback-002", Kind: KindFeedback, Description: "second"},
@@ -462,7 +462,7 @@ func TestLoadAllDMails_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	dmails, err := store.LoadAllDMails()
 	if err != nil {
@@ -480,7 +480,7 @@ func TestSaveConsumed_RoundTrip(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	records := []ConsumedRecord{
@@ -516,7 +516,7 @@ func TestLoadConsumed_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when
 	loaded, err := store.LoadConsumed()
@@ -537,7 +537,7 @@ func TestSaveConsumed_Appends(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	now := time.Now().UTC().Truncate(time.Second)
 
 	first := []ConsumedRecord{{Name: "report-001", Kind: KindReport, ConsumedAt: now, Source: "report-001.md"}}
@@ -568,7 +568,7 @@ func TestScanInbox_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when
 	dmails, err := store.ScanInbox()
@@ -589,7 +589,7 @@ func TestScanInbox_SingleReport(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// Drop a report into inbox/
 	content := []byte("---\nname: report-001\nkind: report\ndescription: test report\n---\n\nReport body.\n")
@@ -634,7 +634,7 @@ func TestScanInbox_MultipleReports(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	for _, name := range []string{"report-001", "report-002", "report-003"} {
 		content := fmt.Sprintf("---\nname: %s\nkind: report\ndescription: test\n---\n\nbody\n", name)
@@ -675,7 +675,7 @@ func TestScanInbox_InvalidFile(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	os.WriteFile(filepath.Join(root, "inbox", "bad.md"), []byte("not valid frontmatter"), 0o644)
 
@@ -698,7 +698,7 @@ func TestScanInbox_AlreadyInArchive(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	content := []byte("---\nname: report-001\nkind: report\ndescription: original\n---\n\nOriginal body.\n")
 	os.WriteFile(filepath.Join(root, "archive", "report-001.md"), content, 0o644)
@@ -804,7 +804,7 @@ func TestScanInbox_SkipsNonMD(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	os.WriteFile(filepath.Join(root, "inbox", "readme.txt"), []byte("ignore me"), 0o644)
 

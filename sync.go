@@ -24,7 +24,7 @@ type CommentRecord struct {
 
 // LoadSyncState reads the sync state from .run/sync.json.
 // Returns an empty SyncState if the file does not exist.
-func (s *StateStore) LoadSyncState() (SyncState, error) {
+func (s *ProjectionStore) LoadSyncState() (SyncState, error) {
 	path := filepath.Join(s.Root, ".run", "sync.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -44,7 +44,7 @@ func (s *StateStore) LoadSyncState() (SyncState, error) {
 }
 
 // SaveSyncState writes the sync state to .run/sync.json.
-func (s *StateStore) SaveSyncState(state SyncState) error {
+func (s *ProjectionStore) SaveSyncState(state SyncState) error {
 	path := filepath.Join(s.Root, ".run", "sync.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -70,7 +70,7 @@ type SyncOutput struct {
 // NOTE(MY-346): Key format changed from "dmailName" to "dmailName:issueID" without migration.
 // Existing sync.json with old keys will cause those D-Mails to reappear as pending.
 // This is acceptable because amadeus is pre-release and no production .gate/ state exists.
-func (s *StateStore) MarkCommented(dmailName, issueID string) error {
+func (s *ProjectionStore) MarkCommented(dmailName, issueID string) error {
 	state, err := s.LoadSyncState()
 	if err != nil {
 		return fmt.Errorf("load sync state: %w", err)

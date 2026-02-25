@@ -80,6 +80,22 @@ func newArchivePruneCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("prune: %w", err)
 			}
+
+			// Emit archive.pruned event
+			divRoot := filepath.Join(repoRoot, ".gate")
+			var paths []string
+			for _, c := range candidates {
+				paths = append(paths, c.Path)
+			}
+			eventStore := &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")}
+			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
+				Paths: paths,
+				Count: count,
+			}, time.Now().UTC())
+			if evErr == nil {
+				eventStore.Append(ev)
+			}
+
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", count)
 			return nil
 		},

@@ -36,8 +36,14 @@ func newMarkCommentedCommand() *cobra.Command {
 				return fmt.Errorf("stat .gate directory: %w", err)
 			}
 
-			store := amadeus.NewStateStore(divRoot)
-			if err := store.MarkCommented(dmailName, issueID); err != nil {
+			store := amadeus.NewProjectionStore(divRoot)
+			a := &amadeus.Amadeus{
+				Store:     store,
+				Events:    &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")},
+				Projector: &amadeus.Projector{Store: store},
+				Logger:    amadeus.NewLogger(cmd.ErrOrStderr(), false),
+			}
+			if err := a.MarkCommented(dmailName, issueID); err != nil {
 				return fmt.Errorf("mark commented: %w", err)
 			}
 

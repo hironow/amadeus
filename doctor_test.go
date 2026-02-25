@@ -212,12 +212,12 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := RunDoctor(ctx, configPath, dir)
 
-	// then: should have 8 results
-	if len(results) != 8 {
-		t.Fatalf("expected 8 results, got %d", len(results))
+	// then: should have 9 results
+	if len(results) != 9 {
+		t.Fatalf("expected 9 results, got %d", len(results))
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "D-Mail Schema", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -259,8 +259,8 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 					eventCount++
 				}
 			}
-			if eventCount != 8 {
-				t.Errorf("expected 8 doctor.check events, got %d", eventCount)
+			if eventCount != 9 {
+				t.Errorf("expected 9 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -340,13 +340,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := RunDoctor(ctx, configPath, dir)
 
-	// then: should have 8 results
-	if len(results) != 8 {
+	// then: should have 9 results
+	if len(results) != 9 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 8 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 9 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -423,7 +423,7 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	store.SaveDMail(DMail{
 		Name:        "feedback-001",
 		Kind:        KindFeedback,

@@ -52,7 +52,7 @@ func TestAmadeus_DivergenceJump_SetsForceFullNext(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	prev := CheckResult{
 		Commit:     "abc123",
 		Divergence: 0.10,
@@ -62,8 +62,8 @@ func TestAmadeus_DivergenceJump_SetsForceFullNext(t *testing.T) {
 	}
 
 	// when: a divergence jump is detected and flagged
-	a := &Amadeus{Config: DefaultConfig(), Store: store}
-	a.FlagForceFullNext()
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(io.Discard, false)}
+	a.FlagForceFullNext(0.10, 0.35)
 	if err := a.SaveCheckState("def456", prev, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestAmadeus_NoShift_AdvancesCheckCount(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	prev := CheckResult{
 		Commit:              "abc123",
 		CheckCountSinceFull: 3,
@@ -95,7 +95,7 @@ func TestAmadeus_NoShift_AdvancesCheckCount(t *testing.T) {
 	}
 
 	// when: AdvanceCheckCount is called (simulating a no-shift early return)
-	a := &Amadeus{Config: DefaultConfig(), Store: store}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}}
 	a.CheckCount = prev.CheckCountSinceFull
 	a.AdvanceCheckCount(false)
 	if err := a.SaveCheckState(prev.Commit, prev, time.Now().UTC()); err != nil {
@@ -119,7 +119,7 @@ func TestAmadeus_NoShift_PreservesPriorDivergence(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	prev := CheckResult{
 		Commit:     "abc123",
 		Divergence: 0.145,
@@ -133,7 +133,7 @@ func TestAmadeus_NoShift_PreservesPriorDivergence(t *testing.T) {
 	}
 
 	// when: SaveCheckState is called (simulating no-shift early return)
-	a := &Amadeus{Config: DefaultConfig(), Store: store}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}}
 	a.CheckCount = prev.CheckCountSinceFull
 	a.AdvanceCheckCount(false)
 	if err := a.SaveCheckState(prev.Commit, prev, time.Now().UTC()); err != nil {
@@ -156,14 +156,19 @@ func TestAmadeus_NoShift_PreservesPriorDivergence(t *testing.T) {
 	}
 }
 
-func TestAmadeus_NoShift_UpdatesCheckedAtAndHistory(t *testing.T) {
+func TestAmadeus_NoShift_UpdatesCheckedAtAndEmitsEvent(t *testing.T) {
 	// given: a state store with a previous result from yesterday
 	dir := t.TempDir()
 	root := dir + "/.gate"
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
+	eventsDir := filepath.Join(root, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	eventStore := &FileEventStore{Dir: eventsDir}
 	yesterday := time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC)
 	prev := CheckResult{
 		CheckedAt:           yesterday,
@@ -177,7 +182,12 @@ func TestAmadeus_NoShift_UpdatesCheckedAtAndHistory(t *testing.T) {
 
 	// when: SaveCheckState is called with a new timestamp
 	now := time.Date(2026, 2, 20, 14, 0, 0, 0, time.UTC)
-	a := &Amadeus{Config: DefaultConfig(), Store: store}
+	a := &Amadeus{
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    eventStore,
+		Projector: &Projector{Store: store},
+	}
 	a.CheckCount = prev.CheckCountSinceFull
 	a.AdvanceCheckCount(false)
 	if err := a.SaveCheckState("def456", prev, now); err != nil {
@@ -193,13 +203,16 @@ func TestAmadeus_NoShift_UpdatesCheckedAtAndHistory(t *testing.T) {
 		t.Errorf("expected CheckedAt %v, got %v", now, loaded.CheckedAt)
 	}
 
-	// then: history should have a new entry
-	entries, err := os.ReadDir(filepath.Join(root, "history"))
+	// then: event store should have a CheckCompleted event
+	events, err := eventStore.LoadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 {
-		t.Errorf("expected 1 history entry, got %d", len(entries))
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].Type != EventCheckCompleted {
+		t.Errorf("event type = %q, want %q", events[0].Type, EventCheckCompleted)
 	}
 }
 
@@ -210,7 +223,7 @@ func TestAmadeus_NoShift_ClearsStalePRAndDMailData(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	prev := CheckResult{
 		Commit:       "abc123",
 		Type:         CheckTypeFull,
@@ -223,7 +236,7 @@ func TestAmadeus_NoShift_ClearsStalePRAndDMailData(t *testing.T) {
 	}
 
 	// when: SaveCheckState is called (no-shift early return)
-	a := &Amadeus{Config: DefaultConfig(), Store: store}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}}
 	a.AdvanceCheckCount(false)
 	now := time.Date(2026, 2, 20, 14, 0, 0, 0, time.UTC)
 	if err := a.SaveCheckState("def456", prev, now); err != nil {
@@ -388,7 +401,7 @@ func TestAmadeus_PrintLog(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	r1 := CheckResult{
 		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
@@ -403,8 +416,14 @@ func TestAmadeus_PrintLog(t *testing.T) {
 		Divergence: 0.15,
 		DMails:     []string{"d-001"},
 	}
+	eventsDir := filepath.Join(root, "events")
+	eventStore := &FileEventStore{Dir: eventsDir}
 	for _, r := range []CheckResult{r1, r2} {
-		if err := store.SaveHistory(r); err != nil {
+		ev, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: r}, r.CheckedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := eventStore.Append(ev); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -420,7 +439,7 @@ func TestAmadeus_PrintLog(t *testing.T) {
 	}
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Events: eventStore, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintLog()
@@ -495,10 +514,10 @@ func TestAmadeus_PrintLog_Empty(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintLog()
@@ -592,7 +611,7 @@ func TestRunCheck_DryRun_NilDataOut_NoPanic(t *testing.T) {
 	}
 	a := &Amadeus{
 		Config:  DefaultConfig(),
-		Store:   NewStateStore(divRoot),
+		Store:   NewProjectionStore(divRoot),
 		Git:     NewGitClient(repo.dir),
 		Logger:  NewLogger(&bytes.Buffer{}, false),
 		DataOut: nil, // intentionally nil
@@ -622,7 +641,7 @@ func TestRunCheck_DryRun_DoesNotConsumeInbox(t *testing.T) {
 
 	a := &Amadeus{
 		Config:  DefaultConfig(),
-		Store:   NewStateStore(divRoot),
+		Store:   NewProjectionStore(divRoot),
 		Git:     NewGitClient(repo.dir),
 		Logger:  NewLogger(&bytes.Buffer{}, false),
 		DataOut: &bytes.Buffer{},
@@ -663,7 +682,7 @@ func TestRunCheck_DryRun_FullCheck_IncludesADRsInPrompt(t *testing.T) {
 	var dataBuf bytes.Buffer
 	a := &Amadeus{
 		Config:  DefaultConfig(),
-		Store:   NewStateStore(divRoot),
+		Store:   NewProjectionStore(divRoot),
 		Git:     NewGitClient(repo.dir),
 		Logger:  NewLogger(&bytes.Buffer{}, false),
 		DataOut: &dataBuf,
@@ -693,7 +712,7 @@ func TestRunCheck_DryRun_FullCheck_NoADRs_StillWorks(t *testing.T) {
 	var dataBuf bytes.Buffer
 	a := &Amadeus{
 		Config:  DefaultConfig(),
-		Store:   NewStateStore(divRoot),
+		Store:   NewProjectionStore(divRoot),
 		Git:     NewGitClient(repo.dir),
 		Logger:  NewLogger(&bytes.Buffer{}, false),
 		DataOut: &dataBuf,
@@ -726,7 +745,7 @@ func TestRunCheck_DryRun_DiffCheck_IncludesADRsInPrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 	git := NewGitClient(repo.dir)
 	// Save a previous state with current commit so diff mode detects the new PR merges
 	commit, err := git.CurrentCommit()
@@ -745,11 +764,12 @@ func TestRunCheck_DryRun_DiffCheck_IncludesADRsInPrompt(t *testing.T) {
 
 	var dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     git,
-		Logger:  NewLogger(&bytes.Buffer{}, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       git,
+		Logger:    NewLogger(&bytes.Buffer{}, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when: diff dry-run check
@@ -773,7 +793,7 @@ func TestRunCheck_DryRun_DiffCheck_IncludesIssueIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 	git := NewGitClient(repo.dir)
 	commit, err := git.CurrentCommit()
 	if err != nil {
@@ -790,11 +810,12 @@ func TestRunCheck_DryRun_DiffCheck_IncludesIssueIDs(t *testing.T) {
 
 	var dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     git,
-		Logger:  NewLogger(&bytes.Buffer{}, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       git,
+		Logger:    NewLogger(&bytes.Buffer{}, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when: diff dry-run check
@@ -821,7 +842,7 @@ func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_OmitsSection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 	git := NewGitClient(repo.dir)
 	commit, err := git.CurrentCommit()
 	if err != nil {
@@ -837,11 +858,12 @@ func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_OmitsSection(t *testing.T) {
 
 	var dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     git,
-		Logger:  NewLogger(&bytes.Buffer{}, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       git,
+		Logger:    NewLogger(&bytes.Buffer{}, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when
@@ -873,7 +895,7 @@ func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_SuppressesDoDs(t *testing.T) {
 	repo.git(t, "add", ".")
 	repo.git(t, "commit", "-m", "add DoD files")
 
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 	git := NewGitClient(repo.dir)
 
 	// Set baseline to current commit (DoD files already exist)
@@ -892,11 +914,12 @@ func TestRunCheck_DryRun_DiffCheck_NoIssueIDs_SuppressesDoDs(t *testing.T) {
 
 	var dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     git,
-		Logger:  NewLogger(&bytes.Buffer{}, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       git,
+		Logger:    NewLogger(&bytes.Buffer{}, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when
@@ -1056,7 +1079,7 @@ func TestRunCheck_ConsumesInbox(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// Verify inbox has file before scan
 	inboxEntries, _ := os.ReadDir(filepath.Join(root, "inbox"))
@@ -1133,7 +1156,7 @@ func TestRunCheck_FullPipeline_CreatesDMails(t *testing.T) {
 	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 
 	cannedResponse := `{
 		"axes": {
@@ -1152,14 +1175,17 @@ func TestRunCheck_FullPipeline_CreatesDMails(t *testing.T) {
 		],
 		"reasoning": "Moderate divergence detected."
 	}`
+	eventStore := &FileEventStore{Dir: filepath.Join(divRoot, "events")}
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     NewGitClient(repo.dir),
-		Claude:  &fakeClaudeRunner{response: cannedResponse},
-		Logger:  NewLogger(&logBuf, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    eventStore,
+		Projector: &Projector{Store: store},
+		Git:       NewGitClient(repo.dir),
+		Claude:    &fakeClaudeRunner{response: cannedResponse},
+		Logger:    NewLogger(&logBuf, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when
@@ -1190,13 +1216,19 @@ func TestRunCheck_FullPipeline_CreatesDMails(t *testing.T) {
 		t.Errorf("expected issues [MY-100], got %v", feedbackDMails[0].Issues)
 	}
 
-	// then: history saved
-	history, err := store.LoadHistory()
+	// then: check.completed event emitted
+	events, err := eventStore.LoadAll()
 	if err != nil {
-		t.Fatalf("LoadHistory: %v", err)
+		t.Fatalf("LoadAll events: %v", err)
 	}
-	if len(history) != 1 {
-		t.Fatalf("expected 1 history entry, got %d", len(history))
+	checkEvents := 0
+	for _, ev := range events {
+		if ev.Type == EventCheckCompleted {
+			checkEvents++
+		}
+	}
+	if checkEvents < 1 {
+		t.Fatalf("expected at least 1 check.completed event, got %d", checkEvents)
 	}
 }
 
@@ -1207,7 +1239,7 @@ func TestRunCheck_ConvergenceTriggered_CreatesDMail(t *testing.T) {
 	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 
 	// Seed 6 feedback D-Mails targeting "auth/session.go" (>= threshold*2 = HIGH)
 	now := time.Now().UTC()
@@ -1240,12 +1272,13 @@ func TestRunCheck_ConvergenceTriggered_CreatesDMail(t *testing.T) {
 	}`
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     NewGitClient(repo.dir),
-		Claude:  &fakeClaudeRunner{response: cleanResponse},
-		Logger:  NewLogger(&logBuf, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       NewGitClient(repo.dir),
+		Claude:    &fakeClaudeRunner{response: cleanResponse},
+		Logger:    NewLogger(&logBuf, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when
@@ -1298,7 +1331,7 @@ func TestPrintLogJSON(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	r1 := CheckResult{
 		CheckedAt:  time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC),
@@ -1306,15 +1339,20 @@ func TestPrintLogJSON(t *testing.T) {
 		Type:       CheckTypeFull,
 		Divergence: 0.10,
 	}
-	if err := store.SaveHistory(r1); err != nil {
+	eventStore := &FileEventStore{Dir: filepath.Join(root, "events")}
+	ev, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: r1}, r1.CheckedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := eventStore.Append(ev); err != nil {
 		t.Fatal(err)
 	}
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Events: eventStore, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
-	err := a.PrintLogJSON()
+	err = a.PrintLogJSON()
 
 	// then
 	if err != nil {
@@ -1341,7 +1379,7 @@ func TestPrintLogJSON_AllDMailsShowSentStatus(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// given: D-Mails of various severities
 	for _, spec := range []struct {
@@ -1361,7 +1399,7 @@ func TestPrintLogJSON_AllDMailsShowSentStatus(t *testing.T) {
 	}
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	if err := a.PrintLogJSON(); err != nil {
@@ -1395,9 +1433,9 @@ func TestSaveConvergenceDMails_ReturnsErrorOnFailure(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	alerts := []ConvergenceAlert{
 		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
@@ -1425,9 +1463,9 @@ func TestSaveConvergenceDMails_Success(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	alerts := []ConvergenceAlert{
 		{Target: "auth/session.go", Count: 6, Window: 14, Severity: SeverityHigh,
@@ -1456,7 +1494,7 @@ func TestSaveConvergenceDMails_DeduplicatesExisting(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	// Pre-save a convergence D-Mail for the same target
 	if err := store.SaveDMail(DMail{
 		Name:     "convergence-001",
@@ -1472,7 +1510,7 @@ func TestSaveConvergenceDMails_DeduplicatesExisting(t *testing.T) {
 	}
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// Same alert that would produce a convergence D-Mail for auth/session.go
 	alerts := []ConvergenceAlert{
@@ -1499,9 +1537,9 @@ func TestSaveCheckState_ClearsConvergenceAlerts(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	previous := CheckResult{
 		Divergence: 0.15,
@@ -1533,7 +1571,7 @@ func TestPrintSync_OutputJSON(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// D-Mail without issues (no pending comments)
 	if err := store.SaveDMail(DMail{
@@ -1563,7 +1601,7 @@ func TestPrintSync_OutputJSON(t *testing.T) {
 	}
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	err := a.PrintSync()
@@ -1592,7 +1630,7 @@ func TestPrintSync_PendingCommentsFromIssues(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	if err := store.SaveDMail(DMail{
 		Name: "feedback-020", Kind: KindFeedback,
@@ -1607,7 +1645,7 @@ func TestPrintSync_PendingCommentsFromIssues(t *testing.T) {
 	}
 
 	var logBuf, dataBuf bytes.Buffer
-	a := &Amadeus{Config: DefaultConfig(), Store: store, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
+	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(&logBuf, false), DataOut: &dataBuf}
 
 	// when
 	if err := a.PrintSync(); err != nil {
@@ -1634,7 +1672,7 @@ func TestMarkCommented_CompositeKey(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	// when: mark same D-Mail for two different issues
 	if err := store.MarkCommented("feedback-030", "MY-500"); err != nil {
@@ -1667,7 +1705,7 @@ func TestPrintLog_ShowsConsumed(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	if err := store.SaveConsumed([]ConsumedRecord{
@@ -1676,20 +1714,31 @@ func TestPrintLog_ShowsConsumed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Save a history entry so PrintLog doesn't bail early
-	store.SaveHistory(CheckResult{
-		CheckedAt:  now,
-		Commit:     "abc1234",
-		Type:       CheckTypeFull,
-		Divergence: 0.1,
-	})
+	// Save a check event so PrintLog doesn't bail early
+	eventStore := &FileEventStore{Dir: filepath.Join(root, "events")}
+	ev, err := NewEvent(EventCheckCompleted, CheckCompletedData{
+		Result: CheckResult{
+			CheckedAt:  now,
+			Commit:     "abc1234",
+			Type:       CheckTypeFull,
+			Divergence: 0.1,
+		},
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := eventStore.Append(ev); err != nil {
+		t.Fatal(err)
+	}
 
 	var buf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Logger:  NewLogger(io.Discard, false),
-		DataOut: &buf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    eventStore,
+		Projector: &Projector{Store: store},
+		Logger:    NewLogger(io.Discard, false),
+		DataOut:   &buf,
 	}
 
 	// when
@@ -1714,7 +1763,7 @@ func TestPrintLogJSON_IncludesConsumed(t *testing.T) {
 	if err := InitGateDir(root); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(root)
+	store := NewProjectionStore(root)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	store.SaveConsumed([]ConsumedRecord{
@@ -1723,10 +1772,11 @@ func TestPrintLogJSON_IncludesConsumed(t *testing.T) {
 
 	var buf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Logger:  NewLogger(io.Discard, false),
-		DataOut: &buf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Logger:    NewLogger(io.Discard, false),
+		DataOut:   &buf,
 	}
 
 	// when
@@ -1766,16 +1816,17 @@ func TestRunCheck_ClaudeError_Propagates(t *testing.T) {
 	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     NewGitClient(repo.dir),
-		Claude:  &errorClaudeRunner{err: fmt.Errorf("claude unavailable")},
-		Logger:  NewLogger(&logBuf, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       NewGitClient(repo.dir),
+		Claude:    &errorClaudeRunner{err: fmt.Errorf("claude unavailable")},
+		Logger:    NewLogger(&logBuf, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when
@@ -1797,17 +1848,18 @@ func TestRunCheck_DryRun_SkipsClaude(t *testing.T) {
 	if err := InitGateDir(divRoot); err != nil {
 		t.Fatal(err)
 	}
-	store := NewStateStore(divRoot)
+	store := NewProjectionStore(divRoot)
 
 	capturing := &capturingClaudeRunner{response: `{}`}
 	var logBuf, dataBuf bytes.Buffer
 	a := &Amadeus{
-		Config:  DefaultConfig(),
-		Store:   store,
-		Git:     NewGitClient(repo.dir),
-		Claude:  capturing,
-		Logger:  NewLogger(&logBuf, false),
-		DataOut: &dataBuf,
+		Config:    DefaultConfig(),
+		Store:     store,
+		Projector: &Projector{Store: store},
+		Git:       NewGitClient(repo.dir),
+		Claude:    capturing,
+		Logger:    NewLogger(&logBuf, false),
+		DataOut:   &dataBuf,
 	}
 
 	// when
@@ -1819,5 +1871,130 @@ func TestRunCheck_DryRun_SkipsClaude(t *testing.T) {
 	}
 	if len(capturing.calls) != 0 {
 		t.Errorf("expected 0 Claude calls in DryRun, got %d", len(capturing.calls))
+	}
+}
+
+func TestAmadeus_AutoRebuild_RestoresProjectionsFromEvents(t *testing.T) {
+	// given: events exist but .run/latest.json does not
+	dir := t.TempDir()
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+	eventsDir := filepath.Join(root, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a CheckCompleted event
+	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
+	ev, err := NewEvent(EventCheckCompleted, CheckCompletedData{
+		Result: CheckResult{
+			CheckedAt:  now,
+			Commit:     "rebuild-me",
+			Type:       CheckTypeFull,
+			Divergence: 0.55,
+		},
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventStore := &FileEventStore{Dir: eventsDir}
+	if err := eventStore.Append(ev); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure no latest.json exists
+	os.Remove(filepath.Join(root, ".run", "latest.json"))
+
+	store := NewProjectionStore(root)
+	a := &Amadeus{
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    eventStore,
+		Projector: &Projector{Store: store},
+		Logger:    NewLogger(io.Discard, false),
+	}
+
+	// when
+	if err := a.autoRebuildIfNeeded(); err != nil {
+		t.Fatalf("autoRebuildIfNeeded: %v", err)
+	}
+
+	// then: latest.json should be restored from events
+	latest, err := store.LoadLatest()
+	if err != nil {
+		t.Fatalf("LoadLatest: %v", err)
+	}
+	if latest.Commit != "rebuild-me" {
+		t.Errorf("Commit = %q, want %q", latest.Commit, "rebuild-me")
+	}
+	if latest.Divergence != 0.55 {
+		t.Errorf("Divergence = %f, want %f", latest.Divergence, 0.55)
+	}
+}
+
+func TestAmadeus_AutoRebuild_SkipsWhenLatestExists(t *testing.T) {
+	// given: latest.json already exists
+	dir := t.TempDir()
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewProjectionStore(root)
+	existing := CheckResult{Commit: "existing", Divergence: 0.10}
+	if err := store.SaveLatest(existing); err != nil {
+		t.Fatal(err)
+	}
+
+	eventsDir := filepath.Join(root, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Amadeus{
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    &FileEventStore{Dir: eventsDir},
+		Projector: &Projector{Store: store},
+		Logger:    NewLogger(io.Discard, false),
+	}
+
+	// when
+	if err := a.autoRebuildIfNeeded(); err != nil {
+		t.Fatalf("autoRebuildIfNeeded: %v", err)
+	}
+
+	// then: latest should still be the original, not rebuilt
+	latest, err := store.LoadLatest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest.Commit != "existing" {
+		t.Errorf("Commit = %q, want %q (should not rebuild)", latest.Commit, "existing")
+	}
+}
+
+func TestAmadeus_AutoRebuild_SkipsWhenNoEventStore(t *testing.T) {
+	// given: Events is nil (event sourcing disabled)
+	dir := t.TempDir()
+	root := dir + "/.gate"
+	if err := InitGateDir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewProjectionStore(root)
+	a := &Amadeus{
+		Config:    DefaultConfig(),
+		Store:     store,
+		Events:    nil, // disabled
+		Projector: nil,
+		Logger:    NewLogger(io.Discard, false),
+	}
+
+	// when: should not panic or error
+	if err := a.autoRebuildIfNeeded(); err != nil {
+		t.Fatalf("autoRebuildIfNeeded with nil Events: %v", err)
 	}
 }
