@@ -181,7 +181,7 @@ func TestDMailCommentedDataMarshalRoundTrip(t *testing.T) {
 func TestArchivePrunedDataMarshalRoundTrip(t *testing.T) {
 	// given
 	data := ArchivePrunedData{
-		Paths: []string{"archive/feedback-001.md", "archive/feedback-002.md"},
+		Paths: []string{"feedback-001.md", "feedback-002.md"},
 		Count: 2,
 	}
 

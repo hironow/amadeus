@@ -102,6 +102,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]Event, error) {
 			return nil, fmt.Errorf("open %s: %w", name, err)
 		}
 		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024) // allow up to 10MiB per line
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			if len(line) == 0 {

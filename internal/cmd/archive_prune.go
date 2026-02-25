@@ -112,18 +112,20 @@ func newArchivePruneCommand() *cobra.Command {
 				totalCount += count
 			}
 
-			// Emit archive.pruned event
+			// Emit archive.pruned event (store filenames only for portability)
 			var paths []string
 			for _, c := range allCandidates {
-				paths = append(paths, c.Path)
+				paths = append(paths, filepath.Base(c.Path))
 			}
 			eventStore := &amadeus.FileEventStore{Dir: eventsDir}
 			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
 				Paths: paths,
 				Count: totalCount,
 			}, time.Now().UTC())
-			if evErr == nil {
-				eventStore.Append(ev)
+			if evErr != nil {
+				fmt.Fprintf(errW, "warning: failed to create archive.pruned event: %v\n", evErr)
+			} else if appendErr := eventStore.Append(ev); appendErr != nil {
+				fmt.Fprintf(errW, "warning: failed to record archive.pruned event: %v\n", appendErr)
 			}
 
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)

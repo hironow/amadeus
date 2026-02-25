@@ -203,6 +203,9 @@ func (s *ProjectionStore) LoadLatest() (CheckResult, error) {
 }
 
 func (s *ProjectionStore) writeJSON(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create directory for %s: %w", path, err)
+	}
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err

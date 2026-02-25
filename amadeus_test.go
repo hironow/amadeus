@@ -63,7 +63,9 @@ func TestAmadeus_DivergenceJump_SetsForceFullNext(t *testing.T) {
 
 	// when: a divergence jump is detected and flagged
 	a := &Amadeus{Config: DefaultConfig(), Store: store, Projector: &Projector{Store: store}, Logger: NewLogger(io.Discard, false)}
-	a.FlagForceFullNext(0.10, 0.35)
+	if err := a.FlagForceFullNext(0.10, 0.35); err != nil {
+		t.Fatal(err)
+	}
 	if err := a.SaveCheckState("def456", prev, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}

@@ -256,7 +256,7 @@ func TestProjector_ApplyArchivePruned(t *testing.T) {
 	os.WriteFile(f2, []byte("---\nname: feedback-002\n---\n"), 0o644)
 
 	ev, err := NewEvent(EventArchivePruned, ArchivePrunedData{
-		Paths: []string{f1, f2}, Count: 2,
+		Paths: []string{"feedback-001.md", "feedback-002.md"}, Count: 2,
 	}, now)
 	if err != nil {
 		t.Fatal(err)

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Projector applies domain events to update materialized projection files.
@@ -37,10 +39,13 @@ func (p *Projector) Apply(event Event) error {
 
 // Rebuild replays all events to regenerate projections from scratch.
 func (p *Projector) Rebuild(events []Event) error {
-	// Clear transient projection files
+	// Clear transient projection files and ensure directory exists
 	runDir := p.Store.runDir()
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return fmt.Errorf("create run dir %s: %w", runDir, err)
+	}
 	for _, name := range []string{"latest.json", "baseline.json", "sync.json", "consumed.json"} {
-		os.Remove(fmt.Sprintf("%s/%s", runDir, name))
+		os.Remove(filepath.Join(runDir, name))
 	}
 
 	for _, ev := range events {
@@ -91,6 +96,10 @@ func (p *Projector) applyDMailGenerated(event Event) error {
 	return p.Store.SaveDMail(data.DMail)
 }
 
+// applyInboxConsumed records that an inbox D-Mail was consumed.
+// NOTE: This only updates consumed.json, not archive/. Inbox D-Mails are copied
+// to archive/ at scan time (ScanInbox), not via event replay. This is intentional:
+// the event payload contains only metadata, not the full D-Mail content.
 func (p *Projector) applyInboxConsumed(event Event) error {
 	var data InboxConsumedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
@@ -128,8 +137,21 @@ func (p *Projector) applyArchivePruned(event Event) error {
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal ArchivePrunedData: %w", err)
 	}
-	for _, path := range data.Paths {
-		os.Remove(path)
+	archiveDir := filepath.Join(p.Store.Root, "archive")
+	eventsDir := filepath.Join(p.Store.Root, "events")
+	for _, name := range data.Paths {
+		// Reject path traversal: only allow plain filenames
+		if strings.Contains(name, "/") || strings.Contains(name, "\\") || name == ".." {
+			continue
+		}
+		// Route by extension to the correct directory
+		var target string
+		if strings.HasSuffix(name, ".jsonl") {
+			target = filepath.Join(eventsDir, name)
+		} else {
+			target = filepath.Join(archiveDir, name)
+		}
+		os.Remove(target)
 	}
 	return nil
 }

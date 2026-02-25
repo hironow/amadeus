@@ -344,7 +344,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			a.Logger.Info("Divergence jump detected (%.2f → %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
-		a.FlagForceFullNext(previous.Divergence, meterResult.Divergence.Value)
+		if err := a.FlagForceFullNext(previous.Divergence, meterResult.Divergence.Value); err != nil {
+			return fmt.Errorf("flag force full next: %w", err)
+		}
 	}
 	span2.End()
 
@@ -400,8 +402,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			cev, cerr := NewEvent(EventConvergenceDetected, ConvergenceDetectedData{
 				Alert: alert,
 			}, now)
-			if cerr == nil {
-				a.emit(cev)
+			if cerr != nil {
+				return fmt.Errorf("phase 4 (create convergence event): %w", cerr)
+			}
+			if err := a.emit(cev); err != nil {
+				return fmt.Errorf("phase 4 (emit convergence event): %w", err)
 			}
 		}
 		saved, saveErr := a.saveConvergenceDMails(convergenceAlerts)
@@ -637,15 +642,16 @@ func (a *Amadeus) AdvanceCheckCount(fullCheck bool) {
 
 // FlagForceFullNext marks that the next check should be a full scan.
 // Called when a divergence jump is detected, deferring recalibration to the next run.
-func (a *Amadeus) FlagForceFullNext(previousDivergence, currentDivergence float64) {
+func (a *Amadeus) FlagForceFullNext(previousDivergence, currentDivergence float64) error {
 	a.ForceFullNext = true
 	ev, err := NewEvent(EventForceFullNextSet, ForceFullNextSetData{
 		PreviousDivergence: previousDivergence,
 		CurrentDivergence:  currentDivergence,
 	}, time.Now().UTC())
-	if err == nil {
-		a.emit(ev)
+	if err != nil {
+		return fmt.Errorf("create force_full_next event: %w", err)
 	}
+	return a.emit(ev)
 }
 
 // SaveCheckState persists an updated CheckResult preserving prior divergence data.
