@@ -30,28 +30,48 @@ func newArchivePruneCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("get working directory: %w", err)
 			}
-			archiveDir := filepath.Join(repoRoot, ".gate", "archive")
+			divRoot := filepath.Join(repoRoot, ".gate")
+			archiveDir := filepath.Join(divRoot, "archive")
+			eventsDir := filepath.Join(divRoot, "events")
 
 			maxAge := time.Duration(days) * 24 * time.Hour
-			candidates, err := amadeus.FindPruneCandidates(archiveDir, maxAge)
+			errW := cmd.ErrOrStderr()
+
+			// Collect archive candidates (.md files)
+			archiveCandidates, err := amadeus.FindPruneCandidates(archiveDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find prune candidates: %w", err)
 			}
 
-			errW := cmd.ErrOrStderr()
-
-			if candidates == nil {
-				fmt.Fprintf(errW, "Archive directory does not exist: %s\n", archiveDir)
-				return nil
-			}
-			if len(candidates) == 0 {
-				fmt.Fprintf(errW, "No files older than %d days in %s\n", days, archiveDir)
-				return nil
+			// Collect event file candidates (.jsonl files)
+			eventCandidates, err := amadeus.FindExpiredEventFiles(eventsDir, maxAge)
+			if err != nil {
+				return fmt.Errorf("find expired event files: %w", err)
 			}
 
-			fmt.Fprintf(errW, "Files to prune in %s (older than %d days):\n", archiveDir, days)
-			for _, c := range candidates {
-				fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
+			// Merge all candidates for display
+			allCandidates := append(archiveCandidates, eventCandidates...)
+
+			if len(allCandidates) == 0 {
+				if archiveCandidates == nil && eventCandidates == nil {
+					fmt.Fprintf(errW, "No prune directories found under %s\n", divRoot)
+				} else {
+					fmt.Fprintf(errW, "No files older than %d days to prune\n", days)
+				}
+				return nil
+			}
+
+			if len(archiveCandidates) > 0 {
+				fmt.Fprintf(errW, "Archive files to prune (older than %d days):\n", days)
+				for _, c := range archiveCandidates {
+					fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
+				}
+			}
+			if len(eventCandidates) > 0 {
+				fmt.Fprintf(errW, "Event files to prune (older than %d days):\n", days)
+				for _, c := range eventCandidates {
+					fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
+				}
 			}
 
 			if dryRun {
@@ -60,7 +80,7 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			if !yes {
-				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", len(candidates))
+				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", len(allCandidates))
 				scanner := bufio.NewScanner(cmd.InOrStdin())
 				if !scanner.Scan() {
 					if err := scanner.Err(); err != nil {
@@ -76,27 +96,37 @@ func newArchivePruneCommand() *cobra.Command {
 				}
 			}
 
-			count, err := amadeus.PruneFiles(candidates)
-			if err != nil {
-				return fmt.Errorf("prune: %w", err)
+			totalCount := 0
+			if len(archiveCandidates) > 0 {
+				count, err := amadeus.PruneFiles(archiveCandidates)
+				if err != nil {
+					return fmt.Errorf("prune archive: %w", err)
+				}
+				totalCount += count
+			}
+			if len(eventCandidates) > 0 {
+				count, err := amadeus.PruneFiles(eventCandidates)
+				if err != nil {
+					return fmt.Errorf("prune event files: %w", err)
+				}
+				totalCount += count
 			}
 
 			// Emit archive.pruned event
-			divRoot := filepath.Join(repoRoot, ".gate")
 			var paths []string
-			for _, c := range candidates {
+			for _, c := range allCandidates {
 				paths = append(paths, c.Path)
 			}
-			eventStore := &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")}
+			eventStore := &amadeus.FileEventStore{Dir: eventsDir}
 			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
 				Paths: paths,
-				Count: count,
+				Count: totalCount,
 			}, time.Now().UTC())
 			if evErr == nil {
 				eventStore.Append(ev)
 			}
 
-			fmt.Fprintf(errW, "Pruned %d file(s).\n", count)
+			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)
 			return nil
 		},
 	}

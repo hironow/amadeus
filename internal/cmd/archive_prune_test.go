@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestArchivePrune_NegativeDays(t *testing.T) {
@@ -19,6 +23,68 @@ func TestArchivePrune_NegativeDays(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--days must be >= 1") {
 		t.Errorf("expected '--days must be >= 1' in error, got: %v", err)
+	}
+}
+
+func TestArchivePrune_PrunesEventFiles(t *testing.T) {
+	// given: create a temp dir with .gate/archive and .gate/events
+	tmpDir := t.TempDir()
+	archiveDir := filepath.Join(tmpDir, ".gate", "archive")
+	eventsDir := filepath.Join(tmpDir, ".gate", "events")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an old event file
+	oldEventFile := filepath.Join(eventsDir, "2025-12-01.jsonl")
+	if err := os.WriteFile(oldEventFile, []byte(`{"id":"1"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-31 * 24 * time.Hour)
+	if err := os.Chtimes(oldEventFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a recent event file (should NOT be pruned)
+	recentEventFile := filepath.Join(eventsDir, "2026-02-25.jsonl")
+	if err := os.WriteFile(recentEventFile, []byte(`{"id":"2"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: run archive-prune with --yes from the temp dir
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	root := NewRootCommand()
+	var stderr bytes.Buffer
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"archive-prune", "--days", "30", "--yes"})
+
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Old event file should be deleted
+	if _, statErr := os.Stat(oldEventFile); !os.IsNotExist(statErr) {
+		t.Error("expected old event file to be deleted")
+	}
+
+	// Recent event file should remain
+	if _, statErr := os.Stat(recentEventFile); statErr != nil {
+		t.Error("expected recent event file to remain")
+	}
+
+	// Output should mention event files
+	output := stderr.String()
+	if !strings.Contains(output, "Event files") {
+		t.Errorf("expected output to mention event files, got: %s", output)
 	}
 }
 
