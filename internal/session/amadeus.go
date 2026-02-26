@@ -19,8 +19,9 @@ type Amadeus struct {
 	Config        amadeus.Config
 	Store         *ProjectionStore
 	Events        amadeus.EventStore // nil skips event persistence (Projector still required for writes)
-	Projector     *Projector         // nil skips projection updates (Events still required for writes)
-	Git           *GitClient
+	Projector     amadeus.EventApplier // nil skips projection updates (Events still required for writes)
+	Git           amadeus.Git
+	RepoDir       string               // repository root directory
 	Claude        amadeus.ClaudeRunner // nil falls back to the default Claude runner
 	Logger        *amadeus.Logger
 	DataOut       io.Writer // machine-readable output (stdout); Logger is for human progress (stderr)
@@ -189,7 +190,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	_, span1 := amadeus.Tracer.Start(ctx, "reading_steiner")
 	if fullCheck {
-		report, err = rs.DetectShiftFull(a.Git.Dir)
+		report, err = rs.DetectShiftFull(a.RepoDir)
 		if err != nil {
 			span1.End()
 			return fmt.Errorf("phase 1 (full): %w", err)
@@ -198,7 +199,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		sinceCommit := previous.Commit
 		if sinceCommit == "" {
 			fullCheck = true
-			report, err = rs.DetectShiftFull(a.Git.Dir)
+			report, err = rs.DetectShiftFull(a.RepoDir)
 			if err != nil {
 				span1.End()
 				return fmt.Errorf("phase 1 (first run): %w", err)
@@ -252,7 +253,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	_, span2 := amadeus.Tracer.Start(ctx, "divergence_meter")
 
-	repoRoot := a.Git.Dir
+	repoRoot := a.RepoDir
 	allADRs, adrErr := CollectADRs(repoRoot)
 	if adrErr != nil && !opts.Quiet {
 		a.Logger.Info("Warning: failed to collect ADRs: %v", adrErr)

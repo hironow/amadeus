@@ -22,6 +22,15 @@ type EventStore interface {
 	LoadSince(after time.Time) ([]Event, error)
 }
 
+// EventApplier applies domain events to update materialized projections.
+type EventApplier interface {
+	// Apply processes a single event and updates the relevant projections.
+	Apply(event Event) error
+
+	// Rebuild replays all events to regenerate projections from scratch.
+	Rebuild(events []Event) error
+}
+
 // EventType identifies the kind of domain event.
 type EventType string
 

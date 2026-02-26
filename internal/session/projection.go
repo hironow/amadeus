@@ -10,6 +10,9 @@ import (
 	amadeus "github.com/hironow/amadeus"
 )
 
+// Compile-time check that Projector implements amadeus.EventApplier.
+var _ amadeus.EventApplier = (*Projector)(nil)
+
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
 	Store      *ProjectionStore

@@ -61,6 +61,7 @@ func newCheckCommand() *cobra.Command {
 				Events:    eventStore,
 				Projector: &session.Projector{Store: store},
 				Git:       session.NewGitClient(repoRoot),
+				RepoDir:  repoRoot,
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}
