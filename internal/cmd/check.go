@@ -55,11 +55,17 @@ func newCheckCommand() *cobra.Command {
 			store := session.NewProjectionStore(divRoot)
 			eventStore := eventsource.NewFileEventStore(eventsource.EventsDir(divRoot))
 
+			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
+			if err != nil {
+				return fmt.Errorf("outbox store: %w", err)
+			}
+			defer outboxStore.Close()
+
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
 				Events:    eventStore,
-				Projector: &session.Projector{Store: store},
+				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Git:       session.NewGitClient(repoRoot),
 				RepoDir:  repoRoot,
 				Logger:    logger,

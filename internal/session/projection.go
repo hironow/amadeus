@@ -15,8 +15,9 @@ var _ amadeus.EventApplier = (*Projector)(nil)
 
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
-	Store      *ProjectionStore
-	rebuilding bool // true during Rebuild to skip outbox writes
+	Store       *ProjectionStore
+	OutboxStore amadeus.OutboxStore // transactional outbox for D-Mail delivery
+	rebuilding  bool                // true during Rebuild to skip outbox writes
 }
 
 // Apply processes a single event and updates the relevant projections.
@@ -113,7 +114,19 @@ func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
 	if p.rebuilding {
 		return p.Store.SaveDMailToArchive(data.DMail)
 	}
-	return p.Store.SaveDMail(data.DMail)
+	// Normal mode: transactional outbox (Stage → Flush to archive/ + outbox/).
+	marshaledData, err := amadeus.MarshalDMail(data.DMail)
+	if err != nil {
+		return fmt.Errorf("marshal dmail: %w", err)
+	}
+	filename := data.DMail.Name + ".md"
+	if err := p.OutboxStore.Stage(filename, marshaledData); err != nil {
+		return fmt.Errorf("stage dmail: %w", err)
+	}
+	if _, err := p.OutboxStore.Flush(); err != nil {
+		return fmt.Errorf("flush dmail: %w", err)
+	}
+	return nil
 }
 
 // applyInboxConsumed records that an inbox D-Mail was consumed.

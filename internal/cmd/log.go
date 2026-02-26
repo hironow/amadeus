@@ -41,11 +41,18 @@ func newLogCommand() *cobra.Command {
 
 			logger := loggerFrom(cmd)
 			store := session.NewProjectionStore(divRoot)
+
+			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
+			if err != nil {
+				return fmt.Errorf("outbox store: %w", err)
+			}
+			defer outboxStore.Close()
+
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
 				Events:    eventsource.NewFileEventStore(eventsource.EventsDir(divRoot)),
-				Projector: &session.Projector{Store: store},
+				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}

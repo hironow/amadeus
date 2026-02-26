@@ -29,7 +29,14 @@ func newRebuildCommand() *cobra.Command {
 
 			eventStore := eventsource.NewFileEventStore(eventsource.EventsDir(divRoot))
 			store := session.NewProjectionStore(divRoot)
-			projector := &session.Projector{Store: store}
+
+			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
+			if err != nil {
+				return fmt.Errorf("outbox store: %w", err)
+			}
+			defer outboxStore.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outboxStore}
 
 			events, err := eventStore.LoadAll()
 			if err != nil {
