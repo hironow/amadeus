@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -52,7 +53,7 @@ func newCheckCommand() *cobra.Command {
 			logger := loggerFrom(cmd)
 
 			store := session.NewProjectionStore(divRoot)
-			eventStore := &session.FileEventStore{Dir: filepath.Join(divRoot, "events")}
+			eventStore := eventsource.NewFileEventStore(eventsource.EventsDir(divRoot))
 
 			a := &session.Amadeus{
 				Config:    cfg,

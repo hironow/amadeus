@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ func newMarkCommentedCommand() *cobra.Command {
 			store := session.NewProjectionStore(divRoot)
 			a := &session.Amadeus{
 				Store:     store,
-				Events:    &session.FileEventStore{Dir: filepath.Join(divRoot, "events")},
+				Events:    eventsource.NewFileEventStore(eventsource.EventsDir(divRoot)),
 				Projector: &session.Projector{Store: store},
 				Logger:    loggerFrom(cmd),
 			}

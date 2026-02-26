@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -45,15 +46,13 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			// Collect event file candidates (.jsonl files)
-			eventCandidates, err := session.FindExpiredEventFiles(eventsDir, maxAge)
+			eventCandidates, err := eventsource.FindExpiredEventFiles(eventsDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find expired event files: %w", err)
 			}
 
-			// Merge all candidates for display
-			allCandidates := append(archiveCandidates, eventCandidates...)
-
-			if len(allCandidates) == 0 {
+			totalFiles := len(archiveCandidates) + len(eventCandidates)
+			if totalFiles == 0 {
 				if archiveCandidates == nil && eventCandidates == nil {
 					fmt.Fprintf(errW, "No prune directories found under %s\n", divRoot)
 				} else {
@@ -81,7 +80,7 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			if !yes {
-				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", len(allCandidates))
+				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
 				scanner := bufio.NewScanner(cmd.InOrStdin())
 				if !scanner.Scan() {
 					if err := scanner.Err(); err != nil {
@@ -106,7 +105,7 @@ func newArchivePruneCommand() *cobra.Command {
 				totalCount += count
 			}
 			if len(eventCandidates) > 0 {
-				count, err := session.PruneFiles(eventCandidates)
+				count, err := eventsource.PruneEventFiles(eventCandidates)
 				if err != nil {
 					return fmt.Errorf("prune event files: %w", err)
 				}
@@ -117,10 +116,13 @@ func newArchivePruneCommand() *cobra.Command {
 			// This MUST succeed: without the event, a future rebuild would replay
 			// historical dmail.generated events and recreate the pruned files.
 			var paths []string
-			for _, c := range allCandidates {
+			for _, c := range archiveCandidates {
 				paths = append(paths, filepath.Base(c.Path))
 			}
-			eventStore := &session.FileEventStore{Dir: eventsDir}
+			for _, c := range eventCandidates {
+				paths = append(paths, filepath.Base(c.Path))
+			}
+			eventStore := eventsource.NewFileEventStore(eventsDir)
 			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
 				Paths: paths,
 				Count: totalCount,

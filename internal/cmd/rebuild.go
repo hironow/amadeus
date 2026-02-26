@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -26,9 +27,7 @@ func newRebuildCommand() *cobra.Command {
 			divRoot := filepath.Join(repoRoot, ".gate")
 			logger := loggerFrom(cmd)
 
-			eventStore := &session.FileEventStore{
-				Dir: filepath.Join(divRoot, "events"),
-			}
+			eventStore := eventsource.NewFileEventStore(eventsource.EventsDir(divRoot))
 			store := session.NewProjectionStore(divRoot)
 			projector := &session.Projector{Store: store}
 

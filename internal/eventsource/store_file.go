@@ -1,4 +1,4 @@
-package session
+package eventsource
 
 import (
 	"bufio"
@@ -16,7 +16,12 @@ import (
 // FileEventStore implements EventStore using daily JSONL files in a directory.
 // Each file is named YYYY-MM-DD.jsonl and contains one JSON event per line.
 type FileEventStore struct {
-	Dir string
+	dir string
+}
+
+// NewFileEventStore creates a FileEventStore rooted at the given directory.
+func NewFileEventStore(dir string) *FileEventStore {
+	return &FileEventStore{dir: dir}
 }
 
 // Append persists events as JSONL lines to the daily file based on each event's timestamp.
@@ -28,7 +33,7 @@ func (s *FileEventStore) Append(events ...amadeus.Event) error {
 		}
 	}
 
-	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+	if err := os.MkdirAll(s.dir, 0o755); err != nil {
 		return fmt.Errorf("create event store dir: %w", err)
 	}
 
@@ -40,7 +45,7 @@ func (s *FileEventStore) Append(events ...amadeus.Event) error {
 	}
 
 	for date, evs := range byDate {
-		filename := filepath.Join(s.Dir, date+".jsonl")
+		filename := filepath.Join(s.dir, date+".jsonl")
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
 			return fmt.Errorf("open event file %s: %w", date, err)
@@ -78,7 +83,7 @@ func (s *FileEventStore) LoadSince(after time.Time) ([]amadeus.Event, error) {
 }
 
 func (s *FileEventStore) loadEvents(after time.Time) ([]amadeus.Event, error) {
-	entries, err := os.ReadDir(s.Dir)
+	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -96,7 +101,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]amadeus.Event, error) {
 
 	var events []amadeus.Event
 	for _, name := range files {
-		path := filepath.Join(s.Dir, name)
+		path := filepath.Join(s.dir, name)
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, fmt.Errorf("open %s: %w", name, err)

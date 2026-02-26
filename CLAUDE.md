@@ -4,9 +4,9 @@
 
 - Do NOT use git worktrees (`EnterWorktree`, `isolation: "worktree"`). Work directly on the current branch.
 
-## Repository Structure (ADR 0016: 2-Layer Separation)
+## Repository Structure (ADR 0016: 3-Layer Separation)
 
-Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
+Dependency direction: `internal/cmd` → `internal/session` → `internal/eventsource` → `amadeus` (root)
 
 ### Root package `amadeus` — types, constants, pure functions, go:embed
 - `amadeus.go` — DriftError, ExitCode, CheckOptions
@@ -21,9 +21,13 @@ Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
 - `logger.go` — structured logger (root infrastructure per S0005)
 - `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
 
+### `internal/eventsource/` — event store infrastructure
+- `store_file.go` — FileEventStore (JSONL append-only, implements EventStore)
+- `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles
+- `path.go` — EventsDir path helper
+
 ### `internal/session/` — all filesystem, network, subprocess I/O
 - `amadeus.go` — Amadeus orchestrator (RunCheck, PrintLog, PrintSync)
-- `event_store_file.go` — FileEventStore (JSONL append-only)
 - `projection.go` — Projector (event replay to materialized state)
 - `state.go` — ProjectionStore, InitGateDir, Save/Load operations
 - `dmail_io.go` — D-Mail file I/O (archive, inbox, outbox, consumed.json)
@@ -63,6 +67,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
 ## Test Layout
 
 - Root tests: `*_test.go` colocated (pure function tests only, `package amadeus`)
+- Eventsource tests: `internal/eventsource/*_test.go` (event store tests, `package eventsource`)
 - Session tests: `internal/session/*_test.go` (I/O tests, `package session`)
 - CLI tests: `internal/cmd/*_test.go` (command + doctor check tests, `package cmd`)
 - E2E tests: `tests/e2e/` (Docker-based, `//go:build e2e` tag)
