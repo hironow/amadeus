@@ -18,8 +18,8 @@ Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
 - `state.go` — CheckType, CheckResult, SkillTemplateFS (go:embed)
 - `sync.go` — SyncState, CommentRecord, PendingComment types
 - `claude.go` — ClaudeRunner interface, go:embed templates, prompt building (pure)
-- `logger.go` — structured logger (root exception per S0001)
-- `telemetry.go` — Tracer, InitTracer (noop default + OTLP HTTP exporter)
+- `logger.go` — structured logger (root infrastructure per S0005)
+- `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
 
 ### `internal/session/` — all filesystem, network, subprocess I/O
 - `amadeus.go` — Amadeus orchestrator (RunCheck, PrintLog, PrintSync)
@@ -40,6 +40,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
 - `check.go`, `sync.go`, `log.go`, `init.go`, `rebuild.go` — subcommands
 - `doctor.go` + `doctor_checks.go` — health check command + all check logic
 - `config.go` — loadConfig (unexported)
+- `telemetry.go` — InitTracer (OTLP HTTP exporter setup)
 - `hook.go`, `archive_prune.go`, `mark_commented.go`, `validate.go`, `update.go`, `version.go`
 
 ### Other

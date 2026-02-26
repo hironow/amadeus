@@ -14,7 +14,7 @@ func main() {
 }
 
 func run() int {
-	shutdown := amadeus.InitTracer("amadeus", cmd.Version)
+	shutdown := cmd.InitTracer("amadeus", cmd.Version)
 	defer shutdown(context.Background())
 
 	root := cmd.NewRootCommand()
