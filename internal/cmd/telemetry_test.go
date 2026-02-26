@@ -10,7 +10,7 @@ import (
 func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
-	shutdown := InitTracer("test-svc", "0.0.1")
+	shutdown := initTracer("test-svc", "0.0.1")
 	defer shutdown(context.Background())
 
 	_, span := amadeus.Tracer.Start(context.Background(), "test-span")

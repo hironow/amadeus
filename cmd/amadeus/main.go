@@ -14,9 +14,6 @@ func main() {
 }
 
 func run() int {
-	shutdown := cmd.InitTracer("amadeus", cmd.Version)
-	defer shutdown(context.Background())
-
 	root := cmd.NewRootCommand()
 	// NOTE: No NormalizeArgs — single-dash long flags (e.g. -config) are intentionally
 	// unsupported per MY-334 POSIX-compliant flags policy. Use --config or -c instead.

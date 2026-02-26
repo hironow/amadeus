@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
 	"github.com/spf13/cobra"
 )
@@ -11,6 +13,13 @@ var (
 	Version = "dev"
 	Commit  = "none"
 	Date    = "unknown"
+)
+
+// shutdownTracer holds the OTel tracer shutdown function registered by
+// PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
+var (
+	shutdownTracer func(context.Context) error
+	finalizerOnce  sync.Once
 )
 
 func init() {
@@ -27,10 +36,22 @@ func NewRootCommand() *cobra.Command {
 		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
 		SilenceUsage:  true,
 		Version:       Version,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			shutdownTracer = initTracer("amadeus", Version)
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("no subcommand specified. Run 'amadeus help' for usage")
 		},
 	}
+
+	finalizerOnce.Do(func() {
+		cobra.OnFinalize(func() {
+			if shutdownTracer != nil {
+				shutdownTracer(context.Background())
+			}
+		})
+	})
 
 	cmd.PersistentFlags().StringP("config", "c", "", "config file path")
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")

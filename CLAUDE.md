@@ -40,11 +40,11 @@ Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
 - `check.go`, `sync.go`, `log.go`, `init.go`, `rebuild.go` — subcommands
 - `doctor.go` + `doctor_checks.go` — health check command + all check logic
 - `config.go` — loadConfig (unexported)
-- `telemetry.go` — InitTracer (OTLP HTTP exporter setup)
+- `telemetry.go` — initTracer (OTLP HTTP exporter setup, shutdown via cobra.OnFinalize)
 - `hook.go`, `archive_prune.go`, `mark_commented.go`, `validate.go`, `update.go`, `version.go`
 
 ### Other
-- Entry: `cmd/amadeus/main.go` (InitTracer + ExitCode)
+- Entry: `cmd/amadeus/main.go` (ExitCode, tracer lifecycle via PersistentPreRunE + cobra.OnFinalize)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
 - ADR: `docs/adr/` (0006~ amadeus-specific; 0001-0005 phonewave canonical)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
