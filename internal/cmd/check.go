@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ func newCheckCommand() *cobra.Command {
 
 			divRoot := filepath.Join(repoRoot, ".gate")
 
-			if err := amadeus.InitGateDir(divRoot); err != nil {
+			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 
@@ -51,20 +52,20 @@ func newCheckCommand() *cobra.Command {
 
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 
-			store := amadeus.NewProjectionStore(divRoot)
-			eventStore := &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")}
+			store := session.NewProjectionStore(divRoot)
+			eventStore := &session.FileEventStore{Dir: filepath.Join(divRoot, "events")}
 
-			a := &amadeus.Amadeus{
+			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
 				Events:    eventStore,
-				Projector: &amadeus.Projector{Store: store},
-				Git:       amadeus.NewGitClient(repoRoot),
+				Projector: &session.Projector{Store: store},
+				Git:       session.NewGitClient(repoRoot),
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}
 
-			return a.RunCheck(cmd.Context(), amadeus.CheckOptions{
+			return a.RunCheck(cmd.Context(), session.CheckOptions{
 				Full:   full,
 				DryRun: dryRun,
 				Quiet:  quiet,

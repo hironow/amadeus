@@ -1,4 +1,4 @@
-package amadeus
+package cmd
 
 import (
 	"context"
@@ -8,8 +8,74 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/amadeus"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"gopkg.in/yaml.v3"
 )
+
+// setupTestTracer configures an in-memory tracer for testing doctor spans.
+func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	amadeus.Tracer = tp.Tracer("amadeus-test")
+	t.Cleanup(func() {
+		tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prev)
+		amadeus.Tracer = prev.Tracer("amadeus")
+	})
+	return exp
+}
+
+// initGateDirForTest creates a minimal .gate/ directory structure for doctor tests.
+func initGateDirForTest(t *testing.T, root string) {
+	t.Helper()
+	dirs := []string{
+		filepath.Join(root, ".run"),
+		filepath.Join(root, "events"),
+		filepath.Join(root, "outbox"),
+		filepath.Join(root, "inbox"),
+		filepath.Join(root, "archive"),
+		filepath.Join(root, "skills", "dmail-sendable"),
+		filepath.Join(root, "skills", "dmail-readable"),
+	}
+	for _, d := range dirs {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Write default config
+	cfg := amadeus.DefaultConfig()
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(root, "config.yaml")
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Write SKILL.md files from embedded templates
+	for _, name := range []string{"dmail-sendable", "dmail-readable"} {
+		tmplPath := "templates/skills/" + name + "/SKILL.md"
+		content, readErr := amadeus.SkillTemplateFS.ReadFile(tmplPath)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		skillPath := filepath.Join(root, "skills", name, "SKILL.md")
+		if err := os.WriteFile(skillPath, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Write .gitignore
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte(".run/\noutbox/\ninbox/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestCheckStatusLabel(t *testing.T) {
 	tests := []struct {
@@ -162,7 +228,7 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 func TestCheckConfig_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	cfg := DefaultConfig()
+	cfg := amadeus.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(path, data, 0o644)
 	result := checkConfig(path)
@@ -199,7 +265,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// Create .gate/ with config
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := DefaultConfig()
+	cfg := amadeus.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 
@@ -210,7 +276,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := RunDoctor(ctx, configPath, dir)
+	results := runDoctor(ctx, configPath, dir)
 
 	// then: should have 9 results
 	if len(results) != 9 {
@@ -237,14 +303,14 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	exec.Command("git", "init", dir).Run()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := DefaultConfig()
+	cfg := amadeus.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 
 	ctx := context.Background()
 
 	// when
-	RunDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir)
+	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir)
 
 	// then: amadeus.doctor span should exist
 	spans := exp.GetSpans()
@@ -252,7 +318,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "amadeus.doctor" {
 			found = true
-			// Should have 8 doctor.check events (one per check)
+			// Should have 9 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
@@ -273,9 +339,7 @@ func TestCheckSkillMD_BothExist(t *testing.T) {
 	// given: properly initialized .gate/ with skills
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
+	initGateDirForTest(t, root)
 
 	// when
 	result := checkSkillMD(dir)
@@ -290,9 +354,7 @@ func TestCheckSkillMD_MissingSendable(t *testing.T) {
 	// given: .gate/ with only dmail-readable
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
+	initGateDirForTest(t, root)
 	os.Remove(filepath.Join(root, "skills", "dmail-sendable", "SKILL.md"))
 
 	// when
@@ -329,16 +391,14 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
-	if err := InitGateDir(divRoot); err != nil {
-		t.Fatal(err)
-	}
+	initGateDirForTest(t, divRoot)
 	exec.Command("git", "init", dir).Run()
 
 	ctx := context.Background()
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := RunDoctor(ctx, configPath, dir)
+	results := runDoctor(ctx, configPath, dir)
 
 	// then: should have 9 results
 	if len(results) != 9 {
@@ -372,7 +432,7 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := DefaultConfig()
+	cfg := amadeus.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 	exec.Command("git", "init", dir).Run()
@@ -381,7 +441,7 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when: pass a nonexistent claude command
-	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz")
+	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz")
 
 	// then
 	var mcpResult DoctorCheckResult
@@ -403,9 +463,7 @@ func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
 	// given: .gate/ with empty archive
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
+	initGateDirForTest(t, root)
 
 	// when
 	result := checkDMailSchema(root)
@@ -420,16 +478,21 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
+	initGateDirForTest(t, root)
+	// Write a valid D-Mail directly to archive
+	dmail := amadeus.DMail{
+		Name:        "feedback-001",
+		Kind:        amadeus.KindFeedback,
+		Description: "test",
+		Severity:    amadeus.SeverityHigh,
+	}
+	data, err := amadeus.MarshalDMail(dmail)
+	if err != nil {
 		t.Fatal(err)
 	}
-	store := NewProjectionStore(root)
-	store.SaveDMail(DMail{
-		Name:        "feedback-001",
-		Kind:        KindFeedback,
-		Description: "test",
-		Severity:    SeverityHigh,
-	})
+	if err := os.WriteFile(filepath.Join(root, "archive", "feedback-001.md"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// when
 	result := checkDMailSchema(root)
@@ -444,9 +507,7 @@ func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
 	// given: a D-Mail missing required kind (schema v1 violation)
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
+	initGateDirForTest(t, root)
 	content := []byte("---\nname: feedback-001\ndescription: test\n---\n\nbody\n")
 	os.WriteFile(filepath.Join(root, "archive", "feedback-001.md"), content, 0o644)
 
@@ -477,9 +538,7 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	// given: archive/ exists but is not readable
 	dir := t.TempDir()
 	root := filepath.Join(dir, ".gate")
-	if err := InitGateDir(root); err != nil {
-		t.Fatal(err)
-	}
+	initGateDirForTest(t, root)
 	archiveDir := filepath.Join(root, "archive")
 	os.Chmod(archiveDir, 0o000)
 	defer os.Chmod(archiveDir, 0o755)

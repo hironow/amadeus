@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestRebuildCommand_RebuildsProjectionsFromEvents(t *testing.T) {
@@ -60,7 +61,7 @@ func TestRebuildCommand_RebuildsProjectionsFromEvents(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Ensure config exists
-	if err := amadeus.InitGateDir(gateDir); err != nil {
+	if err := session.InitGateDir(gateDir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,7 +73,7 @@ func TestRebuildCommand_RebuildsProjectionsFromEvents(t *testing.T) {
 	}
 
 	// then: latest.json should be rebuilt from the event
-	store := amadeus.NewProjectionStore(gateDir)
+	store := session.NewProjectionStore(gateDir)
 	latest, err := store.LoadLatest()
 	if err != nil {
 		t.Fatalf("LoadLatest: %v", err)
@@ -95,7 +96,7 @@ func TestRebuildCommand_EmptyEventsSucceeds(t *testing.T) {
 	// given: a temp .gate/ with empty events directory
 	dir := t.TempDir()
 	gateDir := filepath.Join(dir, ".gate")
-	if err := amadeus.InitGateDir(gateDir); err != nil {
+	if err := session.InitGateDir(gateDir); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(gateDir, "events"), 0o755); err != nil {

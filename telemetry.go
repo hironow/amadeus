@@ -13,13 +13,15 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-var tracer trace.Tracer = noop.NewTracerProvider().Tracer("amadeus")
+// Tracer is the package-level OTel tracer, initialized by InitTracer.
+// Exported so that internal/session can reference it for span creation.
+var Tracer trace.Tracer = noop.NewTracerProvider().Tracer("amadeus")
 
 func InitTracer(serviceName, ver string) func(context.Context) error {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
-		tracer = np.Tracer(serviceName)
+		Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -27,7 +29,7 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 	if err != nil {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
-		tracer = np.Tracer(serviceName)
+		Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -45,7 +47,7 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer(serviceName)
+	Tracer = tp.Tracer(serviceName)
 
 	return func(ctx context.Context) error {
 		return tp.Shutdown(ctx)

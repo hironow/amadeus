@@ -123,4 +123,3 @@ func ValidateConfig(cfg Config) []string {
 
 	return errs
 }
-

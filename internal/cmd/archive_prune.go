@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -38,13 +39,13 @@ func newArchivePruneCommand() *cobra.Command {
 			errW := cmd.ErrOrStderr()
 
 			// Collect archive candidates (.md files)
-			archiveCandidates, err := amadeus.FindPruneCandidates(archiveDir, maxAge)
+			archiveCandidates, err := session.FindPruneCandidates(archiveDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find prune candidates: %w", err)
 			}
 
 			// Collect event file candidates (.jsonl files)
-			eventCandidates, err := amadeus.FindExpiredEventFiles(eventsDir, maxAge)
+			eventCandidates, err := session.FindExpiredEventFiles(eventsDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find expired event files: %w", err)
 			}
@@ -98,14 +99,14 @@ func newArchivePruneCommand() *cobra.Command {
 
 			totalCount := 0
 			if len(archiveCandidates) > 0 {
-				count, err := amadeus.PruneFiles(archiveCandidates)
+				count, err := session.PruneFiles(archiveCandidates)
 				if err != nil {
 					return fmt.Errorf("prune archive: %w", err)
 				}
 				totalCount += count
 			}
 			if len(eventCandidates) > 0 {
-				count, err := amadeus.PruneFiles(eventCandidates)
+				count, err := session.PruneFiles(eventCandidates)
 				if err != nil {
 					return fmt.Errorf("prune event files: %w", err)
 				}
@@ -119,7 +120,7 @@ func newArchivePruneCommand() *cobra.Command {
 			for _, c := range allCandidates {
 				paths = append(paths, filepath.Base(c.Path))
 			}
-			eventStore := &amadeus.FileEventStore{Dir: eventsDir}
+			eventStore := &session.FileEventStore{Dir: eventsDir}
 			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
 				Paths: paths,
 				Count: totalCount,

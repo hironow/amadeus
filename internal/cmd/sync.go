@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ func newSyncCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
-			if err := amadeus.InitGateDir(divRoot); err != nil {
+			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init gate dir: %w", err)
 			}
 
@@ -43,12 +44,12 @@ func newSyncCommand() *cobra.Command {
 			}
 
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
-			store := amadeus.NewProjectionStore(divRoot)
-			a := &amadeus.Amadeus{
+			store := session.NewProjectionStore(divRoot)
+			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
-				Events:    &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")},
-				Projector: &amadeus.Projector{Store: store},
+				Events:    &session.FileEventStore{Dir: filepath.Join(divRoot, "events")},
+				Projector: &session.Projector{Store: store},
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}

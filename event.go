@@ -3,8 +3,11 @@ package amadeus
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // EventStore is the append-only event persistence interface.
@@ -107,4 +110,18 @@ type ConvergenceDetectedData struct {
 type ArchivePrunedData struct {
 	Paths []string `json:"paths"`
 	Count int      `json:"count"`
+}
+
+// NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.
+func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error) {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return Event{}, fmt.Errorf("marshal event data: %w", err)
+	}
+	return Event{
+		ID:        uuid.NewString(),
+		Type:      eventType,
+		Timestamp: timestamp,
+		Data:      raw,
+	}, nil
 }

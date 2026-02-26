@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +20,7 @@ func newInitCommand() *cobra.Command {
 				return fmt.Errorf("get working directory: %w", err)
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
-			if err := amadeus.InitGateDir(divRoot); err != nil {
+			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)

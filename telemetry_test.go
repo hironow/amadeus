@@ -15,11 +15,11 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer("amadeus-test")
+	Tracer = tp.Tracer("amadeus-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		tracer = prev.Tracer("amadeus")
+		Tracer = prev.Tracer("amadeus")
 	})
 	return exp
 }
@@ -30,7 +30,7 @@ func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	shutdown := InitTracer("test-svc", "0.0.1")
 	defer shutdown(context.Background())
 
-	_, span := tracer.Start(context.Background(), "test-span")
+	_, span := Tracer.Start(context.Background(), "test-span")
 	defer span.End()
 
 	if span.IsRecording() {
@@ -41,7 +41,7 @@ func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 func TestSetupTestTracer_RecordsSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	_, span := tracer.Start(context.Background(), "recording-span")
+	_, span := Tracer.Start(context.Background(), "recording-span")
 	span.End()
 
 	spans := exp.GetSpans()

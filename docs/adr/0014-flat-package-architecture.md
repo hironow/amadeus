@@ -1,7 +1,7 @@
 # 0014. Flat Package Architecture Decision
 
 **Date:** 2026-02-25
-**Status:** Accepted
+**Status:** Superseded by [0016](0016-root-package-layer-separation.md)
 
 ## Context
 

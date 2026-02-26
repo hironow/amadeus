@@ -1,7 +1,8 @@
-package amadeus
+package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hironow/amadeus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
@@ -194,15 +196,15 @@ func checkSkillMD(repoRoot string) DoctorCheckResult {
 	}
 }
 
-// RunDoctor executes all health checks and returns the results.
+// runDoctor executes all health checks and returns the results.
 // Uses "claude" as the default Claude CLI command name.
-func RunDoctor(ctx context.Context, configPath string, repoRoot string) []DoctorCheckResult {
-	return RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude")
+func runDoctor(ctx context.Context, configPath string, repoRoot string) []DoctorCheckResult {
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude")
 }
 
-// RunDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
-	_, span := tracer.Start(ctx, "amadeus.doctor")
+// runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
+func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
+	_, span := amadeus.Tracer.Start(ctx, "amadeus.doctor")
 	defer span.End()
 
 	var results []DoctorCheckResult
@@ -270,8 +272,7 @@ func checkEventStore(gateRoot string) DoctorCheckResult {
 			Message: fmt.Sprintf("stat events: %v", err),
 		}
 	}
-	store := &FileEventStore{Dir: eventsDir}
-	events, err := store.LoadAll()
+	count, err := countEventStoreEntries(eventsDir)
 	if err != nil {
 		return DoctorCheckResult{
 			Name:    "Event Store",
@@ -282,8 +283,39 @@ func checkEventStore(gateRoot string) DoctorCheckResult {
 	return DoctorCheckResult{
 		Name:    "Event Store",
 		Status:  CheckOK,
-		Message: fmt.Sprintf("%d event(s) loaded", len(events)),
+		Message: fmt.Sprintf("%d event(s) loaded", count),
 	}
+}
+
+// countEventStoreEntries reads all .jsonl files in the events directory
+// and counts valid event entries. Returns an error if any line fails to parse.
+func countEventStoreEntries(eventsDir string) (int, error) {
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		return 0, fmt.Errorf("read events dir: %w", err)
+	}
+	count := 0
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(eventsDir, e.Name()))
+		if readErr != nil {
+			return 0, fmt.Errorf("read %s: %w", e.Name(), readErr)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var ev amadeus.Event
+			if parseErr := json.Unmarshal([]byte(line), &ev); parseErr != nil {
+				return 0, fmt.Errorf("parse %s: %w", e.Name(), parseErr)
+			}
+			count++
+		}
+	}
+	return count, nil
 }
 
 // checkDMailSchema validates all D-Mails in archive/ conform to schema v1.
@@ -326,12 +358,12 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 			invalid = append(invalid, fmt.Sprintf("%s: read error", name))
 			continue
 		}
-		dmail, parseErr := ParseDMail(data)
+		dmail, parseErr := amadeus.ParseDMail(data)
 		if parseErr != nil {
 			invalid = append(invalid, fmt.Sprintf("%s: %v", name, parseErr))
 			continue
 		}
-		if errs := ValidateDMail(dmail); len(errs) > 0 {
+		if errs := amadeus.ValidateDMail(dmail); len(errs) > 0 {
 			invalid = append(invalid, fmt.Sprintf("%s: %s", name, strings.Join(errs, "; ")))
 		}
 	}
@@ -367,7 +399,7 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
-	cfg := DefaultConfig()
+	cfg := amadeus.DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return DoctorCheckResult{
 			Name:    "Config",
@@ -375,7 +407,7 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
-	if errs := ValidateConfig(cfg); len(errs) > 0 {
+	if errs := amadeus.ValidateConfig(cfg); len(errs) > 0 {
 		return DoctorCheckResult{
 			Name:    "Config",
 			Status:  CheckFail,

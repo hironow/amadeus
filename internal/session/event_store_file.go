@@ -1,4 +1,4 @@
-package amadeus
+package session
 
 import (
 	"bufio"
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	amadeus "github.com/hironow/amadeus"
 )
 
 // FileEventStore implements EventStore using daily JSONL files in a directory.
@@ -21,9 +21,9 @@ type FileEventStore struct {
 
 // Append persists events as JSONL lines to the daily file based on each event's timestamp.
 // All events are validated before any writes occur; if any event is invalid, the entire batch is rejected.
-func (s *FileEventStore) Append(events ...Event) error {
+func (s *FileEventStore) Append(events ...amadeus.Event) error {
 	for _, ev := range events {
-		if err := ValidateEvent(ev); err != nil {
+		if err := amadeus.ValidateEvent(ev); err != nil {
 			return fmt.Errorf("validate event %s: %w", ev.ID, err)
 		}
 	}
@@ -33,7 +33,7 @@ func (s *FileEventStore) Append(events ...Event) error {
 	}
 
 	// Group events by date for file routing
-	byDate := make(map[string][]Event)
+	byDate := make(map[string][]amadeus.Event)
 	for _, ev := range events {
 		date := ev.Timestamp.Format("2006-01-02")
 		byDate[date] = append(byDate[date], ev)
@@ -68,16 +68,16 @@ func (s *FileEventStore) Append(events ...Event) error {
 }
 
 // LoadAll reads all JSONL files in lexicographic order and returns events chronologically.
-func (s *FileEventStore) LoadAll() ([]Event, error) {
+func (s *FileEventStore) LoadAll() ([]amadeus.Event, error) {
 	return s.loadEvents(time.Time{})
 }
 
 // LoadSince returns events with timestamps strictly after the given time.
-func (s *FileEventStore) LoadSince(after time.Time) ([]Event, error) {
+func (s *FileEventStore) LoadSince(after time.Time) ([]amadeus.Event, error) {
 	return s.loadEvents(after)
 }
 
-func (s *FileEventStore) loadEvents(after time.Time) ([]Event, error) {
+func (s *FileEventStore) loadEvents(after time.Time) ([]amadeus.Event, error) {
 	entries, err := os.ReadDir(s.Dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -94,7 +94,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]Event, error) {
 	}
 	sort.Strings(files)
 
-	var events []Event
+	var events []amadeus.Event
 	for _, name := range files {
 		path := filepath.Join(s.Dir, name)
 		f, err := os.Open(path)
@@ -108,7 +108,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]Event, error) {
 			if len(line) == 0 {
 				continue
 			}
-			var ev Event
+			var ev amadeus.Event
 			if err := json.Unmarshal(line, &ev); err != nil {
 				f.Close()
 				return nil, fmt.Errorf("parse event in %s: %w", name, err)
@@ -132,18 +132,4 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]Event, error) {
 		return events[i].Timestamp.Before(events[j].Timestamp)
 	})
 	return events, nil
-}
-
-// NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.
-func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error) {
-	raw, err := json.Marshal(data)
-	if err != nil {
-		return Event{}, fmt.Errorf("marshal event data: %w", err)
-	}
-	return Event{
-		ID:        uuid.NewString(),
-		Type:      eventType,
-		Timestamp: timestamp,
-		Data:      raw,
-	}, nil
 }

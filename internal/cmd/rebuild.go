@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -28,11 +29,11 @@ func newRebuildCommand() *cobra.Command {
 			divRoot := filepath.Join(repoRoot, ".gate")
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 
-			eventStore := &amadeus.FileEventStore{
+			eventStore := &session.FileEventStore{
 				Dir: filepath.Join(divRoot, "events"),
 			}
-			store := amadeus.NewProjectionStore(divRoot)
-			projector := &amadeus.Projector{Store: store}
+			store := session.NewProjectionStore(divRoot)
+			projector := &session.Projector{Store: store}
 
 			events, err := eventStore.LoadAll()
 			if err != nil {

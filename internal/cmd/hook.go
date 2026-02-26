@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func newInstallHookCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := amadeus.InstallHook(gitDir); err != nil {
+			if err := session.InstallHook(gitDir); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Installed post-merge hook in %s\n", filepath.Join(gitDir, "hooks", "post-merge"))
@@ -40,7 +40,7 @@ func newUninstallHookCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := amadeus.UninstallHook(gitDir); err != nil {
+			if err := session.UninstallHook(gitDir); err != nil {
 				return err
 			}
 			fmt.Fprintln(cmd.ErrOrStderr(), "  Removed amadeus post-merge hook")

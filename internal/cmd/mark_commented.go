@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -36,11 +37,11 @@ func newMarkCommentedCommand() *cobra.Command {
 				return fmt.Errorf("stat .gate directory: %w", err)
 			}
 
-			store := amadeus.NewProjectionStore(divRoot)
-			a := &amadeus.Amadeus{
+			store := session.NewProjectionStore(divRoot)
+			a := &session.Amadeus{
 				Store:     store,
-				Events:    &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")},
-				Projector: &amadeus.Projector{Store: store},
+				Events:    &session.FileEventStore{Dir: filepath.Join(divRoot, "events")},
+				Projector: &session.Projector{Store: store},
 				Logger:    amadeus.NewLogger(cmd.ErrOrStderr(), false),
 			}
 			if err := a.MarkCommented(dmailName, issueID); err != nil {
