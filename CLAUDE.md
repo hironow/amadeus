@@ -13,9 +13,10 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 - `config.go` — Config type, DefaultConfig, ValidateConfig (LoadConfig is in cmd)
 - `convergence.go` — pure convergence algorithm
 - `dmail.go` — DMail types, ParseDMail, MarshalDMail, ValidateDMail (pure)
-- `event.go` — Event envelope, EventType constants, NewEvent
+- `event.go` — Event envelope, EventType constants, NewEvent, EventStore interface, EventApplier interface
+- `git.go` — MergedPR type, Git interface
 - `scoring.go` — pure scoring calculation
-- `state.go` — CheckType, CheckResult, SkillTemplateFS (go:embed)
+- `state.go` — CheckType, CheckResult, StateReader interface, SkillTemplateFS (go:embed)
 - `sync.go` — SyncState, CommentRecord, PendingComment types
 - `claude.go` — ClaudeRunner interface, go:embed templates, prompt building (pure)
 - `logger.go` — structured logger (root infrastructure per S0005)

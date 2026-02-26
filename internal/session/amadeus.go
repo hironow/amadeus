@@ -17,7 +17,7 @@ import (
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
 	Config        amadeus.Config
-	Store         *ProjectionStore
+	Store         amadeus.StateReader
 	Events        amadeus.EventStore // nil skips event persistence (Projector still required for writes)
 	Projector     amadeus.EventApplier // nil skips projection updates (Events still required for writes)
 	Git           amadeus.Git

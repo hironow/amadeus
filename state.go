@@ -8,6 +8,27 @@ import (
 //go:embed templates/skills/*/SKILL.md
 var SkillTemplateFS embed.FS
 
+// StateReader is the port interface for reading materialized projection state.
+type StateReader interface {
+	// LoadLatest returns the most recent check result.
+	LoadLatest() (CheckResult, error)
+
+	// ScanInbox consumes inbound D-Mails from the inbox directory.
+	ScanInbox() ([]DMail, error)
+
+	// NextDMailName generates a unique D-Mail name for the given kind.
+	NextDMailName(kind DMailKind) (string, error)
+
+	// LoadAllDMails returns all D-Mails from the archive.
+	LoadAllDMails() ([]DMail, error)
+
+	// LoadConsumed returns consumed inbox records.
+	LoadConsumed() ([]ConsumedRecord, error)
+
+	// LoadSyncState returns the current sync state.
+	LoadSyncState() (SyncState, error)
+}
+
 // CheckType represents the type of divergence check performed.
 type CheckType string
 

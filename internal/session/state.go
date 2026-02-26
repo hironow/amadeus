@@ -14,6 +14,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Compile-time check that ProjectionStore implements amadeus.StateReader.
+var _ amadeus.StateReader = (*ProjectionStore)(nil)
+
 // ProjectionStore manages reading and writing materialized projection files within the .gate/ directory.
 type ProjectionStore struct {
 	Root string
