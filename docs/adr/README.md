@@ -19,6 +19,7 @@
 | [S0001](https://github.com/hironow/phonewave/blob/main/docs/adr/S0001-logger-root-package-exception.md) | Logger as root package exception |
 | [S0002](https://github.com/hironow/phonewave/blob/main/docs/adr/S0002-event-sourcing-jsonl-pattern.md) | JSONL append-only event sourcing pattern |
 | [S0003](https://github.com/hironow/phonewave/blob/main/docs/adr/S0003-three-way-approval-contract.md) | Three-way approval contract |
+| [S0004](https://github.com/hironow/phonewave/blob/main/docs/adr/S0004-layer-architecture-conventions.md) | Layer architecture naming and telemetry conventions |
 
 ## amadeus-specific ADRs
 
