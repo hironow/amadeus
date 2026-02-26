@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -20,8 +19,6 @@ func newSyncCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-
 			repoRoot, err := os.Getwd()
 			if err != nil {
 				return err
@@ -43,7 +40,7 @@ func newSyncCommand() *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger := loggerFrom(cmd)
 			store := session.NewProjectionStore(divRoot)
 			a := &session.Amadeus{
 				Config:    cfg,

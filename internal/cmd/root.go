@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hironow/amadeus"
 	"github.com/spf13/cobra"
 )
+
+type loggerKeyType struct{}
+
+var loggerKey loggerKeyType
 
 // Version, Commit, Date are set at build time via -ldflags.
 var (
@@ -37,7 +42,11 @@ func NewRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		Version:       Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("amadeus", Version)
+			cmd.SetContext(ctx)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -74,4 +83,13 @@ func NewRootCommand() *cobra.Command {
 	)
 
 	return cmd
+}
+
+// loggerFrom extracts the *amadeus.Logger from the cobra command context.
+// Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
+func loggerFrom(cmd *cobra.Command) *amadeus.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(*amadeus.Logger); ok {
+		return l
+	}
+	return amadeus.NewLogger(cmd.ErrOrStderr(), false)
 }

@@ -17,7 +17,6 @@ func newCheckCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			verbose, _ := cmd.Flags().GetBool("verbose")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			full, _ := cmd.Flags().GetBool("full")
 			quiet, _ := cmd.Flags().GetBool("quiet")
@@ -50,7 +49,7 @@ func newCheckCommand() *cobra.Command {
 				cfg.Lang = lang
 			}
 
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger := loggerFrom(cmd)
 
 			store := session.NewProjectionStore(divRoot)
 			eventStore := &session.FileEventStore{Dir: filepath.Join(divRoot, "events")}

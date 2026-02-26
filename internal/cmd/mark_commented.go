@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +41,7 @@ func newMarkCommentedCommand() *cobra.Command {
 				Store:     store,
 				Events:    &session.FileEventStore{Dir: filepath.Join(divRoot, "events")},
 				Projector: &session.Projector{Store: store},
-				Logger:    amadeus.NewLogger(cmd.ErrOrStderr(), false),
+				Logger:    loggerFrom(cmd),
 			}
 			if err := a.MarkCommented(dmailName, issueID); err != nil {
 				return fmt.Errorf("mark commented: %w", err)

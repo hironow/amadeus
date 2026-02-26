@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -19,15 +18,13 @@ func newRebuildCommand() *cobra.Command {
 			"inbox.consumed events contain only metadata, not the full D-Mail content.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			verbose, _ := cmd.Flags().GetBool("verbose")
-
 			repoRoot, err := os.Getwd()
 			if err != nil {
 				return fmt.Errorf("get working directory: %w", err)
 			}
 
 			divRoot := filepath.Join(repoRoot, ".gate")
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger := loggerFrom(cmd)
 
 			eventStore := &session.FileEventStore{
 				Dir: filepath.Join(divRoot, "events"),
