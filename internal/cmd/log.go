@@ -7,21 +7,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newLogCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log",
+		Use:   "log [path]",
 		Short: "Show divergence log",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			verbose, _ := cmd.Flags().GetBool("verbose")
 			jsonOut, _ := cmd.Flags().GetBool("json")
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
@@ -34,18 +33,25 @@ func newLogCommand() *cobra.Command {
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
-			cfg, err := amadeus.LoadConfig(configPath)
+			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
-			store := amadeus.NewProjectionStore(divRoot)
-			a := &amadeus.Amadeus{
+			logger := loggerFrom(cmd)
+			store := session.NewProjectionStore(divRoot)
+
+			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
+			if err != nil {
+				return fmt.Errorf("outbox store: %w", err)
+			}
+			defer outboxStore.Close()
+
+			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
-				Events:    &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")},
-				Projector: &amadeus.Projector{Store: store},
+				Events:    session.NewEventStore(divRoot),
+				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}

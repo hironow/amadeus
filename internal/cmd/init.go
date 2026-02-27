@@ -5,22 +5,25 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newInitCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "init",
+		Use:   "init [path]",
 		Short: "Initialize .gate directory",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
-			if err := amadeus.InitGateDir(divRoot); err != nil {
+			if _, err := os.Stat(divRoot); err == nil {
+				return fmt.Errorf("%s already exists", divRoot)
+			}
+			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)

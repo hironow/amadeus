@@ -4,32 +4,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
 	"github.com/spf13/cobra"
 )
 
 func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "doctor",
+		Use:   "doctor [path]",
 		Short: "Run health checks",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			jsonOut, _ := cmd.Flags().GetBool("json")
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
 
-			results := amadeus.RunDoctor(cmd.Context(), configPath, repoRoot)
+			results := runDoctor(cmd.Context(), configPath, repoRoot)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)
@@ -49,12 +47,12 @@ type jsonCheck struct {
 	Message string `json:"message"`
 }
 
-func printDoctorJSON(w io.Writer, results []amadeus.DoctorCheckResult) error {
+func printDoctorJSON(w io.Writer, results []DoctorCheckResult) error {
 	checks := make([]jsonCheck, len(results))
 	hasFail := false
 	for i, r := range results {
 		checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message}
-		if r.Status == amadeus.CheckFail {
+		if r.Status == CheckFail {
 			hasFail = true
 		}
 	}
@@ -71,11 +69,11 @@ func printDoctorJSON(w io.Writer, results []amadeus.DoctorCheckResult) error {
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []amadeus.DoctorCheckResult) error {
+func printDoctorText(w io.Writer, results []DoctorCheckResult) error {
 	hasFail := false
 	for _, r := range results {
 		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
-		if r.Status == amadeus.CheckFail {
+		if r.Status == CheckFail {
 			hasFail = true
 		}
 	}

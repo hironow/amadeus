@@ -68,23 +68,26 @@ func TestLogger_Verbose_Shown(t *testing.T) {
 	}
 }
 
-func TestLogger_SetLogFile(t *testing.T) {
+func TestLogger_SetExtraWriter(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 
 	var buf bytes.Buffer
 	log := NewLogger(&buf, false)
 
-	if err := log.SetLogFile(path); err != nil {
-		t.Fatalf("SetLogFile: %v", err)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		t.Fatalf("OpenFile: %v", err)
 	}
-	defer log.CloseLogFile()
+	defer f.Close()
+
+	log.SetExtraWriter(f)
 
 	log.Info("dual")
 
-	// Check stderr output
+	// Check buffer output
 	if !strings.Contains(buf.String(), "INFO dual") {
-		t.Errorf("expected stderr output, got %q", buf.String())
+		t.Errorf("expected buffer output, got %q", buf.String())
 	}
 
 	// Check file output
@@ -97,21 +100,26 @@ func TestLogger_SetLogFile(t *testing.T) {
 	}
 }
 
-func TestLogger_CloseLogFile(t *testing.T) {
+func TestLogger_SetExtraWriter_Nil(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 
 	var buf bytes.Buffer
 	log := NewLogger(&buf, false)
 
-	if err := log.SetLogFile(path); err != nil {
-		t.Fatalf("SetLogFile: %v", err)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		t.Fatalf("OpenFile: %v", err)
 	}
-	log.CloseLogFile()
+	log.SetExtraWriter(f)
+	f.Close()
 
-	// After close, should write only to out, not crash
-	log.Info("after close")
-	if !strings.Contains(buf.String(), "INFO after close") {
-		t.Errorf("expected output after close, got %q", buf.String())
+	// Disconnect extra writer
+	log.SetExtraWriter(nil)
+
+	// After disconnect, should write only to buf, not crash
+	log.Info("after disconnect")
+	if !strings.Contains(buf.String(), "INFO after disconnect") {
+		t.Errorf("expected output after disconnect, got %q", buf.String())
 	}
 }

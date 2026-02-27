@@ -2,37 +2,39 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newRebuildCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rebuild",
+		Use:   "rebuild [path]",
 		Short: "Rebuild projections from event store",
 		Long: "Replays all events from .gate/events/ to regenerate .run/ projection files and archive/ D-Mails from scratch.\n" +
 			"NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed because\n" +
 			"inbox.consumed events contain only metadata, not the full D-Mail content.",
-		Args: cobra.NoArgs,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			verbose, _ := cmd.Flags().GetBool("verbose")
-
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 
 			divRoot := filepath.Join(repoRoot, ".gate")
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger := loggerFrom(cmd)
 
-			eventStore := &amadeus.FileEventStore{
-				Dir: filepath.Join(divRoot, "events"),
+			eventStore := session.NewEventStore(divRoot)
+			store := session.NewProjectionStore(divRoot)
+
+			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
+			if err != nil {
+				return fmt.Errorf("outbox store: %w", err)
 			}
-			store := amadeus.NewProjectionStore(divRoot)
-			projector := &amadeus.Projector{Store: store}
+			defer outboxStore.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outboxStore}
 
 			events, err := eventStore.LoadAll()
 			if err != nil {

@@ -3,8 +3,11 @@ package amadeus
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // EventStore is the append-only event persistence interface.
@@ -17,6 +20,24 @@ type EventStore interface {
 
 	// LoadSince returns events with timestamps after the given time.
 	LoadSince(after time.Time) ([]Event, error)
+}
+
+// EventApplier applies domain events to update materialized projections.
+type EventApplier interface {
+	// Apply processes a single event and updates the relevant projections.
+	Apply(event Event) error
+
+	// Rebuild replays all events to regenerate projections from scratch.
+	Rebuild(events []Event) error
+}
+
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
 }
 
 // EventType identifies the kind of domain event.
@@ -107,4 +128,18 @@ type ConvergenceDetectedData struct {
 type ArchivePrunedData struct {
 	Paths []string `json:"paths"`
 	Count int      `json:"count"`
+}
+
+// NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.
+func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error) {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return Event{}, fmt.Errorf("marshal event data: %w", err)
+	}
+	return Event{
+		ID:        uuid.NewString(),
+		Type:      eventType,
+		Timestamp: timestamp,
+		Data:      raw,
+	}, nil
 }

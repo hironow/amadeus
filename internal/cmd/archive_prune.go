@@ -3,12 +3,12 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive-prune",
 		Short: "Prune old archived files",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -26,9 +26,9 @@ func newArchivePruneCommand() *cobra.Command {
 				return fmt.Errorf("--days must be >= 1 (got %d)", days)
 			}
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
 			archiveDir := filepath.Join(divRoot, "archive")
@@ -38,21 +38,19 @@ func newArchivePruneCommand() *cobra.Command {
 			errW := cmd.ErrOrStderr()
 
 			// Collect archive candidates (.md files)
-			archiveCandidates, err := amadeus.FindPruneCandidates(archiveDir, maxAge)
+			archiveCandidates, err := session.FindPruneCandidates(archiveDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find prune candidates: %w", err)
 			}
 
 			// Collect event file candidates (.jsonl files)
-			eventCandidates, err := amadeus.FindExpiredEventFiles(eventsDir, maxAge)
+			eventCandidates, err := session.FindExpiredEventFiles(eventsDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find expired event files: %w", err)
 			}
 
-			// Merge all candidates for display
-			allCandidates := append(archiveCandidates, eventCandidates...)
-
-			if len(allCandidates) == 0 {
+			totalFiles := len(archiveCandidates) + len(eventCandidates)
+			if totalFiles == 0 {
 				if archiveCandidates == nil && eventCandidates == nil {
 					fmt.Fprintf(errW, "No prune directories found under %s\n", divRoot)
 				} else {
@@ -80,7 +78,7 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			if !yes {
-				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", len(allCandidates))
+				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
 				scanner := bufio.NewScanner(cmd.InOrStdin())
 				if !scanner.Scan() {
 					if err := scanner.Err(); err != nil {
@@ -98,14 +96,14 @@ func newArchivePruneCommand() *cobra.Command {
 
 			totalCount := 0
 			if len(archiveCandidates) > 0 {
-				count, err := amadeus.PruneFiles(archiveCandidates)
+				count, err := session.PruneFiles(archiveCandidates)
 				if err != nil {
 					return fmt.Errorf("prune archive: %w", err)
 				}
 				totalCount += count
 			}
 			if len(eventCandidates) > 0 {
-				count, err := amadeus.PruneFiles(eventCandidates)
+				count, err := session.PruneEventFiles(eventCandidates)
 				if err != nil {
 					return fmt.Errorf("prune event files: %w", err)
 				}
@@ -116,10 +114,13 @@ func newArchivePruneCommand() *cobra.Command {
 			// This MUST succeed: without the event, a future rebuild would replay
 			// historical dmail.generated events and recreate the pruned files.
 			var paths []string
-			for _, c := range allCandidates {
+			for _, c := range archiveCandidates {
 				paths = append(paths, filepath.Base(c.Path))
 			}
-			eventStore := &amadeus.FileEventStore{Dir: eventsDir}
+			for _, c := range eventCandidates {
+				paths = append(paths, filepath.Base(c.Path))
+			}
+			eventStore := session.NewEventStoreFromEventsDir(eventsDir)
 			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
 				Paths: paths,
 				Count: totalCount,

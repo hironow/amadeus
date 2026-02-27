@@ -1,7 +1,7 @@
 rules:
   # ==========================================================================
   # ADR enforcement rules
-  # docs/adr/ (0000-0010) のうち Go コードで静的検知できるものをカバー
+  # docs/adr/ (0000-0016) + S-series (S0001-S0005) のうち Go コードで静的検知できるものをカバー
   # 対象外: ADR 0000 (governance), ADR 0004 (data format)
   # ==========================================================================
 
@@ -122,3 +122,97 @@ rules:
           $M.Lock()
           ...
           defer $M.Unlock()
+
+  # --- Shared ADR 0007: Docker E2E testing (canonical: phonewave) ---
+
+  # Rule 7: testcontainers.GenericContainer without Terminate
+  # Source: ADR 0007 — container cleanup in Docker E2E
+  - id: adr0007-testcontainers-generic-without-terminate
+    languages: [go]
+    message: |
+      testcontainers.GenericContainer() で作成したコンテナに
+      Terminate() が呼ばれていません。
+      defer func() { container.Terminate(ctx) }() または
+      t.Cleanup(func() { container.Terminate(ctx) }) で確実に停止してください。
+      Ref: phonewave docs/adr/0007-testcontainers-docker-e2e.md
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $CONTAINER, $ERR := testcontainers.GenericContainer(...)
+      - pattern-not-inside: |
+          $CONTAINER, $_ := testcontainers.GenericContainer(...)
+          ...
+          $CONTAINER.Terminate(...)
+    paths:
+      include:
+        - "*_test.go"
+
+  # Rule 8: Mock/stub usage in Docker E2E tests
+  # Source: ADR 0007 — "All dependencies must be real"
+  - id: adr0007-mock-in-docker-test
+    languages: [go]
+    message: |
+      Docker E2E テスト (_docker_test.go) でモックを使用しないでください。
+      全ての依存は実サービスで構成してください。
+      モックが必要なテストは integration テストに移動してください。
+      Ref: phonewave docs/adr/0007-testcontainers-docker-e2e.md
+    severity: WARNING
+    pattern-either:
+      - pattern: gomock.NewController(...)
+      - pattern: httptest.NewServer(...)
+      - pattern: httptest.NewTLSServer(...)
+    paths:
+      include:
+        - "*_docker_test.go"
+
+  # --- Shared ADR 0008: Signal context propagation (canonical: phonewave) ---
+
+  # Rule 9: signal.Notify instead of signal.NotifyContext
+  # Source: ADR 0008 — prefer NotifyContext for context-based cancellation
+  - id: adr0008-signal-notify-instead-of-notifycontext
+    languages: [go]
+    message: |
+      signal.Notify() ではなく signal.NotifyContext() を使用してください。
+      signal.NotifyContext は context のキャンセルチェーンに統合され、
+      goroutine リークのリスクも低減されます。
+      Ref: phonewave docs/adr/0008-signal-context-propagation.md
+    severity: WARNING
+    pattern: signal.Notify(...)
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # Rule 10: Execute() without context
+  # Source: ADR 0008 — "ExecuteContext(ctx) passes context to cobra root command"
+  - id: adr0008-execute-without-context
+    languages: [go]
+    message: |
+      $CMD.Execute() ではなく $CMD.ExecuteContext(ctx) を使用してください。
+      Execute() ではシグナルコンテキストが cobra コマンドに伝播されません。
+      signal.NotifyContext で作成した ctx を渡すことで、
+      Ctrl+C 時にコマンドツリー全体が適切にキャンセルされます。
+      Ref: phonewave docs/adr/0008-signal-context-propagation.md
+    severity: ERROR
+    pattern: $CMD.Execute()
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # --- Shared ADR 0009: Config-relative state directory (canonical: phonewave) ---
+
+  # Rule 11: os.Getwd in cobra command handler
+  # Source: ADR 0009 — state dir from configBase(cmd), not CWD
+  - id: adr0009-os-getwd-in-cobra-cmd
+    languages: [go]
+    message: |
+      cobra コマンド内で os.Getwd() を使用しないでください。
+      状態ディレクトリは configBase(cmd) から取得してください。
+      CWD 依存はテストの非決定性とパスのずれを引き起こします。
+      Ref: phonewave docs/adr/0009-config-relative-state-directory.md
+    severity: WARNING
+    patterns:
+      - pattern: os.Getwd()
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }

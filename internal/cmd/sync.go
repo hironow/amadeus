@@ -7,21 +7,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newSyncCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "sync",
+		Use:   "sync [path]",
 		Short: "Show D-Mail sync status (JSON)",
 		Long:  "Output unsynced D-Mails and pending Linear comments as JSON.",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
@@ -30,25 +28,32 @@ func newSyncCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
-			if err := amadeus.InitGateDir(divRoot); err != nil {
+			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init gate dir: %w", err)
 			}
 
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
-			cfg, err := amadeus.LoadConfig(configPath)
+			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
-			store := amadeus.NewProjectionStore(divRoot)
-			a := &amadeus.Amadeus{
+			logger := loggerFrom(cmd)
+			store := session.NewProjectionStore(divRoot)
+
+			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
+			if err != nil {
+				return fmt.Errorf("outbox store: %w", err)
+			}
+			defer outboxStore.Close()
+
+			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
-				Events:    &amadeus.FileEventStore{Dir: filepath.Join(divRoot, "events")},
-				Projector: &amadeus.Projector{Store: store},
+				Events:    session.NewEventStore(divRoot),
+				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}

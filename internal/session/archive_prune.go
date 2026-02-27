@@ -1,4 +1,4 @@
-package amadeus
+package session
 
 import (
 	"errors"
@@ -40,37 +40,6 @@ func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandid
 		if info.ModTime().Before(cutoff) {
 			candidates = append(candidates, PruneCandidate{
 				Path:    filepath.Join(archiveDir, e.Name()),
-				ModTime: info.ModTime(),
-			})
-		}
-	}
-	return candidates, nil
-}
-
-// FindExpiredEventFiles returns .jsonl files in eventsDir older than maxAge.
-// Returns (nil, nil) if the directory does not exist.
-func FindExpiredEventFiles(eventsDir string, maxAge time.Duration) ([]PruneCandidate, error) {
-	entries, err := os.ReadDir(eventsDir)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	cutoff := time.Now().Add(-maxAge)
-	candidates := []PruneCandidate{}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			return nil, fmt.Errorf("stat %s: %w", e.Name(), err)
-		}
-		if info.ModTime().Before(cutoff) {
-			candidates = append(candidates, PruneCandidate{
-				Path:    filepath.Join(eventsDir, e.Name()),
 				ModTime: info.ModTime(),
 			})
 		}

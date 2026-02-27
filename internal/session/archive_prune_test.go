@@ -1,4 +1,4 @@
-package amadeus
+package session
 
 import (
 	"errors"
@@ -179,97 +179,6 @@ func TestPruneFiles_DeletesFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(f2); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected %s to be deleted", f2)
-	}
-}
-
-func TestFindExpiredEventFiles_DirNotExist(t *testing.T) {
-	// given
-	dir := filepath.Join(t.TempDir(), "nonexistent")
-
-	// when
-	candidates, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
-
-	// then
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if candidates != nil {
-		t.Errorf("expected nil for missing directory, got %v", candidates)
-	}
-}
-
-func TestFindExpiredEventFiles_EmptyDir(t *testing.T) {
-	// given
-	dir := t.TempDir()
-
-	// when
-	candidates, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
-
-	// then
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if candidates == nil {
-		t.Error("expected non-nil empty slice, got nil")
-	}
-	if len(candidates) != 0 {
-		t.Errorf("expected empty, got %v", candidates)
-	}
-}
-
-func TestFindExpiredEventFiles_FiltersOldJsonlFiles(t *testing.T) {
-	// given
-	dir := t.TempDir()
-	oldFile := filepath.Join(dir, "2026-01-01.jsonl")
-	if err := os.WriteFile(oldFile, []byte(`{"id":"1"}`+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	oldTime := time.Now().Add(-31 * 24 * time.Hour)
-	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
-		t.Fatal(err)
-	}
-
-	newFile := filepath.Join(dir, "2026-02-25.jsonl")
-	if err := os.WriteFile(newFile, []byte(`{"id":"2"}`+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	// when
-	candidates, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
-
-	// then
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(candidates) != 1 {
-		t.Fatalf("expected 1 candidate, got %d", len(candidates))
-	}
-	if filepath.Base(candidates[0].Path) != "2026-01-01.jsonl" {
-		t.Errorf("expected 2026-01-01.jsonl, got %s", candidates[0].Path)
-	}
-}
-
-func TestFindExpiredEventFiles_IgnoresNonJsonlFiles(t *testing.T) {
-	// given
-	dir := t.TempDir()
-	mdFile := filepath.Join(dir, "feedback-001.md")
-	if err := os.WriteFile(mdFile, []byte("markdown"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	oldTime := time.Now().Add(-31 * 24 * time.Hour)
-	if err := os.Chtimes(mdFile, oldTime, oldTime); err != nil {
-		t.Fatal(err)
-	}
-
-	// when
-	candidates, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
-
-	// then
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(candidates) != 0 {
-		t.Errorf("expected 0 candidates (non-jsonl ignored), got %d", len(candidates))
 	}
 }
 
