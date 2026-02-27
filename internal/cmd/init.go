@@ -20,6 +20,9 @@ func newInitCommand() *cobra.Command {
 				return fmt.Errorf("get working directory: %w", err)
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
+			if _, err := os.Stat(divRoot); err == nil {
+				return fmt.Errorf("%s already exists", divRoot)
+			}
 			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}

@@ -30,6 +30,24 @@ func ensureGateDirs(t *testing.T, root string) {
 	}
 }
 
+func TestSQLiteOutboxStore_PragmaSynchronousNormal(t *testing.T) {
+	// given
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+	store := testOutboxStore(t, root)
+
+	// when: query PRAGMA on the store's own connection
+	var synchronous string
+	if err := store.DBForTest().QueryRow("PRAGMA synchronous").Scan(&synchronous); err != nil {
+		t.Fatalf("query PRAGMA synchronous: %v", err)
+	}
+
+	// then: synchronous = 1 (NORMAL)
+	if synchronous != "1" {
+		t.Errorf("PRAGMA synchronous: got %q, want %q (NORMAL)", synchronous, "1")
+	}
+}
+
 func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)

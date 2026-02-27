@@ -46,6 +46,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 	// underscore-prefixed query parameters like mattn/go-sqlite3.
 	for _, pragma := range []string{
 		"PRAGMA journal_mode=WAL",
+		"PRAGMA synchronous=NORMAL",
 		"PRAGMA busy_timeout=5000",
 	} {
 		if _, err := db.Exec(pragma); err != nil {
