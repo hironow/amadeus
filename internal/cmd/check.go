@@ -35,6 +35,15 @@ func newCheckCommand() *cobra.Command {
 				return fmt.Errorf("not initialized — run 'amadeus init' first")
 			}
 
+			// Preflight: verify required binaries exist
+			bins := []string{"git"}
+			if !dryRun {
+				bins = append(bins, "claude")
+			}
+			if preErr := session.PreflightCheck(bins...); preErr != nil {
+				return preErr
+			}
+
 			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
