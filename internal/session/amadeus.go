@@ -18,15 +18,17 @@ import (
 type Amadeus struct {
 	Config        amadeus.Config
 	Store         amadeus.StateReader
-	Events        amadeus.EventStore // nil skips event persistence (Projector still required for writes)
+	Events        amadeus.EventStore   // nil skips event persistence (Projector still required for writes)
 	Projector     amadeus.EventApplier // nil skips projection updates (Events still required for writes)
 	Git           amadeus.Git
 	RepoDir       string               // repository root directory
 	Claude        amadeus.ClaudeRunner // nil falls back to the default Claude runner
 	Logger        *amadeus.Logger
-	DataOut       io.Writer // machine-readable output (stdout); Logger is for human progress (stderr)
-	CheckCount    int       // number of diff checks since last full check
-	ForceFullNext bool      // set when a divergence jump defers a full scan to the next run
+	DataOut       io.Writer            // machine-readable output (stdout); Logger is for human progress (stderr)
+	Approver      amadeus.Approver     // nil = no gate (auto-approve)
+	Notifier      amadeus.Notifier     // nil = no notifications
+	CheckCount    int                  // number of diff checks since last full check
+	ForceFullNext bool                 // set when a divergence jump defers a full scan to the next run
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.

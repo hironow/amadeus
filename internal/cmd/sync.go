@@ -7,20 +7,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newSyncCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "sync",
+		Use:   "sync [path]",
 		Short: "Show D-Mail sync status (JSON)",
 		Long:  "Output unsynced D-Mails and pending Linear comments as JSON.",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
@@ -53,7 +52,7 @@ func newSyncCommand() *cobra.Command {
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
-				Events:    eventsource.NewFileEventStore(eventsource.EventsDir(divRoot)),
+				Events:    session.NewEventStore(divRoot),
 				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),

@@ -11,13 +11,13 @@ import (
 
 func newInitCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "init",
+		Use:   "init [path]",
 		Short: "Initialize .gate directory",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
 			if _, err := os.Stat(divRoot); err == nil {

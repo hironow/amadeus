@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -12,16 +11,16 @@ import (
 
 func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "doctor",
+		Use:   "doctor [path]",
 		Short: "Run health checks",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			jsonOut, _ := cmd.Flags().GetBool("json")
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
 			if configPath == "" {

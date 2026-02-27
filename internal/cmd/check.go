@@ -6,16 +6,15 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
-	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newCheckCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "check",
+		Use:   "check [path]",
 		Short: "Run divergence check",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -24,12 +23,17 @@ func newCheckCommand() *cobra.Command {
 			jsonOut, _ := cmd.Flags().GetBool("json")
 			lang, _ := cmd.Flags().GetString("lang")
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 
 			divRoot := filepath.Join(repoRoot, ".gate")
+
+			// Pre-flight check: ensure init has been run
+			if _, statErr := os.Stat(divRoot); statErr != nil {
+				return fmt.Errorf("not initialized — run 'amadeus init' first")
+			}
 
 			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
@@ -53,7 +57,7 @@ func newCheckCommand() *cobra.Command {
 			logger := loggerFrom(cmd)
 
 			store := session.NewProjectionStore(divRoot)
-			eventStore := eventsource.NewFileEventStore(eventsource.EventsDir(divRoot))
+			eventStore := session.NewEventStore(divRoot)
 
 			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
 			if err != nil {
@@ -61,15 +65,40 @@ func newCheckCommand() *cobra.Command {
 			}
 			defer outboxStore.Close()
 
+			// Wire approver
+			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
+			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
+
+			var approver amadeus.Approver
+			switch {
+			case autoApprove:
+				approver = &amadeus.AutoApprover{}
+			case approveCmd != "":
+				approver = session.NewCmdApprover(approveCmd)
+			default:
+				approver = &amadeus.AutoApprover{} // default: no gate
+			}
+
+			// Wire notifier
+			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
+			var notifier amadeus.Notifier
+			if notifyCmd != "" {
+				notifier = session.NewCmdNotifier(notifyCmd)
+			} else {
+				notifier = &amadeus.NopNotifier{}
+			}
+
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
 				Events:    eventStore,
 				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Git:       session.NewGitClient(repoRoot),
-				RepoDir:  repoRoot,
+				RepoDir:   repoRoot,
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
+				Approver:  approver,
+				Notifier:  notifier,
 			}
 
 			return a.RunCheck(cmd.Context(), session.CheckOptions{
@@ -85,6 +114,9 @@ func newCheckCommand() *cobra.Command {
 	cmd.Flags().BoolP("full", "f", false, "force full calibration check")
 	cmd.Flags().BoolP("quiet", "q", false, "summary-only output")
 	cmd.Flags().BoolP("json", "j", false, "output as JSON")
+	cmd.Flags().Bool("auto-approve", false, "skip approval gate")
+	cmd.Flags().String("approve-cmd", "", "external command for approval ({message} placeholder)")
+	cmd.Flags().String("notify-cmd", "", "external command for notifications ({title} and {message} placeholders)")
 
 	return cmd
 }

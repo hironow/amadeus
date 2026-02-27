@@ -13,16 +13,16 @@ import (
 
 func newValidateCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "validate",
+		Use:   "validate [path]",
 		Short: "Validate config file",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 
 			if configPath == "" {
-				repoRoot, err := os.Getwd()
+				repoRoot, err := resolveTargetDir(args)
 				if err != nil {
-					return fmt.Errorf("get working directory: %w", err)
+					return err
 				}
 				configPath = filepath.Join(repoRoot, ".gate", "config.yaml")
 			}

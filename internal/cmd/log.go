@@ -7,21 +7,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newLogCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log",
+		Use:   "log [path]",
 		Short: "Show divergence log",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			jsonOut, _ := cmd.Flags().GetBool("json")
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
@@ -51,7 +50,7 @@ func newLogCommand() *cobra.Command {
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
-				Events:    eventsource.NewFileEventStore(eventsource.EventsDir(divRoot)),
+				Events:    session.NewEventStore(divRoot),
 				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),

@@ -8,23 +8,22 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
 func newMarkCommentedCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "mark-commented <dmail-name> <issue-id>",
+		Use:   "mark-commented <dmail-name> <issue-id> [path]",
 		Short: "Record that a D-Mail has been posted as a comment",
 		Long:  "Mark a D-Mail × Issue pair as commented in the sync state.",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dmailName := args[0]
 			issueID := args[1]
 			jsonFlag, _ := cmd.Flags().GetBool("json")
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args[2:])
 			if err != nil {
 				return err
 			}
@@ -47,7 +46,7 @@ func newMarkCommentedCommand() *cobra.Command {
 
 			a := &session.Amadeus{
 				Store:     store,
-				Events:    eventsource.NewFileEventStore(eventsource.EventsDir(divRoot)),
+				Events:    session.NewEventStore(divRoot),
 				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
 				Logger:    loggerFrom(cmd),
 			}

@@ -3,13 +3,11 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/hironow/amadeus"
-	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +16,7 @@ func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive-prune",
 		Short: "Prune old archived files",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -28,9 +26,9 @@ func newArchivePruneCommand() *cobra.Command {
 				return fmt.Errorf("--days must be >= 1 (got %d)", days)
 			}
 
-			repoRoot, err := os.Getwd()
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
+				return err
 			}
 			divRoot := filepath.Join(repoRoot, ".gate")
 			archiveDir := filepath.Join(divRoot, "archive")
@@ -46,7 +44,7 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			// Collect event file candidates (.jsonl files)
-			eventCandidates, err := eventsource.FindExpiredEventFiles(eventsDir, maxAge)
+			eventCandidates, err := session.FindExpiredEventFiles(eventsDir, maxAge)
 			if err != nil {
 				return fmt.Errorf("find expired event files: %w", err)
 			}
@@ -105,7 +103,7 @@ func newArchivePruneCommand() *cobra.Command {
 				totalCount += count
 			}
 			if len(eventCandidates) > 0 {
-				count, err := eventsource.PruneEventFiles(eventCandidates)
+				count, err := session.PruneEventFiles(eventCandidates)
 				if err != nil {
 					return fmt.Errorf("prune event files: %w", err)
 				}
@@ -122,7 +120,7 @@ func newArchivePruneCommand() *cobra.Command {
 			for _, c := range eventCandidates {
 				paths = append(paths, filepath.Base(c.Path))
 			}
-			eventStore := eventsource.NewFileEventStore(eventsDir)
+			eventStore := session.NewEventStoreFromEventsDir(eventsDir)
 			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
 				Paths: paths,
 				Count: totalCount,
