@@ -52,4 +52,5 @@ type CheckResult struct {
 	ConvergenceAlerts   []ConvergenceAlert `json:"convergence_alerts,omitempty"`
 	CheckCountSinceFull int                `json:"check_count_since_full"`
 	ForceFullNext       bool               `json:"force_full_next,omitempty"`
+	GateDenied          bool               `json:"gate_denied,omitempty"`
 }

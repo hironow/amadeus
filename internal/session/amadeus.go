@@ -353,6 +353,50 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 	now := time.Now().UTC()
 
+	// Gate: request approval before D-Mail generation
+	gateApproved := true
+	if len(meterResult.DMailCandidates) > 0 && a.Approver != nil {
+		approved, gateErr := a.Approver.RequestApproval(ctx, fmt.Sprintf(
+			"Drift detected (%.1f%%) — %d D-Mail(s) to generate. Approve?",
+			meterResult.Divergence.Value*100, len(meterResult.DMailCandidates)))
+		if gateErr != nil {
+			return fmt.Errorf("approval gate: %w", gateErr)
+		}
+		gateApproved = approved
+	}
+
+	if !gateApproved {
+		// Emit check.completed event to maintain ES invariant.
+		// State persistence is handled by the projector (SaveLatest) when event is emitted.
+		a.AdvanceCheckCount(fullCheck)
+		checkType := amadeus.CheckTypeDiff
+		if fullCheck {
+			checkType = amadeus.CheckTypeFull
+		}
+		result := amadeus.CheckResult{
+			CheckedAt:           now,
+			Commit:              currentCommit,
+			Type:                checkType,
+			Divergence:          meterResult.Divergence.Value,
+			Axes:                meterResult.Divergence.Axes,
+			GateDenied:          true,
+			CheckCountSinceFull: a.CheckCount,
+			ForceFullNext:       a.ForceFullNext,
+		}
+		checkEv, evErr := amadeus.NewEvent(amadeus.EventCheckCompleted,
+			amadeus.CheckCompletedData{Result: result}, now)
+		if evErr != nil {
+			return fmt.Errorf("create check event (gate denied): %w", evErr)
+		}
+		if err := a.emit(checkEv); err != nil {
+			return fmt.Errorf("emit check event (gate denied): %w", err)
+		}
+		if !opts.Quiet {
+			a.Logger.Info("Gate denied — D-Mail generation skipped")
+		}
+		return nil
+	}
+
 	_, span3 := amadeus.Tracer.Start(ctx, "dmail")
 	var dmails []amadeus.DMail
 	for _, candidate := range meterResult.DMailCandidates {
@@ -472,6 +516,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	}
 
 	if len(dmails) > 0 {
+		if a.Notifier != nil {
+			_ = a.Notifier.Notify(ctx, "amadeus",
+				fmt.Sprintf("Drift %.1f%% — %d D-Mail(s) sent",
+					result.Divergence*100, len(dmails)))
+		}
 		return &amadeus.DriftError{Divergence: result.Divergence, DMails: len(dmails)}
 	}
 	return nil
