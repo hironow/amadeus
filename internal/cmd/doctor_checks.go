@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
@@ -234,7 +235,10 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	// 8. D-Mail schema v1 validation
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, ".gate")))
 
-	// 9. Linear MCP (skip if claude unavailable)
+	// 9. Success rate (informational)
+	results = append(results, checkSuccessRate(filepath.Join(repoRoot, ".gate")))
+
+	// 10. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != CheckOK {
 		results = append(results, DoctorCheckResult{
 			Name:    "Linear MCP",
@@ -379,6 +383,41 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 		Name:    "D-Mail Schema",
 		Status:  CheckOK,
 		Message: fmt.Sprintf("%d D-Mail(s) valid", len(mdFiles)),
+	}
+}
+
+// checkSuccessRate calculates and reports the event-based success rate.
+func checkSuccessRate(gateDir string) DoctorCheckResult {
+	store := session.NewEventStore(gateDir)
+	events, err := store.LoadAll()
+	if err != nil || len(events) == 0 {
+		return DoctorCheckResult{
+			Name:    "success-rate",
+			Status:  CheckOK,
+			Message: "no events",
+		}
+	}
+
+	rate := amadeus.SuccessRate(events)
+	var clean, total int
+	for _, ev := range events {
+		if ev.Type != amadeus.EventCheckCompleted {
+			continue
+		}
+		var data amadeus.CheckCompletedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		total++
+		if len(data.Result.DMails) == 0 {
+			clean++
+		}
+	}
+
+	return DoctorCheckResult{
+		Name:    "success-rate",
+		Status:  CheckOK,
+		Message: amadeus.FormatSuccessRate(rate, clean, total),
 	}
 }
 

@@ -76,3 +76,33 @@ func TestSuccessRate_IgnoresOtherEvents(t *testing.T) {
 		t.Errorf("SuccessRate = %f, want 1.0", rate)
 	}
 }
+
+func TestFormatSuccessRate_WithEvents(t *testing.T) {
+	// given
+	rate := 0.857142
+	success := 6
+	total := 7
+
+	// when
+	msg := amadeus.FormatSuccessRate(rate, success, total)
+
+	// then
+	if msg != "85.7% (6/7)" {
+		t.Errorf("FormatSuccessRate = %q, want %q", msg, "85.7% (6/7)")
+	}
+}
+
+func TestFormatSuccessRate_NoEvents(t *testing.T) {
+	// given
+	rate := 0.0
+	success := 0
+	total := 0
+
+	// when
+	msg := amadeus.FormatSuccessRate(rate, success, total)
+
+	// then
+	if msg != "no events" {
+		t.Errorf("FormatSuccessRate = %q, want %q", msg, "no events")
+	}
+}

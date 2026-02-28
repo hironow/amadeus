@@ -1,6 +1,9 @@
 package amadeus
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // SuccessRate calculates the clean check rate from a list of events.
 // A check with zero D-Mails generated is considered a success.
@@ -25,4 +28,13 @@ func SuccessRate(events []Event) float64 {
 		return 0.0
 	}
 	return float64(clean) / float64(total)
+}
+
+// FormatSuccessRate formats the success rate as a human-readable string.
+// Returns "no events" when total is zero.
+func FormatSuccessRate(rate float64, success, total int) string {
+	if total == 0 {
+		return "no events"
+	}
+	return fmt.Sprintf("%.1f%% (%d/%d)", rate*100, success, total)
 }

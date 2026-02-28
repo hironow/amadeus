@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus"
 	"go.opentelemetry.io/otel"
@@ -278,12 +280,12 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir)
 
-	// then: should have 9 results
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d", len(results))
+	// then: should have 10 results
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d", len(results))
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "success-rate", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -318,15 +320,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "amadeus.doctor" {
 			found = true
-			// Should have 9 doctor.check events (one per check)
+			// Should have 10 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 9 {
-				t.Errorf("expected 9 doctor.check events, got %d", eventCount)
+			if eventCount != 10 {
+				t.Errorf("expected 10 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -400,13 +402,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir)
 
-	// then: should have 9 results
-	if len(results) != 9 {
+	// then: should have 10 results
+	if len(results) != 10 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 9 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 10 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -549,5 +551,62 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	// then: FAIL — permission error should not be masked
 	if result.Status != CheckFail {
 		t.Errorf("expected CheckFail for permission error, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
+	// given: mock commands succeed
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	repoRoot := t.TempDir()
+	gateDir := filepath.Join(repoRoot, ".gate")
+	initGateDirForTest(t, gateDir)
+
+	exec.Command("git", "init", repoRoot).Run()
+	exec.Command("git", "-C", repoRoot, "commit", "--allow-empty", "-m", "init").Run()
+
+	// Write 3 check.completed events: 2 clean, 1 with drift
+	eventsDir := filepath.Join(gateDir, "events")
+	today := time.Now().UTC().Format("2006-01-02")
+
+	cleanData, _ := json.Marshal(amadeus.CheckCompletedData{
+		Result: amadeus.CheckResult{DMails: nil},
+	})
+	driftData, _ := json.Marshal(amadeus.CheckCompletedData{
+		Result: amadeus.CheckResult{DMails: []string{"feedback-001"}},
+	})
+	now := time.Now().UTC().Format(time.RFC3339)
+	lines := []string{
+		`{"id":"e1","type":"check.completed","timestamp":"` + now + `","data":` + string(cleanData) + `}`,
+		`{"id":"e2","type":"check.completed","timestamp":"` + now + `","data":` + string(cleanData) + `}`,
+		`{"id":"e3","type":"check.completed","timestamp":"` + now + `","data":` + string(driftData) + `}`,
+	}
+	eventContent := strings.Join(lines, "\n") + "\n"
+	os.WriteFile(filepath.Join(eventsDir, today+".jsonl"), []byte(eventContent), 0o644)
+
+	ctx := context.Background()
+	configPath := filepath.Join(gateDir, "config.yaml")
+
+	// when
+	results := runDoctor(ctx, configPath, repoRoot)
+
+	// then: success-rate check should be present
+	var found bool
+	for _, r := range results {
+		if r.Name == "success-rate" {
+			found = true
+			if r.Status != CheckOK {
+				t.Errorf("expected CheckOK, got %v", r.Status)
+			}
+			if !strings.Contains(r.Message, "66.7%") || !strings.Contains(r.Message, "(2/3)") {
+				t.Errorf("unexpected message: %s", r.Message)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected success-rate check in results")
 	}
 }
