@@ -58,6 +58,10 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 		db.Close()
 		return nil, err
 	}
+	if err := os.Chmod(dbPath, 0o600); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("outbox store: chmod db: %w", err)
+	}
 	return &SQLiteOutboxStore{
 		db:         db,
 		archiveDir: archiveDir,
@@ -65,11 +69,16 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 	}, nil
 }
 
+// maxRetryCount is the maximum number of flush attempts per item. Items
+// that exceed this limit are treated as dead-letter and skipped.
+const maxRetryCount = 3
+
 func createOutboxSchema(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS staged (
-		name    TEXT PRIMARY KEY,
-		data    BLOB    NOT NULL,
-		flushed INTEGER NOT NULL DEFAULT 0
+		name        TEXT PRIMARY KEY,
+		data        BLOB    NOT NULL,
+		flushed     INTEGER NOT NULL DEFAULT 0,
+		retry_count INTEGER NOT NULL DEFAULT 0
 	)`)
 	if err != nil {
 		return fmt.Errorf("outbox store: create schema: %w", err)
@@ -113,7 +122,8 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 		}
 	}()
 
-	rows, err := conn.QueryContext(ctx, `SELECT name, data FROM staged WHERE flushed = 0`)
+	rows, err := conn.QueryContext(ctx,
+		`SELECT name, data FROM staged WHERE flushed = 0 AND retry_count < ?`, maxRetryCount)
 	if err != nil {
 		return 0, fmt.Errorf("outbox store: query staged: %w", err)
 	}
@@ -141,28 +151,31 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 		return 0, nil
 	}
 
+	flushed := 0
 	for _, it := range items {
 		archivePath := filepath.Join(s.archiveDir, it.name)
-		if err := atomicWrite(archivePath, it.data); err != nil {
-			return 0, fmt.Errorf("outbox store: atomic write archive %s: %w", it.name, err)
+		if writeErr := atomicWrite(archivePath, it.data); writeErr != nil {
+			conn.ExecContext(ctx, //nolint:errcheck
+				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
+			continue
 		}
 		outboxPath := filepath.Join(s.outboxDir, it.name)
-		if err := atomicWrite(outboxPath, it.data); err != nil {
-			return 0, fmt.Errorf("outbox store: atomic write outbox %s: %w", it.name, err)
+		if writeErr := atomicWrite(outboxPath, it.data); writeErr != nil {
+			conn.ExecContext(ctx, //nolint:errcheck
+				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
+			continue
 		}
-	}
-
-	for _, it := range items {
 		if _, err := conn.ExecContext(ctx, `UPDATE staged SET flushed = 1 WHERE name = ?`, it.name); err != nil {
 			return 0, fmt.Errorf("outbox store: mark flushed %s: %w", it.name, err)
 		}
+		flushed++
 	}
 
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
-	return len(items), nil
+	return flushed, nil
 }
 
 // Close closes the underlying database connection.

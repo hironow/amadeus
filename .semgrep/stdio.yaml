@@ -1,0 +1,128 @@
+rules:
+  # ==========================================================================
+  # ADR 0002: stdio convention enforcement
+  # stdout = machine-readable data only, stderr = human-readable messages
+  # Session / eventsource / domain layers must never write to stdio directly.
+  # Only the cmd layer (cobra handlers) may access stdio via cobra abstractions.
+  # Ref: docs/adr/0002-stdio-convention.md
+  # ==========================================================================
+
+  # --- Rule 1: fmt.Print* in session layer ---
+  # session layer should write through injected io.Writer, never to stdout.
+  - id: adr0002-no-fmt-print-in-session
+    languages: [go]
+    message: |
+      session 層で fmt.Print/Println/Printf を直接呼ばないでください。
+      stdout にデータが混入し、パイプやリダイレクトで後続処理が壊れます。
+      ログは注入された logger を使用し、データ出力は io.Writer 引数を介してください。
+      Ref: docs/adr/0002-stdio-convention.md
+    severity: ERROR
+    pattern-either:
+      - pattern: fmt.Print(...)
+      - pattern: fmt.Println(...)
+      - pattern: fmt.Printf(...)
+    paths:
+      include:
+        - "/internal/session/**/*.go"
+      exclude:
+        - "*_test.go"
+
+  # --- Rule 2: fmt.Print* in eventsource layer ---
+  - id: adr0002-no-fmt-print-in-eventsource
+    languages: [go]
+    message: |
+      eventsource 層で fmt.Print/Println/Printf を直接呼ばないでください。
+      eventsource はデータ永続化層であり、stdout/stderr への出力は不適切です。
+      Ref: docs/adr/0002-stdio-convention.md
+    severity: ERROR
+    pattern-either:
+      - pattern: fmt.Print(...)
+      - pattern: fmt.Println(...)
+      - pattern: fmt.Printf(...)
+    paths:
+      include:
+        - "/internal/eventsource/**/*.go"
+      exclude:
+        - "*_test.go"
+
+  # --- Rule 3: os.Stdout in non-cmd layers ---
+  # Only cmd layer may access os.Stdout (via cmd.OutOrStdout()).
+  - id: adr0002-no-os-stdout-in-internal
+    languages: [go]
+    message: |
+      cmd 層以外で os.Stdout を参照しないでください。
+      session / eventsource 層は stdout にアクセスすべきではありません。
+      データ出力が必要な場合は io.Writer を引数として受け取ってください。
+      Ref: docs/adr/0002-stdio-convention.md
+    severity: ERROR
+    pattern: os.Stdout
+    paths:
+      include:
+        - "/internal/session/**/*.go"
+        - "/internal/eventsource/**/*.go"
+        - "/internal/domain/**/*.go"
+      exclude:
+        - "*_test.go"
+
+  # --- Rule 4: os.Stderr in non-cmd layers ---
+  # Logging should go through injected logger, not direct os.Stderr.
+  - id: adr0002-no-os-stderr-in-internal
+    languages: [go]
+    message: |
+      cmd 層以外で os.Stderr を直接参照しないでください。
+      ログ出力は注入された logger を通じて行ってください。
+      cmd 層で cmd.ErrOrStderr() から logger を構築し、DI で渡すのが正しいパターンです。
+      Ref: docs/adr/0002-stdio-convention.md
+    severity: ERROR
+    pattern: os.Stderr
+    paths:
+      include:
+        - "/internal/session/**/*.go"
+        - "/internal/eventsource/**/*.go"
+        - "/internal/domain/**/*.go"
+      exclude:
+        - "*_test.go"
+
+  # --- Rule 5: os.Stdin in non-cmd layers ---
+  # Interactive input should come from TTY (/dev/tty or CONIN$), not stdin.
+  # stdin is reserved for piped data input.
+  - id: adr0002-no-os-stdin-in-internal
+    languages: [go]
+    message: |
+      cmd 層以外で os.Stdin を直接参照しないでください。
+      対話入力は /dev/tty (Windows: CONIN$) から読み取るか、
+      cmd.InOrStdin() を cobra 層で呼び出して io.Reader として渡してください。
+      stdin はパイプ入力に予約されています。
+      Ref: docs/adr/0002-stdio-convention.md
+    severity: ERROR
+    pattern: os.Stdin
+    paths:
+      include:
+        - "/internal/session/**/*.go"
+        - "/internal/eventsource/**/*.go"
+        - "/internal/domain/**/*.go"
+      exclude:
+        - "*_test.go"
+
+  # --- Rule 6: fmt.Print* in root package ---
+  # Root package contains types, constants, pure functions.
+  # No side effects (including stdio) allowed.
+  - id: adr0002-no-fmt-print-in-root
+    languages: [go]
+    message: |
+      root パッケージで fmt.Print/Println/Printf を直接呼ばないでください。
+      root パッケージは types, constants, pure functions のみを含みます。
+      副作用（stdout への出力を含む）は session 層以上で実行してください。
+      Ref: docs/adr/0002-stdio-convention.md
+    severity: ERROR
+    pattern-either:
+      - pattern: fmt.Print(...)
+      - pattern: fmt.Println(...)
+      - pattern: fmt.Printf(...)
+    paths:
+      include:
+        - "/*.go"
+      exclude:
+        - "/internal/**/*.go"
+        - "/cmd/**/*.go"
+        - "*_test.go"

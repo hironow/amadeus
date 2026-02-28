@@ -97,6 +97,8 @@ func newCheckCommand() *cobra.Command {
 				notifier = &amadeus.NopNotifier{}
 			}
 
+			reviewCmd, _ := cmd.Flags().GetString("review-cmd")
+
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
@@ -108,6 +110,7 @@ func newCheckCommand() *cobra.Command {
 				DataOut:   cmd.OutOrStdout(),
 				Approver:  approver,
 				Notifier:  notifier,
+				ReviewCmd: reviewCmd,
 			}
 
 			return a.RunCheck(cmd.Context(), session.CheckOptions{
@@ -126,6 +129,7 @@ func newCheckCommand() *cobra.Command {
 	cmd.Flags().Bool("auto-approve", false, "skip approval gate")
 	cmd.Flags().String("approve-cmd", "", "external command for approval ({message} placeholder)")
 	cmd.Flags().String("notify-cmd", "", "external command for notifications ({title} and {message} placeholders)")
+	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
 
 	return cmd
 }

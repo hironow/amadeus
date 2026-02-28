@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"os"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -42,14 +43,41 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 		),
 	)
 
-	tp := sdktrace.NewTracerProvider(
+	opts := []sdktrace.TracerProviderOption{
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(res),
-	)
+	}
+
+	for _, ep := range parseExtraEndpoints(os.Getenv("OTEL_EXPORTER_OTLP_EXTRA_ENDPOINTS")) {
+		extra, extraErr := otlptracehttp.New(context.Background(),
+			otlptracehttp.WithEndpoint(ep),
+			otlptracehttp.WithInsecure(),
+		)
+		if extraErr == nil {
+			opts = append(opts, sdktrace.WithBatcher(extra))
+		}
+	}
+
+	tp := sdktrace.NewTracerProvider(opts...)
 	otel.SetTracerProvider(tp)
 	amadeus.Tracer = tp.Tracer(serviceName)
 
 	return func(ctx context.Context) error {
 		return tp.Shutdown(ctx)
 	}
+}
+
+// parseExtraEndpoints splits a comma-separated list of OTLP endpoints.
+func parseExtraEndpoints(envVal string) []string {
+	if envVal == "" {
+		return nil
+	}
+	var endpoints []string
+	for _, ep := range strings.Split(envVal, ",") {
+		ep = strings.TrimSpace(ep)
+		if ep != "" {
+			endpoints = append(endpoints, ep)
+		}
+	}
+	return endpoints
 }

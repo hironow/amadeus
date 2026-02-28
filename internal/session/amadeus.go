@@ -27,6 +27,7 @@ type Amadeus struct {
 	DataOut       io.Writer            // machine-readable output (stdout); Logger is for human progress (stderr)
 	Approver      amadeus.Approver     // nil = no gate (auto-approve)
 	Notifier      amadeus.Notifier     // nil = no notifications
+	ReviewCmd     string               // code review command (empty = skip)
 	CheckCount    int                  // number of diff checks since last full check
 	ForceFullNext bool                 // set when a divergence jump defers a full scan to the next run
 }
@@ -513,6 +514,16 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		a.PrintCheckOutputQuiet(result, dmails, previous.Divergence)
 	} else {
 		a.PrintCheckOutput(result, dmails, previous.Divergence)
+	}
+
+	// Review Gate: run code review if configured
+	if a.ReviewCmd != "" {
+		passed, revErr := RunReviewGate(ctx, a.ReviewCmd, a.RepoDir, 300, a.Logger)
+		if revErr != nil {
+			a.Logger.Warn("Review gate error: %v", revErr)
+		} else if !passed {
+			a.Logger.Warn("Review gate: not resolved after %d cycles", maxReviewGateCycles)
+		}
 	}
 
 	if len(dmails) > 0 {

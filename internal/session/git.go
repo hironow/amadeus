@@ -30,27 +30,47 @@ func (g *GitClient) CurrentCommit() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
-var prMergePattern = regexp.MustCompile(`Merge pull request #(\d+)`)
+var (
+	// Standard merge commit: "Merge pull request #42 from user/branch"
+	prMergePattern = regexp.MustCompile(`Merge pull request #(\d+)`)
+	// Squash merge: "feat: add something (#123)"
+	prSquashPattern = regexp.MustCompile(`\(#(\d+)\)`)
+)
+
+// parseMergedPRs extracts PR numbers from git log output.
+// It detects both standard merge commits and squash merges,
+// deduplicating when a single line matches both patterns.
+func parseMergedPRs(log string) []amadeus.MergedPR {
+	trimmed := strings.TrimSpace(log)
+	if trimmed == "" {
+		return nil
+	}
+	var prs []amadeus.MergedPR
+	for _, line := range strings.Split(trimmed, "\n") {
+		seen := make(map[string]bool)
+		// Try standard merge commit pattern first
+		if m := prMergePattern.FindStringSubmatch(line); len(m) >= 2 {
+			num := "#" + m[1]
+			seen[num] = true
+			prs = append(prs, amadeus.MergedPR{Number: num, Title: line})
+		}
+		// Try squash merge pattern
+		if m := prSquashPattern.FindStringSubmatch(line); len(m) >= 2 {
+			num := "#" + m[1]
+			if !seen[num] {
+				prs = append(prs, amadeus.MergedPR{Number: num, Title: line})
+			}
+		}
+	}
+	return prs
+}
 
 func (g *GitClient) MergedPRsSince(since string) ([]amadeus.MergedPR, error) {
-	out, err := g.run("log", fmt.Sprintf("%s..HEAD", since), "--oneline", "--grep=Merge pull request")
+	out, err := g.run("log", "--first-parent", fmt.Sprintf("%s..HEAD", since), "--oneline")
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(out) == "" {
-		return nil, nil
-	}
-	var prs []amadeus.MergedPR
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		matches := prMergePattern.FindStringSubmatch(line)
-		if len(matches) >= 2 {
-			prs = append(prs, amadeus.MergedPR{
-				Number: "#" + matches[1],
-				Title:  line,
-			})
-		}
-	}
-	return prs, nil
+	return parseMergedPRs(out), nil
 }
 
 func (g *GitClient) DiffSince(since string) (string, error) {

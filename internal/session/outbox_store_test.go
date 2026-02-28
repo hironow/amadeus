@@ -267,6 +267,115 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	}
 }
 
+func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
+	if os.Getenv("CI") != "" && strings.Contains(strings.ToLower(os.Getenv("RUNNER_OS")), "windows") {
+		t.Skip("NTFS does not support Unix file permissions")
+	}
+
+	// given
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+	store := testOutboxStore(t, root)
+	_ = store
+
+	// when
+	dbPath := filepath.Join(root, ".run", "outbox.db")
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		t.Fatalf("stat db: %v", err)
+	}
+
+	// then: permission should be 0o600 (owner read/write only)
+	perm := info.Mode().Perm()
+	if perm != 0o600 {
+		t.Errorf("db permission: got %o, want %o", perm, 0o600)
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
+	// given
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+
+	dbPath := filepath.Join(root, ".run", "outbox.db")
+	archiveDir := filepath.Join(root, "archive")
+	outboxDir := filepath.Join(root, "outbox")
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	store.Stage("fail.md", []byte("data"))
+
+	// Make archive dir read-only so atomicWrite fails
+	os.Chmod(archiveDir, 0o444)
+	defer os.Chmod(archiveDir, 0o755)
+
+	// when: flush 3 times (each fails, incrementing retry_count to 3)
+	for i := range 3 {
+		n, _ := store.Flush()
+		if n != 0 {
+			t.Errorf("flush %d: expected 0 flushed, got %d", i+1, n)
+		}
+	}
+
+	// Restore permissions
+	os.Chmod(archiveDir, 0o755)
+
+	// when: flush again — item should be dead-letter
+	n, err := store.Flush()
+	if err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 flushed (dead-letter), got %d", n)
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+
+	dbPath := filepath.Join(root, ".run", "outbox.db")
+	archiveDir := filepath.Join(root, "archive")
+	outboxDir := filepath.Join(root, "outbox")
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	store.Stage("retry.md", []byte("retry-data"))
+
+	// First flush fails
+	os.Chmod(archiveDir, 0o444)
+	n, _ := store.Flush()
+	if n != 0 {
+		t.Errorf("first flush: expected 0, got %d", n)
+	}
+
+	// Restore — second flush succeeds
+	os.Chmod(archiveDir, 0o755)
+	n, err = store.Flush()
+	if err != nil {
+		t.Fatalf("second Flush: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("second flush: expected 1, got %d", n)
+	}
+
+	data, err := os.ReadFile(filepath.Join(archiveDir, "retry.md"))
+	if err != nil {
+		t.Fatalf("read archive: %v", err)
+	}
+	if string(data) != "retry-data" {
+		t.Errorf("content: got %q, want %q", string(data), "retry-data")
+	}
+}
+
 func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
