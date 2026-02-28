@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -36,19 +38,9 @@ func newRebuildCommand() *cobra.Command {
 
 			projector := &session.Projector{Store: store, OutboxStore: outboxStore}
 
-			events, err := eventStore.LoadAll()
-			if err != nil {
-				return fmt.Errorf("load events: %w", err)
-			}
-
-			logger.Info("rebuilding projections from %d event(s)", len(events))
-
-			if err := projector.Rebuild(events); err != nil {
-				return fmt.Errorf("rebuild: %w", err)
-			}
-
-			logger.Info("rebuild complete")
-			return nil
+			return usecase.Rebuild(amadeus.RebuildCommand{
+				RepoPath: repoRoot,
+			}, eventStore, projector, logger)
 		},
 	}
 

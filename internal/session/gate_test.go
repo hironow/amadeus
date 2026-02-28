@@ -149,13 +149,14 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
 
-	return &session.Amadeus{
-		Config: amadeus.Config{
-			Lang: "en",
-			FullCheck: amadeus.FullCheckConfig{
-				Interval: 10,
-			},
+	cfg := amadeus.Config{
+		Lang: "en",
+		FullCheck: amadeus.FullCheckConfig{
+			Interval: 10,
 		},
+	}
+	return &session.Amadeus{
+		Config: cfg,
 		Store: &fakeStateReader{
 			latest: amadeus.CheckResult{
 				CheckedAt:  time.Now().Add(-1 * time.Hour),
@@ -171,11 +172,12 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 			prs:    []amadeus.MergedPR{{Number: "#1", Title: "test PR"}},
 			diff:   "diff --git a/file.go b/file.go\n--- a/file.go\n+++ b/file.go\n@@ -1 +1 @@\n-old\n+new",
 		},
-		Claude:   &fakeClaude{response: claudeResponseWithDrift()},
-		RepoDir:  root,
-		Logger:   amadeus.NewLogger(io.Discard, false),
-		Approver: approver,
-		Notifier: notifier,
+		Claude:    &fakeClaude{response: claudeResponseWithDrift()},
+		RepoDir:   root,
+		Logger:    amadeus.NewLogger(io.Discard, false),
+		Approver:  approver,
+		Notifier:  notifier,
+		Aggregate: amadeus.NewCheckAggregate(cfg),
 	}
 }
 
@@ -187,7 +189,7 @@ func TestRunCheck_GateApproved_GeneratesDMails(t *testing.T) {
 	a := newGateTestAmadeus(t, &amadeus.AutoApprover{}, notifier)
 
 	// when
-	err := a.RunCheck(context.Background(), session.CheckOptions{})
+	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
 
 	// then: should return DriftError (dmails generated)
 	var driftErr *amadeus.DriftError
@@ -212,7 +214,7 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 	a.Projector = projector
 
 	// when
-	err := a.RunCheck(context.Background(), session.CheckOptions{})
+	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
 
 	// then: should return nil (no DriftError — D-Mails skipped)
 	if err != nil {
@@ -250,7 +252,7 @@ func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 	a := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &amadeus.NopNotifier{})
 
 	// when
-	err := a.RunCheck(context.Background(), session.CheckOptions{})
+	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
 
 	// then: should fail closed (return the error)
 	if err == nil {
@@ -269,7 +271,7 @@ func TestRunCheck_NilApprover_AutoApproves(t *testing.T) {
 	a := newGateTestAmadeus(t, nil, &amadeus.NopNotifier{})
 
 	// when
-	err := a.RunCheck(context.Background(), session.CheckOptions{})
+	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
 
 	// then: should return DriftError (dmails generated, gate skipped)
 	var driftErr *amadeus.DriftError

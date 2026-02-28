@@ -16,20 +16,20 @@ import (
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
-	Config        amadeus.Config
-	Store         amadeus.StateReader
-	Events        amadeus.EventStore   // nil skips event persistence (Projector still required for writes)
-	Projector     amadeus.EventApplier // nil skips projection updates (Events still required for writes)
-	Git           amadeus.Git
-	RepoDir       string               // repository root directory
-	Claude        amadeus.ClaudeRunner // nil falls back to the default Claude runner
-	Logger        *amadeus.Logger
-	DataOut       io.Writer            // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver      amadeus.Approver     // nil = no gate (auto-approve)
-	Notifier      amadeus.Notifier     // nil = no notifications
-	ReviewCmd     string               // code review command (empty = skip)
-	CheckCount    int                  // number of diff checks since last full check
-	ForceFullNext bool                 // set when a divergence jump defers a full scan to the next run
+	Config    amadeus.Config
+	Store     amadeus.StateReader
+	Events    amadeus.EventStore   // nil skips event persistence (Projector still required for writes)
+	Projector amadeus.EventApplier // nil skips projection updates (Events still required for writes)
+	Git       amadeus.Git
+	RepoDir   string               // repository root directory
+	Claude    amadeus.ClaudeRunner // nil falls back to the default Claude runner
+	Logger    *amadeus.Logger
+	DataOut   io.Writer            // machine-readable output (stdout); Logger is for human progress (stderr)
+	Approver  amadeus.Approver     // nil = no gate (auto-approve)
+	Notifier  amadeus.Notifier     // nil = no notifications
+	ReviewCmd  string               // code review command (empty = skip)
+	Aggregate  *amadeus.CheckAggregate  // domain logic aggregate (injected by usecase layer)
+	Dispatcher amadeus.EventDispatcher  // policy dispatch (injected by usecase layer; nil = no dispatch)
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
@@ -56,6 +56,16 @@ func (a *Amadeus) emit(events ...amadeus.Event) error {
 		for _, ev := range events {
 			if err := a.Projector.Apply(ev); err != nil {
 				return fmt.Errorf("apply event %s: %w", ev.Type, err)
+			}
+		}
+	}
+	// Dispatch events to policy handlers (best-effort: log and continue on error)
+	if a.Dispatcher != nil {
+		for _, ev := range events {
+			if err := a.Dispatcher.Dispatch(context.Background(), ev); err != nil {
+				if a.Logger != nil {
+					a.Logger.Warn("policy dispatch %s: %v", ev.Type, err)
+				}
 			}
 		}
 	}
@@ -102,31 +112,13 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	return nil
 }
 
-// CheckOptions controls how RunCheck operates.
-type CheckOptions struct {
-	Full   bool
-	DryRun bool
-	Quiet  bool
-	JSON   bool
-}
-
-// ShouldFullCheck determines whether the next check should be a full scan.
-// Returns true if forceFlag is set or the check count since last full check
-// has reached the configured interval.
-func (a *Amadeus) ShouldFullCheck(forceFlag bool) bool {
-	if forceFlag || a.ForceFullNext {
-		return true
-	}
-	return a.CheckCount >= a.Config.FullCheck.Interval
-}
-
 // RunCheck executes the five-phase divergence check pipeline:
 //   - Phase 0: Inbox consumption (scan inbound D-Mails)
 //   - Phase 1: ReadingSteiner detects shifts (diff or full scan)
 //   - Phase 2: Claude evaluates divergence, DivergenceMeter scores it
 //   - Phase 3: D-Mail generation and routing
 //   - Phase 4: World Line Convergence detection
-func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
+func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error {
 	ctx, span := amadeus.Tracer.Start(ctx, "amadeus.check",
 		trace.WithAttributes(
 			attribute.Bool("check.dry_run", opts.DryRun),
@@ -146,9 +138,8 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		return fmt.Errorf("load previous state: %w", err)
 	}
 
-	// Restore persisted state
-	a.CheckCount = previous.CheckCountSinceFull
-	a.ForceFullNext = previous.ForceFullNext
+	// Restore aggregate from persisted state (usecase layer sets up Aggregate)
+	a.Aggregate.Restore(previous)
 
 	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state)
 	if !opts.DryRun {
@@ -180,12 +171,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		}
 	}
 
-	fullCheck := a.ShouldFullCheck(opts.Full)
-	if a.ForceFullNext {
+	fullCheck := a.Aggregate.ShouldFullCheck(opts.Full)
+	if a.Aggregate.ForceFullNext() {
 		if !opts.Quiet {
 			a.Logger.Info("Full scan triggered by previous divergence jump")
 		}
-		a.ForceFullNext = false // consumed
+		a.Aggregate.SetForceFullNext(false) // consumed
 	}
 
 	rs := &ReadingSteiner{Git: a.Git}
@@ -231,9 +222,21 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		if err != nil {
 			return fmt.Errorf("get current commit: %w", err)
 		}
-		a.AdvanceCheckCount(fullCheck)
-		if err := a.SaveCheckState(currentCommit, previous, time.Now().UTC()); err != nil {
-			return fmt.Errorf("save check state: %w", err)
+		a.Aggregate.AdvanceCheckCount(fullCheck)
+		now := time.Now().UTC()
+		noShiftResult := previous
+		noShiftResult.Commit = currentCommit
+		noShiftResult.CheckedAt = now
+		noShiftResult.Type = amadeus.CheckTypeDiff
+		noShiftResult.PRsEvaluated = nil
+		noShiftResult.DMails = nil
+		noShiftResult.ConvergenceAlerts = nil
+		events, evErr := a.Aggregate.RecordCheck(noShiftResult, now)
+		if evErr != nil {
+			return fmt.Errorf("record check (no shift): %w", evErr)
+		}
+		if err := a.emit(events...); err != nil {
+			return fmt.Errorf("emit check (no shift): %w", err)
 		}
 		if opts.JSON {
 			if err := a.PrintCheckOutputJSON(previous, nil, previous.Divergence); err != nil {
@@ -333,7 +336,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 	))
 
 	// Defer full scan to next run on large divergence jump
-	if !fullCheck && a.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
+	if !fullCheck && a.Aggregate.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
 		span2.AddEvent("divergence.jump", trace.WithAttributes(
 			attribute.Float64("divergence.previous", previous.Divergence),
 			attribute.Float64("divergence.current", meterResult.Divergence.Value),
@@ -342,8 +345,16 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 			a.Logger.Info("Divergence jump detected (%.2f -> %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
-		if err := a.FlagForceFullNext(previous.Divergence, meterResult.Divergence.Value); err != nil {
-			return fmt.Errorf("flag force full next: %w", err)
+		a.Aggregate.SetForceFullNext(true)
+		ev, evErr := amadeus.NewEvent(amadeus.EventForceFullNextSet, amadeus.ForceFullNextSetData{
+			PreviousDivergence: previous.Divergence,
+			CurrentDivergence:  meterResult.Divergence.Value,
+		}, time.Now().UTC())
+		if evErr != nil {
+			return fmt.Errorf("create force_full_next event: %w", evErr)
+		}
+		if err := a.emit(ev); err != nil {
+			return fmt.Errorf("emit force_full_next: %w", err)
 		}
 	}
 	span2.End()
@@ -368,29 +379,25 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 
 	if !gateApproved {
 		// Emit check.completed event to maintain ES invariant.
-		// State persistence is handled by the projector (SaveLatest) when event is emitted.
-		a.AdvanceCheckCount(fullCheck)
+		a.Aggregate.AdvanceCheckCount(fullCheck)
 		checkType := amadeus.CheckTypeDiff
 		if fullCheck {
 			checkType = amadeus.CheckTypeFull
 		}
-		result := amadeus.CheckResult{
-			CheckedAt:           now,
-			Commit:              currentCommit,
-			Type:                checkType,
-			Divergence:          meterResult.Divergence.Value,
-			Axes:                meterResult.Divergence.Axes,
-			GateDenied:          true,
-			CheckCountSinceFull: a.CheckCount,
-			ForceFullNext:       a.ForceFullNext,
+		gateDeniedResult := amadeus.CheckResult{
+			CheckedAt:  now,
+			Commit:     currentCommit,
+			Type:       checkType,
+			Divergence: meterResult.Divergence.Value,
+			Axes:       meterResult.Divergence.Axes,
+			GateDenied: true,
 		}
-		checkEv, evErr := amadeus.NewEvent(amadeus.EventCheckCompleted,
-			amadeus.CheckCompletedData{Result: result}, now)
+		events, evErr := a.Aggregate.RecordCheck(gateDeniedResult, now)
 		if evErr != nil {
-			return fmt.Errorf("create check event (gate denied): %w", evErr)
+			return fmt.Errorf("record check (gate denied): %w", evErr)
 		}
-		if err := a.emit(checkEv); err != nil {
-			return fmt.Errorf("emit check event (gate denied): %w", err)
+		if err := a.emit(events...); err != nil {
+			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
 		if !opts.Quiet {
 			a.Logger.Info("Gate denied — D-Mail generation skipped")
@@ -467,43 +474,30 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts CheckOptions) error {
 		dmailNames = append(dmailNames, d.Name)
 	}
 
-	a.AdvanceCheckCount(fullCheck)
+	a.Aggregate.AdvanceCheckCount(fullCheck)
 	checkType := amadeus.CheckTypeDiff
 	if fullCheck {
 		checkType = amadeus.CheckTypeFull
 	}
 
 	result := amadeus.CheckResult{
-		CheckedAt:           now,
-		Commit:              currentCommit,
-		Type:                checkType,
-		Divergence:          meterResult.Divergence.Value,
-		Axes:                meterResult.Divergence.Axes,
-		ImpactRadius:        meterResult.ImpactRadius,
-		PRsEvaluated:        prNumbers,
-		DMails:              dmailNames,
-		ConvergenceAlerts:   convergenceAlerts,
-		CheckCountSinceFull: a.CheckCount,
-		ForceFullNext:       a.ForceFullNext,
+		CheckedAt:         now,
+		Commit:            currentCommit,
+		Type:              checkType,
+		Divergence:        meterResult.Divergence.Value,
+		Axes:              meterResult.Divergence.Axes,
+		ImpactRadius:      meterResult.ImpactRadius,
+		PRsEvaluated:      prNumbers,
+		DMails:            dmailNames,
+		ConvergenceAlerts: convergenceAlerts,
 	}
 
-	checkEv, evErr := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{Result: result}, now)
+	checkEvents, evErr := a.Aggregate.RecordCheck(result, now)
 	if evErr != nil {
-		return fmt.Errorf("create check event: %w", evErr)
+		return fmt.Errorf("record check: %w", evErr)
 	}
-	if err := a.emit(checkEv); err != nil {
+	if err := a.emit(checkEvents...); err != nil {
 		return fmt.Errorf("emit check completed: %w", err)
-	}
-	if fullCheck {
-		baselineEv, bErr := amadeus.NewEvent(amadeus.EventBaselineUpdated, amadeus.BaselineUpdatedData{
-			Commit: currentCommit, Divergence: result.Divergence,
-		}, now)
-		if bErr != nil {
-			return fmt.Errorf("create baseline event: %w", bErr)
-		}
-		if err := a.emit(baselineEv); err != nil {
-			return fmt.Errorf("emit baseline updated: %w", err)
-		}
 	}
 
 	if opts.JSON {
@@ -674,61 +668,6 @@ func (a *Amadeus) PrintCheckOutputQuiet(result amadeus.CheckResult, dmails []ama
 		len(dmails),
 		dmailLabel,
 		convergenceStr)
-}
-
-// ShouldPromoteToFull returns true when the absolute divergence change between
-// the previous and current values exceeds the configured on_divergence_jump threshold.
-// Both increases and decreases trigger recalibration.
-func (a *Amadeus) ShouldPromoteToFull(previousDivergence, currentDivergence float64) bool {
-	delta := currentDivergence - previousDivergence
-	if delta < 0 {
-		delta = -delta
-	}
-	return delta >= a.Config.FullCheck.OnDivergenceJump
-}
-
-// AdvanceCheckCount updates the internal check counter.
-// If fullCheck is true, the counter resets to 0; otherwise it increments by 1.
-func (a *Amadeus) AdvanceCheckCount(fullCheck bool) {
-	if fullCheck {
-		a.CheckCount = 0
-	} else {
-		a.CheckCount++
-	}
-}
-
-// FlagForceFullNext marks that the next check should be a full scan.
-// Called when a divergence jump is detected, deferring recalibration to the next run.
-func (a *Amadeus) FlagForceFullNext(previousDivergence, currentDivergence float64) error {
-	a.ForceFullNext = true
-	ev, err := amadeus.NewEvent(amadeus.EventForceFullNextSet, amadeus.ForceFullNextSetData{
-		PreviousDivergence: previousDivergence,
-		CurrentDivergence:  currentDivergence,
-	}, time.Now().UTC())
-	if err != nil {
-		return fmt.Errorf("create force_full_next event: %w", err)
-	}
-	return a.emit(ev)
-}
-
-// SaveCheckState persists an updated CheckResult preserving prior divergence data.
-// Emits a check.completed event so every check run is recorded in the event store.
-// Used on the early-return path when no significant shift is detected,
-// and also to persist ForceFullNext when a divergence jump defers a full scan.
-func (a *Amadeus) SaveCheckState(commit string, previous amadeus.CheckResult, checkedAt time.Time) error {
-	previous.Commit = commit
-	previous.CheckedAt = checkedAt
-	previous.Type = amadeus.CheckTypeDiff
-	previous.PRsEvaluated = nil
-	previous.DMails = nil
-	previous.ConvergenceAlerts = nil
-	previous.CheckCountSinceFull = a.CheckCount
-	previous.ForceFullNext = a.ForceFullNext
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{Result: previous}, checkedAt)
-	if err != nil {
-		return fmt.Errorf("create check event: %w", err)
-	}
-	return a.emit(ev)
 }
 
 // loadCheckHistory returns CheckResults extracted from the event store.

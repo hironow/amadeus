@@ -7,6 +7,7 @@ import (
 
 	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -113,12 +114,15 @@ func newCheckCommand() *cobra.Command {
 				ReviewCmd: reviewCmd,
 			}
 
-			return a.RunCheck(cmd.Context(), session.CheckOptions{
+			// COMMAND → usecase → Aggregate → EVENT
+			return usecase.RunCheck(cmd.Context(), amadeus.ExecuteCheckCommand{
+				RepoPath: repoRoot,
+			}, amadeus.CheckOptions{
 				Full:   full,
 				DryRun: dryRun,
 				Quiet:  quiet,
 				JSON:   jsonOut,
-			})
+			}, a)
 		},
 	}
 

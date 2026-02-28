@@ -1,0 +1,48 @@
+package usecase
+
+import (
+	"context"
+	"fmt"
+
+	amadeus "github.com/hironow/amadeus"
+)
+
+// PolicyHandler processes a domain event as part of a policy reaction.
+// WHEN [EVENT] THEN [handler logic].
+type PolicyHandler func(ctx context.Context, event amadeus.Event) error
+
+// PolicyEngine dispatches domain events to registered policy handlers.
+// This connects the POLICY registry (amadeus.Policies) to executable handlers.
+type PolicyEngine struct {
+	handlers map[amadeus.EventType][]PolicyHandler
+	logger   *amadeus.Logger
+}
+
+// NewPolicyEngine creates a PolicyEngine. Pass nil logger for silent operation.
+func NewPolicyEngine(logger *amadeus.Logger) *PolicyEngine {
+	return &PolicyEngine{
+		handlers: make(map[amadeus.EventType][]PolicyHandler),
+		logger:   logger,
+	}
+}
+
+// Register adds a handler for the given event type.
+// Multiple handlers can be registered for the same event type.
+func (e *PolicyEngine) Register(trigger amadeus.EventType, handler PolicyHandler) {
+	e.handlers[trigger] = append(e.handlers[trigger], handler)
+}
+
+// Dispatch sends an event to all handlers registered for its type.
+// Handlers execute sequentially; the first error stops dispatch.
+func (e *PolicyEngine) Dispatch(ctx context.Context, event amadeus.Event) error {
+	handlers, ok := e.handlers[event.Type]
+	if !ok {
+		return nil
+	}
+	for _, h := range handlers {
+		if err := h(ctx, event); err != nil {
+			return fmt.Errorf("policy dispatch %s: %w", event.Type, err)
+		}
+	}
+	return nil
+}

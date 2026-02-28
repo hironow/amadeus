@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/hironow/amadeus"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -22,36 +21,31 @@ func newArchivePruneCommand() *cobra.Command {
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			yes, _ := cmd.Flags().GetBool("yes")
 
-			if days < 1 {
-				return fmt.Errorf("--days must be >= 1 (got %d)", days)
-			}
-
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
-			archiveDir := filepath.Join(divRoot, "archive")
-			eventsDir := filepath.Join(divRoot, "events")
 
-			maxAge := time.Duration(days) * 24 * time.Hour
+			pruneCmd := amadeus.ArchivePruneCommand{
+				RepoPath: repoRoot,
+				Days:     days,
+				DryRun:   dryRun,
+				Yes:      yes,
+			}
+
+			// COMMAND → usecase (collect candidates)
+			result, err := usecase.CollectPruneCandidates(pruneCmd)
+			if err != nil {
+				return err
+			}
+
+			divRoot := filepath.Join(repoRoot, ".gate")
+			eventsDir := filepath.Join(divRoot, "events")
 			errW := cmd.ErrOrStderr()
 
-			// Collect archive candidates (.md files)
-			archiveCandidates, err := session.FindPruneCandidates(archiveDir, maxAge)
-			if err != nil {
-				return fmt.Errorf("find prune candidates: %w", err)
-			}
-
-			// Collect event file candidates (.jsonl files)
-			eventCandidates, err := session.FindExpiredEventFiles(eventsDir, maxAge)
-			if err != nil {
-				return fmt.Errorf("find expired event files: %w", err)
-			}
-
-			totalFiles := len(archiveCandidates) + len(eventCandidates)
+			totalFiles := len(result.ArchiveCandidates) + len(result.EventCandidates)
 			if totalFiles == 0 {
-				if archiveCandidates == nil && eventCandidates == nil {
+				if result.ArchiveCandidates == nil && result.EventCandidates == nil {
 					fmt.Fprintf(errW, "No prune directories found under %s\n", divRoot)
 				} else {
 					fmt.Fprintf(errW, "No files older than %d days to prune\n", days)
@@ -59,15 +53,15 @@ func newArchivePruneCommand() *cobra.Command {
 				return nil
 			}
 
-			if len(archiveCandidates) > 0 {
+			if len(result.ArchiveCandidates) > 0 {
 				fmt.Fprintf(errW, "Archive files to prune (older than %d days):\n", days)
-				for _, c := range archiveCandidates {
+				for _, c := range result.ArchiveCandidates {
 					fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
 				}
 			}
-			if len(eventCandidates) > 0 {
+			if len(result.EventCandidates) > 0 {
 				fmt.Fprintf(errW, "Event files to prune (older than %d days):\n", days)
-				for _, c := range eventCandidates {
+				for _, c := range result.EventCandidates {
 					fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
 				}
 			}
@@ -94,42 +88,10 @@ func newArchivePruneCommand() *cobra.Command {
 				}
 			}
 
-			totalCount := 0
-			if len(archiveCandidates) > 0 {
-				count, err := session.PruneFiles(archiveCandidates)
-				if err != nil {
-					return fmt.Errorf("prune archive: %w", err)
-				}
-				totalCount += count
-			}
-			if len(eventCandidates) > 0 {
-				count, err := session.PruneEventFiles(eventCandidates)
-				if err != nil {
-					return fmt.Errorf("prune event files: %w", err)
-				}
-				totalCount += count
-			}
-
-			// Emit archive.pruned event (store filenames only for portability).
-			// This MUST succeed: without the event, a future rebuild would replay
-			// historical dmail.generated events and recreate the pruned files.
-			var paths []string
-			for _, c := range archiveCandidates {
-				paths = append(paths, filepath.Base(c.Path))
-			}
-			for _, c := range eventCandidates {
-				paths = append(paths, filepath.Base(c.Path))
-			}
-			eventStore := session.NewEventStoreFromEventsDir(eventsDir)
-			ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
-				Paths: paths,
-				Count: totalCount,
-			}, time.Now().UTC())
-			if evErr != nil {
-				return fmt.Errorf("pruned %d file(s) but failed to create archive.pruned event: %w", totalCount, evErr)
-			}
-			if appendErr := eventStore.Append(ev); appendErr != nil {
-				return fmt.Errorf("pruned %d file(s) but failed to record archive.pruned event: %w", totalCount, appendErr)
+			// usecase → execute prune + emit event
+			totalCount, err := usecase.ExecutePrune(result, eventsDir)
+			if err != nil {
+				return err
 			}
 
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)
