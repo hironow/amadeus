@@ -41,15 +41,18 @@ If amadeus grows beyond ~8,000 lines or introduces a second process (daemon mode
 ## Consequences
 
 ### Positive
+
 - No unnecessary import ceremony for a small codebase
 - All types remain directly accessible without package prefixes
 - Developers can understand the full codebase by reading ~15 files
 - `go:embed` works without workarounds
 
 ### Negative
+
 - File-level conventions are not compiler-enforced (unlike package boundaries)
 - If amadeus grows significantly, the flat structure may become harder to navigate
 
 ### Neutral
+
 - This decision does not preclude future splitting; it merely defers it until the codebase warrants it
 - File-level conventions are documented here and in CLAUDE.md for tooling and human reference

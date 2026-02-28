@@ -16,20 +16,20 @@ import (
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
-	Config    amadeus.Config
-	Store     amadeus.StateReader
-	Events    amadeus.EventStore   // nil skips event persistence (Projector still required for writes)
-	Projector amadeus.EventApplier // nil skips projection updates (Events still required for writes)
-	Git       amadeus.Git
-	RepoDir   string               // repository root directory
-	Claude    amadeus.ClaudeRunner // nil falls back to the default Claude runner
-	Logger    *amadeus.Logger
-	DataOut   io.Writer            // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver  amadeus.Approver     // nil = no gate (auto-approve)
-	Notifier  amadeus.Notifier     // nil = no notifications
-	ReviewCmd  string               // code review command (empty = skip)
-	Aggregate  *amadeus.CheckAggregate  // domain logic aggregate (injected by usecase layer)
-	Dispatcher amadeus.EventDispatcher  // policy dispatch (injected by usecase layer; nil = no dispatch)
+	Config     amadeus.Config
+	Store      amadeus.StateReader
+	Events     amadeus.EventStore   // nil skips event persistence (Projector still required for writes)
+	Projector  amadeus.EventApplier // nil skips projection updates (Events still required for writes)
+	Git        amadeus.Git
+	RepoDir    string               // repository root directory
+	Claude     amadeus.ClaudeRunner // nil falls back to the default Claude runner
+	Logger     *amadeus.Logger
+	DataOut    io.Writer               // machine-readable output (stdout); Logger is for human progress (stderr)
+	Approver   amadeus.Approver        // nil = no gate (auto-approve)
+	Notifier   amadeus.Notifier        // nil = no notifications
+	ReviewCmd  string                  // code review command (empty = skip)
+	Aggregate  *amadeus.CheckAggregate // domain logic aggregate (injected by usecase layer)
+	Dispatcher amadeus.EventDispatcher // policy dispatch (injected by usecase layer; nil = no dispatch)
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
@@ -627,12 +627,12 @@ func (a *Amadeus) PrintCheckOutputJSON(result amadeus.CheckResult, dmails []amad
 		convergenceAlerts = []amadeus.ConvergenceAlert{}
 	}
 	output := struct {
-		Divergence        float64                       `json:"divergence"`
-		Delta             float64                       `json:"delta"`
+		Divergence        float64                            `json:"divergence"`
+		Delta             float64                            `json:"delta"`
 		Axes              map[amadeus.Axis]amadeus.AxisScore `json:"axes"`
-		ImpactRadius      []amadeus.ImpactEntry         `json:"impact_radius"`
-		DMails            []amadeus.DMail               `json:"dmails"`
-		ConvergenceAlerts []amadeus.ConvergenceAlert    `json:"convergence_alerts"`
+		ImpactRadius      []amadeus.ImpactEntry              `json:"impact_radius"`
+		DMails            []amadeus.DMail                    `json:"dmails"`
+		ConvergenceAlerts []amadeus.ConvergenceAlert         `json:"convergence_alerts"`
 	}{
 		Divergence:        result.Divergence,
 		Delta:             result.Divergence - previousDivergence,

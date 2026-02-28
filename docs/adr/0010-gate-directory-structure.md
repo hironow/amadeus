@@ -73,12 +73,14 @@ does not exist, preventing accidental overwrites.
 ## Consequences
 
 ### Positive
+
 - Clear separation between tracked (audit) and ephemeral (runtime) data
 - `archive/` in git provides a complete D-Mail history without external storage
 - Embedded skill templates ensure consistent initial setup across projects
 - Automatic legacy migration handles version upgrades transparently
 
 ### Negative
+
 - `.gate/` directory adds project-level state that some teams may find intrusive
 - Gitignore management adds complexity to `InitGateDir()`
 - Embedded templates increase binary size (marginally)

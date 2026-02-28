@@ -80,16 +80,19 @@ Dependency direction: `internal/cmd` → `internal/session` → `amadeus` (root)
 ## Consequences
 
 ### Positive
+
 - Consistent 2-layer pattern across all four tools
 - Root package safe to import without pulling in I/O dependencies
 - Clear separation of concerns: types vs operations
 - Tests split naturally: pure function tests in root, I/O tests in session
 
 ### Negative
+
 - Large migration effort (~14 structural commits)
 - `internal/cmd` now imports two packages instead of one
 - `logger.go` and `telemetry.go` exceptions break pure types-only rule
 
 ### Neutral
+
 - go:embed files must remain at or below root package directory
 - Split files require careful interface design at boundary

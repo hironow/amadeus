@@ -63,12 +63,14 @@ to stderr ("error:" for code 1, "drift detected:" for code 2).
 ## Consequences
 
 ### Positive
+
 - Incremental checks are fast (diff only); full scans provide periodic calibration
 - Automatic promotion ensures full scans happen when divergence shifts significantly
 - Exit code 2 enables CI gates (`amadeus check || exit $?`) without output parsing
 - Phase 0 inbox consumption enables asynchronous inter-tool communication
 
 ### Negative
+
 - Pipeline complexity increases debugging difficulty for multi-phase failures
 - Full check depends on Claude CLI availability and response quality
 - State persistence across runs requires careful management of `latest.json`

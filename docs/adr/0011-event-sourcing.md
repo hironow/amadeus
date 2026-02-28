@@ -37,6 +37,7 @@ Adopt Event Sourcing with eager projection:
 ## Consequences
 
 ### Positive
+
 - Single source of truth: all state changes are traceable events
 - Full rebuild capability: delete `.run/`, run `amadeus rebuild`, state is restored
 - Auto-rebuild: if projections are missing but events exist, they are rebuilt automatically
@@ -44,10 +45,12 @@ Adopt Event Sourcing with eager projection:
 - Audit trail: the event log captures the complete history of all mutations
 
 ### Negative
+
 - Slightly more disk I/O: events are written in addition to projections (eager projection)
 - Event store grows indefinitely (no compaction implemented yet)
 - All CLI commands now construct EventStore + Projector, adding initialization overhead
 
 ### Neutral
+
 - No package restructuring: Event Sourcing components live in the root `amadeus` package alongside existing code, matching the flat package design
 - `events/` is git-tracked (same policy as the former `history/`), keeping the audit trail in version control

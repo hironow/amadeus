@@ -72,12 +72,14 @@ allowing tests to inject a fake implementation that returns predetermined
 ## Consequences
 
 ### Positive
+
 - Qualitative reasoning capability that static analysis cannot provide
 - Structured JSON contract enables deterministic downstream processing
 - Language-specific prompts support bilingual (ja/en) operation
 - Function variable pattern enables comprehensive unit testing without Claude
 
 ### Negative
+
 - Runtime dependency on Claude CLI binary (must be installed and authenticated)
 - Model output is non-deterministic — same input may produce different scores
 - Prompt quality directly impacts evaluation accuracy

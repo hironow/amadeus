@@ -22,9 +22,9 @@ type fakeGit struct {
 	diff   string
 }
 
-func (g *fakeGit) CurrentCommit() (string, error)                        { return g.commit, nil }
-func (g *fakeGit) MergedPRsSince(_ string) ([]amadeus.MergedPR, error)   { return g.prs, nil }
-func (g *fakeGit) DiffSince(_ string) (string, error)                    { return g.diff, nil }
+func (g *fakeGit) CurrentCommit() (string, error)                      { return g.commit, nil }
+func (g *fakeGit) MergedPRsSince(_ string) ([]amadeus.MergedPR, error) { return g.prs, nil }
+func (g *fakeGit) DiffSince(_ string) (string, error)                  { return g.diff, nil }
 
 type fakeClaude struct {
 	response string

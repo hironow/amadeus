@@ -35,10 +35,12 @@ an unexported `loadConfig` function.
 ## Consequences
 
 ### Positive
+
 - Root `config.go` becomes genuinely types-only, closing the ADR 0014 gap
 - `loadConfig` is unexported, minimizing API surface
 - `checkConfig` is simplified by removing redundant error handling
 
 ### Negative
+
 - File-reading logic exists in two places (cmd/config.go and doctor.go) — but
   the doctor version is specialized (stat-first, no default fallback)

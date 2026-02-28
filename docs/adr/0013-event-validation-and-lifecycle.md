@@ -18,6 +18,7 @@ This ADR follows the same rationale as sightjack ADR 0009, adapted for amadeus's
 ### A. Event Validation at Append Level
 
 Add `ValidateEvent(Event) error` that checks:
+
 - ID is non-empty
 - Type is non-empty
 - Timestamp is non-zero
@@ -48,15 +49,18 @@ Integrate event file pruning into the existing `archive-prune` CLI command so a 
 ## Consequences
 
 ### Positive
+
 - Invalid events are caught at write time, preventing event stream corruption
 - fsync ensures events survive process crashes and power failures
 - `archive-prune` now manages the full lifecycle of both archive and event files
 - `PruneCandidate` type is reused, keeping the abstraction minimal
 
 ### Negative
+
 - fsync adds ~1ms latency per file write (negligible for CLI tool)
 - Batch-level validation means one bad event rejects the entire batch (desired behavior for atomicity)
 
 ### Neutral
+
 - `ValidateEvent` checks structural validity only (non-empty fields), not semantic validity (e.g., valid EventType values)
 - Event file pruning uses the same `--days` threshold as archive pruning
