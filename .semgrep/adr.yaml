@@ -33,7 +33,7 @@ rules:
     message: |
       otel.SetTracerProvider() は InitTracer() 内でのみ呼び出してください。
       TracerProvider の設定を分散させると noop デフォルトの保証が崩れます。
-      Ref: docs/adr/0003-otel-noop-default-tracer.md
+      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
     severity: WARNING
     patterns:
       - pattern: otel.SetTracerProvider(...)
@@ -56,7 +56,7 @@ rules:
       watcher のファイルディスクリプタがリークします。
       同一関数内で defer watcher.Close() を呼び出すか、
       struct に保存して別途 Close する場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
     severity: ERROR
     patterns:
       - pattern: |
@@ -75,7 +75,7 @@ rules:
       filepath.Join() を使用してください。
       OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
       マップキーや表示用ラベルの場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
     severity: WARNING
     pattern-regex: '\+\s*"/"\s*\+'
     paths:
@@ -92,7 +92,7 @@ rules:
       otel.SetMeterProvider() は InitTracer() 内でのみ呼び出してください。
       MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
       TracerProvider と同様に集中管理してください。
-      Ref: docs/adr/0003-otel-noop-default-tracer.md
+      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
     severity: WARNING
     patterns:
       - pattern: otel.SetMeterProvider(...)
@@ -114,7 +114,7 @@ rules:
       $M.Lock() の直後に defer $M.Unlock() がありません。
       Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
       条件付き Unlock が必要な場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
     severity: ERROR
     patterns:
       - pattern: $M.Lock()

@@ -12,8 +12,9 @@ func ValidLang(lang string) bool {
 
 // ConvergenceConfig controls the world-line convergence detection parameters.
 type ConvergenceConfig struct {
-	WindowDays int `yaml:"window_days"`
-	Threshold  int `yaml:"threshold"`
+	WindowDays           int `yaml:"window_days"`
+	Threshold            int `yaml:"threshold"`
+	EscalationMultiplier int `yaml:"escalation_multiplier"`
 }
 
 // Config holds the complete Amadeus configuration.
@@ -45,8 +46,9 @@ func DefaultConfig() Config {
 			OnDivergenceJump: 0.15,
 		},
 		Convergence: ConvergenceConfig{
-			WindowDays: 14,
-			Threshold:  3,
+			WindowDays:           14,
+			Threshold:            3,
+			EscalationMultiplier: 2,
 		},
 	}
 }
@@ -111,6 +113,9 @@ func ValidateConfig(cfg Config) []string {
 	}
 	if cfg.Convergence.Threshold <= 0 {
 		errs = append(errs, fmt.Sprintf("convergence.threshold must be positive (got %d)", cfg.Convergence.Threshold))
+	}
+	if cfg.Convergence.EscalationMultiplier < 0 {
+		errs = append(errs, fmt.Sprintf("convergence.escalation_multiplier must be non-negative (got %d)", cfg.Convergence.EscalationMultiplier))
 	}
 
 	// Full check config

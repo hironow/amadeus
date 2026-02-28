@@ -25,3 +25,12 @@ type Notifier interface {
 type NopNotifier struct{}
 
 func (*NopNotifier) Notify(_ context.Context, _, _ string) error { return nil }
+
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
+}

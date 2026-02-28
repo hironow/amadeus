@@ -64,13 +64,18 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 		}
 	}
 
+	escalation := cfg.EscalationMultiplier
+	if escalation <= 0 {
+		escalation = 2
+	}
+
 	var alerts []ConvergenceAlert
 	for target, info := range targets {
 		if len(info.dmailNames) < cfg.Threshold {
 			continue
 		}
 		severity := SeverityMedium
-		if len(info.dmailNames) >= cfg.Threshold*2 {
+		if len(info.dmailNames) >= cfg.Threshold*escalation {
 			severity = SeverityHigh
 		}
 		alerts = append(alerts, ConvergenceAlert{

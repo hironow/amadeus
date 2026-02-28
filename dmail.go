@@ -2,6 +2,8 @@ package amadeus
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"sort"
@@ -126,8 +128,29 @@ func ParseDMail(data []byte) (DMail, error) {
 	}, nil
 }
 
+// DMailIdempotencyKey computes a SHA256 content-based idempotency key from
+// the core fields of a DMail (name, kind, description, body).
+func DMailIdempotencyKey(dmail DMail) string {
+	h := sha256.New()
+	h.Write([]byte(dmail.Name))
+	h.Write([]byte{0})
+	h.Write([]byte(string(dmail.Kind)))
+	h.Write([]byte{0})
+	h.Write([]byte(dmail.Description))
+	h.Write([]byte{0})
+	h.Write([]byte(dmail.Body))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // MarshalDMail serializes a DMail to YAML frontmatter + Markdown format.
+// Automatically injects an idempotency_key into metadata based on content hash.
 func MarshalDMail(dmail DMail) ([]byte, error) {
+	meta := make(map[string]string, len(dmail.Metadata)+1)
+	for k, v := range dmail.Metadata {
+		meta[k] = v
+	}
+	meta["idempotency_key"] = DMailIdempotencyKey(dmail)
+
 	fm := dmailFrontmatter{
 		Name:        dmail.Name,
 		Kind:        dmail.Kind,
@@ -135,7 +158,7 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 		Issues:      dmail.Issues,
 		Severity:    dmail.Severity,
 		Targets:     dmail.Targets,
-		Metadata:    dmail.Metadata,
+		Metadata:    meta,
 	}
 	yamlData, err := yaml.Marshal(fm)
 	if err != nil {
