@@ -89,7 +89,7 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			// usecase → execute prune + emit event
-			totalCount, err := usecase.ExecutePrune(result, eventsDir)
+			totalCount, err := usecase.ExecutePrune(result, divRoot, eventsDir)
 			if err != nil {
 				return err
 			}

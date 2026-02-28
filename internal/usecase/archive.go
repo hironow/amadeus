@@ -43,8 +43,9 @@ func CollectPruneCandidates(cmd amadeus.ArchivePruneCommand) (*PruneResult, erro
 	}, nil
 }
 
-// ExecutePrune deletes the collected candidates and emits an archive.pruned event.
-func ExecutePrune(result *PruneResult, eventsDir string) (int, error) {
+// ExecutePrune deletes the collected candidates, prunes flushed outbox rows,
+// and emits an archive.pruned event.
+func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	totalCount := 0
 
 	if len(result.ArchiveCandidates) > 0 {
@@ -61,6 +62,11 @@ func ExecutePrune(result *PruneResult, eventsDir string) (int, error) {
 			return totalCount, fmt.Errorf("prune event files: %w", err)
 		}
 		totalCount += count
+	}
+
+	// Prune flushed outbox DB rows + incremental vacuum.
+	if pruned, pruneErr := session.PruneFlushedOutbox(gateDir); pruneErr == nil && pruned > 0 {
+		totalCount += pruned
 	}
 
 	// Emit archive.pruned event

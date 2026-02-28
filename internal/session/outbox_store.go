@@ -179,6 +179,25 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	return flushed, nil
 }
 
+// PruneFlushed deletes all flushed rows from the staging table and runs
+// incremental vacuum to reclaim disk space. Returns the number of deleted rows.
+func (s *SQLiteOutboxStore) PruneFlushed() (int, error) {
+	result, err := s.db.Exec(`DELETE FROM staged WHERE flushed = 1`)
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: prune flushed: %w", err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: rows affected: %w", err)
+	}
+	if deleted > 0 {
+		if vacErr := s.IncrementalVacuum(); vacErr != nil {
+			return int(deleted), fmt.Errorf("outbox store: vacuum after prune: %w", vacErr)
+		}
+	}
+	return int(deleted), nil
+}
+
 // IncrementalVacuum reclaims free pages without acquiring an exclusive lock.
 // Call after bulk deletes (e.g., archive-prune) to shrink the DB file.
 // Requires PRAGMA auto_vacuum=INCREMENTAL set at DB open time.
@@ -200,6 +219,21 @@ func NewOutboxStoreForGateDir(root string) (*SQLiteOutboxStore, error) {
 	archiveDir := filepath.Join(root, "archive")
 	outboxDir := filepath.Join(root, "outbox")
 	return NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+}
+
+// PruneFlushedOutbox opens the outbox DB, deletes flushed rows, runs
+// incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
+func PruneFlushedOutbox(root string) (int, error) {
+	dbPath := filepath.Join(root, ".run", "outbox.db")
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return 0, nil
+	}
+	store, err := NewOutboxStoreForGateDir(root)
+	if err != nil {
+		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
+	}
+	defer store.Close()
+	return store.PruneFlushed()
 }
 
 // atomicWrite writes data to a temporary file in the same directory, then
