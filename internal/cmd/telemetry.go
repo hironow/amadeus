@@ -7,7 +7,10 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	metricnoop "go.opentelemetry.io/otel/metric/noop"
+	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -66,6 +69,45 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 
 	return func(ctx context.Context) error {
 		return tp.Shutdown(ctx)
+	}
+}
+
+// initMeter sets up the OTel meter provider. When OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// is set, it creates an OTLP HTTP metric exporter; otherwise it stays noop.
+func initMeter(serviceName, ver string) func(context.Context) error {
+	if os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") == "" {
+		mp := metricnoop.NewMeterProvider()
+		amadeus.Meter = mp.Meter(serviceName)
+		return func(context.Context) error { return nil }
+	}
+
+	exp, err := otlpmetrichttp.New(context.Background(),
+		otlpmetrichttp.WithEndpoint(os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")),
+		otlpmetrichttp.WithInsecure(),
+	)
+	if err != nil {
+		mp := metricnoop.NewMeterProvider()
+		amadeus.Meter = mp.Meter(serviceName)
+		return func(context.Context) error { return nil }
+	}
+
+	res, _ := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName(serviceName),
+			semconv.ServiceVersion(ver),
+		),
+	)
+
+	mp := metric.NewMeterProvider(
+		metric.WithReader(metric.NewPeriodicReader(exp)),
+		metric.WithResource(res),
+	)
+	amadeus.Meter = mp.Meter(serviceName)
+
+	return func(ctx context.Context) error {
+		return mp.Shutdown(ctx)
 	}
 }
 

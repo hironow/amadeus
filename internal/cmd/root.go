@@ -24,6 +24,7 @@ var (
 // PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
 var (
 	shutdownTracer func(context.Context) error
+	shutdownMeter  func(context.Context) error
 	finalizerOnce  sync.Once
 )
 
@@ -46,6 +47,7 @@ func NewRootCommand() *cobra.Command {
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("amadeus", Version)
+			shutdownMeter = initMeter("amadeus", Version)
 			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 			return nil
@@ -58,6 +60,9 @@ func NewRootCommand() *cobra.Command {
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
 			endRootSpan()
+			if shutdownMeter != nil {
+				shutdownMeter(context.Background())
+			}
 			if shutdownTracer != nil {
 				shutdownTracer(context.Background())
 			}
