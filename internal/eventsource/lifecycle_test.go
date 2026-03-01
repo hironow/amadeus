@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-func TestFindExpiredEventFiles_DirNotExist(t *testing.T) {
+func TestListExpiredEventFiles_DirNotExist(t *testing.T) {
 	// given
-	dir := filepath.Join(t.TempDir(), "nonexistent")
+	stateDir := filepath.Join(t.TempDir(), "nonexistent")
 
 	// when
-	files, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
+	files, err := ListExpiredEventFiles(stateDir, 30)
 
 	// then
 	if err != nil {
@@ -23,12 +23,16 @@ func TestFindExpiredEventFiles_DirNotExist(t *testing.T) {
 	}
 }
 
-func TestFindExpiredEventFiles_EmptyDir(t *testing.T) {
+func TestListExpiredEventFiles_EmptyDir(t *testing.T) {
 	// given
-	dir := t.TempDir()
+	stateDir := t.TempDir()
+	eventsDir := filepath.Join(stateDir, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	// when
-	files, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
+	files, err := ListExpiredEventFiles(stateDir, 30)
 
 	// then
 	if err != nil {
@@ -39,10 +43,15 @@ func TestFindExpiredEventFiles_EmptyDir(t *testing.T) {
 	}
 }
 
-func TestFindExpiredEventFiles_FiltersOldJsonlFiles(t *testing.T) {
+func TestListExpiredEventFiles_FiltersOldJsonlFiles(t *testing.T) {
 	// given
-	dir := t.TempDir()
-	oldFile := filepath.Join(dir, "2026-01-01.jsonl")
+	stateDir := t.TempDir()
+	eventsDir := filepath.Join(stateDir, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldFile := filepath.Join(eventsDir, "2026-01-01.jsonl")
 	if err := os.WriteFile(oldFile, []byte(`{"id":"1"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -51,13 +60,13 @@ func TestFindExpiredEventFiles_FiltersOldJsonlFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newFile := filepath.Join(dir, "2026-02-25.jsonl")
+	newFile := filepath.Join(eventsDir, "2026-02-25.jsonl")
 	if err := os.WriteFile(newFile, []byte(`{"id":"2"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	files, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
+	files, err := ListExpiredEventFiles(stateDir, 30)
 
 	// then
 	if err != nil {
@@ -66,15 +75,20 @@ func TestFindExpiredEventFiles_FiltersOldJsonlFiles(t *testing.T) {
 	if len(files) != 1 {
 		t.Fatalf("expected 1 expired file, got %d", len(files))
 	}
-	if filepath.Base(files[0].Path) != "2026-01-01.jsonl" {
-		t.Errorf("expected 2026-01-01.jsonl, got %s", files[0].Path)
+	if files[0] != "2026-01-01.jsonl" {
+		t.Errorf("expected 2026-01-01.jsonl, got %s", files[0])
 	}
 }
 
-func TestFindExpiredEventFiles_IgnoresNonJsonlFiles(t *testing.T) {
+func TestListExpiredEventFiles_IgnoresNonJsonlFiles(t *testing.T) {
 	// given
-	dir := t.TempDir()
-	mdFile := filepath.Join(dir, "feedback-001.md")
+	stateDir := t.TempDir()
+	eventsDir := filepath.Join(stateDir, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	mdFile := filepath.Join(eventsDir, "feedback-001.md")
 	if err := os.WriteFile(mdFile, []byte("markdown"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +98,7 @@ func TestFindExpiredEventFiles_IgnoresNonJsonlFiles(t *testing.T) {
 	}
 
 	// when
-	files, err := FindExpiredEventFiles(dir, 30*24*time.Hour)
+	files, err := ListExpiredEventFiles(stateDir, 30)
 
 	// then
 	if err != nil {
@@ -97,25 +111,26 @@ func TestFindExpiredEventFiles_IgnoresNonJsonlFiles(t *testing.T) {
 
 func TestPruneEventFiles_DeletesFiles(t *testing.T) {
 	// given
-	dir := t.TempDir()
-	f1 := filepath.Join(dir, "2026-01-01.jsonl")
+	stateDir := t.TempDir()
+	eventsDir := filepath.Join(stateDir, "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	f1 := filepath.Join(eventsDir, "2026-01-01.jsonl")
 	if err := os.WriteFile(f1, []byte(`{"id":"1"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	files := []ExpiredFile{
-		{Path: f1, ModTime: time.Now()},
-	}
-
 	// when
-	count, err := PruneEventFiles(files)
+	deleted, err := PruneEventFiles(stateDir, []string{"2026-01-01.jsonl"})
 
 	// then
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if count != 1 {
-		t.Errorf("expected 1 deleted, got %d", count)
+	if len(deleted) != 1 {
+		t.Errorf("expected 1 deleted, got %d", len(deleted))
 	}
 	if _, err := os.Stat(f1); !os.IsNotExist(err) {
 		t.Errorf("expected %s to be deleted", f1)

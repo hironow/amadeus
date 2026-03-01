@@ -12,7 +12,7 @@ import (
 // PruneResult holds the outcome of an archive prune operation.
 type PruneResult struct {
 	ArchiveCandidates []session.PruneCandidate
-	EventCandidates   []session.ExpiredEventFile
+	EventCandidates   []string
 }
 
 // CollectPruneCandidates finds files eligible for pruning.
@@ -24,7 +24,6 @@ func CollectPruneCandidates(cmd amadeus.ArchivePruneCommand) (*PruneResult, erro
 
 	divRoot := filepath.Join(cmd.RepoPath, ".gate")
 	archiveDir := filepath.Join(divRoot, "archive")
-	eventsDir := filepath.Join(divRoot, "events")
 	maxAge := time.Duration(cmd.Days) * 24 * time.Hour
 
 	archiveCandidates, err := session.FindPruneCandidates(archiveDir, maxAge)
@@ -32,7 +31,7 @@ func CollectPruneCandidates(cmd amadeus.ArchivePruneCommand) (*PruneResult, erro
 		return nil, fmt.Errorf("find prune candidates: %w", err)
 	}
 
-	eventCandidates, err := session.FindExpiredEventFiles(eventsDir, maxAge)
+	eventCandidates, err := session.ListExpiredEventFiles(divRoot, cmd.Days)
 	if err != nil {
 		return nil, fmt.Errorf("find expired event files: %w", err)
 	}
@@ -57,11 +56,11 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	}
 
 	if len(result.EventCandidates) > 0 {
-		count, err := session.PruneEventFiles(result.EventCandidates)
+		deleted, err := session.PruneEventFiles(gateDir, result.EventCandidates)
 		if err != nil {
 			return totalCount, fmt.Errorf("prune event files: %w", err)
 		}
-		totalCount += count
+		totalCount += len(deleted)
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
@@ -74,9 +73,7 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	for _, c := range result.ArchiveCandidates {
 		paths = append(paths, filepath.Base(c.Path))
 	}
-	for _, c := range result.EventCandidates {
-		paths = append(paths, filepath.Base(c.Path))
-	}
+	paths = append(paths, result.EventCandidates...)
 
 	eventStore := session.NewEventStoreFromEventsDir(eventsDir)
 	ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{

@@ -62,7 +62,7 @@ func newArchivePruneCommand() *cobra.Command {
 			if len(result.EventCandidates) > 0 {
 				fmt.Fprintf(errW, "Event files to prune (older than %d days):\n", days)
 				for _, c := range result.EventCandidates {
-					fmt.Fprintf(errW, "  %s (modified %s)\n", filepath.Base(c.Path), c.ModTime.Format("2006-01-02"))
+					fmt.Fprintf(errW, "  %s\n", c)
 				}
 			}
 
