@@ -3,6 +3,7 @@ package session
 import (
 	"bytes"
 	"context"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -202,6 +203,52 @@ func TestStdinApprover_Timeout(t *testing.T) {
 	}
 	if err == nil {
 		t.Error("expected error on timeout")
+	}
+}
+
+func TestCmdApprover_EmptyTemplate(t *testing.T) {
+	// given
+	a := NewCmdApprover("")
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then -- empty template should produce an error and deny
+	if err == nil {
+		t.Error("expected error for empty template")
+	}
+	if approved {
+		t.Error("expected approved=false for empty template")
+	}
+}
+
+func TestCmdApprover_FactoryDI(t *testing.T) {
+	// given -- inject a factory that records the expanded command
+	var capturedArgs []string
+	a := &CmdApprover{
+		cmdTemplate: "echo {message}",
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			capturedArgs = args
+			return exec.Command("true")
+		},
+	}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "hello world")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approved=true for exit code 0")
+	}
+	if len(capturedArgs) == 0 {
+		t.Fatal("expected args to be captured by factory")
+	}
+	joined := strings.Join(capturedArgs, " ")
+	if !strings.Contains(joined, "'hello world'") {
+		t.Errorf("expected quoted message in command, got: %s", joined)
 	}
 }
 

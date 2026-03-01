@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	amadeus "github.com/hironow/amadeus"
 )
 
 func TestCmdNotifier_Timeout(t *testing.T) {
@@ -76,5 +78,22 @@ func TestCmdNotifier_Placeholders(t *testing.T) {
 	}
 	if !strings.Contains(joined, "'World'") {
 		t.Errorf("expected quoted message in command, got: %s", joined)
+	}
+}
+
+func TestLocalNotifier_UnsupportedOS(t *testing.T) {
+	// given: unsupported OS
+	n := NewLocalNotifierForTest("freebsd",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then: should return ErrUnsupportedOS sentinel
+	if err != amadeus.ErrUnsupportedOS {
+		t.Errorf("err = %v, want amadeus.ErrUnsupportedOS", err)
 	}
 }

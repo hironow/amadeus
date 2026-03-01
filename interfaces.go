@@ -1,6 +1,12 @@
 package amadeus
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
+var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
 // Approver determines whether an action should proceed.
 // Implementations include StdinApprover (human prompt),

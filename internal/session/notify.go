@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	amadeus "github.com/hironow/amadeus"
 )
 
 // psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.
@@ -53,15 +55,33 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 }
 
 // LocalNotifier sends desktop notifications using OS-native commands.
-type LocalNotifier struct{}
+type LocalNotifier struct {
+	forceOS    string         // override runtime.GOOS for testing
+	cmdFactory cmdFactoryFunc // override exec.CommandContext for testing
+}
+
+func (n *LocalNotifier) os() string {
+	if n.forceOS != "" {
+		return n.forceOS
+	}
+	return runtime.GOOS
+}
+
+func (n *LocalNotifier) factory() cmdFactoryFunc {
+	if n.cmdFactory != nil {
+		return n.cmdFactory
+	}
+	return defaultCmdFactory
+}
 
 func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error {
-	switch runtime.GOOS {
+	factory := n.factory()
+	switch n.os() {
 	case "darwin":
 		script := fmt.Sprintf(`display notification %q with title %q sound name "Funk"`, message, title)
-		return exec.CommandContext(ctx, "osascript", "-e", script).Run()
+		return factory(ctx, "osascript", "-e", script).Run()
 	case "linux":
-		return exec.CommandContext(ctx, "notify-send", title, message).Run()
+		return factory(ctx, "notify-send", title, message).Run()
 	case "windows":
 		script := fmt.Sprintf(
 			`Add-Type -AssemblyName System.Windows.Forms; `+
@@ -73,8 +93,8 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 				`$n.ShowBalloonTip(5000)`,
 			psEscapeSingleQuote(title), psEscapeSingleQuote(message),
 		)
-		return exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", script).Run()
+		return factory(ctx, "powershell", "-NoProfile", "-Command", script).Run()
 	default:
-		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+		return amadeus.ErrUnsupportedOS
 	}
 }

@@ -200,3 +200,53 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 		t.Error("expected passed=true")
 	}
 }
+
+// === BuildReviewFixPrompt ===
+
+func TestBuildReviewFixPrompt(t *testing.T) {
+	// given
+	branch := "feature/foo"
+	comments := "fix the bug"
+
+	// when
+	prompt := BuildReviewFixPrompt(branch, comments)
+
+	// then
+	if !strings.Contains(prompt, "feature/foo") {
+		t.Error("prompt should contain branch name")
+	}
+	if !strings.Contains(prompt, "fix the bug") {
+		t.Error("prompt should contain comments")
+	}
+}
+
+// === summarizeReview ===
+
+func TestSummarizeReview_Short(t *testing.T) {
+	// given
+	input := "short comment"
+
+	// when
+	result := summarizeReview(input)
+
+	// then
+	if result != "short comment" {
+		t.Errorf("expected 'short comment', got %q", result)
+	}
+}
+
+func TestSummarizeReview_Truncates(t *testing.T) {
+	// given
+	long := strings.Repeat("x", 600)
+
+	// when
+	result := summarizeReview(long)
+
+	// then
+	if len([]rune(result)) > 520 {
+		t.Error("should truncate long output")
+	}
+	if !strings.HasSuffix(result, "...(truncated)") {
+		t.Error("should end with truncation marker")
+	}
+}

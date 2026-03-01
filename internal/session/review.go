@@ -49,7 +49,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 				Comments: output,
 			}, nil
 		}
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, output)
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, summarizeReview(output))
 	}
 
 	return &ReviewResult{
@@ -113,6 +113,38 @@ func RunReviewGate(ctx context.Context, reviewCmd string, dir string, timeoutSec
 
 	logger.Warn("Review gate: exhausted %d cycles, review not resolved", maxCycles)
 	return false, nil
+}
+
+// BuildReviewFixPrompt creates a focused prompt for fixing review comments.
+func BuildReviewFixPrompt(branch string, comments string) string {
+	return fmt.Sprintf(`You are on branch %s. A code review found the following issues:
+
+%s
+
+Fix all review comments above. Commit and push your changes.
+Keep fixes focused — only address the review comments, do not refactor unrelated code.`, branch, comments)
+}
+
+// summarizeReview normalizes multi-line review output and truncates.
+func summarizeReview(comments string) string {
+	normalized := strings.Join(strings.Fields(comments), " ")
+	const maxLen = 500
+	runes := []rune(normalized)
+	if len(runes) <= maxLen {
+		return normalized
+	}
+	return string(runes[:maxLen]) + "...(truncated)"
+}
+
+// currentBranch returns the current git branch name.
+func currentBranch(ctx context.Context, dir string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func isRateLimited(output string) bool {

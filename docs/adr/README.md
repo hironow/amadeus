@@ -2,27 +2,27 @@
 
 ## Shared ADRs (canonical: phonewave)
 
-0001-0005 are reserved. Canonical versions live in [phonewave docs/adr/](https://github.com/hironow/phonewave/tree/main/docs/adr).
+0001-0005 are reserved. Canonical versions live in `phonewave/docs/adr/`.
 
 | # | Decision | Linear |
 |---|----------|--------|
-| [0001](https://github.com/hironow/phonewave/blob/main/docs/adr/0001-cobra-cli-framework.md) | cobra CLI Framework Adoption | MY-329 |
-| [0002](https://github.com/hironow/phonewave/blob/main/docs/adr/0002-stdio-convention.md) | stdio Convention (stdout=data, stderr=logs) | MY-339 |
-| [0003](https://github.com/hironow/phonewave/blob/main/docs/adr/0003-opentelemetry-noop-default.md) | OpenTelemetry noop-default + OTLP HTTP | — |
-| [0004](https://github.com/hironow/phonewave/blob/main/docs/adr/0004-dmail-schema-v1.md) | D-Mail Schema v1 Specification | MY-352, MY-353 |
-| [0005](https://github.com/hironow/phonewave/blob/main/docs/adr/0005-fsnotify-daemon-design.md) | fsnotify-based File Watch Daemon | — |
+| 0001 | cobra CLI framework adoption | MY-329 |
+| 0002 | stdio convention (stdout=data, stderr=logs) | MY-339 |
+| 0003 | OpenTelemetry noop-default + OTLP HTTP | — |
+| 0004 | D-Mail Schema v1 specification | MY-352, MY-353 |
+| 0005 | fsnotify daemon design | — |
 
 ## Extended Shared ADRs (S-series, canonical: phonewave)
 
-Canonical versions live in [phonewave docs/adr/](https://github.com/hironow/phonewave/tree/main/docs/adr). Referenced here for discoverability.
+Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverability.
 
 | # | Decision | Status |
 |---|----------|--------|
-| [S0001](https://github.com/hironow/phonewave/blob/main/docs/adr/S0001-logger-root-package-exception.md) | ~~Logger as root package exception~~ | Superseded by S0005 |
-| [S0002](https://github.com/hironow/phonewave/blob/main/docs/adr/S0002-event-sourcing-jsonl-pattern.md) | JSONL append-only event sourcing pattern | Accepted |
-| [S0003](https://github.com/hironow/phonewave/blob/main/docs/adr/S0003-three-way-approval-contract.md) | Three-way approval contract | Accepted |
-| [S0004](https://github.com/hironow/phonewave/blob/main/docs/adr/S0004-layer-architecture-conventions.md) | ~~Layer architecture conventions~~ | Superseded by S0005 |
-| [S0005](https://github.com/hironow/phonewave/blob/main/docs/adr/S0005-root-infrastructure-and-layer-conventions.md) | Root infrastructure pattern and layer conventions | Accepted |
+| S0001 | ~~Logger as root package exception~~ | Superseded by S0005 |
+| S0002 | JSONL append-only event sourcing pattern | Accepted |
+| S0003 | Three-way approval contract | Accepted |
+| S0004 | ~~Layer architecture conventions~~ | Superseded by S0005 |
+| S0005 | Root infrastructure pattern and layer conventions | Accepted |
 | S0011 | SQLite WAL cooperative model for concurrent CLI | Accepted |
 | S0012 | Reference data management pattern | Accepted |
 | S0013 | COMMAND naming convention (imperative present tense) | Accepted |

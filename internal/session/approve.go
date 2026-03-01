@@ -88,15 +88,26 @@ func readLine(r io.Reader) (string, error) {
 // The template may contain a {message} placeholder.
 type CmdApprover struct {
 	cmdTemplate string
+	cmdFactory  cmdFactoryFunc
 }
 
 func NewCmdApprover(cmdTemplate string) *CmdApprover {
 	return &CmdApprover{cmdTemplate: cmdTemplate}
 }
 
+func (a *CmdApprover) factory() cmdFactoryFunc {
+	if a.cmdFactory != nil {
+		return a.cmdFactory
+	}
+	return defaultCmdFactory
+}
+
 func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
+	if a.cmdTemplate == "" {
+		return false, fmt.Errorf("approve: empty command template")
+	}
 	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", ShellQuote(message))
-	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), expanded)
+	cmd := a.factory()(ctx, shellName(), shellFlag(), expanded)
 	err := cmd.Run()
 	if err != nil {
 		var exitErr *exec.ExitError
