@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ func newArchivePruneCommand() *cobra.Command {
 			days, _ := cmd.Flags().GetInt("days")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			yes, _ := cmd.Flags().GetBool("yes")
+			outputFmt, _ := cmd.Flags().GetString("output")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
@@ -43,6 +45,43 @@ func newArchivePruneCommand() *cobra.Command {
 			eventsDir := filepath.Join(divRoot, "events")
 			errW := cmd.ErrOrStderr()
 
+			// Extract file names for output.
+			archiveFiles := make([]string, 0, len(result.ArchiveCandidates))
+			for _, c := range result.ArchiveCandidates {
+				archiveFiles = append(archiveFiles, filepath.Base(c.Path))
+			}
+
+			if outputFmt == "json" {
+				out := struct {
+					ArchiveCandidates int      `json:"archive_candidates"`
+					ArchiveDeleted    int      `json:"archive_deleted"`
+					ArchiveFiles      []string `json:"archive_files"`
+					EventCandidates   int      `json:"event_candidates"`
+					EventDeleted      int      `json:"event_deleted"`
+					EventFiles        []string `json:"event_files"`
+				}{
+					ArchiveCandidates: len(result.ArchiveCandidates),
+					ArchiveFiles:      archiveFiles,
+					EventCandidates:   len(result.EventCandidates),
+					EventFiles:        result.EventCandidates,
+				}
+				if !dryRun {
+					totalCount, execErr := usecase.ExecutePrune(result, divRoot, eventsDir)
+					if execErr != nil {
+						return execErr
+					}
+					out.ArchiveDeleted = len(result.ArchiveCandidates)
+					out.EventDeleted = totalCount - len(result.ArchiveCandidates)
+				}
+				data, jsonErr := json.Marshal(out)
+				if jsonErr != nil {
+					return jsonErr
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), string(data))
+				return nil
+			}
+
+			// text output — all metadata to stderr
 			totalFiles := len(result.ArchiveCandidates) + len(result.EventCandidates)
 			if totalFiles == 0 {
 				if result.ArchiveCandidates == nil && result.EventCandidates == nil {

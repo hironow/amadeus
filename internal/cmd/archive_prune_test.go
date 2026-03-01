@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,6 +142,140 @@ func TestArchivePrune_FailsWhenEventRecordFails(t *testing.T) {
 	// Old file should still have been deleted (deletion happens before event recording)
 	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
 		t.Error("expected old archive file to be deleted despite event recording failure")
+	}
+}
+
+func TestArchivePrune_JSONOutput_DryRun(t *testing.T) {
+	// given — expired event file exists
+	tmpDir := t.TempDir()
+	eventsDir := filepath.Join(tmpDir, ".gate", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldEventFile := filepath.Join(eventsDir, "2025-12-01.jsonl")
+	if err := os.WriteFile(oldEventFile, []byte(`{"id":"old"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-40 * 24 * time.Hour)
+	os.Chtimes(oldEventFile, oldTime, oldTime)
+
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"--output", "json", "archive-prune", "--dry-run", tmpDir})
+
+	// when
+	err := root.Execute()
+
+	// then — JSON to stdout, file not deleted (dry-run)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(oldEventFile); os.IsNotExist(statErr) {
+		t.Error("dry-run should NOT delete the file")
+	}
+
+	var result struct {
+		EventCandidates int      `json:"event_candidates"`
+		EventDeleted    int      `json:"event_deleted"`
+		EventFiles      []string `json:"event_files"`
+	}
+	if jsonErr := json.Unmarshal(outBuf.Bytes(), &result); jsonErr != nil {
+		t.Fatalf("invalid JSON output: %v\nraw: %s", jsonErr, outBuf.String())
+	}
+	if result.EventCandidates != 1 {
+		t.Errorf("event_candidates = %d, want 1", result.EventCandidates)
+	}
+	if result.EventDeleted != 0 {
+		t.Errorf("event_deleted = %d, want 0 (dry-run)", result.EventDeleted)
+	}
+}
+
+func TestArchivePrune_JSONOutput_Execute(t *testing.T) {
+	// given — expired event file exists
+	tmpDir := t.TempDir()
+	eventsDir := filepath.Join(tmpDir, ".gate", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldEventFile := filepath.Join(eventsDir, "2025-12-01.jsonl")
+	if err := os.WriteFile(oldEventFile, []byte(`{"id":"old"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-40 * 24 * time.Hour)
+	os.Chtimes(oldEventFile, oldTime, oldTime)
+
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"--output", "json", "archive-prune", "--yes", tmpDir})
+
+	// when
+	err := root.Execute()
+
+	// then — JSON to stdout, file deleted
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(oldEventFile); !os.IsNotExist(statErr) {
+		t.Error("--yes should delete the expired file")
+	}
+
+	var result struct {
+		EventCandidates int `json:"event_candidates"`
+		EventDeleted    int `json:"event_deleted"`
+	}
+	if jsonErr := json.Unmarshal(outBuf.Bytes(), &result); jsonErr != nil {
+		t.Fatalf("invalid JSON output: %v\nraw: %s", jsonErr, outBuf.String())
+	}
+	if result.EventCandidates != 1 {
+		t.Errorf("event_candidates = %d, want 1", result.EventCandidates)
+	}
+	if result.EventDeleted != 1 {
+		t.Errorf("event_deleted = %d, want 1", result.EventDeleted)
+	}
+}
+
+func TestArchivePrune_TextOutput_StdoutClean(t *testing.T) {
+	// given — expired event file exists
+	tmpDir := t.TempDir()
+	eventsDir := filepath.Join(tmpDir, ".gate", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldEventFile := filepath.Join(eventsDir, "2025-12-01.jsonl")
+	if err := os.WriteFile(oldEventFile, []byte(`{"id":"old"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-40 * 24 * time.Hour)
+	os.Chtimes(oldEventFile, oldTime, oldTime)
+
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", "--dry-run", tmpDir})
+
+	// when
+	err := root.Execute()
+
+	// then — text mode: stdout must be empty (all output to stderr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if outBuf.Len() != 0 {
+		t.Errorf("text mode should not write to stdout, got: %q", outBuf.String())
+	}
+	if !strings.Contains(errBuf.String(), "dry-run") {
+		t.Errorf("expected dry-run message in stderr, got: %q", errBuf.String())
 	}
 }
 

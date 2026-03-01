@@ -67,6 +67,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.PersistentFlags().StringP("config", "c", "", "config file path")
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
 	cmd.PersistentFlags().StringP("lang", "l", "", "output language (ja, en)")
+	cmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 
 	cmd.AddCommand(
 		newInitCommand(),
