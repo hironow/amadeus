@@ -63,7 +63,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 // Returns (true, nil) if review passes or is skipped (empty reviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, reviewCmd string, dir string, timeoutSec int, logger *amadeus.Logger, budget ...int) (bool, error) {
+func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger *amadeus.Logger, budget ...int) (bool, error) {
 	if strings.TrimSpace(reviewCmd) == "" {
 		return true, nil
 	}

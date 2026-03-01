@@ -106,7 +106,7 @@ func TestRunReviewGate_EmptyCmd_Passes(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	passed, err := RunReviewGate(ctx, "", t.TempDir(), 300, nil)
+	passed, err := RunReviewGate(ctx, "", "", "", t.TempDir(), 300, nil)
 
 	// then
 	if err != nil {
@@ -122,7 +122,7 @@ func TestRunReviewGate_PassingReview(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	passed, err := RunReviewGate(ctx, "echo ok", t.TempDir(), 300, nil)
+	passed, err := RunReviewGate(ctx, "echo ok", "", "", t.TempDir(), 300, nil)
 
 	// then
 	if err != nil {
@@ -141,7 +141,7 @@ func TestRunReviewGate_FailsAfterMaxCycles(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'style error'\nexit 1\n"), 0755)
 
 	// when — no Claude runner, so fix attempts will fail and exhaust cycles
-	passed, err := RunReviewGate(ctx, scriptPath, dir, 300, nil)
+	passed, err := RunReviewGate(ctx, scriptPath, "", "", dir, 300, nil)
 
 	// then
 	if err != nil {
@@ -158,7 +158,7 @@ func TestRunReviewGate_RespectsTimeout(t *testing.T) {
 	defer cancel()
 
 	// when
-	_, err := RunReviewGate(ctx, "sleep 10", t.TempDir(), 300, nil)
+	_, err := RunReviewGate(ctx, "sleep 10", "", "", t.TempDir(), 300, nil)
 
 	// then
 	if err == nil {
@@ -174,7 +174,7 @@ func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'error'\nexit 1\n"), 0755)
 
 	// when
-	passed, err := RunReviewGate(ctx, scriptPath, dir, 300, nil, 1)
+	passed, err := RunReviewGate(ctx, scriptPath, "", "", dir, 300, nil, 1)
 
 	// then
 	if err != nil {
@@ -190,7 +190,7 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	passed, err := RunReviewGate(ctx, "echo ok", t.TempDir(), 300, nil, 0)
+	passed, err := RunReviewGate(ctx, "echo ok", "", "", t.TempDir(), 300, nil, 0)
 
 	// then
 	if err != nil {

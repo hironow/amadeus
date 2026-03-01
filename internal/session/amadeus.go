@@ -28,6 +28,8 @@ type Amadeus struct {
 	Approver   amadeus.Approver        // nil = no gate (auto-approve)
 	Notifier   amadeus.Notifier        // nil = no notifications
 	ReviewCmd  string                  // code review command (empty = skip)
+	ClaudeCmd  string                  // Claude CLI command (empty = "claude")
+	ClaudeModel string                 // Claude model for review fix (empty = "opus")
 	Aggregate  *amadeus.CheckAggregate // domain logic aggregate (injected by usecase layer)
 	Dispatcher amadeus.EventDispatcher // policy dispatch (injected by usecase layer; nil = no dispatch)
 }
@@ -517,7 +519,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 
 	// Review Gate: run code review if configured
 	if a.ReviewCmd != "" {
-		passed, revErr := RunReviewGate(ctx, a.ReviewCmd, a.RepoDir, 300, a.Logger)
+		passed, revErr := RunReviewGate(ctx, a.ReviewCmd, a.ClaudeCmd, a.ClaudeModel, a.RepoDir, 300, a.Logger)
 		if revErr != nil {
 			a.Logger.Warn("Review gate error: %v", revErr)
 		} else if !passed {
