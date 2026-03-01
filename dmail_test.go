@@ -242,10 +242,11 @@ func TestMarshalDMail_OmitsEmptyTargets(t *testing.T) {
 
 func TestValidateDMail_Valid(t *testing.T) {
 	dmail := amadeus.DMail{
-		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
-		Description: "ADR violation detected",
-		Severity:    amadeus.SeverityHigh,
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "ADR violation detected",
+		Severity:      amadeus.SeverityHigh,
 	}
 	errs := amadeus.ValidateDMail(dmail)
 	if len(errs) != 0 {
@@ -256,10 +257,11 @@ func TestValidateDMail_Valid(t *testing.T) {
 func TestValidateDMail_AllKinds(t *testing.T) {
 	for _, kind := range []amadeus.DMailKind{amadeus.KindFeedback, amadeus.KindSpecification, amadeus.KindReport, amadeus.KindConvergence} {
 		dmail := amadeus.DMail{
-			Name:        "test-001",
-			Kind:        kind,
-			Description: "test",
-			Severity:    amadeus.SeverityLow,
+			SchemaVersion: amadeus.DMailSchemaVersion,
+			Name:          "test-001",
+			Kind:          kind,
+			Description:   "test",
+			Severity:      amadeus.SeverityLow,
 		}
 		errs := amadeus.ValidateDMail(dmail)
 		if len(errs) != 0 {
@@ -320,9 +322,10 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 	// severity is optional — inbox reports from external tools may omit it
 	dmail := amadeus.DMail{
-		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
-		Description: "test",
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "test",
 	}
 	errs := amadeus.ValidateDMail(dmail)
 	if len(errs) != 0 {
@@ -348,6 +351,31 @@ func TestValidateDMail_MultipleErrors(t *testing.T) {
 	errs := amadeus.ValidateDMail(dmail)
 	if len(errs) < 3 {
 		t.Errorf("expected at least 3 errors for empty DMail, got %d: %v", len(errs), errs)
+	}
+}
+
+func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
+	dmail := amadeus.DMail{
+		Name:        "feedback-001",
+		Kind:        amadeus.KindFeedback,
+		Description: "test",
+	}
+	errs := amadeus.ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for missing dmail-schema-version")
+	}
+}
+
+func TestValidateDMail_UnsupportedSchemaVersion(t *testing.T) {
+	dmail := amadeus.DMail{
+		SchemaVersion: "99",
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "test",
+	}
+	errs := amadeus.ValidateDMail(dmail)
+	if len(errs) == 0 {
+		t.Error("expected error for unsupported dmail-schema-version")
 	}
 }
 

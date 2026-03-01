@@ -202,6 +202,9 @@ func TestGenerateConvergenceDMails_OnlyHigh(t *testing.T) {
 	if len(dmails[0].Targets) != 1 || dmails[0].Targets[0] != "api/handler.go" {
 		t.Errorf("expected target 'api/handler.go', got %v", dmails[0].Targets)
 	}
+	if dmails[0].SchemaVersion != amadeus.DMailSchemaVersion {
+		t.Errorf("expected schema version %q, got %q", amadeus.DMailSchemaVersion, dmails[0].SchemaVersion)
+	}
 }
 
 func TestGenerateConvergenceDMails_Empty(t *testing.T) {

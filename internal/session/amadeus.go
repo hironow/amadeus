@@ -414,16 +414,21 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 			return fmt.Errorf("phase 3 (dmail name): %w", err)
 		}
 		dmail := amadeus.DMail{
-			Name:        name,
-			Kind:        amadeus.KindFeedback,
-			Description: candidate.Description,
-			Issues:      candidate.Issues,
-			Severity:    meterResult.Divergence.Severity,
-			Targets:     candidate.Targets,
+			SchemaVersion: amadeus.DMailSchemaVersion,
+			Name:          name,
+			Kind:          amadeus.KindFeedback,
+			Description:   candidate.Description,
+			Issues:        candidate.Issues,
+			Severity:      meterResult.Divergence.Severity,
+			Targets:       candidate.Targets,
 			Metadata: map[string]string{
 				"created_at": now.Format(time.RFC3339),
 			},
 			Body: candidate.Detail,
+		}
+		if errs := amadeus.ValidateDMail(dmail); len(errs) > 0 {
+			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
+			continue
 		}
 		ev, evErr := amadeus.NewEvent(amadeus.EventDMailGenerated, amadeus.DMailGeneratedData{DMail: dmail}, now)
 		if evErr != nil {

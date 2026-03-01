@@ -35,30 +35,35 @@ const (
 	DMailSent DMailStatus = "sent"
 )
 
+// DMailSchemaVersion is the current D-Mail protocol schema version.
+const DMailSchemaVersion = "1"
+
 // dmailFrontmatter is the YAML frontmatter of a D-Mail file.
 // NOTE(MY-346): linear_issue_id was intentionally removed without migration.
 // Existing D-Mail files with linear_issue_id will lose that field on parse.
 // This is acceptable because amadeus is pre-release and no production .gate/ state exists.
 type dmailFrontmatter struct {
-	Name        string            `yaml:"name"`
-	Kind        DMailKind         `yaml:"kind"`
-	Description string            `yaml:"description"`
-	Issues      []string          `yaml:"issues,omitempty"`
-	Severity    Severity          `yaml:"severity,omitempty"`
-	Targets     []string          `yaml:"targets,omitempty"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
+	SchemaVersion string            `yaml:"dmail-schema-version"`
+	Name          string            `yaml:"name"`
+	Kind          DMailKind         `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      Severity          `yaml:"severity,omitempty"`
+	Targets       []string          `yaml:"targets,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
 }
 
 // DMail is the correction routing message using YAML frontmatter + Markdown body.
 type DMail struct {
-	Name        string            `yaml:"name"`
-	Kind        DMailKind         `yaml:"kind"`
-	Description string            `yaml:"description"`
-	Issues      []string          `yaml:"issues,omitempty"`
-	Severity    Severity          `yaml:"severity,omitempty"`
-	Targets     []string          `yaml:"targets,omitempty"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
-	Body        string            `yaml:"-"`
+	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
+	Name          string            `yaml:"name"`
+	Kind          DMailKind         `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      Severity          `yaml:"severity,omitempty"`
+	Targets       []string          `yaml:"targets,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Body          string            `yaml:"-"`
 }
 
 // validKinds is the set of valid DMailKind values per schema v1.
@@ -80,6 +85,11 @@ var validSeverities = map[Severity]bool{
 // Returns a list of validation errors (empty if valid).
 func ValidateDMail(dmail DMail) []string {
 	var errs []string
+	if dmail.SchemaVersion == "" {
+		errs = append(errs, "dmail-schema-version is required")
+	} else if dmail.SchemaVersion != DMailSchemaVersion {
+		errs = append(errs, fmt.Sprintf("unsupported dmail-schema-version: %q (want %q)", dmail.SchemaVersion, DMailSchemaVersion))
+	}
 	if dmail.Name == "" {
 		errs = append(errs, "name is required")
 	}
@@ -117,14 +127,15 @@ func ParseDMail(data []byte) (DMail, error) {
 	}
 
 	return DMail{
-		Name:        fm.Name,
-		Kind:        fm.Kind,
-		Description: fm.Description,
-		Issues:      fm.Issues,
-		Severity:    NormalizeSeverity(fm.Severity),
-		Targets:     fm.Targets,
-		Metadata:    fm.Metadata,
-		Body:        strings.TrimLeft(bodyPart, "\n"),
+		SchemaVersion: fm.SchemaVersion,
+		Name:          fm.Name,
+		Kind:          fm.Kind,
+		Description:   fm.Description,
+		Issues:        fm.Issues,
+		Severity:      NormalizeSeverity(fm.Severity),
+		Targets:       fm.Targets,
+		Metadata:      fm.Metadata,
+		Body:          strings.TrimLeft(bodyPart, "\n"),
 	}, nil
 }
 
@@ -152,13 +163,14 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 	meta["idempotency_key"] = DMailIdempotencyKey(dmail)
 
 	fm := dmailFrontmatter{
-		Name:        dmail.Name,
-		Kind:        dmail.Kind,
-		Description: dmail.Description,
-		Issues:      dmail.Issues,
-		Severity:    dmail.Severity,
-		Targets:     dmail.Targets,
-		Metadata:    meta,
+		SchemaVersion: dmail.SchemaVersion,
+		Name:          dmail.Name,
+		Kind:          dmail.Kind,
+		Description:   dmail.Description,
+		Issues:        dmail.Issues,
+		Severity:      dmail.Severity,
+		Targets:       dmail.Targets,
+		Metadata:      meta,
 	}
 	yamlData, err := yaml.Marshal(fm)
 	if err != nil {

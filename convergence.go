@@ -114,10 +114,11 @@ func GenerateConvergenceDMails(alerts []ConvergenceAlert) []DMail {
 		body += "\nThis convergence indicates a structural issue requiring attention.\n"
 
 		dmails = append(dmails, DMail{
-			Kind:        KindConvergence,
-			Description: fmt.Sprintf("World line convergence on %s (%d hits)", alert.Target, alert.Count),
-			Targets:     []string{alert.Target},
-			Severity:    SeverityHigh,
+			SchemaVersion: DMailSchemaVersion,
+			Kind:          KindConvergence,
+			Description:   fmt.Sprintf("World line convergence on %s (%d hits)", alert.Target, alert.Count),
+			Targets:       []string{alert.Target},
+			Severity:      SeverityHigh,
 			Metadata: map[string]string{
 				"created_at":      now.Format(time.RFC3339),
 				"convergence_for": strings.Join(alert.DMails, ","),

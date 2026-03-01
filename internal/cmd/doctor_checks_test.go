@@ -483,10 +483,11 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	initGateDirForTest(t, root)
 	// Write a valid D-Mail directly to archive
 	dmail := amadeus.DMail{
-		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
-		Description: "test",
-		Severity:    amadeus.SeverityHigh,
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "test",
+		Severity:      amadeus.SeverityHigh,
 	}
 	data, err := amadeus.MarshalDMail(dmail)
 	if err != nil {
