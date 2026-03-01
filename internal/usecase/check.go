@@ -29,6 +29,7 @@ func RunCheck(ctx context.Context, cmd amadeus.ExecuteCheckCommand, opts amadeus
 	// Wire policy engine (WHEN [EVENT] THEN [handler])
 	// Handlers will be registered here as policies are implemented.
 	engine := NewPolicyEngine(a.Logger)
+	registerCheckPolicies(engine, a.Logger)
 	a.Dispatcher = engine
 
 	// Delegate to session I/O pipeline

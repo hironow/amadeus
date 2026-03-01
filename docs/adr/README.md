@@ -14,13 +14,24 @@
 
 ## Extended Shared ADRs (S-series, canonical: phonewave)
 
-| # | Decision |
-|---|----------|
-| [S0001](https://github.com/hironow/phonewave/blob/main/docs/adr/S0001-logger-root-package-exception.md) | ~~Logger as root package exception~~ (superseded by S0005) |
-| [S0002](https://github.com/hironow/phonewave/blob/main/docs/adr/S0002-event-sourcing-jsonl-pattern.md) | JSONL append-only event sourcing pattern |
-| [S0003](https://github.com/hironow/phonewave/blob/main/docs/adr/S0003-three-way-approval-contract.md) | Three-way approval contract |
-| [S0004](https://github.com/hironow/phonewave/blob/main/docs/adr/S0004-layer-architecture-conventions.md) | ~~Layer architecture conventions~~ (superseded by S0005) |
-| [S0005](https://github.com/hironow/phonewave/blob/main/docs/adr/S0005-root-infrastructure-and-layer-conventions.md) | Root infrastructure pattern and layer conventions |
+Canonical versions live in [phonewave docs/adr/](https://github.com/hironow/phonewave/tree/main/docs/adr). Referenced here for discoverability.
+
+| # | Decision | Status |
+|---|----------|--------|
+| [S0001](https://github.com/hironow/phonewave/blob/main/docs/adr/S0001-logger-root-package-exception.md) | ~~Logger as root package exception~~ | Superseded by S0005 |
+| [S0002](https://github.com/hironow/phonewave/blob/main/docs/adr/S0002-event-sourcing-jsonl-pattern.md) | JSONL append-only event sourcing pattern | Accepted |
+| [S0003](https://github.com/hironow/phonewave/blob/main/docs/adr/S0003-three-way-approval-contract.md) | Three-way approval contract | Accepted |
+| [S0004](https://github.com/hironow/phonewave/blob/main/docs/adr/S0004-layer-architecture-conventions.md) | ~~Layer architecture conventions~~ | Superseded by S0005 |
+| [S0005](https://github.com/hironow/phonewave/blob/main/docs/adr/S0005-root-infrastructure-and-layer-conventions.md) | Root infrastructure pattern and layer conventions | Accepted |
+| S0011 | SQLite WAL cooperative model for concurrent CLI | Accepted |
+| S0012 | Reference data management pattern | Accepted |
+| S0013 | COMMAND naming convention (imperative present tense) | Accepted |
+| S0014 | POLICY pattern reference implementation | Accepted |
+| S0015 | State directory naming convention | Accepted |
+| S0016 | Root package file organization | Accepted |
+| S0017 | Aggregate root and use case layer | Accepted |
+| S0018 | Event Storming alignment and per-tool applicability | Accepted |
+| S0019 | Data persistence boundaries (Linear/GitHub/local) | Accepted |
 
 ## amadeus-specific ADRs
 
@@ -36,3 +47,4 @@
 | [0013](0013-event-validation-and-lifecycle.md) | Event Validation and Lifecycle Management | — |
 | [0014](0014-flat-package-architecture.md) | Flat Package Architecture Decision | — |
 | [0015](0015-load-config-to-cmd.md) | Move LoadConfig to internal/cmd | — |
+| [0016](0016-root-package-layer-separation.md) | Root package layer separation | — |
