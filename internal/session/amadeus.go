@@ -240,6 +240,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		if err := a.emit(events...); err != nil {
 			return fmt.Errorf("emit check (no shift): %w", err)
 		}
+		amadeus.RecordCheck(ctx, "clean")
 		if opts.JSON {
 			if err := a.PrintCheckOutputJSON(previous, nil, previous.Divergence); err != nil {
 				return fmt.Errorf("write JSON output: %w", err)
@@ -401,6 +402,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		if err := a.emit(events...); err != nil {
 			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
+		amadeus.RecordCheck(ctx, "drift")
 		if !opts.Quiet {
 			a.Logger.Info("Gate denied — D-Mail generation skipped")
 		}
@@ -505,6 +507,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 	}
 	if err := a.emit(checkEvents...); err != nil {
 		return fmt.Errorf("emit check completed: %w", err)
+	}
+	if len(dmails) > 0 {
+		amadeus.RecordCheck(ctx, "drift")
+	} else {
+		amadeus.RecordCheck(ctx, "clean")
 	}
 
 	if opts.JSON {
