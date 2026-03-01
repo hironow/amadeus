@@ -67,7 +67,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 - All commands use `RunE` (not `Run`)
 - `--config`, `--verbose`, `--lang` are PersistentFlags on root
 - Exit codes: 0 = success, 1 = error, 2 = drift detected
-- No default subcommand (requires explicit subcommand)
+- Default subcommand: `amadeus [flags] <repo>` prepends `check` via `NeedsDefaultCheck`
 - stdio convention (ADR 0002): stdout = machine-readable data (JSON), stderr = human-readable logs
 
 ## Test Layout
