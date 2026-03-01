@@ -85,12 +85,13 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 		30*time.Second,
 	)
 
+	var lastComments string
 	for cycle := 1; cycle <= maxCycles; cycle++ {
 		if ctx.Err() != nil {
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
 
-		logger.Info("Review gate: cycle %d/%d", cycle, maxReviewGateCycles)
+		logger.Info("Review gate: cycle %d/%d", cycle, maxCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, reviewCmd, dir)
@@ -104,15 +105,64 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 			return true, nil
 		}
 
+		lastComments = result.Comments
 		logger.Warn("Review gate: comments found (cycle %d/%d)", cycle, maxCycles)
 
+		// Last cycle — no point running fix
 		if cycle == maxCycles {
 			break
+		}
+
+		// Run Claude --continue to fix review comments
+		if err := runReviewFix(ctx, claudeCmd, model, dir, lastComments, timeoutSec, logger); err != nil {
+			logger.Warn("Review fix failed: %v", err)
+			return false, nil
 		}
 	}
 
 	logger.Warn("Review gate: exhausted %d cycles, review not resolved", maxCycles)
 	return false, nil
+}
+
+// runReviewFix runs Claude --continue to fix review comments.
+func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, timeoutSec int, logger *amadeus.Logger) error {
+	branch, err := currentBranch(ctx, dir)
+	if err != nil {
+		return fmt.Errorf("detect branch: %w", err)
+	}
+
+	if claudeCmd == "" {
+		claudeCmd = "claude"
+	}
+	if model == "" {
+		model = "opus"
+	}
+
+	prompt := BuildReviewFixPrompt(branch, comments)
+
+	fixTimeout := time.Duration(timeoutSec) * time.Second
+	if fixTimeout <= 0 {
+		fixTimeout = 300 * time.Second
+	}
+	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
+	defer fixCancel()
+
+	cmd := exec.CommandContext(fixCtx, claudeCmd,
+		"--model", model,
+		"--continue",
+		"--dangerously-skip-permissions",
+		"--print",
+		"-p", prompt,
+	)
+	cmd.Dir = dir
+	cmd.WaitDelay = 3 * time.Second
+
+	logger.Info("Review fix: running %s --model %s --continue", claudeCmd, model)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("claude fix: %w\noutput: %s", err, summarizeReview(string(out)))
+	}
+	return nil
 }
 
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.
