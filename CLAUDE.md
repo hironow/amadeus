@@ -26,7 +26,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 ### `internal/eventsource/` — event store infrastructure
 
 - `store_file.go` — FileEventStore (JSONL append-only, implements EventStore)
-- `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles
+- `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles (flat `.jsonl` storage, `os.Remove` pruning)
 - `path.go` — EventsDir path helper
 
 ### `internal/session/` — all filesystem, network, subprocess I/O
