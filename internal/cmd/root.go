@@ -46,7 +46,8 @@ func NewRootCommand() *cobra.Command {
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("amadeus", Version)
-			cmd.SetContext(ctx)
+			spanCtx := startRootSpan(ctx, cmd.Name())
+			cmd.SetContext(spanCtx)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,6 +57,7 @@ func NewRootCommand() *cobra.Command {
 
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
+			endRootSpan()
 			if shutdownTracer != nil {
 				shutdownTracer(context.Background())
 			}

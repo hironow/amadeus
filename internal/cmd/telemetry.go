@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/hironow/amadeus"
@@ -64,6 +66,31 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 
 	return func(ctx context.Context) error {
 		return tp.Shutdown(ctx)
+	}
+}
+
+// rootSpan holds the top-level span for the CLI invocation.
+// It is set by startRootSpan and closed by endRootSpan (called from
+// cobra.OnFinalize, which runs even on error — unlike PersistentPostRunE).
+var rootSpan trace.Span
+
+// startRootSpan creates the top-level span for an amadeus subcommand and
+// returns a new context carrying it. The span is stored in the package-level
+// rootSpan variable so endRootSpan can close it without a context argument.
+func startRootSpan(ctx context.Context, command string) context.Context {
+	ctx, rootSpan = amadeus.Tracer.Start(ctx, "amadeus."+command,
+		trace.WithAttributes(
+			attribute.String("amadeus.command", command),
+		),
+	)
+	return ctx
+}
+
+// endRootSpan ends the package-level rootSpan (created by startRootSpan).
+// Safe to call when rootSpan is nil (e.g., before startRootSpan runs).
+func endRootSpan() {
+	if rootSpan != nil {
+		rootSpan.End()
 	}
 }
 

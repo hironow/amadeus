@@ -83,3 +83,38 @@ func TestParseExtraEndpoints_Whitespace(t *testing.T) {
 		t.Errorf("eps[0] = %q, want %q", eps[0], "localhost:4318")
 	}
 }
+
+func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
+	// given
+	exp := setupTestTracer(t)
+
+	// when
+	_ = startRootSpan(context.Background(), "check")
+	endRootSpan()
+
+	// then
+	spans := exp.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least 1 span")
+	}
+	if spans[0].Name != "amadeus.check" {
+		t.Errorf("span name = %q, want %q", spans[0].Name, "amadeus.check")
+	}
+	var found bool
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "amadeus.command" && attr.Value.AsString() == "check" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected amadeus.command=check attribute on root span")
+	}
+}
+
+func TestEndRootSpan_NilSafe(t *testing.T) {
+	// given — rootSpan is nil (no startRootSpan called)
+	rootSpan = nil
+
+	// when / then — must not panic
+	endRootSpan()
+}
