@@ -5,9 +5,18 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	amadeus "github.com/hironow/amadeus"
 )
+
+// DivergenceMeterAllowedTools is the minimal tool set for divergence evaluation.
+// The divergence meter only needs to read pre-collected content from the prompt;
+// all filesystem I/O is done by Go before invoking Claude.
+var DivergenceMeterAllowedTools = []string{
+	"Read",
+	"Bash(cat:*)",
+}
 
 // defaultClaudeRunner executes the real Claude CLI as a subprocess.
 type defaultClaudeRunner struct{}
@@ -18,6 +27,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	cmd := exec.CommandContext(ctx, "claude",
 		"--model", "opus",
 		"--output-format", "json",
+		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
 		"--dangerously-skip-permissions",
 		"--print",
 	)
