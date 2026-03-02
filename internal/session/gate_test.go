@@ -2,6 +2,7 @@ package session_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -181,6 +182,46 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 	}
 }
 
+// claudeResponseWithDriftAndAction returns a canned Claude response
+// where the D-Mail candidate includes an explicit action field.
+func claudeResponseWithDriftAndAction(action string) string {
+	return fmt.Sprintf(`{
+		"axes": {
+			"adr_integrity": {"score": 30, "details": "drift detected"},
+			"dod_fulfillment": {"score": 20, "details": "some issues"},
+			"dependency_integrity": {"score": 10, "details": "ok"},
+			"implicit_constraints": {"score": 15, "details": "mild drift"}
+		},
+		"dmails": [
+			{
+				"description": "ADR drift detected",
+				"issues": ["TEST-1"],
+				"detail": "Detailed feedback body",
+				"targets": ["sightjack"],
+				"action": %q
+			}
+		],
+		"reasoning": "test drift"
+	}`, action)
+}
+
+// extractDMailsFromEvents extracts DMails from dmail.generated events.
+func extractDMailsFromEvents(t *testing.T, events []amadeus.Event) []amadeus.DMail {
+	t.Helper()
+	var dmails []amadeus.DMail
+	for _, ev := range events {
+		if ev.Type != amadeus.EventDMailGenerated {
+			continue
+		}
+		var data amadeus.DMailGeneratedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			t.Fatalf("unmarshal DMailGeneratedData: %v", err)
+		}
+		dmails = append(dmails, data.DMail)
+	}
+	return dmails
+}
+
 // --- Gate Tests ---
 
 func TestRunCheck_GateApproved_GeneratesDMails(t *testing.T) {
@@ -280,5 +321,65 @@ func TestRunCheck_NilApprover_AutoApproves(t *testing.T) {
 	}
 	if driftErr.DMails == 0 {
 		t.Error("expected DMails > 0")
+	}
+}
+
+func TestRunCheck_FeedbackDMail_DefaultAction_BasedOnSeverity(t *testing.T) {
+	// given: Claude response without explicit action — severity-based default should apply.
+	// With zero-value config thresholds, divergence 0.0 >= MediumMax 0.0 → SeverityHigh → ActionEscalate.
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &amadeus.AutoApprover{}, &amadeus.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+
+	// when
+	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+
+	// then: should return DriftError
+	var driftErr *amadeus.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	// Extract DMails from events and verify action
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected at least one feedback D-Mail in events")
+	}
+	for _, dmail := range dmails {
+		if dmail.Action != amadeus.ActionEscalate {
+			t.Errorf("expected default action %q for high severity, got %q", amadeus.ActionEscalate, dmail.Action)
+		}
+	}
+}
+
+func TestRunCheck_FeedbackDMail_ExplicitAction_FromCandidate(t *testing.T) {
+	// given: Claude response with explicit action "retry" on the candidate
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &amadeus.AutoApprover{}, &amadeus.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("retry")}
+
+	// when
+	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+
+	// then: should return DriftError
+	var driftErr *amadeus.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	// Extract DMails from events and verify explicit action is preserved
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected at least one feedback D-Mail in events")
+	}
+	for _, dmail := range dmails {
+		if dmail.Action != amadeus.ActionRetry {
+			t.Errorf("expected explicit action %q from candidate, got %q", amadeus.ActionRetry, dmail.Action)
+		}
 	}
 }

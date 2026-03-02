@@ -424,11 +424,22 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 			Description:   candidate.Description,
 			Issues:        candidate.Issues,
 			Severity:      meterResult.Divergence.Severity,
+			Action:        amadeus.DMailAction(candidate.Action),
 			Targets:       candidate.Targets,
 			Metadata: map[string]string{
 				"created_at": now.Format(time.RFC3339),
 			},
 			Body: candidate.Detail,
+		}
+		if dmail.Action == "" {
+			switch meterResult.Divergence.Severity {
+			case amadeus.SeverityHigh:
+				dmail.Action = amadeus.ActionEscalate
+			case amadeus.SeverityMedium:
+				dmail.Action = amadeus.ActionRetry
+			default:
+				dmail.Action = amadeus.ActionResolve
+			}
 		}
 		if errs := amadeus.ValidateDMail(dmail); len(errs) > 0 {
 			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
