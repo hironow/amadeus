@@ -1,0 +1,17 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 5, "details": "Minor naming drift"},
+    "dod_fulfillment": {"score": 10, "details": "AUTH-1 DoD partially met"},
+    "dependency_integrity": {"score": 0, "details": "Clean"},
+    "implicit_constraints": {"score": 0, "details": "No issues"}
+  },
+  "dmails": [
+    {
+      "description": "AUTH-1 DoD needs review after recent changes",
+      "detail": "The login flow implementation has partial coverage of the DoD acceptance criteria.",
+      "issues": ["AUTH-1"],
+      "targets": ["auth/login.go"]
+    }
+  ],
+  "reasoning": "Check detected minor divergence in AUTH-1 DoD fulfillment."
+}
