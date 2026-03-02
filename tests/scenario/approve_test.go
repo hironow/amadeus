@@ -71,13 +71,13 @@ func TestScenario_ApproveCmdPath(t *testing.T) {
 	// Verify outbox was flushed
 	ws.WaitForAbsent(t, ".gate", "outbox", 10*time.Second)
 
-	// Verify notify script was invoked (notify.log should exist and be non-empty)
+	// Verify notify script was invoked (amadeus notifies on check completion)
 	data, err := os.ReadFile(notifyLog)
 	if err != nil {
-		t.Logf("notify.log not found (notification may not have fired): %v", err)
-	} else if len(data) == 0 {
-		t.Log("notify.log exists but is empty")
-	} else {
-		t.Logf("notify.log content:\n%s", string(data))
+		t.Fatalf("notify.log not found — notify-cmd was not invoked: %v", err)
 	}
+	if len(data) == 0 {
+		t.Fatal("notify.log exists but is empty — notify-cmd produced no output")
+	}
+	t.Logf("notify.log content:\n%s", string(data))
 }
