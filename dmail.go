@@ -60,9 +60,9 @@ const (
 const DMailSchemaVersion = "1"
 
 // dmailFrontmatter is the YAML frontmatter of a D-Mail file.
-// NOTE(MY-346): linear_issue_id was intentionally removed without migration.
-// Existing D-Mail files with linear_issue_id will lose that field on parse.
-// This is acceptable because amadeus is pre-release and no production .gate/ state exists.
+// DECISION(MY-346): linear_issue_id field was removed in favor of Issues []string.
+// Old D-Mail files with linear_issue_id silently drop that field on parse.
+// This is a finalized non-backward-compatible change; no migration is provided.
 type dmailFrontmatter struct {
 	SchemaVersion string            `yaml:"dmail-schema-version"`
 	Name          string            `yaml:"name"`

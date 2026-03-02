@@ -32,6 +32,8 @@ Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverab
 | S0017 | Aggregate root and use case layer | Accepted |
 | S0018 | Event Storming alignment and per-tool applicability | Accepted |
 | S0019 | Data persistence boundaries (Linear/GitHub/local) | Accepted |
+| S0020 | Accepted cross-tool divergence (default subcommand, storage model) | Accepted |
+| S0021 | D-Mail receive-side validation (Postel's Law) | Accepted |
 
 ## amadeus-specific ADRs
 
