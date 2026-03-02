@@ -124,6 +124,30 @@ test-e2e-shell:
 test-e2e-down:
     docker compose -f tests/e2e/compose-e2e.yaml down --rmi local --volumes
 
+# Run L1 scenario test
+test-scenario-min:
+    go test -tags scenario ./tests/scenario/ -run TestScenario_L1 -count=1 -v -timeout=120s
+
+# Run L2 scenario test
+test-scenario-small:
+    go test -tags scenario ./tests/scenario/ -run TestScenario_L2 -count=1 -v -timeout=180s
+
+# Run L3 scenario test
+test-scenario-middle:
+    go test -tags scenario ./tests/scenario/ -run TestScenario_L3 -count=1 -v -timeout=300s
+
+# Run L4 scenario test
+test-scenario-hard:
+    go test -tags scenario ./tests/scenario/ -run TestScenario_L4 -count=1 -v -timeout=600s
+
+# Run L1+L2 scenario tests (CI default)
+test-scenario:
+    go test -tags scenario ./tests/scenario/ -run "TestScenario_L[12]" -count=1 -v -timeout=300s
+
+# Run all scenario tests
+test-scenario-all:
+    go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
+
 # Clean build artifacts
 clean:
     rm -f {{TOOL}} coverage.out
