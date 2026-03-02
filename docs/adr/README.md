@@ -44,10 +44,11 @@ Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverab
 | S0021 | D-Mail receive-side validation (Postel's Law) | Accepted |
 | S0022 | OTel Metrics Design | Accepted |
 | S0023 | Cross-Tool Contract Testing | Accepted |
-| S0024 | CLI Argument Design Decisions | Accepted |
+| S0024 | ~~CLI Argument Design Decisions~~ | Superseded by S0028 |
 | S0025 | Event Delivery Guarantee Levels | Accepted |
 | S0026 | Domain Model Maturity Assessment | Accepted |
 | S0027 | RDRA Gap Resolution — D-Mail Protocol Extension | Accepted |
+| S0028 | CLI Argument Design (Actual Implementation) | Accepted |
 
 ## amadeus-specific ADRs
 

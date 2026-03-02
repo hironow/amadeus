@@ -192,6 +192,9 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 | `amadeus log` | Print check history and D-Mail log |
 | `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
 | `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
+| `amadeus status [path]` | Show amadeus operational status |
+| `amadeus clean [path]` | Remove state directory (`.gate/`) |
+| `amadeus rebuild [path]` | Rebuild projections from event store |
 | `amadeus archive-prune` | Prune old archived D-Mail files |
 | `amadeus install-hook` | Install git post-merge hook |
 | `amadeus uninstall-hook` | Remove git post-merge hook |
