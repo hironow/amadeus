@@ -128,10 +128,15 @@ test-e2e-down:
 [private]
 check-go:
     @GO_VER=$(go version | awk '{print $3}'); \
-    TOOL_VER=$(go env GOVERSION); \
-    if [ "$GO_VER" != "$TOOL_VER" ]; then \
-        echo "ERROR: go binary ($GO_VER) != GOVERSION ($TOOL_VER)"; \
-        echo "Fix: unset GOROOT GOTOOLDIR, or run 'mise install go'"; \
+    COMPILE_VER=$(go tool compile -V 2>&1 | awk '{print $3}') || true; \
+    if [ "$GO_VER" != "$COMPILE_VER" ]; then \
+        echo "ERROR: go binary ($GO_VER) != go tool compile ($COMPILE_VER)"; \
+        echo "  go version:       $(go version)"; \
+        echo "  go tool compile:  $(go tool compile -V 2>&1)"; \
+        echo "  GOROOT:           $(go env GOROOT)"; \
+        echo "  GOTOOLDIR:        $(go env GOTOOLDIR)"; \
+        echo ""; \
+        echo "Fix: unset GOROOT GOTOOLDIR && mise install go && mise reshim"; \
         exit 1; \
     fi
 
