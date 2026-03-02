@@ -25,7 +25,28 @@ const (
 	KindReport DMailKind = "report"
 	// KindConvergence is generated when multiple D-Mails converge on the same target.
 	KindConvergence DMailKind = "convergence"
+	// KindCIResult is produced by CI/CD pipeline integrations.
+	KindCIResult DMailKind = "ci-result"
 )
+
+// DMailAction represents a recommended follow-up action for a D-Mail.
+type DMailAction string
+
+const (
+	// ActionRetry indicates the operation should be retried.
+	ActionRetry DMailAction = "retry"
+	// ActionEscalate indicates the issue should be escalated.
+	ActionEscalate DMailAction = "escalate"
+	// ActionResolve indicates the issue can be resolved.
+	ActionResolve DMailAction = "resolve"
+)
+
+// validActions is the set of valid DMailAction values per schema v1.
+var validActions = map[DMailAction]bool{
+	ActionRetry:    true,
+	ActionEscalate: true,
+	ActionResolve:  true,
+}
 
 // DMailStatus represents the lifecycle status of a D-Mail.
 type DMailStatus string
@@ -49,6 +70,8 @@ type dmailFrontmatter struct {
 	Description   string            `yaml:"description"`
 	Issues        []string          `yaml:"issues,omitempty"`
 	Severity      Severity          `yaml:"severity,omitempty"`
+	Action        DMailAction       `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
 	Targets       []string          `yaml:"targets,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 }
@@ -61,6 +84,8 @@ type DMail struct {
 	Description   string            `yaml:"description"`
 	Issues        []string          `yaml:"issues,omitempty"`
 	Severity      Severity          `yaml:"severity,omitempty"`
+	Action        DMailAction       `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
 	Targets       []string          `yaml:"targets,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Body          string            `yaml:"-"`
@@ -72,6 +97,7 @@ var validKinds = map[DMailKind]bool{
 	KindSpecification: true,
 	KindReport:        true,
 	KindConvergence:   true,
+	KindCIResult:      true,
 }
 
 // validSeverities is the set of valid Severity values per schema v1.
@@ -104,6 +130,9 @@ func ValidateDMail(dmail DMail) []string {
 	if dmail.Severity != "" && !validSeverities[dmail.Severity] {
 		errs = append(errs, fmt.Sprintf("invalid severity: %q", dmail.Severity))
 	}
+	if dmail.Action != "" && !validActions[dmail.Action] {
+		errs = append(errs, fmt.Sprintf("invalid action %q", dmail.Action))
+	}
 	return errs
 }
 
@@ -133,6 +162,8 @@ func ParseDMail(data []byte) (DMail, error) {
 		Description:   fm.Description,
 		Issues:        fm.Issues,
 		Severity:      NormalizeSeverity(fm.Severity),
+		Action:        fm.Action,
+		Priority:      fm.Priority,
 		Targets:       fm.Targets,
 		Metadata:      fm.Metadata,
 		Body:          strings.TrimLeft(bodyPart, "\n"),
@@ -169,6 +200,8 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 		Description:   dmail.Description,
 		Issues:        dmail.Issues,
 		Severity:      dmail.Severity,
+		Action:        dmail.Action,
+		Priority:      dmail.Priority,
 		Targets:       dmail.Targets,
 		Metadata:      meta,
 	}

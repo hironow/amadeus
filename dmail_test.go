@@ -255,7 +255,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 }
 
 func TestValidateDMail_AllKinds(t *testing.T) {
-	for _, kind := range []amadeus.DMailKind{amadeus.KindFeedback, amadeus.KindSpecification, amadeus.KindReport, amadeus.KindConvergence} {
+	for _, kind := range []amadeus.DMailKind{amadeus.KindFeedback, amadeus.KindSpecification, amadeus.KindReport, amadeus.KindConvergence, amadeus.KindCIResult} {
 		dmail := amadeus.DMail{
 			SchemaVersion: amadeus.DMailSchemaVersion,
 			Name:          "test-001",
@@ -606,6 +606,163 @@ func TestExtractIssueIDs_NonMyPrefix(t *testing.T) {
 	}
 	if ids[0] != "AM-123" || ids[1] != "OPS-45" {
 		t.Errorf("expected [AM-123 OPS-45], got %v", ids)
+	}
+}
+
+func TestValidateDMail_CIResultKind(t *testing.T) {
+	// given: D-Mail with ci-result kind
+	dmail := amadeus.DMail{
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "ci-result-pr42-run1",
+		Kind:          amadeus.KindCIResult,
+		Description:   "GitHub Actions CI run for PR #42",
+	}
+
+	// when
+	errs := amadeus.ValidateDMail(dmail)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for ci-result kind, got %v", errs)
+	}
+}
+
+func TestParseDMail_ActionField_RoundTrip(t *testing.T) {
+	// given: D-Mail with action field
+	original := amadeus.DMail{
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-action-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "Evaluation with retry action",
+		Action:        amadeus.ActionRetry,
+		Body:          "Implementation needs revision.\n",
+	}
+
+	// when: marshal then parse
+	data, err := amadeus.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+	parsed, err := amadeus.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail round-trip failed: %v", err)
+	}
+
+	// then: action field preserved
+	if parsed.Action != amadeus.ActionRetry {
+		t.Errorf("expected action %q, got %q", amadeus.ActionRetry, parsed.Action)
+	}
+}
+
+func TestValidateDMail_InvalidAction(t *testing.T) {
+	// given: D-Mail with invalid action
+	dmail := amadeus.DMail{
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "test",
+		Action:        amadeus.DMailAction("invalid-action"),
+	}
+
+	// when
+	errs := amadeus.ValidateDMail(dmail)
+
+	// then
+	if len(errs) == 0 {
+		t.Error("expected error for invalid action")
+	}
+	found := false
+	for _, e := range errs {
+		if e == `invalid action "invalid-action"` {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected invalid action error message, got %v", errs)
+	}
+}
+
+func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
+	// given: D-Mail without action (action is optional)
+	dmail := amadeus.DMail{
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "test",
+	}
+
+	// when
+	errs := amadeus.ValidateDMail(dmail)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty action, got %v", errs)
+	}
+}
+
+func TestValidateDMail_AllActions(t *testing.T) {
+	for _, action := range []amadeus.DMailAction{amadeus.ActionRetry, amadeus.ActionEscalate, amadeus.ActionResolve} {
+		dmail := amadeus.DMail{
+			SchemaVersion: amadeus.DMailSchemaVersion,
+			Name:          "test-001",
+			Kind:          amadeus.KindFeedback,
+			Description:   "test",
+			Action:        action,
+		}
+		errs := amadeus.ValidateDMail(dmail)
+		if len(errs) != 0 {
+			t.Errorf("action %s: expected no errors, got %v", action, errs)
+		}
+	}
+}
+
+func TestParseDMail_PriorityField_RoundTrip(t *testing.T) {
+	// given: D-Mail with priority field
+	original := amadeus.DMail{
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "spec-priority-001",
+		Kind:          amadeus.KindSpecification,
+		Description:   "High priority specification",
+		Priority:      2,
+		Body:          "Implement authentication module.\n",
+	}
+
+	// when: marshal then parse
+	data, err := amadeus.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+	parsed, err := amadeus.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail round-trip failed: %v", err)
+	}
+
+	// then: priority field preserved
+	if parsed.Priority != 2 {
+		t.Errorf("expected priority 2, got %d", parsed.Priority)
+	}
+}
+
+func TestParseDMail_ZeroPriority_OmittedInMarshal(t *testing.T) {
+	// given: D-Mail without priority (zero value)
+	original := amadeus.DMail{
+		SchemaVersion: amadeus.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          amadeus.KindFeedback,
+		Description:   "test without prio field",
+	}
+
+	// when
+	data, err := amadeus.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+
+	// then: "priority:" YAML key not present in output
+	content := string(data)
+	if strings.Contains(content, "priority:") {
+		t.Errorf("expected no 'priority:' key in output for zero value, got:\n%s", content)
 	}
 }
 
