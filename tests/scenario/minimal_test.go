@@ -54,5 +54,8 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	// Verify feedback kind
 	obs.AssertDMailKind(feedbackPath, "feedback")
 
+	// Verify closed loop: all 3 delivery points have D-Mails
+	obs.WaitForClosedLoop(60 * time.Second)
+
 	obs.AssertAllOutboxEmpty()
 }

@@ -99,11 +99,14 @@ func (o *Observer) AssertDMailKind(path, expectedKind string) {
 	}
 }
 
-// WaitForClosedLoop waits for a complete closed loop (specification -> report -> feedback).
+// WaitForClosedLoop waits for a complete closed loop (report -> feedback).
 // It polls all 3 delivery points:
-//  1. specification in .expedition/inbox
-//  2. report in .gate/inbox
-//  3. feedback in .siren/inbox AND .expedition/inbox
+//  1. feedback in .expedition/inbox (delivered by phonewave from .gate/outbox)
+//  2. report in .gate/archive (amadeus consumed from .gate/inbox and archived)
+//  3. feedback in .siren/inbox (delivered by phonewave from .gate/outbox)
+//
+// NOTE: amadeus checks .gate/archive (not .gate/inbox) because amadeus
+// consumes reports from inbox during check, archiving them in the process.
 func (o *Observer) WaitForClosedLoop(timeout time.Duration) {
 	o.t.Helper()
 	stepTimeout := timeout / 3
@@ -112,6 +115,6 @@ func (o *Observer) WaitForClosedLoop(timeout time.Duration) {
 	}
 
 	o.ws.WaitForDMail(o.t, ".expedition", "inbox", stepTimeout)
-	o.ws.WaitForDMail(o.t, ".gate", "inbox", stepTimeout)
+	o.ws.WaitForDMail(o.t, ".gate", "archive", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".siren", "inbox", stepTimeout)
 }
