@@ -1,0 +1,21 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 15, "details": "ADR-003 minor tension with auth module"},
+    "dod_fulfillment": {"score": 20, "details": "Issue AUTH-1 edge case not covered"},
+    "dependency_integrity": {"score": 10, "details": "auth -> cart dependency detected"},
+    "implicit_constraints": {"score": 5, "details": "Naming convention drift in utils/"}
+  },
+  "dmails": [
+    {
+      "description": "ADR-003 needs review for auth module changes",
+      "detail": "The auth module implementation has drifted from ADR-003 guidelines.",
+      "issues": ["AUTH-1"],
+      "targets": ["auth/session.go"]
+    }
+  ],
+  "reasoning": "Full calibration detected moderate divergence. ADR-003 tension is the primary concern.",
+  "impact_radius": [
+    {"area": "auth/session.go", "impact": "direct", "detail": "Session validation changed"},
+    {"area": "api/middleware.go", "impact": "indirect", "detail": "Uses auth session"}
+  ]
+}
