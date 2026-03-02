@@ -16,12 +16,35 @@ func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive-prune",
 		Short: "Prune old archived files",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Prune archived d-mail files and expired event files.
+
+By default, runs in dry-run mode showing what would be deleted.
+Pass --execute to actually remove the files.`,
+		Example: `  # Dry-run: list expired files (default 30 days)
+  amadeus archive-prune
+
+  # Delete expired files (with confirmation)
+  amadeus archive-prune --execute
+
+  # Delete without confirmation
+  amadeus archive-prune --execute --yes
+
+  # Custom retention period
+  amadeus archive-prune --days 7 --execute
+
+  # JSON output for scripting
+  amadeus archive-prune -o json`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
-			dryRun, _ := cmd.Flags().GetBool("dry-run")
+			execute, _ := cmd.Flags().GetBool("execute")
+			dryRunExplicit := cmd.Flags().Changed("dry-run")
 			yes, _ := cmd.Flags().GetBool("yes")
 			outputFmt, _ := cmd.Flags().GetString("output")
+
+			if execute && dryRunExplicit {
+				return fmt.Errorf("--execute and --dry-run are mutually exclusive")
+			}
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
@@ -31,7 +54,7 @@ func newArchivePruneCommand() *cobra.Command {
 			pruneCmd := amadeus.ArchivePruneCommand{
 				RepoPath: repoRoot,
 				Days:     days,
-				DryRun:   dryRun,
+				DryRun:   !execute,
 				Yes:      yes,
 			}
 
@@ -65,7 +88,7 @@ func newArchivePruneCommand() *cobra.Command {
 					EventCandidates:   len(result.EventCandidates),
 					EventFiles:        result.EventCandidates,
 				}
-				if !dryRun {
+				if execute {
 					totalCount, execErr := usecase.ExecutePrune(result, divRoot, eventsDir)
 					if execErr != nil {
 						return execErr
@@ -105,8 +128,8 @@ func newArchivePruneCommand() *cobra.Command {
 				}
 			}
 
-			if dryRun {
-				fmt.Fprintf(errW, "\n(dry-run — no files deleted)\n")
+			if !execute {
+				fmt.Fprintln(errW, "(dry-run — pass --execute to delete)")
 				return nil
 			}
 
@@ -138,9 +161,10 @@ func newArchivePruneCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntP("days", "d", 30, "prune files older than N days")
-	cmd.Flags().BoolP("dry-run", "n", false, "show what would be pruned without deleting")
-	cmd.Flags().BoolP("yes", "y", false, "skip confirmation prompt")
+	cmd.Flags().IntP("days", "d", 30, "Retention days")
+	cmd.Flags().BoolP("execute", "x", false, "Execute pruning (default: dry-run)")
+	cmd.Flags().BoolP("dry-run", "n", false, "Dry-run mode (default behavior, explicit for scripting)")
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }

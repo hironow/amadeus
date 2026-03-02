@@ -55,7 +55,7 @@ func TestArchivePrune_PrunesEventFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// when: run archive-prune with --yes from the temp dir
+	// when: run archive-prune with --execute --yes from the temp dir
 	origDir, _ := os.Getwd()
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
@@ -63,7 +63,7 @@ func TestArchivePrune_PrunesEventFiles(t *testing.T) {
 	root := NewRootCommand()
 	var stderr bytes.Buffer
 	root.SetErr(&stderr)
-	root.SetArgs([]string{"archive-prune", "--days", "30", "--yes"})
+	root.SetArgs([]string{"archive-prune", "--days", "30", "--execute", "--yes"})
 
 	err := root.Execute()
 
@@ -127,7 +127,7 @@ func TestArchivePrune_FailsWhenEventRecordFails(t *testing.T) {
 	root := NewRootCommand()
 	var stderr bytes.Buffer
 	root.SetErr(&stderr)
-	root.SetArgs([]string{"archive-prune", "--days", "30", "--yes"})
+	root.SetArgs([]string{"archive-prune", "--days", "30", "--execute", "--yes"})
 
 	err := root.Execute()
 
@@ -214,7 +214,7 @@ func TestArchivePrune_JSONOutput_Execute(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
 	root.SetErr(errBuf)
-	root.SetArgs([]string{"--output", "json", "archive-prune", "--yes", tmpDir})
+	root.SetArgs([]string{"--output", "json", "archive-prune", "--execute", "--yes", tmpDir})
 
 	// when
 	err := root.Execute()
