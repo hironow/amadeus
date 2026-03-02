@@ -124,28 +124,39 @@ test-e2e-shell:
 test-e2e-down:
     docker compose -f tests/e2e/compose-e2e.yaml down --rmi local --volumes
 
+# Verify Go toolchain consistency (GOROOT vs go binary)
+[private]
+check-go:
+    @GO_VER=$(go version | awk '{print $3}'); \
+    TOOL_VER=$(go env GOVERSION); \
+    if [ "$GO_VER" != "$TOOL_VER" ]; then \
+        echo "ERROR: go binary ($GO_VER) != GOVERSION ($TOOL_VER)"; \
+        echo "Fix: unset GOROOT GOTOOLDIR, or run 'mise install go'"; \
+        exit 1; \
+    fi
+
 # Run L1 scenario test
-test-scenario-min:
+test-scenario-min: check-go
     go test -tags scenario ./tests/scenario/ -run TestScenario_L1 -count=1 -v -timeout=120s
 
 # Run L2 scenario test
-test-scenario-small:
+test-scenario-small: check-go
     go test -tags scenario ./tests/scenario/ -run TestScenario_L2 -count=1 -v -timeout=180s
 
 # Run L3 scenario test
-test-scenario-middle:
+test-scenario-middle: check-go
     go test -tags scenario ./tests/scenario/ -run TestScenario_L3 -count=1 -v -timeout=300s
 
 # Run L4 scenario test
-test-scenario-hard:
+test-scenario-hard: check-go
     go test -tags scenario ./tests/scenario/ -run TestScenario_L4 -count=1 -v -timeout=600s
 
 # Run L1+L2 scenario tests (CI default)
-test-scenario:
+test-scenario: check-go
     go test -tags scenario ./tests/scenario/ -run "TestScenario_L[12]" -count=1 -v -timeout=300s
 
 # Run all scenario tests
-test-scenario-all:
+test-scenario-all: check-go
     go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
 
 # Clean build artifacts
