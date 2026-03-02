@@ -1,8 +1,10 @@
-package amadeus
+package amadeus_test
 
 import (
 	"math"
 	"testing"
+
+	"github.com/hironow/amadeus"
 )
 
 func almostEqual(a, b float64) bool {
@@ -10,13 +12,13 @@ func almostEqual(a, b float64) bool {
 }
 
 func TestCalcDivergence_AllZero(t *testing.T) {
-	axes := map[Axis]AxisScore{
-		AxisADR:        {Score: 0},
-		AxisDoD:        {Score: 0},
-		AxisDependency: {Score: 0},
-		AxisImplicit:   {Score: 0},
+	axes := map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR:        {Score: 0},
+		amadeus.AxisDoD:        {Score: 0},
+		amadeus.AxisDependency: {Score: 0},
+		amadeus.AxisImplicit:   {Score: 0},
 	}
-	result := CalcDivergence(axes, DefaultWeights())
+	result := amadeus.CalcDivergence(axes, amadeus.DefaultWeights())
 	if !almostEqual(result.Value, 0.0) {
 		t.Errorf("expected 0.000000, got %f", result.Value)
 	}
@@ -26,13 +28,13 @@ func TestCalcDivergence_AllZero(t *testing.T) {
 }
 
 func TestCalcDivergence_MaxDeviation(t *testing.T) {
-	axes := map[Axis]AxisScore{
-		AxisADR:        {Score: 100},
-		AxisDoD:        {Score: 100},
-		AxisDependency: {Score: 100},
-		AxisImplicit:   {Score: 100},
+	axes := map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR:        {Score: 100},
+		amadeus.AxisDoD:        {Score: 100},
+		amadeus.AxisDependency: {Score: 100},
+		amadeus.AxisImplicit:   {Score: 100},
 	}
-	result := CalcDivergence(axes, DefaultWeights())
+	result := amadeus.CalcDivergence(axes, amadeus.DefaultWeights())
 	if !almostEqual(result.Value, 1.0) {
 		t.Errorf("expected 1.000000, got %f", result.Value)
 	}
@@ -45,13 +47,13 @@ func TestCalcDivergence_WeightedSum(t *testing.T) {
 	// From architecture doc example:
 	// ADR=15, DoD=20, Dep=10, Implicit=5
 	// Internal = 15*0.4 + 20*0.3 + 10*0.2 + 5*0.1 = 6+6+2+0.5 = 14.5
-	axes := map[Axis]AxisScore{
-		AxisADR:        {Score: 15, Details: "ADR-003 minor tension"},
-		AxisDoD:        {Score: 20, Details: "Issue #42 edge case"},
-		AxisDependency: {Score: 10, Details: "clean"},
-		AxisImplicit:   {Score: 5, Details: "naming drift in cart"},
+	axes := map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR:        {Score: 15, Details: "ADR-003 minor tension"},
+		amadeus.AxisDoD:        {Score: 20, Details: "Issue #42 edge case"},
+		amadeus.AxisDependency: {Score: 10, Details: "clean"},
+		amadeus.AxisImplicit:   {Score: 5, Details: "naming drift in cart"},
 	}
-	result := CalcDivergence(axes, DefaultWeights())
+	result := amadeus.CalcDivergence(axes, amadeus.DefaultWeights())
 	if !almostEqual(result.Internal, 14.5) {
 		t.Errorf("expected internal 14.5, got %f", result.Internal)
 	}
@@ -61,11 +63,11 @@ func TestCalcDivergence_WeightedSum(t *testing.T) {
 }
 
 func TestDetermineSeverity_Low(t *testing.T) {
-	result := DivergenceResult{Internal: 10.0, Value: 0.10, Axes: map[Axis]AxisScore{
-		AxisADR: {Score: 10}, AxisDoD: {Score: 10}, AxisDependency: {Score: 10}, AxisImplicit: {Score: 10},
+	result := amadeus.DivergenceResult{Internal: 10.0, Value: 0.10, Axes: map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR: {Score: 10}, amadeus.AxisDoD: {Score: 10}, amadeus.AxisDependency: {Score: 10}, amadeus.AxisImplicit: {Score: 10},
 	}}
-	sev := DetermineSeverity(result, DefaultThresholds())
-	if sev.Severity != SeverityLow {
+	sev := amadeus.DetermineSeverity(result, amadeus.DefaultThresholds())
+	if sev.Severity != amadeus.SeverityLow {
 		t.Errorf("expected low, got %s", sev.Severity)
 	}
 	if sev.Overridden {
@@ -74,32 +76,32 @@ func TestDetermineSeverity_Low(t *testing.T) {
 }
 
 func TestDetermineSeverity_Medium(t *testing.T) {
-	result := DivergenceResult{Internal: 35.0, Value: 0.35, Axes: map[Axis]AxisScore{
-		AxisADR: {Score: 30}, AxisDoD: {Score: 30}, AxisDependency: {Score: 30}, AxisImplicit: {Score: 30},
+	result := amadeus.DivergenceResult{Internal: 35.0, Value: 0.35, Axes: map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR: {Score: 30}, amadeus.AxisDoD: {Score: 30}, amadeus.AxisDependency: {Score: 30}, amadeus.AxisImplicit: {Score: 30},
 	}}
-	sev := DetermineSeverity(result, DefaultThresholds())
-	if sev.Severity != SeverityMedium {
+	sev := amadeus.DetermineSeverity(result, amadeus.DefaultThresholds())
+	if sev.Severity != amadeus.SeverityMedium {
 		t.Errorf("expected medium, got %s", sev.Severity)
 	}
 }
 
 func TestDetermineSeverity_High(t *testing.T) {
-	result := DivergenceResult{Internal: 60.0, Value: 0.60, Axes: map[Axis]AxisScore{
-		AxisADR: {Score: 50}, AxisDoD: {Score: 50}, AxisDependency: {Score: 50}, AxisImplicit: {Score: 50},
+	result := amadeus.DivergenceResult{Internal: 60.0, Value: 0.60, Axes: map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR: {Score: 50}, amadeus.AxisDoD: {Score: 50}, amadeus.AxisDependency: {Score: 50}, amadeus.AxisImplicit: {Score: 50},
 	}}
-	sev := DetermineSeverity(result, DefaultThresholds())
-	if sev.Severity != SeverityHigh {
+	sev := amadeus.DetermineSeverity(result, amadeus.DefaultThresholds())
+	if sev.Severity != amadeus.SeverityHigh {
 		t.Errorf("expected high, got %s", sev.Severity)
 	}
 }
 
 func TestDetermineSeverity_ADROverrideForceHigh(t *testing.T) {
 	// Total divergence is LOW (internal=24) but ADR axis=60 forces HIGH
-	result := DivergenceResult{Internal: 24.0, Value: 0.24, Axes: map[Axis]AxisScore{
-		AxisADR: {Score: 60}, AxisDoD: {Score: 0}, AxisDependency: {Score: 0}, AxisImplicit: {Score: 0},
+	result := amadeus.DivergenceResult{Internal: 24.0, Value: 0.24, Axes: map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR: {Score: 60}, amadeus.AxisDoD: {Score: 0}, amadeus.AxisDependency: {Score: 0}, amadeus.AxisImplicit: {Score: 0},
 	}}
-	sev := DetermineSeverity(result, DefaultThresholds())
-	if sev.Severity != SeverityHigh {
+	sev := amadeus.DetermineSeverity(result, amadeus.DefaultThresholds())
+	if sev.Severity != amadeus.SeverityHigh {
 		t.Errorf("expected high (ADR override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
@@ -108,11 +110,11 @@ func TestDetermineSeverity_ADROverrideForceHigh(t *testing.T) {
 }
 
 func TestDetermineSeverity_DoDOverrideForceHigh(t *testing.T) {
-	result := DivergenceResult{Internal: 21.0, Value: 0.21, Axes: map[Axis]AxisScore{
-		AxisADR: {Score: 0}, AxisDoD: {Score: 70}, AxisDependency: {Score: 0}, AxisImplicit: {Score: 0},
+	result := amadeus.DivergenceResult{Internal: 21.0, Value: 0.21, Axes: map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR: {Score: 0}, amadeus.AxisDoD: {Score: 70}, amadeus.AxisDependency: {Score: 0}, amadeus.AxisImplicit: {Score: 0},
 	}}
-	sev := DetermineSeverity(result, DefaultThresholds())
-	if sev.Severity != SeverityHigh {
+	sev := amadeus.DetermineSeverity(result, amadeus.DefaultThresholds())
+	if sev.Severity != amadeus.SeverityHigh {
 		t.Errorf("expected high (DoD override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
@@ -121,11 +123,11 @@ func TestDetermineSeverity_DoDOverrideForceHigh(t *testing.T) {
 }
 
 func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
-	result := DivergenceResult{Internal: 16.0, Value: 0.16, Axes: map[Axis]AxisScore{
-		AxisADR: {Score: 0}, AxisDoD: {Score: 0}, AxisDependency: {Score: 80}, AxisImplicit: {Score: 0},
+	result := amadeus.DivergenceResult{Internal: 16.0, Value: 0.16, Axes: map[amadeus.Axis]amadeus.AxisScore{
+		amadeus.AxisADR: {Score: 0}, amadeus.AxisDoD: {Score: 0}, amadeus.AxisDependency: {Score: 80}, amadeus.AxisImplicit: {Score: 0},
 	}}
-	sev := DetermineSeverity(result, DefaultThresholds())
-	if sev.Severity != SeverityMedium {
+	sev := amadeus.DetermineSeverity(result, amadeus.DefaultThresholds())
+	if sev.Severity != amadeus.SeverityMedium {
 		t.Errorf("expected medium (Dep override), got %s", sev.Severity)
 	}
 	if !sev.Overridden {
@@ -136,23 +138,23 @@ func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
 func TestNormalizeSeverity(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    Severity
-		expected Severity
+		input    amadeus.Severity
+		expected amadeus.Severity
 	}{
-		{"lowercase low", SeverityLow, SeverityLow},
-		{"lowercase medium", SeverityMedium, SeverityMedium},
-		{"lowercase high", SeverityHigh, SeverityHigh},
-		{"uppercase LOW", Severity("LOW"), SeverityLow},
-		{"uppercase MEDIUM", Severity("MEDIUM"), SeverityMedium},
-		{"uppercase HIGH", Severity("HIGH"), SeverityHigh},
-		{"mixed case High", Severity("High"), SeverityHigh},
-		{"mixed case Medium", Severity("Medium"), SeverityMedium},
-		{"empty string", Severity(""), Severity("")},
-		{"unrecognized", Severity("critical"), Severity("critical")},
+		{"lowercase low", amadeus.SeverityLow, amadeus.SeverityLow},
+		{"lowercase medium", amadeus.SeverityMedium, amadeus.SeverityMedium},
+		{"lowercase high", amadeus.SeverityHigh, amadeus.SeverityHigh},
+		{"uppercase LOW", amadeus.Severity("LOW"), amadeus.SeverityLow},
+		{"uppercase MEDIUM", amadeus.Severity("MEDIUM"), amadeus.SeverityMedium},
+		{"uppercase HIGH", amadeus.Severity("HIGH"), amadeus.SeverityHigh},
+		{"mixed case High", amadeus.Severity("High"), amadeus.SeverityHigh},
+		{"mixed case Medium", amadeus.Severity("Medium"), amadeus.SeverityMedium},
+		{"empty string", amadeus.Severity(""), amadeus.Severity("")},
+		{"unrecognized", amadeus.Severity("critical"), amadeus.Severity("critical")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NormalizeSeverity(tt.input)
+			got := amadeus.NormalizeSeverity(tt.input)
 			if got != tt.expected {
 				t.Errorf("NormalizeSeverity(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
@@ -175,7 +177,7 @@ func TestFormatDivergence(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FormatDivergence(tt.internal)
+			got := amadeus.FormatDivergence(tt.internal)
 			if got != tt.expected {
 				t.Errorf("FormatDivergence(%f) = %q, want %q", tt.internal, got, tt.expected)
 			}
@@ -197,7 +199,7 @@ func TestFormatDelta(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FormatDelta(tt.current, tt.previous)
+			got := amadeus.FormatDelta(tt.current, tt.previous)
 			if got != tt.expected {
 				t.Errorf("FormatDelta(%f, %f) = %q, want %q", tt.current, tt.previous, got, tt.expected)
 			}
@@ -206,17 +208,17 @@ func TestFormatDelta(t *testing.T) {
 }
 
 func TestDivergenceMeter_ProcessResponse(t *testing.T) {
-	meter := &DivergenceMeter{
-		Config: DefaultConfig(),
+	meter := &amadeus.DivergenceMeter{
+		Config: amadeus.DefaultConfig(),
 	}
-	resp := ClaudeResponse{
-		Axes: map[Axis]AxisScore{
-			AxisADR:        {Score: 15, Details: "minor"},
-			AxisDoD:        {Score: 20, Details: "edge case"},
-			AxisDependency: {Score: 10, Details: "clean"},
-			AxisImplicit:   {Score: 5, Details: "naming"},
+	resp := amadeus.ClaudeResponse{
+		Axes: map[amadeus.Axis]amadeus.AxisScore{
+			amadeus.AxisADR:        {Score: 15, Details: "minor"},
+			amadeus.AxisDoD:        {Score: 20, Details: "edge case"},
+			amadeus.AxisDependency: {Score: 10, Details: "clean"},
+			amadeus.AxisImplicit:   {Score: 5, Details: "naming"},
 		},
-		DMails: []ClaudeDMailCandidate{
+		DMails: []amadeus.ClaudeDMailCandidate{
 			{Description: "ADR-003", Detail: "violation"},
 		},
 		Reasoning: "Minor tensions",
@@ -225,7 +227,7 @@ func TestDivergenceMeter_ProcessResponse(t *testing.T) {
 	if !almostEqual(result.Divergence.Internal, 14.5) {
 		t.Errorf("expected internal 14.5, got %f", result.Divergence.Internal)
 	}
-	if result.Divergence.Severity != SeverityLow {
+	if result.Divergence.Severity != amadeus.SeverityLow {
 		t.Errorf("expected low severity, got %s", result.Divergence.Severity)
 	}
 	if len(result.DMailCandidates) != 1 {
@@ -235,17 +237,17 @@ func TestDivergenceMeter_ProcessResponse(t *testing.T) {
 
 func TestDivergenceMeter_ProcessResponse_PassesImpactRadius(t *testing.T) {
 	// given
-	meter := &DivergenceMeter{Config: DefaultConfig()}
-	resp := ClaudeResponse{
-		Axes: map[Axis]AxisScore{
-			AxisADR:        {Score: 0, Details: "ok"},
-			AxisDoD:        {Score: 0, Details: "ok"},
-			AxisDependency: {Score: 0, Details: "ok"},
-			AxisImplicit:   {Score: 0, Details: "ok"},
+	meter := &amadeus.DivergenceMeter{Config: amadeus.DefaultConfig()}
+	resp := amadeus.ClaudeResponse{
+		Axes: map[amadeus.Axis]amadeus.AxisScore{
+			amadeus.AxisADR:        {Score: 0, Details: "ok"},
+			amadeus.AxisDoD:        {Score: 0, Details: "ok"},
+			amadeus.AxisDependency: {Score: 0, Details: "ok"},
+			amadeus.AxisImplicit:   {Score: 0, Details: "ok"},
 		},
-		DMails:    []ClaudeDMailCandidate{},
+		DMails:    []amadeus.ClaudeDMailCandidate{},
 		Reasoning: "clean",
-		ImpactRadius: []ImpactEntry{
+		ImpactRadius: []amadeus.ImpactEntry{
 			{Area: "auth/session.go", Impact: "direct", Detail: "changed"},
 			{Area: "api/handler.go", Impact: "indirect", Detail: "calls auth"},
 		},
@@ -268,15 +270,15 @@ func TestDivergenceMeter_ProcessResponse_PassesImpactRadius(t *testing.T) {
 
 func TestDivergenceMeter_ProcessResponse_NilImpactRadius(t *testing.T) {
 	// given: ClaudeResponse without ImpactRadius
-	meter := &DivergenceMeter{Config: DefaultConfig()}
-	resp := ClaudeResponse{
-		Axes: map[Axis]AxisScore{
-			AxisADR:        {Score: 0, Details: "ok"},
-			AxisDoD:        {Score: 0, Details: "ok"},
-			AxisDependency: {Score: 0, Details: "ok"},
-			AxisImplicit:   {Score: 0, Details: "ok"},
+	meter := &amadeus.DivergenceMeter{Config: amadeus.DefaultConfig()}
+	resp := amadeus.ClaudeResponse{
+		Axes: map[amadeus.Axis]amadeus.AxisScore{
+			amadeus.AxisADR:        {Score: 0, Details: "ok"},
+			amadeus.AxisDoD:        {Score: 0, Details: "ok"},
+			amadeus.AxisDependency: {Score: 0, Details: "ok"},
+			amadeus.AxisImplicit:   {Score: 0, Details: "ok"},
 		},
-		DMails:    []ClaudeDMailCandidate{},
+		DMails:    []amadeus.ClaudeDMailCandidate{},
 		Reasoning: "clean",
 	}
 
@@ -290,21 +292,21 @@ func TestDivergenceMeter_ProcessResponse_NilImpactRadius(t *testing.T) {
 }
 
 func TestDivergenceMeter_ProcessResponse_HighSeverity(t *testing.T) {
-	meter := &DivergenceMeter{
-		Config: DefaultConfig(),
+	meter := &amadeus.DivergenceMeter{
+		Config: amadeus.DefaultConfig(),
 	}
-	resp := ClaudeResponse{
-		Axes: map[Axis]AxisScore{
-			AxisADR:        {Score: 70, Details: "major violation"},
-			AxisDoD:        {Score: 50, Details: "failing"},
-			AxisDependency: {Score: 40, Details: "broken"},
-			AxisImplicit:   {Score: 30, Details: "messy"},
+	resp := amadeus.ClaudeResponse{
+		Axes: map[amadeus.Axis]amadeus.AxisScore{
+			amadeus.AxisADR:        {Score: 70, Details: "major violation"},
+			amadeus.AxisDoD:        {Score: 50, Details: "failing"},
+			amadeus.AxisDependency: {Score: 40, Details: "broken"},
+			amadeus.AxisImplicit:   {Score: 30, Details: "messy"},
 		},
-		DMails:    []ClaudeDMailCandidate{},
+		DMails:    []amadeus.ClaudeDMailCandidate{},
 		Reasoning: "Serious issues",
 	}
 	result := meter.ProcessResponse(resp)
-	if result.Divergence.Severity != SeverityHigh {
+	if result.Divergence.Severity != amadeus.SeverityHigh {
 		t.Errorf("expected high severity, got %s", result.Divergence.Severity)
 	}
 }

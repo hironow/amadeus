@@ -1,4 +1,4 @@
-package amadeus
+package amadeus_test
 
 import (
 	"bytes"
@@ -7,11 +7,13 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus"
 )
 
 func TestLogger_Info(t *testing.T) {
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 	log.Info("hello %s", "world")
 
 	got := buf.String()
@@ -25,7 +27,7 @@ func TestLogger_Info(t *testing.T) {
 
 func TestLogger_OK(t *testing.T) {
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 	log.OK("done")
 	if !strings.Contains(buf.String(), " OK  done") {
 		t.Errorf("expected OK prefix, got %q", buf.String())
@@ -34,7 +36,7 @@ func TestLogger_OK(t *testing.T) {
 
 func TestLogger_Warn(t *testing.T) {
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 	log.Warn("careful")
 	if !strings.Contains(buf.String(), "WARN careful") {
 		t.Errorf("expected WARN prefix, got %q", buf.String())
@@ -43,7 +45,7 @@ func TestLogger_Warn(t *testing.T) {
 
 func TestLogger_Error(t *testing.T) {
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 	log.Error("bad")
 	if !strings.Contains(buf.String(), " ERR bad") {
 		t.Errorf("expected ERR prefix, got %q", buf.String())
@@ -52,7 +54,7 @@ func TestLogger_Error(t *testing.T) {
 
 func TestLogger_Verbose_Suppressed(t *testing.T) {
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 	log.Debug("hidden")
 	if buf.Len() != 0 {
 		t.Errorf("expected no output in non-verbose mode, got %q", buf.String())
@@ -61,7 +63,7 @@ func TestLogger_Verbose_Suppressed(t *testing.T) {
 
 func TestLogger_Verbose_Shown(t *testing.T) {
 	var buf bytes.Buffer
-	log := NewLogger(&buf, true)
+	log := amadeus.NewLogger(&buf, true)
 	log.Debug("shown")
 	if !strings.Contains(buf.String(), "DBUG shown") {
 		t.Errorf("expected DBUG prefix, got %q", buf.String())
@@ -73,7 +75,7 @@ func TestLogger_SetExtraWriter(t *testing.T) {
 	path := filepath.Join(dir, "test.log")
 
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
@@ -105,7 +107,7 @@ func TestLogger_SetExtraWriter_Nil(t *testing.T) {
 	path := filepath.Join(dir, "test.log")
 
 	var buf bytes.Buffer
-	log := NewLogger(&buf, false)
+	log := amadeus.NewLogger(&buf, false)
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {

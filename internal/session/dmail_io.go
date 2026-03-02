@@ -35,26 +35,6 @@ func (s *ProjectionStore) NextDMailName(kind amadeus.DMailKind) (string, error) 
 	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
 }
 
-// SaveDMail writes a D-Mail to archive/ and outbox/.
-// Archive is always written first so the permanent record exists even if
-// the second write fails. All D-Mails go directly to outbox/ (MY-359).
-func (s *ProjectionStore) SaveDMail(dmail amadeus.DMail) error {
-	data, err := amadeus.MarshalDMail(dmail)
-	if err != nil {
-		return fmt.Errorf("marshal dmail: %w", err)
-	}
-	filename := dmail.Name + ".md"
-	archivePath := filepath.Join(s.Root, "archive", filename)
-	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
-		return fmt.Errorf("write archive: %w", err)
-	}
-	outboxPath := filepath.Join(s.Root, "outbox", filename)
-	if err := os.WriteFile(outboxPath, data, 0o644); err != nil {
-		return fmt.Errorf("write outbox: %w", err)
-	}
-	return nil
-}
-
 // SaveDMailToArchive writes a D-Mail to archive/ only, skipping outbox/.
 // Used during rebuild to avoid re-queuing historical D-Mails for delivery.
 func (s *ProjectionStore) SaveDMailToArchive(dmail amadeus.DMail) error {

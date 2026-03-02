@@ -1,8 +1,13 @@
 rules:
   # ==========================================================================
-  # ADR enforcement rules
-  # docs/adr/ (0000-0016) + S-series (S0001-S0005) のうち Go コードで静的検知できるものをカバー
-  # 対象外: ADR 0000 (governance), ADR 0004 (data format)
+  # Shared ADR enforcement rules (CANONICAL — identical across all tools)
+  #
+  # phonewave docs/adr/ (0001-0009) のうち Go コードで静的検知できるものをカバー
+  # + D4 resource leak detection
+  # 対象外: ADR 0000 (governance), ADR 0002 (stdio — see stdio.yaml),
+  #          ADR 0004 (data format), ADR 0006 (build config)
+  #
+  # Ref: phonewave docs/adr/ (canonical source for shared ADRs 0001-0009)
   # ==========================================================================
 
   # --- ADR 0001: cobra CLI conventions ---
@@ -15,7 +20,7 @@ rules:
       cobra.Command で Run フィールドを使用しないでください。
       RunE を使用して error を返すようにしてください。
       Run は error を返せないため、main() での exit code 制御ができなくなります。
-      Ref: docs/adr/0001-cobra-cli-framework.md
+      Ref: phonewave docs/adr/0001-cobra-cli-framework.md
     severity: ERROR
     pattern: |
       &cobra.Command{
@@ -33,7 +38,7 @@ rules:
     message: |
       otel.SetTracerProvider() は InitTracer() 内でのみ呼び出してください。
       TracerProvider の設定を分散させると noop デフォルトの保証が崩れます。
-      Ref: docs/adr/0003-otel-noop-default-tracer.md
+      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
     severity: WARNING
     patterns:
       - pattern: otel.SetTracerProvider(...)
@@ -45,46 +50,7 @@ rules:
       exclude:
         - "*_test.go"
 
-  # --- ADR 0005: fsnotify daemon ---
-
-  # Rule 3: fsnotify.NewWatcher without defer Close
-  # Source: ADR 0005 — watcher lifecycle management
-  - id: adr0005-fsnotify-watcher-without-close
-    languages: [go]
-    message: |
-      fsnotify.NewWatcher() の後に defer $W.Close() がありません。
-      watcher のファイルディスクリプタがリークします。
-      同一関数内で defer watcher.Close() を呼び出すか、
-      struct に保存して別途 Close する場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
-    severity: ERROR
-    patterns:
-      - pattern: |
-          $W, $ERR := fsnotify.NewWatcher()
-      - pattern-not-inside: |
-          $W, $_ := fsnotify.NewWatcher()
-          ...
-          defer $W.Close()
-
-  # Rule 4: String concatenation for file paths
-  # Source: ADR 0005 + Go convention — use filepath.Join
-  - id: adr0005-string-concat-file-path
-    languages: [go]
-    message: |
-      文字列連結 (+ "/" +) でファイルパスを構築しないでください。
-      filepath.Join() を使用してください。
-      OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
-      マップキーや表示用ラベルの場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
-    severity: WARNING
-    pattern-regex: '\+\s*"/"\s*\+'
-    paths:
-      exclude:
-        - "*_test.go"
-
-  # --- ADR 0003: OTel noop-default (continued) ---
-
-  # Rule 5: otel.SetMeterProvider outside InitTracer
+  # Rule 3: otel.SetMeterProvider outside InitTracer
   # Source: ADR 0003 — centralized provider initialization
   - id: adr0003-otel-set-meter-provider-outside-init
     languages: [go]
@@ -92,7 +58,7 @@ rules:
       otel.SetMeterProvider() は InitTracer() 内でのみ呼び出してください。
       MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
       TracerProvider と同様に集中管理してください。
-      Ref: docs/adr/0003-otel-noop-default-tracer.md
+      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
     severity: WARNING
     patterns:
       - pattern: otel.SetMeterProvider(...)
@@ -104,9 +70,62 @@ rules:
       exclude:
         - "*_test.go"
 
-  # --- ADR 0005: fsnotify daemon (continued) ---
+  # Rule 4: OTel span without defer End
+  # Source: ADR 0003 — OTel noop-default, span lifecycle
+  - id: adr0003-otel-span-without-defer-end
+    languages: [go]
+    message: |
+      tracer.Start() で作成した span に defer $SPAN.End() がありません。
+      span が End されないとメモリリークし、エクスポーターにも送信されません。
+      startRootSpan 等の別関数で End する場合は nosemgrep を付与してください。
+      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $CTX, $SPAN := $TRACER.Start(...)
+      - pattern-not-inside: |
+          $CTX, $SPAN := $TRACER.Start(...)
+          ...
+          defer $SPAN.End()
 
-  # Rule 6: mutex Lock without defer Unlock
+  # --- ADR 0005: fsnotify daemon ---
+
+  # Rule 5: fsnotify.NewWatcher without defer Close
+  # Source: ADR 0005 — watcher lifecycle management
+  - id: adr0005-fsnotify-watcher-without-close
+    languages: [go]
+    message: |
+      fsnotify.NewWatcher() の後に defer $W.Close() がありません。
+      watcher のファイルディスクリプタがリークします。
+      同一関数内で defer watcher.Close() を呼び出すか、
+      struct に保存して別途 Close する場合は nosemgrep を付与してください。
+      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $W, $ERR := fsnotify.NewWatcher()
+      - pattern-not-inside: |
+          $W, $_ := fsnotify.NewWatcher()
+          ...
+          defer $W.Close()
+
+  # Rule 6: String concatenation for file paths
+  # Source: ADR 0005 + Go convention — use filepath.Join
+  - id: adr0005-string-concat-file-path
+    languages: [go]
+    message: |
+      文字列連結 (+ "/" +) でファイルパスを構築しないでください。
+      filepath.Join() を使用してください。
+      OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
+      マップキーや表示用ラベルの場合は nosemgrep を付与してください。
+      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
+    severity: WARNING
+    pattern-regex: '\+\s*"/"\s*\+'
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # Rule 7: mutex Lock without defer Unlock
   # Source: ADR 0005 — thread-safe daemon operations
   - id: adr0005-mutex-lock-without-defer-unlock
     languages: [go]
@@ -114,7 +133,7 @@ rules:
       $M.Lock() の直後に defer $M.Unlock() がありません。
       Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
       条件付き Unlock が必要な場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
     severity: ERROR
     patterns:
       - pattern: $M.Lock()
@@ -123,9 +142,9 @@ rules:
           ...
           defer $M.Unlock()
 
-  # --- Shared ADR 0007: Docker E2E testing (canonical: phonewave) ---
+  # --- ADR 0007: Docker E2E testing ---
 
-  # Rule 7: testcontainers.GenericContainer without Terminate
+  # Rule 8: testcontainers.GenericContainer without Terminate
   # Source: ADR 0007 — container cleanup in Docker E2E
   - id: adr0007-testcontainers-generic-without-terminate
     languages: [go]
@@ -147,7 +166,7 @@ rules:
       include:
         - "*_test.go"
 
-  # Rule 8: Mock/stub usage in Docker E2E tests
+  # Rule 9: Mock/stub usage in Docker E2E tests
   # Source: ADR 0007 — "All dependencies must be real"
   - id: adr0007-mock-in-docker-test
     languages: [go]
@@ -165,9 +184,9 @@ rules:
       include:
         - "*_docker_test.go"
 
-  # --- Shared ADR 0008: Signal context propagation (canonical: phonewave) ---
+  # --- ADR 0008: Signal context propagation ---
 
-  # Rule 9: signal.Notify instead of signal.NotifyContext
+  # Rule 10: signal.Notify instead of signal.NotifyContext
   # Source: ADR 0008 — prefer NotifyContext for context-based cancellation
   - id: adr0008-signal-notify-instead-of-notifycontext
     languages: [go]
@@ -182,7 +201,7 @@ rules:
       exclude:
         - "*_test.go"
 
-  # Rule 10: Execute() without context
+  # Rule 11: Execute() without context
   # Source: ADR 0008 — "ExecuteContext(ctx) passes context to cobra root command"
   - id: adr0008-execute-without-context
     languages: [go]
@@ -198,9 +217,9 @@ rules:
       exclude:
         - "*_test.go"
 
-  # --- Shared ADR 0009: Config-relative state directory (canonical: phonewave) ---
+  # --- ADR 0009: Config-relative state directory ---
 
-  # Rule 11: os.Getwd in cobra command handler
+  # Rule 12: os.Getwd in cobra command handler
   # Source: ADR 0009 — state dir from configBase(cmd), not CWD
   - id: adr0009-os-getwd-in-cobra-cmd
     languages: [go]
@@ -216,3 +235,23 @@ rules:
           func($CMD *cobra.Command, $ARGS []string) error {
             ...
           }
+
+  # --- D4: Resource leak detection ---
+
+  # Rule 13: sql.Open without defer Close
+  # Source: CLAUDE.md — SQLite in .run/, connection lifecycle management
+  - id: d4-sql-open-without-defer-close
+    languages: [go]
+    message: |
+      sql.Open() の後に defer $DB.Close() がありません。
+      データベース接続がリークし、SQLite の WAL ロックが解放されません。
+      struct に保存して別途 Close する場合は nosemgrep を付与してください。
+      Ref: CLAUDE.md (SQLite WAL cooperative model)
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $DB, $ERR := sql.Open(...)
+      - pattern-not-inside: |
+          $DB, $_ := sql.Open(...)
+          ...
+          defer $DB.Close()

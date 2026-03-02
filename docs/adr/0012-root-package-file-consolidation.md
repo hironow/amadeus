@@ -42,15 +42,18 @@ This is a purely structural change: no code was added, removed, or modified beyo
 ## Consequences
 
 ### Positive
+
 - Higher cohesion: related types and functions live in the same file
 - Reduced file count: 7 fewer files to navigate (4 source + 3 test)
 - Easier discoverability: `event.go` is the single source for all event-related types
 - Consistent with Tidy First principle of structural changes preceding behavioral changes
 
 ### Negative
+
 - Larger individual files (e.g., `event.go` grew from ~30 to ~90 lines), though still well within reasonable bounds
 - Slightly larger diffs when modifying consolidated files
 
 ### Neutral
+
 - No behavioral changes; all existing tests pass unmodified
 - File-level organization continues to follow the convention established in ADR 0014

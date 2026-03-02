@@ -79,6 +79,7 @@ amadeus rebuild
 ```
 
 **Limitations:**
+
 - Inbox-sourced D-Mails (`inbox.consumed` events) contain only metadata, not the full D-Mail content. These files in `archive/` are NOT reconstructed by rebuild.
 - `archive.pruned` events may also reference `events/*.jsonl` files for event log pruning.
 

@@ -32,10 +32,12 @@ per-axis override rules.
    (`AxisScore` struct with `Score` and `Details`).
 2. **`CalcDivergence()`**: Weighted sum of axis scores divided by 100 produces
    a 0.0-1.0 divergence value.
+
    ```
    internal = ADR*0.4 + DoD*0.3 + Dep*0.2 + Implicit*0.1
    divergence = internal / 100.0
    ```
+
 3. **`DetermineSeverity()`**: Maps the divergence value to a severity tier using
    configurable thresholds, then applies per-axis overrides.
 
@@ -69,12 +71,14 @@ This separation allows the scoring logic to be tested independently of Claude.
 ## Consequences
 
 ### Positive
+
 - Multi-axis scoring provides actionable feedback (which axis drifted most)
 - Configurable weights allow projects to emphasize different concerns
 - Per-axis overrides catch critical single-point failures that composite scores miss
 - Scoring is deterministic given the same axis scores (testable without Claude)
 
 ### Negative
+
 - Weight tuning requires empirical calibration per project
 - Per-axis override thresholds are somewhat arbitrary initial values
 - Claude's axis scores are subjective and may vary between runs

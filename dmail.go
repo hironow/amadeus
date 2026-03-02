@@ -2,6 +2,8 @@ package amadeus
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"sort"
@@ -23,7 +25,28 @@ const (
 	KindReport DMailKind = "report"
 	// KindConvergence is generated when multiple D-Mails converge on the same target.
 	KindConvergence DMailKind = "convergence"
+	// KindCIResult is produced by CI/CD pipeline integrations.
+	KindCIResult DMailKind = "ci-result"
 )
+
+// DMailAction represents a recommended follow-up action for a D-Mail.
+type DMailAction string
+
+const (
+	// ActionRetry indicates the operation should be retried.
+	ActionRetry DMailAction = "retry"
+	// ActionEscalate indicates the issue should be escalated.
+	ActionEscalate DMailAction = "escalate"
+	// ActionResolve indicates the issue can be resolved.
+	ActionResolve DMailAction = "resolve"
+)
+
+// validActions is the set of valid DMailAction values per schema v1.
+var validActions = map[DMailAction]bool{
+	ActionRetry:    true,
+	ActionEscalate: true,
+	ActionResolve:  true,
+}
 
 // DMailStatus represents the lifecycle status of a D-Mail.
 type DMailStatus string
@@ -33,30 +56,39 @@ const (
 	DMailSent DMailStatus = "sent"
 )
 
+// DMailSchemaVersion is the current D-Mail protocol schema version.
+const DMailSchemaVersion = "1"
+
 // dmailFrontmatter is the YAML frontmatter of a D-Mail file.
 // NOTE(MY-346): linear_issue_id was intentionally removed without migration.
 // Existing D-Mail files with linear_issue_id will lose that field on parse.
 // This is acceptable because amadeus is pre-release and no production .gate/ state exists.
 type dmailFrontmatter struct {
-	Name        string            `yaml:"name"`
-	Kind        DMailKind         `yaml:"kind"`
-	Description string            `yaml:"description"`
-	Issues      []string          `yaml:"issues,omitempty"`
-	Severity    Severity          `yaml:"severity,omitempty"`
-	Targets     []string          `yaml:"targets,omitempty"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
+	SchemaVersion string            `yaml:"dmail-schema-version"`
+	Name          string            `yaml:"name"`
+	Kind          DMailKind         `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      Severity          `yaml:"severity,omitempty"`
+	Action        DMailAction       `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
+	Targets       []string          `yaml:"targets,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
 }
 
 // DMail is the correction routing message using YAML frontmatter + Markdown body.
 type DMail struct {
-	Name        string            `yaml:"name"`
-	Kind        DMailKind         `yaml:"kind"`
-	Description string            `yaml:"description"`
-	Issues      []string          `yaml:"issues,omitempty"`
-	Severity    Severity          `yaml:"severity,omitempty"`
-	Targets     []string          `yaml:"targets,omitempty"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
-	Body        string            `yaml:"-"`
+	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
+	Name          string            `yaml:"name"`
+	Kind          DMailKind         `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      Severity          `yaml:"severity,omitempty"`
+	Action        DMailAction       `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
+	Targets       []string          `yaml:"targets,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Body          string            `yaml:"-"`
 }
 
 // validKinds is the set of valid DMailKind values per schema v1.
@@ -65,6 +97,7 @@ var validKinds = map[DMailKind]bool{
 	KindSpecification: true,
 	KindReport:        true,
 	KindConvergence:   true,
+	KindCIResult:      true,
 }
 
 // validSeverities is the set of valid Severity values per schema v1.
@@ -78,6 +111,11 @@ var validSeverities = map[Severity]bool{
 // Returns a list of validation errors (empty if valid).
 func ValidateDMail(dmail DMail) []string {
 	var errs []string
+	if dmail.SchemaVersion == "" {
+		errs = append(errs, "dmail-schema-version is required")
+	} else if dmail.SchemaVersion != DMailSchemaVersion {
+		errs = append(errs, fmt.Sprintf("unsupported dmail-schema-version: %q (want %q)", dmail.SchemaVersion, DMailSchemaVersion))
+	}
 	if dmail.Name == "" {
 		errs = append(errs, "name is required")
 	}
@@ -91,6 +129,9 @@ func ValidateDMail(dmail DMail) []string {
 	}
 	if dmail.Severity != "" && !validSeverities[dmail.Severity] {
 		errs = append(errs, fmt.Sprintf("invalid severity: %q", dmail.Severity))
+	}
+	if dmail.Action != "" && !validActions[dmail.Action] {
+		errs = append(errs, fmt.Sprintf("invalid action %q", dmail.Action))
 	}
 	return errs
 }
@@ -115,27 +156,54 @@ func ParseDMail(data []byte) (DMail, error) {
 	}
 
 	return DMail{
-		Name:        fm.Name,
-		Kind:        fm.Kind,
-		Description: fm.Description,
-		Issues:      fm.Issues,
-		Severity:    NormalizeSeverity(fm.Severity),
-		Targets:     fm.Targets,
-		Metadata:    fm.Metadata,
-		Body:        strings.TrimLeft(bodyPart, "\n"),
+		SchemaVersion: fm.SchemaVersion,
+		Name:          fm.Name,
+		Kind:          fm.Kind,
+		Description:   fm.Description,
+		Issues:        fm.Issues,
+		Severity:      NormalizeSeverity(fm.Severity),
+		Action:        fm.Action,
+		Priority:      fm.Priority,
+		Targets:       fm.Targets,
+		Metadata:      fm.Metadata,
+		Body:          strings.TrimLeft(bodyPart, "\n"),
 	}, nil
 }
 
+// DMailIdempotencyKey computes a SHA256 content-based idempotency key from
+// the core fields of a DMail (name, kind, description, body).
+func DMailIdempotencyKey(dmail DMail) string {
+	h := sha256.New()
+	h.Write([]byte(dmail.Name))
+	h.Write([]byte{0})
+	h.Write([]byte(string(dmail.Kind)))
+	h.Write([]byte{0})
+	h.Write([]byte(dmail.Description))
+	h.Write([]byte{0})
+	h.Write([]byte(dmail.Body))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // MarshalDMail serializes a DMail to YAML frontmatter + Markdown format.
+// Automatically injects an idempotency_key into metadata based on content hash.
 func MarshalDMail(dmail DMail) ([]byte, error) {
+	meta := make(map[string]string, len(dmail.Metadata)+1)
+	for k, v := range dmail.Metadata {
+		meta[k] = v
+	}
+	meta["idempotency_key"] = DMailIdempotencyKey(dmail)
+
 	fm := dmailFrontmatter{
-		Name:        dmail.Name,
-		Kind:        dmail.Kind,
-		Description: dmail.Description,
-		Issues:      dmail.Issues,
-		Severity:    dmail.Severity,
-		Targets:     dmail.Targets,
-		Metadata:    dmail.Metadata,
+		SchemaVersion: dmail.SchemaVersion,
+		Name:          dmail.Name,
+		Kind:          dmail.Kind,
+		Description:   dmail.Description,
+		Issues:        dmail.Issues,
+		Severity:      dmail.Severity,
+		Action:        dmail.Action,
+		Priority:      dmail.Priority,
+		Targets:       dmail.Targets,
+		Metadata:      meta,
 	}
 	yamlData, err := yaml.Marshal(fm)
 	if err != nil {

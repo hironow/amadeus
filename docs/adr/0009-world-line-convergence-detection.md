@@ -46,6 +46,7 @@ convergence:
 ### Output
 
 `ConvergenceAlert` struct captures the detection result:
+
 - `Target`: The repeatedly-hit area
 - `Count`: Number of D-Mails in the window
 - `DMails`: Names of contributing D-Mails
@@ -55,12 +56,14 @@ convergence:
 ## Consequences
 
 ### Positive
+
 - Detects systemic issues that individual D-Mails cannot convey
 - Severity escalation (MEDIUM -> HIGH at 2x threshold) reflects increasing urgency
 - Self-exclusion prevents infinite convergence-on-convergence loops
 - Convergence D-Mails enter the normal routing pipeline (archive + outbox)
 
 ### Negative
+
 - Detection depends on accurate `metadata.created_at` timestamps
 - Window-based approach may miss slow-building convergence outside the window
 - Threshold tuning requires empirical observation per project

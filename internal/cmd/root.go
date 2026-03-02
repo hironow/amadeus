@@ -24,6 +24,7 @@ var (
 // PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
 var (
 	shutdownTracer func(context.Context) error
+	shutdownMeter  func(context.Context) error
 	finalizerOnce  sync.Once
 )
 
@@ -46,7 +47,9 @@ func NewRootCommand() *cobra.Command {
 			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("amadeus", Version)
-			cmd.SetContext(ctx)
+			shutdownMeter = initMeter("amadeus", Version)
+			spanCtx := startRootSpan(ctx, cmd.Name())
+			cmd.SetContext(spanCtx)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,6 +59,10 @@ func NewRootCommand() *cobra.Command {
 
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
+			endRootSpan()
+			if shutdownMeter != nil {
+				shutdownMeter(context.Background())
+			}
 			if shutdownTracer != nil {
 				shutdownTracer(context.Background())
 			}
@@ -65,6 +72,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.PersistentFlags().StringP("config", "c", "", "config file path")
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
 	cmd.PersistentFlags().StringP("lang", "l", "", "output language (ja, en)")
+	cmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 
 	cmd.AddCommand(
 		newInitCommand(),
@@ -79,6 +87,7 @@ func NewRootCommand() *cobra.Command {
 		newArchivePruneCommand(),
 		newCleanCommand(),
 		newRebuildCommand(),
+		newStatusCommand(),
 		newVersionCommand(),
 		newUpdateCommand(),
 	)

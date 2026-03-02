@@ -1,15 +1,9 @@
 package session
 
 import (
-	"time"
-
 	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/eventsource"
 )
-
-// ExpiredEventFile re-exports eventsource.ExpiredFile so cmd layer
-// does not need to import eventsource directly (ADR S0008).
-type ExpiredEventFile = eventsource.ExpiredFile
 
 // NewEventStore creates an event store for the given gate directory.
 // Derives the events path from the gate root.
@@ -27,12 +21,12 @@ func EventsDir(gateDir string) string {
 	return eventsource.EventsDir(gateDir)
 }
 
-// FindExpiredEventFiles returns .jsonl event files older than maxAge.
-func FindExpiredEventFiles(eventsDir string, maxAge time.Duration) ([]ExpiredEventFile, error) {
-	return eventsource.FindExpiredEventFiles(eventsDir, maxAge)
+// ListExpiredEventFiles returns .jsonl event file names older than the given days.
+func ListExpiredEventFiles(stateDir string, days int) ([]string, error) {
+	return eventsource.ListExpiredEventFiles(stateDir, days)
 }
 
-// PruneEventFiles deletes the specified expired event files.
-func PruneEventFiles(files []ExpiredEventFile) (int, error) {
-	return eventsource.PruneEventFiles(files)
+// PruneEventFiles deletes the named .jsonl files from the events directory.
+func PruneEventFiles(stateDir string, files []string) ([]string, error) {
+	return eventsource.PruneEventFiles(stateDir, files)
 }

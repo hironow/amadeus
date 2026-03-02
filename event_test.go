@@ -1,18 +1,20 @@
-package amadeus
+package amadeus_test
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/hironow/amadeus"
 )
 
 func TestEventMarshalRoundTrip(t *testing.T) {
 	// given
 	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
 	rawData := json.RawMessage(`{"commit":"abc123","check_type":"diff"}`)
-	event := Event{
+	event := amadeus.Event{
 		ID:        "test-id-001",
-		Type:      EventCheckCompleted,
+		Type:      amadeus.EventCheckCompleted,
 		Timestamp: now,
 		Data:      rawData,
 	}
@@ -23,7 +25,7 @@ func TestEventMarshalRoundTrip(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var got Event
+	var got amadeus.Event
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -45,18 +47,18 @@ func TestEventMarshalRoundTrip(t *testing.T) {
 
 func TestEventTypeConstants(t *testing.T) {
 	// then: verify all event types are distinct non-empty strings
-	types := []EventType{
-		EventCheckCompleted,
-		EventBaselineUpdated,
-		EventForceFullNextSet,
-		EventDMailGenerated,
-		EventInboxConsumed,
-		EventDMailCommented,
-		EventConvergenceDetected,
-		EventArchivePruned,
+	types := []amadeus.EventType{
+		amadeus.EventCheckCompleted,
+		amadeus.EventBaselineUpdated,
+		amadeus.EventForceFullNextSet,
+		amadeus.EventDMailGenerated,
+		amadeus.EventInboxConsumed,
+		amadeus.EventDMailCommented,
+		amadeus.EventConvergenceDetected,
+		amadeus.EventArchivePruned,
 	}
 
-	seen := make(map[EventType]bool)
+	seen := make(map[amadeus.EventType]bool)
 	for _, et := range types {
 		if et == "" {
 			t.Error("found empty EventType constant")
@@ -70,11 +72,11 @@ func TestEventTypeConstants(t *testing.T) {
 
 func TestCheckCompletedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := CheckCompletedData{
-		Result: CheckResult{
+	data := amadeus.CheckCompletedData{
+		Result: amadeus.CheckResult{
 			CheckedAt:  time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC),
 			Commit:     "abc123",
-			Type:       CheckTypeDiff,
+			Type:       amadeus.CheckTypeDiff,
 			Divergence: 0.42,
 		},
 	}
@@ -84,7 +86,7 @@ func TestCheckCompletedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got CheckCompletedData
+	var got amadeus.CheckCompletedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -100,12 +102,12 @@ func TestCheckCompletedDataMarshalRoundTrip(t *testing.T) {
 
 func TestDMailGeneratedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := DMailGeneratedData{
-		DMail: DMail{
+	data := amadeus.DMailGeneratedData{
+		DMail: amadeus.DMail{
 			Name:        "feedback-001",
-			Kind:        KindFeedback,
+			Kind:        amadeus.KindFeedback,
 			Description: "test",
-			Severity:    SeverityMedium,
+			Severity:    amadeus.SeverityMedium,
 		},
 	}
 
@@ -114,7 +116,7 @@ func TestDMailGeneratedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got DMailGeneratedData
+	var got amadeus.DMailGeneratedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -127,9 +129,9 @@ func TestDMailGeneratedDataMarshalRoundTrip(t *testing.T) {
 
 func TestInboxConsumedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := InboxConsumedData{
+	data := amadeus.InboxConsumedData{
 		Name:   "report-001",
-		Kind:   KindReport,
+		Kind:   amadeus.KindReport,
 		Source: "report-001.md",
 	}
 
@@ -138,7 +140,7 @@ func TestInboxConsumedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got InboxConsumedData
+	var got amadeus.InboxConsumedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -154,7 +156,7 @@ func TestInboxConsumedDataMarshalRoundTrip(t *testing.T) {
 
 func TestDMailCommentedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := DMailCommentedData{
+	data := amadeus.DMailCommentedData{
 		DMail:   "feedback-001",
 		IssueID: "MY-123",
 	}
@@ -164,7 +166,7 @@ func TestDMailCommentedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got DMailCommentedData
+	var got amadeus.DMailCommentedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -180,7 +182,7 @@ func TestDMailCommentedDataMarshalRoundTrip(t *testing.T) {
 
 func TestArchivePrunedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := ArchivePrunedData{
+	data := amadeus.ArchivePrunedData{
 		Paths: []string{"feedback-001.md", "feedback-002.md"},
 		Count: 2,
 	}
@@ -190,7 +192,7 @@ func TestArchivePrunedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got ArchivePrunedData
+	var got amadeus.ArchivePrunedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -203,7 +205,7 @@ func TestArchivePrunedDataMarshalRoundTrip(t *testing.T) {
 
 func TestForceFullNextSetDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := ForceFullNextSetData{
+	data := amadeus.ForceFullNextSetData{
 		PreviousDivergence: 0.10,
 		CurrentDivergence:  0.35,
 	}
@@ -213,7 +215,7 @@ func TestForceFullNextSetDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got ForceFullNextSetData
+	var got amadeus.ForceFullNextSetData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -229,7 +231,7 @@ func TestForceFullNextSetDataMarshalRoundTrip(t *testing.T) {
 
 func TestBaselineUpdatedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := BaselineUpdatedData{
+	data := amadeus.BaselineUpdatedData{
 		Commit:     "def456",
 		Divergence: 0.25,
 	}
@@ -239,7 +241,7 @@ func TestBaselineUpdatedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got BaselineUpdatedData
+	var got amadeus.BaselineUpdatedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -252,15 +254,15 @@ func TestBaselineUpdatedDataMarshalRoundTrip(t *testing.T) {
 
 func TestValidateEvent_Valid(t *testing.T) {
 	// given
-	event := Event{
+	event := amadeus.Event{
 		ID:        "test-001",
-		Type:      EventCheckCompleted,
+		Type:      amadeus.EventCheckCompleted,
 		Timestamp: time.Now(),
 		Data:      json.RawMessage(`{"result":{}}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err != nil {
@@ -270,7 +272,7 @@ func TestValidateEvent_Valid(t *testing.T) {
 
 func TestValidateEvent_EmptyType(t *testing.T) {
 	// given
-	event := Event{
+	event := amadeus.Event{
 		ID:        "test-001",
 		Type:      "",
 		Timestamp: time.Now(),
@@ -278,7 +280,7 @@ func TestValidateEvent_EmptyType(t *testing.T) {
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -288,14 +290,14 @@ func TestValidateEvent_EmptyType(t *testing.T) {
 
 func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 	// given
-	event := Event{
+	event := amadeus.Event{
 		ID:   "test-001",
-		Type: EventCheckCompleted,
+		Type: amadeus.EventCheckCompleted,
 		Data: json.RawMessage(`{}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -305,15 +307,15 @@ func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 
 func TestValidateEvent_NilData(t *testing.T) {
 	// given
-	event := Event{
+	event := amadeus.Event{
 		ID:        "test-001",
-		Type:      EventCheckCompleted,
+		Type:      amadeus.EventCheckCompleted,
 		Timestamp: time.Now(),
 		Data:      nil,
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -323,15 +325,15 @@ func TestValidateEvent_NilData(t *testing.T) {
 
 func TestValidateEvent_EmptyData(t *testing.T) {
 	// given
-	event := Event{
+	event := amadeus.Event{
 		ID:        "test-001",
-		Type:      EventCheckCompleted,
+		Type:      amadeus.EventCheckCompleted,
 		Timestamp: time.Now(),
 		Data:      json.RawMessage(``),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -341,15 +343,15 @@ func TestValidateEvent_EmptyData(t *testing.T) {
 
 func TestValidateEvent_EmptyID(t *testing.T) {
 	// given
-	event := Event{
+	event := amadeus.Event{
 		ID:        "",
-		Type:      EventCheckCompleted,
+		Type:      amadeus.EventCheckCompleted,
 		Timestamp: time.Now(),
 		Data:      json.RawMessage(`{}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -359,10 +361,10 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 
 func TestValidateEvent_MultipleErrors(t *testing.T) {
 	// given: everything is invalid
-	event := Event{}
+	event := amadeus.Event{}
 
 	// when
-	err := ValidateEvent(event)
+	err := amadeus.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -372,13 +374,13 @@ func TestValidateEvent_MultipleErrors(t *testing.T) {
 
 func TestConvergenceDetectedDataMarshalRoundTrip(t *testing.T) {
 	// given
-	data := ConvergenceDetectedData{
-		Alert: ConvergenceAlert{
+	data := amadeus.ConvergenceDetectedData{
+		Alert: amadeus.ConvergenceAlert{
 			Target:   "auth",
 			Count:    5,
 			Window:   14,
 			DMails:   []string{"feedback-001", "feedback-002"},
-			Severity: SeverityHigh,
+			Severity: amadeus.SeverityHigh,
 		},
 	}
 
@@ -387,7 +389,7 @@ func TestConvergenceDetectedDataMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got ConvergenceDetectedData
+	var got amadeus.ConvergenceDetectedData
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

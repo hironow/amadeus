@@ -123,8 +123,12 @@ func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
 	if err := p.OutboxStore.Stage(filename, marshaledData); err != nil {
 		return fmt.Errorf("stage dmail: %w", err)
 	}
-	if _, err := p.OutboxStore.Flush(); err != nil {
+	n, err := p.OutboxStore.Flush()
+	if err != nil {
 		return fmt.Errorf("flush dmail: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("flush dmail: item not delivered (write failure, will retry)")
 	}
 	return nil
 }

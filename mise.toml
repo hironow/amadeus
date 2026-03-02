@@ -1,5 +1,5 @@
 [tools]
 bun = "latest"
-go = "latest"
+go = "1.26"
 just = "latest"
 markdownlint-cli2 = "latest"

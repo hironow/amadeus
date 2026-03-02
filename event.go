@@ -1,6 +1,7 @@
 package amadeus
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,13 +32,10 @@ type EventApplier interface {
 	Rebuild(events []Event) error
 }
 
-// OutboxStore is the transactional outbox interface for D-Mail delivery.
-// Stage writes to a write-ahead log (SQLite); Flush materialises staged
-// items to archive/ and outbox/ using atomic file writes.
-type OutboxStore interface {
-	Stage(name string, data []byte) error
-	Flush() (int, error)
-	Close() error
+// EventDispatcher dispatches domain events to policy handlers.
+// Implemented by usecase.PolicyEngine; injected into session via Amadeus struct.
+type EventDispatcher interface {
+	Dispatch(ctx context.Context, event Event) error
 }
 
 // EventType identifies the kind of domain event.

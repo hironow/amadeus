@@ -1,6 +1,12 @@
 package amadeus
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
+var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
 // Approver determines whether an action should proceed.
 // Implementations include StdinApprover (human prompt),
@@ -25,3 +31,12 @@ type Notifier interface {
 type NopNotifier struct{}
 
 func (*NopNotifier) Notify(_ context.Context, _, _ string) error { return nil }
+
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
+}
