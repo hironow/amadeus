@@ -113,7 +113,7 @@ amadeus check
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
     |   +-- baseline.json     <- Full calibration baseline
-    +-- history/              <- Historical check results
+    +-- events/               <- Append-only event log (JSONL, daily rotation)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
     +-- archive/              <- All D-Mails (git-tracked)
@@ -179,7 +179,7 @@ amadeus init
 amadeus check
 ```
 
-Amadeus creates `.gate/` with config, state, history, and D-Mail storage automatically.
+Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Subcommands
 
