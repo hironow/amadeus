@@ -388,41 +388,42 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 |   +-- sync.go              sync subcommand (JSON output)
 |   +-- mark_commented.go    mark-commented subcommand (sync state)
 |   +-- hook.go              install-hook / uninstall-hook
-+-- internal/tools/
-|   +-- docgen/main.go       CLI docs generation (standalone tool)
-+-- amadeus.go               Main orchestrator (three-phase pipeline)
-+-- reading_steiner.go       Phase 1: Shift detection (diff + full scan)
-+-- divergence_meter.go      Phase 2: Scoring bridge (Claude -> scores)
-+-- claude.go                Claude CLI integration + prompt rendering
-+-- scoring.go               Divergence scoring (weights, thresholds, severity)
-+-- dmail.go                 D-Mail model (YAML+MD format)
-+-- config.go                Configuration loader (.gate/config.yaml)
-+-- state.go                 State persistence (.gate/)
-+-- sync.go                  Sync state tracking (Linear comment status)
-+-- convergence.go           World line convergence detection
-+-- git.go                   Git client (merged PRs, diffs, HEAD)
-+-- source.go                Source file discovery
-+-- issue_id.go              Issue ID extraction from branches/commits
-+-- hook.go                  Git hook management
-+-- doctor.go                Environment health checks
-+-- logger.go                Leveled logging
-+-- telemetry.go             OpenTelemetry tracer setup
-+-- *_test.go                Tests
-+-- templates/
-|   +-- diff_check_en.md.tmpl  Diff-based check prompt (English)
-|   +-- diff_check_ja.md.tmpl  Diff-based check prompt (Japanese)
-|   +-- full_check_en.md.tmpl  Full calibration prompt (English)
-|   +-- full_check_ja.md.tmpl  Full calibration prompt (Japanese)
-|   +-- skills/                Claude Code skill templates
-+-- .semgrep/
-|   +-- cobra.yaml           14 cobra best-practice rules
-+-- .goreleaser.yaml         Release configuration
-+-- .github/workflows/
-|   +-- release.yaml         Tag-triggered release workflow
-+-- docker/
-|   +-- compose.yaml         Jaeger all-in-one for trace viewing
-+-- docs/cli/                Generated CLI reference (Markdown)
-+-- justfile                 Task runner
++-- internal/usecase/         Use case layer (PolicyEngine + handlers)
++-- internal/session/         I/O orchestration layer
+|   +-- amadeus.go            Amadeus orchestrator (RunCheck, PrintLog, PrintSync)
+|   +-- projection.go         Projector (event replay to materialized state)
+|   +-- reading_steiner.go    Shift detection (diff + full scan)
+|   +-- claude.go             DefaultClaudeRunner (subprocess)
+|   +-- dmail_io.go           D-Mail file I/O (archive, inbox, outbox)
+|   +-- git.go                GitClient (subprocess)
+|   +-- source.go             Content collection (ADRs, DoDs, go.mod)
+|   +-- state.go              ProjectionStore, InitGateDir
+|   +-- sync_io.go            Sync state persistence
+|   +-- hook.go               Git hook file management
+|   +-- archive_prune.go      Archive file discovery/deletion
++-- internal/eventsource/     Event store infrastructure (JSONL append-only)
++-- internal/domain/          Pure domain functions
++-- internal/tools/docgen/    CLI docs generation
++-- Root package (amadeus)    Types, interfaces, pure functions, go:embed
+|   +-- amadeus.go            DriftError, ExitCode, CheckOptions
+|   +-- config.go             Config type, DefaultConfig, ValidateConfig
+|   +-- convergence.go        Pure convergence algorithm
+|   +-- dmail.go              DMail types, ParseDMail, MarshalDMail, ValidateDMail
+|   +-- event.go              Event envelope, EventType constants
+|   +-- scoring.go            Pure scoring calculation
+|   +-- state.go              CheckType, CheckResult, StateReader interface
+|   +-- claude.go             ClaudeRunner interface, go:embed templates
+|   +-- logger.go             Structured logger (noop default)
+|   +-- telemetry.go          OTel tracer (noop default)
++-- templates/                AI prompt templates ({en,ja})
+|   +-- skills/               D-Mail SKILL.md templates
++-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
++-- tests/e2e/                Docker E2E tests (//go:build e2e)
++-- .semgrep/                 Semgrep rules (layer enforcement)
++-- .goreleaser.yaml          Release configuration
++-- .github/workflows/        CI + Release
++-- docker/                   Jaeger v2 for trace viewing
++-- docs/cli/                 Generated CLI reference (Markdown)
 ```
 
 ## The Ecosystem
@@ -446,7 +447,7 @@ Linear Issues -----------> Git Repository -----------> .gate/
 
 ## Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Docker](https://www.docker.com/) (optional, for Jaeger tracing)
 
