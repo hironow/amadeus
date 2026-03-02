@@ -48,7 +48,7 @@ func NewWorkspace(t *testing.T, level string) *Workspace {
 	runCmd(t, repoPath, "git", "init")
 	runCmd(t, repoPath, "git", "config", "user.email", "test@scenario.test")
 	runCmd(t, repoPath, "git", "config", "user.name", "Scenario Test")
-	runCmd(t, repoPath, "git", "commit", "--allow-empty", "-m", "init")
+	runCmd(t, repoPath, "git", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "init")
 
 	// Resolve testdata/fixtures directory
 	here, err := os.Getwd()

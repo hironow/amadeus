@@ -127,42 +127,42 @@ test-e2e-down:
 # Verify Go toolchain consistency (GOROOT vs go binary)
 [private]
 check-go:
-    @GO_VER=$(go version | awk '{print $3}'); \
-    COMPILE_VER=$(go tool compile -V 2>&1 | awk '{print $3}') || true; \
+    @GO_VER=$(mise exec -- go version | awk '{print $3}'); \
+    COMPILE_VER=$(mise exec -- go tool compile -V 2>&1 | awk '{print $3}') || true; \
     if [ "$GO_VER" != "$COMPILE_VER" ]; then \
         echo "ERROR: go binary ($GO_VER) != go tool compile ($COMPILE_VER)"; \
-        echo "  go version:       $(go version)"; \
-        echo "  go tool compile:  $(go tool compile -V 2>&1)"; \
-        echo "  GOROOT:           $(go env GOROOT)"; \
-        echo "  GOTOOLDIR:        $(go env GOTOOLDIR)"; \
+        echo "  go version:       $(mise exec -- go version)"; \
+        echo "  go tool compile:  $(mise exec -- go tool compile -V 2>&1)"; \
+        echo "  GOROOT:           $(mise exec -- go env GOROOT)"; \
+        echo "  GOTOOLDIR:        $(mise exec -- go env GOTOOLDIR)"; \
         echo ""; \
-        echo "Fix: unset GOROOT GOTOOLDIR && mise install go && mise reshim"; \
+        echo "Fix: mise install go && mise reshim"; \
         exit 1; \
     fi
 
 # Run L1 scenario test
 test-scenario-min: check-go
-    go test -tags scenario ./tests/scenario/ -run TestScenario_L1 -count=1 -v -timeout=120s
+    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L1 -count=1 -v -timeout=120s
 
 # Run L2 scenario test
 test-scenario-small: check-go
-    go test -tags scenario ./tests/scenario/ -run TestScenario_L2 -count=1 -v -timeout=180s
+    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L2 -count=1 -v -timeout=180s
 
 # Run L3 scenario test
 test-scenario-middle: check-go
-    go test -tags scenario ./tests/scenario/ -run TestScenario_L3 -count=1 -v -timeout=300s
+    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L3 -count=1 -v -timeout=300s
 
 # Run L4 scenario test
 test-scenario-hard: check-go
-    go test -tags scenario ./tests/scenario/ -run TestScenario_L4 -count=1 -v -timeout=600s
+    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L4 -count=1 -v -timeout=600s
 
 # Run L1+L2 scenario tests (CI default)
 test-scenario: check-go
-    go test -tags scenario ./tests/scenario/ -run "TestScenario_L[12]" -count=1 -v -timeout=300s
+    mise exec -- go test -tags scenario ./tests/scenario/ -run "TestScenario_L[12]" -count=1 -v -timeout=300s
 
 # Run all scenario tests
 test-scenario-all: check-go
-    go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
+    mise exec -- go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
 
 # Clean build artifacts
 clean:
