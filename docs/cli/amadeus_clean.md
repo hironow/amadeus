@@ -1,16 +1,20 @@
-## amadeus update
+## amadeus clean
 
-Update amadeus to the latest version
+Remove state directory (.gate/)
+
+### Synopsis
+
+Delete the .gate/ directory to reset to a clean state. Use 'amadeus init' to reinitialize.
 
 ```
-amadeus update [flags]
+amadeus clean [path] [flags]
 ```
 
 ### Options
 
 ```
-  -C, --check   check for updates without installing
-  -h, --help    help for update
+  -h, --help   help for clean
+      --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

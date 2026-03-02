@@ -7,7 +7,7 @@ Show D-Mail sync status (JSON)
 Output unsynced D-Mails and pending Linear comments as JSON.
 
 ```
-amadeus sync [flags]
+amadeus sync [path] [flags]
 ```
 
 ### Options
@@ -21,9 +21,11 @@ amadeus sync [flags]
 ```
   -c, --config string   config file path
   -l, --lang string     output language (ja, en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         verbose output
 ```
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+

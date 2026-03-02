@@ -3,7 +3,7 @@
 Show divergence log
 
 ```
-amadeus log [flags]
+amadeus log [path] [flags]
 ```
 
 ### Options
@@ -18,9 +18,11 @@ amadeus log [flags]
 ```
   -c, --config string   config file path
   -l, --lang string     output language (ja, en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         verbose output
 ```
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+

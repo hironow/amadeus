@@ -7,7 +7,7 @@ Record that a D-Mail has been posted as a comment
 Mark a D-Mail × Issue pair as commented in the sync state.
 
 ```
-amadeus mark-commented <dmail-name> <issue-id> [flags]
+amadeus mark-commented <dmail-name> <issue-id> [path] [flags]
 ```
 
 ### Options
@@ -22,9 +22,11 @@ amadeus mark-commented <dmail-name> <issue-id> [flags]
 ```
   -c, --config string   config file path
   -l, --lang string     output language (ja, en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         verbose output
 ```
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+

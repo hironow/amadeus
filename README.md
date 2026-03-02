@@ -252,6 +252,7 @@ amadeus update -C
 |------|-------|---------|-------------|
 | `--config` | `-c` | `.gate/config.yaml` | Config file path |
 | `--verbose` | `-v` | `false` | Verbose logging |
+| `--output` | `-o` | `text` | Output format: `text` or `json` |
 | `--lang` | `-l` | | Output language (`ja`, `en`) |
 
 ### check
