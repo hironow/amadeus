@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
@@ -59,7 +59,7 @@ func newSyncCommand() *cobra.Command {
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}
-			return usecase.PrintSync(amadeus.RunSyncCommand{
+			return usecase.PrintSync(domain.RunSyncCommand{
 				RepoPath: repoRoot,
 			}, a)
 		},

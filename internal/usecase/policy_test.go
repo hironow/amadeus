@@ -7,12 +7,13 @@ import (
 	"time"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: amadeus.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
@@ -32,11 +33,11 @@ func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: amadeus.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
@@ -60,12 +61,12 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	engine := NewPolicyEngine(nil)
 	var count int
 	for range 3 {
-		engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+		engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 			count++
 			return nil
 		})
 	}
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: amadeus.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
@@ -87,10 +88,10 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 func TestPolicyEngine_HandlerError(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
-	engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		return fmt.Errorf("handler failed")
 	})
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: amadeus.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
@@ -110,11 +111,11 @@ func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 	// given: register for check.completed only
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := amadeus.NewEvent(amadeus.EventBaselineUpdated, amadeus.BaselineUpdatedData{
+	ev, err := domain.NewEvent(domain.EventBaselineUpdated, domain.BaselineUpdatedData{
 		Commit: "abc123",
 	}, time.Now().UTC())
 	if err != nil {

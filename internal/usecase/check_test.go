@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestRunCheck_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := amadeus.ExecuteCheckCommand{RepoPath: ""}
+	cmd := domain.ExecuteCheckCommand{RepoPath: ""}
 	opts := amadeus.CheckOptions{}
 	a := &session.Amadeus{
 		Config: amadeus.DefaultConfig(),
@@ -45,7 +46,7 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 	store := session.NewProjectionStore(gateDir)
 	eventStore := session.NewEventStore(gateDir)
 
-	cmd := amadeus.ExecuteCheckCommand{RepoPath: tmpDir}
+	cmd := domain.ExecuteCheckCommand{RepoPath: tmpDir}
 	opts := amadeus.CheckOptions{DryRun: true}
 	a := &session.Amadeus{
 		Config: amadeus.DefaultConfig(),

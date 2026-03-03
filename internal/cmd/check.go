@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
@@ -115,7 +116,7 @@ func newCheckCommand() *cobra.Command {
 			}
 
 			// COMMAND → usecase → Aggregate → EVENT
-			return usecase.RunCheck(cmd.Context(), amadeus.ExecuteCheckCommand{
+			return usecase.RunCheck(cmd.Context(), domain.ExecuteCheckCommand{
 				RepoPath: repoRoot,
 			}, amadeus.CheckOptions{
 				Full:   full,

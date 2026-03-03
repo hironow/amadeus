@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // FileEventStore implements EventStore using daily JSONL files in a directory.
@@ -26,9 +26,9 @@ func NewFileEventStore(dir string) *FileEventStore {
 
 // Append persists events as JSONL lines to the daily file based on each event's timestamp.
 // All events are validated before any writes occur; if any event is invalid, the entire batch is rejected.
-func (s *FileEventStore) Append(events ...amadeus.Event) error {
+func (s *FileEventStore) Append(events ...domain.Event) error {
 	for _, ev := range events {
-		if err := amadeus.ValidateEvent(ev); err != nil {
+		if err := domain.ValidateEvent(ev); err != nil {
 			return fmt.Errorf("validate event %s: %w", ev.ID, err)
 		}
 	}
@@ -38,7 +38,7 @@ func (s *FileEventStore) Append(events ...amadeus.Event) error {
 	}
 
 	// Group events by date for file routing
-	byDate := make(map[string][]amadeus.Event)
+	byDate := make(map[string][]domain.Event)
 	for _, ev := range events {
 		date := ev.Timestamp.Format("2006-01-02")
 		byDate[date] = append(byDate[date], ev)
@@ -73,16 +73,16 @@ func (s *FileEventStore) Append(events ...amadeus.Event) error {
 }
 
 // LoadAll reads all JSONL files in lexicographic order and returns events chronologically.
-func (s *FileEventStore) LoadAll() ([]amadeus.Event, error) {
+func (s *FileEventStore) LoadAll() ([]domain.Event, error) {
 	return s.loadEvents(time.Time{})
 }
 
 // LoadSince returns events with timestamps strictly after the given time.
-func (s *FileEventStore) LoadSince(after time.Time) ([]amadeus.Event, error) {
+func (s *FileEventStore) LoadSince(after time.Time) ([]domain.Event, error) {
 	return s.loadEvents(after)
 }
 
-func (s *FileEventStore) loadEvents(after time.Time) ([]amadeus.Event, error) {
+func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, error) {
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -99,7 +99,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]amadeus.Event, error) {
 	}
 	sort.Strings(files)
 
-	var events []amadeus.Event
+	var events []domain.Event
 	for _, name := range files {
 		path := filepath.Join(s.dir, name)
 		f, err := os.Open(path)
@@ -113,7 +113,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]amadeus.Event, error) {
 			if len(line) == 0 {
 				continue
 			}
-			var ev amadeus.Event
+			var ev domain.Event
 			if err := json.Unmarshal(line, &ev); err != nil {
 				f.Close()
 				return nil, fmt.Errorf("parse event in %s: %w", name, err)

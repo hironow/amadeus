@@ -9,6 +9,7 @@ import (
 	"time"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -16,22 +17,22 @@ import (
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
-	Config     amadeus.Config
-	Store      amadeus.StateReader
-	Events     amadeus.EventStore   // nil skips event persistence (Projector still required for writes)
-	Projector  amadeus.EventApplier // nil skips projection updates (Events still required for writes)
-	Git        amadeus.Git
-	RepoDir    string               // repository root directory
-	Claude     amadeus.ClaudeRunner // nil falls back to the default Claude runner
-	Logger     *amadeus.Logger
-	DataOut    io.Writer               // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver   amadeus.Approver        // nil = no gate (auto-approve)
-	Notifier   amadeus.Notifier        // nil = no notifications
-	ReviewCmd  string                  // code review command (empty = skip)
-	ClaudeCmd  string                  // Claude CLI command (empty = "claude")
+	Config      amadeus.Config
+	Store       amadeus.StateReader
+	Events      domain.EventStore   // nil skips event persistence (Projector still required for writes)
+	Projector   domain.EventApplier // nil skips projection updates (Events still required for writes)
+	Git         amadeus.Git
+	RepoDir     string               // repository root directory
+	Claude      amadeus.ClaudeRunner // nil falls back to the default Claude runner
+	Logger      *amadeus.Logger
+	DataOut     io.Writer              // machine-readable output (stdout); Logger is for human progress (stderr)
+	Approver    amadeus.Approver       // nil = no gate (auto-approve)
+	Notifier    amadeus.Notifier       // nil = no notifications
+	ReviewCmd   string                 // code review command (empty = skip)
+	ClaudeCmd   string                 // Claude CLI command (empty = "claude")
 	ClaudeModel string                 // Claude model for review fix (empty = "opus")
-	Aggregate  *amadeus.CheckAggregate // domain logic aggregate (injected by usecase layer)
-	Dispatcher amadeus.EventDispatcher // policy dispatch (injected by usecase layer; nil = no dispatch)
+	Aggregate   *domain.CheckAggregate // domain logic aggregate (injected by usecase layer)
+	Dispatcher  domain.EventDispatcher // policy dispatch (injected by usecase layer; nil = no dispatch)
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
@@ -45,7 +46,7 @@ func (a *Amadeus) claudeRunner() amadeus.ClaudeRunner {
 // emit appends events to the event store and applies them to projections.
 // At least one of Events or Projector must be non-nil; otherwise emit returns
 // an error to prevent silent data loss.
-func (a *Amadeus) emit(events ...amadeus.Event) error {
+func (a *Amadeus) emit(events ...domain.Event) error {
 	if a.Events == nil && a.Projector == nil {
 		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
 	}
@@ -98,7 +99,7 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	// Rebuild clears archive/ and outbox/, so inbox-sourced D-Mails would be
 	// permanently lost. Skip auto-rebuild and recommend explicit rebuild.
 	for _, ev := range events {
-		if ev.Type == amadeus.EventInboxConsumed {
+		if ev.Type == domain.EventInboxConsumed {
 			if !quiet {
 				a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
 			}
@@ -158,7 +159,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 			))
 			now := time.Now().UTC()
 			for _, d := range consumed {
-				ev, evErr := amadeus.NewEvent(amadeus.EventInboxConsumed, amadeus.InboxConsumedData{
+				ev, evErr := domain.NewEvent(domain.EventInboxConsumed, domain.InboxConsumedData{
 					Name:   d.Name,
 					Kind:   d.Kind,
 					Source: d.Name + ".md",
@@ -240,7 +241,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		if err := a.emit(events...); err != nil {
 			return fmt.Errorf("emit check (no shift): %w", err)
 		}
-		amadeus.RecordCheck(ctx, "clean")
+		domain.RecordCheck(ctx, "clean")
 		if opts.JSON {
 			if err := a.PrintCheckOutputJSON(previous, nil, previous.Divergence); err != nil {
 				return fmt.Errorf("write JSON output: %w", err)
@@ -349,7 +350,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 				previous.Divergence, meterResult.Divergence.Value)
 		}
 		a.Aggregate.SetForceFullNext(true)
-		ev, evErr := amadeus.NewEvent(amadeus.EventForceFullNextSet, amadeus.ForceFullNextSetData{
+		ev, evErr := domain.NewEvent(domain.EventForceFullNextSet, domain.ForceFullNextSetData{
 			PreviousDivergence: previous.Divergence,
 			CurrentDivergence:  meterResult.Divergence.Value,
 		}, time.Now().UTC())
@@ -402,7 +403,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		if err := a.emit(events...); err != nil {
 			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
-		amadeus.RecordCheck(ctx, "drift")
+		domain.RecordCheck(ctx, "drift")
 		if !opts.Quiet {
 			a.Logger.Info("Gate denied — D-Mail generation skipped")
 		}
@@ -445,7 +446,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
 			continue
 		}
-		ev, evErr := amadeus.NewEvent(amadeus.EventDMailGenerated, amadeus.DMailGeneratedData{DMail: dmail}, now)
+		ev, evErr := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{DMail: dmail}, now)
 		if evErr != nil {
 			span3.End()
 			return fmt.Errorf("phase 3 (create event): %w", evErr)
@@ -468,7 +469,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 	if convergenceErr == nil {
 		convergenceAlerts = amadeus.AnalyzeConvergence(allDMails, a.Config.Convergence, now)
 		for _, alert := range convergenceAlerts {
-			cev, cerr := amadeus.NewEvent(amadeus.EventConvergenceDetected, amadeus.ConvergenceDetectedData{
+			cev, cerr := domain.NewEvent(domain.EventConvergenceDetected, domain.ConvergenceDetectedData{
 				Alert: alert,
 			}, now)
 			if cerr != nil {
@@ -520,9 +521,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		return fmt.Errorf("emit check completed: %w", err)
 	}
 	if len(dmails) > 0 {
-		amadeus.RecordCheck(ctx, "drift")
+		domain.RecordCheck(ctx, "drift")
 	} else {
-		amadeus.RecordCheck(ctx, "clean")
+		domain.RecordCheck(ctx, "clean")
 	}
 
 	if opts.JSON {
@@ -706,10 +707,10 @@ func (a *Amadeus) loadCheckHistory() ([]amadeus.CheckResult, error) {
 	}
 	var results []amadeus.CheckResult
 	for _, ev := range events {
-		if ev.Type != amadeus.EventCheckCompleted {
+		if ev.Type != domain.EventCheckCompleted {
 			continue
 		}
-		var data amadeus.CheckCompletedData
+		var data domain.CheckCompletedData
 		if err := json.Unmarshal(ev.Data, &data); err != nil {
 			return nil, fmt.Errorf("unmarshal check event %s: %w", ev.ID, err)
 		}
@@ -921,7 +922,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []amadeus.ConvergenceAlert) ([]am
 			return saved, fmt.Errorf("convergence dmail name: %w", err)
 		}
 		cd.Name = cdName
-		ev, evErr := amadeus.NewEvent(amadeus.EventDMailGenerated, amadeus.DMailGeneratedData{DMail: cd}, time.Now().UTC())
+		ev, evErr := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{DMail: cd}, time.Now().UTC())
 		if evErr != nil {
 			return saved, fmt.Errorf("create convergence event: %w", evErr)
 		}
@@ -940,7 +941,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []amadeus.ConvergenceAlert) ([]am
 // MarkCommented records that a D-Mail x Issue pair has been posted as a comment.
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
 	now := time.Now().UTC()
-	ev, err := amadeus.NewEvent(amadeus.EventDMailCommented, amadeus.DMailCommentedData{
+	ev, err := domain.NewEvent(domain.EventDMailCommented, domain.DMailCommentedData{
 		DMail: dmailName, IssueID: issueID,
 	}, now)
 	if err != nil {

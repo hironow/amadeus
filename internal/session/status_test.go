@@ -9,6 +9,7 @@ import (
 	"time"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -101,7 +102,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		Divergence: 0.05,
 		DMails:     nil,
 	}
-	cleanEv, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	cleanEv, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: cleanResult,
 	}, now)
 	if err != nil {
@@ -115,7 +116,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		Divergence: 0.35,
 		DMails:     []string{"feedback-001"},
 	}
-	driftEv, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	driftEv, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: driftResult,
 	}, now.Add(time.Hour))
 	if err != nil {
@@ -123,7 +124,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 
 	// Create a convergence event
-	convergenceEv, err := amadeus.NewEvent(amadeus.EventConvergenceDetected, amadeus.ConvergenceDetectedData{
+	convergenceEv, err := domain.NewEvent(domain.EventConvergenceDetected, domain.ConvergenceDetectedData{
 		Alert: amadeus.ConvergenceAlert{
 			Target:   "internal/session",
 			Count:    3,

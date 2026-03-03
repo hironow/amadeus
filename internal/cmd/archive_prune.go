@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +51,7 @@ Pass --execute to actually remove the files.`,
 				return err
 			}
 
-			pruneCmd := amadeus.ArchivePruneCommand{
+			pruneCmd := domain.ArchivePruneCommand{
 				RepoPath: repoRoot,
 				Days:     days,
 				DryRun:   !execute,

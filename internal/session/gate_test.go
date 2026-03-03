@@ -12,6 +12,7 @@ import (
 	"time"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -62,29 +63,29 @@ func (s *fakeStateReader) LoadSyncState() (amadeus.SyncState, error) {
 }
 
 type fakeEventStore struct {
-	events []amadeus.Event
+	events []domain.Event
 }
 
-func (e *fakeEventStore) Append(events ...amadeus.Event) error {
+func (e *fakeEventStore) Append(events ...domain.Event) error {
 	e.events = append(e.events, events...)
 	return nil
 }
-func (e *fakeEventStore) LoadAll() ([]amadeus.Event, error) {
+func (e *fakeEventStore) LoadAll() ([]domain.Event, error) {
 	return e.events, nil
 }
-func (e *fakeEventStore) LoadSince(_ time.Time) ([]amadeus.Event, error) {
+func (e *fakeEventStore) LoadSince(_ time.Time) ([]domain.Event, error) {
 	return e.events, nil
 }
 
 type fakeProjector struct {
-	applied []amadeus.Event
+	applied []domain.Event
 }
 
-func (p *fakeProjector) Apply(event amadeus.Event) error {
+func (p *fakeProjector) Apply(event domain.Event) error {
 	p.applied = append(p.applied, event)
 	return nil
 }
-func (p *fakeProjector) Rebuild(_ []amadeus.Event) error {
+func (p *fakeProjector) Rebuild(_ []domain.Event) error {
 	return nil
 }
 
@@ -178,7 +179,7 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 		Logger:    amadeus.NewLogger(io.Discard, false),
 		Approver:  approver,
 		Notifier:  notifier,
-		Aggregate: amadeus.NewCheckAggregate(cfg),
+		Aggregate: domain.NewCheckAggregate(cfg),
 	}
 }
 
@@ -206,14 +207,14 @@ func claudeResponseWithDriftAndAction(action string) string {
 }
 
 // extractDMailsFromEvents extracts DMails from dmail.generated events.
-func extractDMailsFromEvents(t *testing.T, events []amadeus.Event) []amadeus.DMail {
+func extractDMailsFromEvents(t *testing.T, events []domain.Event) []amadeus.DMail {
 	t.Helper()
 	var dmails []amadeus.DMail
 	for _, ev := range events {
-		if ev.Type != amadeus.EventDMailGenerated {
+		if ev.Type != domain.EventDMailGenerated {
 			continue
 		}
-		var data amadeus.DMailGeneratedData
+		var data domain.DMailGeneratedData
 		if err := json.Unmarshal(ev.Data, &data); err != nil {
 			t.Fatalf("unmarshal DMailGeneratedData: %v", err)
 		}
@@ -265,7 +266,7 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 	// check.completed event should still be emitted (ES invariant)
 	found := false
 	for _, ev := range events.events {
-		if ev.Type == amadeus.EventCheckCompleted {
+		if ev.Type == domain.EventCheckCompleted {
 			found = true
 			break
 		}
@@ -277,7 +278,7 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 	// Projector should have applied the check.completed event
 	projectorFound := false
 	for _, ev := range projector.applied {
-		if ev.Type == amadeus.EventCheckCompleted {
+		if ev.Type == domain.EventCheckCompleted {
 			projectorFound = true
 			break
 		}

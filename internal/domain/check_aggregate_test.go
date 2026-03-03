@@ -1,15 +1,16 @@
-package amadeus_test
+package domain_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/hironow/amadeus"
+	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestCheckAggregate_ShouldFullCheck_ForceFlag(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 
 	// when — force flag overrides everything
 	result := agg.ShouldFullCheck(true)
@@ -24,7 +25,7 @@ func TestCheckAggregate_ShouldFullCheck_IntervalReached(t *testing.T) {
 	// given
 	cfg := amadeus.DefaultConfig()
 	cfg.FullCheck.Interval = 3
-	agg := amadeus.NewCheckAggregate(cfg)
+	agg := domain.NewCheckAggregate(cfg)
 	// Simulate 3 diff checks
 	for range 3 {
 		agg.AdvanceCheckCount(false)
@@ -43,7 +44,7 @@ func TestCheckAggregate_ShouldFullCheck_BelowInterval(t *testing.T) {
 	// given
 	cfg := amadeus.DefaultConfig()
 	cfg.FullCheck.Interval = 5
-	agg := amadeus.NewCheckAggregate(cfg)
+	agg := domain.NewCheckAggregate(cfg)
 
 	// when
 	result := agg.ShouldFullCheck(false)
@@ -56,7 +57,7 @@ func TestCheckAggregate_ShouldFullCheck_BelowInterval(t *testing.T) {
 
 func TestCheckAggregate_AdvanceCheckCount_Diff(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 
 	// when
 	agg.AdvanceCheckCount(false)
@@ -70,7 +71,7 @@ func TestCheckAggregate_AdvanceCheckCount_Diff(t *testing.T) {
 
 func TestCheckAggregate_AdvanceCheckCount_FullResetsToZero(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 	agg.AdvanceCheckCount(false)
 	agg.AdvanceCheckCount(false)
 
@@ -87,7 +88,7 @@ func TestCheckAggregate_ShouldPromoteToFull(t *testing.T) {
 	// given
 	cfg := amadeus.DefaultConfig()
 	cfg.FullCheck.OnDivergenceJump = 0.05
-	agg := amadeus.NewCheckAggregate(cfg)
+	agg := domain.NewCheckAggregate(cfg)
 
 	// when — small delta below threshold
 	small := agg.ShouldPromoteToFull(0.10, 0.12)
@@ -108,7 +109,7 @@ func TestCheckAggregate_ShouldPromoteToFull(t *testing.T) {
 
 func TestCheckAggregate_ShouldFullCheck_ForceFullNext(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 	agg.SetForceFullNext(true)
 
 	// when
@@ -122,7 +123,7 @@ func TestCheckAggregate_ShouldFullCheck_ForceFullNext(t *testing.T) {
 
 func TestCheckAggregate_Restore(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 	prev := amadeus.CheckResult{
 		CheckCountSinceFull: 3,
 		ForceFullNext:       true,
@@ -143,7 +144,7 @@ func TestCheckAggregate_Restore(t *testing.T) {
 
 func TestCheckAggregate_RecordCheck_ProducesEvents(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 	result := amadeus.CheckResult{
 		CheckedAt:  time.Now().UTC(),
 		Commit:     "abc123",
@@ -161,14 +162,14 @@ func TestCheckAggregate_RecordCheck_ProducesEvents(t *testing.T) {
 	if len(events) == 0 {
 		t.Fatal("expected at least one event")
 	}
-	if events[0].Type != amadeus.EventCheckCompleted {
-		t.Errorf("expected %s, got %s", amadeus.EventCheckCompleted, events[0].Type)
+	if events[0].Type != domain.EventCheckCompleted {
+		t.Errorf("expected %s, got %s", domain.EventCheckCompleted, events[0].Type)
 	}
 }
 
 func TestCheckAggregate_RecordCheck_GateDeniedFullCheckSkipsBaseline(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 	result := amadeus.CheckResult{
 		CheckedAt:  time.Now().UTC(),
 		Commit:     "abc123",
@@ -187,14 +188,14 @@ func TestCheckAggregate_RecordCheck_GateDeniedFullCheckSkipsBaseline(t *testing.
 	if len(events) != 1 {
 		t.Fatalf("expected exactly 1 event for gate-denied full check, got %d", len(events))
 	}
-	if events[0].Type != amadeus.EventCheckCompleted {
-		t.Errorf("expected %s, got %s", amadeus.EventCheckCompleted, events[0].Type)
+	if events[0].Type != domain.EventCheckCompleted {
+		t.Errorf("expected %s, got %s", domain.EventCheckCompleted, events[0].Type)
 	}
 }
 
 func TestCheckAggregate_RecordCheck_FullCheckProducesBaselineEvent(t *testing.T) {
 	// given
-	agg := amadeus.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
 	result := amadeus.CheckResult{
 		CheckedAt:  time.Now().UTC(),
 		Commit:     "abc123",
@@ -212,7 +213,7 @@ func TestCheckAggregate_RecordCheck_FullCheckProducesBaselineEvent(t *testing.T)
 	if len(events) < 2 {
 		t.Fatalf("expected at least 2 events for full check, got %d", len(events))
 	}
-	if events[1].Type != amadeus.EventBaselineUpdated {
-		t.Errorf("expected %s as second event, got %s", amadeus.EventBaselineUpdated, events[1].Type)
+	if events[1].Type != domain.EventBaselineUpdated {
+		t.Errorf("expected %s as second event, got %s", domain.EventBaselineUpdated, events[1].Type)
 	}
 }

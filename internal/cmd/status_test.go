@@ -10,6 +10,7 @@ import (
 	"time"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -111,7 +112,7 @@ func TestStatusCmd_JSONOutput(t *testing.T) {
 	// Add a check event
 	store := session.NewEventStore(gateDir)
 	now := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: amadeus.CheckResult{
 			CheckedAt:  now,
 			Commit:     "abc123",

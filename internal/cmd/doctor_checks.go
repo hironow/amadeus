@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -312,7 +313,7 @@ func countEventStoreEntries(eventsDir string) (int, error) {
 			if line == "" {
 				continue
 			}
-			var ev amadeus.Event
+			var ev domain.Event
 			if parseErr := json.Unmarshal([]byte(line), &ev); parseErr != nil {
 				return 0, fmt.Errorf("parse %s: %w", e.Name(), parseErr)
 			}
@@ -398,13 +399,13 @@ func checkSuccessRate(gateDir string) DoctorCheckResult {
 		}
 	}
 
-	rate := amadeus.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 	var clean, total int
 	for _, ev := range events {
-		if ev.Type != amadeus.EventCheckCompleted {
+		if ev.Type != domain.EventCheckCompleted {
 			continue
 		}
-		var data amadeus.CheckCompletedData
+		var data domain.CheckCompletedData
 		if err := json.Unmarshal(ev.Data, &data); err != nil {
 			continue
 		}
@@ -417,7 +418,7 @@ func checkSuccessRate(gateDir string) DoctorCheckResult {
 	return DoctorCheckResult{
 		Name:    "success-rate",
 		Status:  CheckOK,
-		Message: amadeus.FormatSuccessRate(rate, clean, total),
+		Message: domain.FormatSuccessRate(rate, clean, total),
 	}
 }
 

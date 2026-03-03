@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestPrintSync_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := amadeus.RunSyncCommand{RepoPath: ""}
+	cmd := domain.RunSyncCommand{RepoPath: ""}
 	a := &session.Amadeus{
 		Config: amadeus.DefaultConfig(),
 		Logger: amadeus.NewLogger(nil, false),
@@ -29,7 +30,7 @@ func TestPrintSync_InvalidCommand(t *testing.T) {
 
 func TestRebuild_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := amadeus.RebuildCommand{RepoPath: ""}
+	cmd := domain.RebuildCommand{RepoPath: ""}
 
 	// when
 	err := Rebuild(cmd, nil, nil, amadeus.NewLogger(nil, false))
@@ -45,7 +46,7 @@ func TestRebuild_InvalidCommand(t *testing.T) {
 
 func TestCollectPruneCandidates_InvalidCommand(t *testing.T) {
 	// given: missing Days
-	cmd := amadeus.ArchivePruneCommand{RepoPath: "/tmp/test", Days: 0}
+	cmd := domain.ArchivePruneCommand{RepoPath: "/tmp/test", Days: 0}
 
 	// when
 	_, err := CollectPruneCandidates(cmd)
@@ -61,7 +62,7 @@ func TestCollectPruneCandidates_InvalidCommand(t *testing.T) {
 
 func TestCollectPruneCandidates_InvalidRepoPath(t *testing.T) {
 	// given: missing RepoPath
-	cmd := amadeus.ArchivePruneCommand{RepoPath: "", Days: 30}
+	cmd := domain.ArchivePruneCommand{RepoPath: "", Days: 30}
 
 	// when
 	_, err := CollectPruneCandidates(cmd)

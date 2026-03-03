@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -17,7 +17,7 @@ type PruneResult struct {
 
 // CollectPruneCandidates finds files eligible for pruning.
 // Validates the ArchivePruneCommand before collecting candidates.
-func CollectPruneCandidates(cmd amadeus.ArchivePruneCommand) (*PruneResult, error) {
+func CollectPruneCandidates(cmd domain.ArchivePruneCommand) (*PruneResult, error) {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return nil, fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -76,7 +76,7 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	paths = append(paths, result.EventCandidates...)
 
 	eventStore := session.NewEventStoreFromEventsDir(eventsDir)
-	ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
+	ev, evErr := domain.NewEvent(domain.EventArchivePruned, domain.ArchivePrunedData{
 		Paths: paths,
 		Count: totalCount,
 	}, time.Now().UTC())

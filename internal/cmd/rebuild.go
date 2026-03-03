@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
@@ -38,7 +38,7 @@ func newRebuildCommand() *cobra.Command {
 
 			projector := &session.Projector{Store: store, OutboxStore: outboxStore}
 
-			return usecase.Rebuild(amadeus.RebuildCommand{
+			return usecase.Rebuild(domain.RebuildCommand{
 				RepoPath: repoRoot,
 			}, eventStore, projector, logger)
 		},

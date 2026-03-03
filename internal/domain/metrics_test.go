@@ -1,4 +1,4 @@
-package amadeus_test
+package domain_test
 
 import (
 	"context"
@@ -6,25 +6,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/amadeus"
+	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
-func makeCheckEvent(dmails []string) amadeus.Event {
-	data, _ := json.Marshal(amadeus.CheckCompletedData{
+func makeCheckEvent(dmails []string) domain.Event {
+	data, _ := json.Marshal(domain.CheckCompletedData{
 		Result: amadeus.CheckResult{DMails: dmails},
 	})
-	return amadeus.Event{ID: "test", Type: amadeus.EventCheckCompleted, Timestamp: time.Now(), Data: data}
+	return domain.Event{ID: "test", Type: domain.EventCheckCompleted, Timestamp: time.Now(), Data: data}
 }
 
 func TestSuccessRate_AllClean(t *testing.T) {
-	events := []amadeus.Event{
+	events := []domain.Event{
 		makeCheckEvent(nil),
 		makeCheckEvent(nil),
 	}
 
-	rate := amadeus.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate != 1.0 {
 		t.Errorf("SuccessRate = %f, want 1.0", rate)
@@ -32,12 +33,12 @@ func TestSuccessRate_AllClean(t *testing.T) {
 }
 
 func TestSuccessRate_AllDrift(t *testing.T) {
-	events := []amadeus.Event{
+	events := []domain.Event{
 		makeCheckEvent([]string{"feedback-001"}),
 		makeCheckEvent([]string{"feedback-002"}),
 	}
 
-	rate := amadeus.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate != 0.0 {
 		t.Errorf("SuccessRate = %f, want 0.0", rate)
@@ -45,13 +46,13 @@ func TestSuccessRate_AllDrift(t *testing.T) {
 }
 
 func TestSuccessRate_Mixed(t *testing.T) {
-	events := []amadeus.Event{
+	events := []domain.Event{
 		makeCheckEvent(nil),
 		makeCheckEvent([]string{"feedback-001"}),
 		makeCheckEvent(nil),
 	}
 
-	rate := amadeus.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate < 0.66 || rate > 0.67 {
 		t.Errorf("SuccessRate = %f, want ~0.666", rate)
@@ -59,7 +60,7 @@ func TestSuccessRate_Mixed(t *testing.T) {
 }
 
 func TestSuccessRate_NoEvents(t *testing.T) {
-	rate := amadeus.SuccessRate(nil)
+	rate := domain.SuccessRate(nil)
 
 	if rate != 0.0 {
 		t.Errorf("SuccessRate = %f, want 0.0", rate)
@@ -67,13 +68,13 @@ func TestSuccessRate_NoEvents(t *testing.T) {
 }
 
 func TestSuccessRate_IgnoresOtherEvents(t *testing.T) {
-	events := []amadeus.Event{
-		{ID: "1", Type: amadeus.EventBaselineUpdated, Timestamp: time.Now()},
+	events := []domain.Event{
+		{ID: "1", Type: domain.EventBaselineUpdated, Timestamp: time.Now()},
 		makeCheckEvent(nil),
-		{ID: "3", Type: amadeus.EventDMailGenerated, Timestamp: time.Now()},
+		{ID: "3", Type: domain.EventDMailGenerated, Timestamp: time.Now()},
 	}
 
-	rate := amadeus.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate != 1.0 {
 		t.Errorf("SuccessRate = %f, want 1.0", rate)
@@ -90,9 +91,9 @@ func TestRecordCheck_IncreasesCounter(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	amadeus.RecordCheck(ctx, "clean")
-	amadeus.RecordCheck(ctx, "drift")
-	amadeus.RecordCheck(ctx, "clean")
+	domain.RecordCheck(ctx, "clean")
+	domain.RecordCheck(ctx, "drift")
+	domain.RecordCheck(ctx, "clean")
 
 	// then
 	var rm metricdata.ResourceMetrics
@@ -130,7 +131,7 @@ func TestFormatSuccessRate_WithEvents(t *testing.T) {
 	total := 7
 
 	// when
-	msg := amadeus.FormatSuccessRate(rate, success, total)
+	msg := domain.FormatSuccessRate(rate, success, total)
 
 	// then
 	if msg != "85.7% (6/7)" {
@@ -145,7 +146,7 @@ func TestFormatSuccessRate_NoEvents(t *testing.T) {
 	total := 0
 
 	// when
-	msg := amadeus.FormatSuccessRate(rate, success, total)
+	msg := domain.FormatSuccessRate(rate, success, total)
 
 	// then
 	if msg != "no events" {

@@ -1,4 +1,4 @@
-package amadeus
+package domain
 
 // Policy represents an implicit reactive rule: WHEN [EVENT] THEN [COMMAND].
 // See ADR S0014 for the POLICY pattern reference.

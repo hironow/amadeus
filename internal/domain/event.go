@@ -1,4 +1,4 @@
-package amadeus
+package domain
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	amadeus "github.com/hironow/amadeus"
 )
 
 // EventStore is the append-only event persistence interface.
@@ -84,7 +85,7 @@ func ValidateEvent(e Event) error {
 
 // CheckCompletedData is the payload for EventCheckCompleted.
 type CheckCompletedData struct {
-	Result CheckResult `json:"result"`
+	Result amadeus.CheckResult `json:"result"`
 }
 
 // BaselineUpdatedData is the payload for EventBaselineUpdated.
@@ -101,14 +102,14 @@ type ForceFullNextSetData struct {
 
 // DMailGeneratedData is the payload for EventDMailGenerated.
 type DMailGeneratedData struct {
-	DMail DMail `json:"dmail"`
+	DMail amadeus.DMail `json:"dmail"`
 }
 
 // InboxConsumedData is the payload for EventInboxConsumed.
 type InboxConsumedData struct {
-	Name   string    `json:"name"`
-	Kind   DMailKind `json:"kind"`
-	Source string    `json:"source"`
+	Name   string            `json:"name"`
+	Kind   amadeus.DMailKind `json:"kind"`
+	Source string            `json:"source"`
 }
 
 // DMailCommentedData is the payload for EventDMailCommented.
@@ -119,7 +120,7 @@ type DMailCommentedData struct {
 
 // ConvergenceDetectedData is the payload for EventConvergenceDetected.
 type ConvergenceDetectedData struct {
-	Alert ConvergenceAlert `json:"alert"`
+	Alert amadeus.ConvergenceAlert `json:"alert"`
 }
 
 // ArchivePrunedData is the payload for EventArchivePruned.

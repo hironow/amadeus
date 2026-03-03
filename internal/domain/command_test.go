@@ -1,14 +1,14 @@
-package amadeus_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestExecuteCheckCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := amadeus.ExecuteCheckCommand{
+	cmd := domain.ExecuteCheckCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -23,7 +23,7 @@ func TestExecuteCheckCommand_Validate_Valid(t *testing.T) {
 
 func TestExecuteCheckCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := amadeus.ExecuteCheckCommand{}
+	cmd := domain.ExecuteCheckCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -36,7 +36,7 @@ func TestExecuteCheckCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestRunSyncCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := amadeus.RunSyncCommand{
+	cmd := domain.RunSyncCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -51,7 +51,7 @@ func TestRunSyncCommand_Validate_Valid(t *testing.T) {
 
 func TestRunSyncCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := amadeus.RunSyncCommand{}
+	cmd := domain.RunSyncCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -64,7 +64,7 @@ func TestRunSyncCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestRebuildCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := amadeus.RebuildCommand{
+	cmd := domain.RebuildCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -79,7 +79,7 @@ func TestRebuildCommand_Validate_Valid(t *testing.T) {
 
 func TestRebuildCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := amadeus.RebuildCommand{}
+	cmd := domain.RebuildCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -92,7 +92,7 @@ func TestRebuildCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestArchivePruneCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := amadeus.ArchivePruneCommand{
+	cmd := domain.ArchivePruneCommand{
 		RepoPath: "/tmp/repo",
 		Days:     30,
 	}
@@ -108,7 +108,7 @@ func TestArchivePruneCommand_Validate_Valid(t *testing.T) {
 
 func TestArchivePruneCommand_Validate_InvalidDays(t *testing.T) {
 	// given
-	cmd := amadeus.ArchivePruneCommand{
+	cmd := domain.ArchivePruneCommand{
 		RepoPath: "/tmp/repo",
 		Days:     0,
 	}

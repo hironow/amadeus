@@ -1,18 +1,18 @@
 package session
 
 import (
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/eventsource"
 )
 
 // NewEventStore creates an event store for the given gate directory.
 // Derives the events path from the gate root.
-func NewEventStore(gateDir string) amadeus.EventStore {
+func NewEventStore(gateDir string) domain.EventStore {
 	return eventsource.NewFileEventStore(eventsource.EventsDir(gateDir))
 }
 
 // NewEventStoreFromEventsDir creates an event store from an explicit events directory path.
-func NewEventStoreFromEventsDir(eventsDir string) amadeus.EventStore {
+func NewEventStoreFromEventsDir(eventsDir string) domain.EventStore {
 	return eventsource.NewFileEventStore(eventsDir)
 }
 

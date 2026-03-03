@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // StatusReport holds operational status information for the amadeus tool.
@@ -41,7 +41,7 @@ func Status(gateDir string) StatusReport {
 	}
 
 	// Count check events and compute success rate
-	report.SuccessRate = amadeus.SuccessRate(allEvents)
+	report.SuccessRate = domain.SuccessRate(allEvents)
 
 	var checkCount int
 	var lastCheck time.Time
@@ -49,16 +49,16 @@ func Status(gateDir string) StatusReport {
 	var convergences int
 	for _, ev := range allEvents {
 		switch ev.Type {
-		case amadeus.EventCheckCompleted:
+		case domain.EventCheckCompleted:
 			checkCount++
-			var data amadeus.CheckCompletedData
+			var data domain.CheckCompletedData
 			if err := json.Unmarshal(ev.Data, &data); err == nil {
 				if data.Result.CheckedAt.After(lastCheck) {
 					lastCheck = data.Result.CheckedAt
 					lastDivergence = data.Result.Divergence
 				}
 			}
-		case amadeus.EventConvergenceDetected:
+		case domain.EventConvergenceDetected:
 			convergences++
 		}
 	}

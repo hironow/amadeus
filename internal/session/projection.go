@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
-// Compile-time check that Projector implements amadeus.EventApplier.
-var _ amadeus.EventApplier = (*Projector)(nil)
+// Compile-time check that Projector implements domain.EventApplier.
+var _ domain.EventApplier = (*Projector)(nil)
 
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
@@ -21,23 +22,23 @@ type Projector struct {
 }
 
 // Apply processes a single event and updates the relevant projections.
-func (p *Projector) Apply(event amadeus.Event) error {
+func (p *Projector) Apply(event domain.Event) error {
 	switch event.Type {
-	case amadeus.EventCheckCompleted:
+	case domain.EventCheckCompleted:
 		return p.applyCheckCompleted(event)
-	case amadeus.EventBaselineUpdated:
+	case domain.EventBaselineUpdated:
 		return p.applyBaselineUpdated(event)
-	case amadeus.EventForceFullNextSet:
+	case domain.EventForceFullNextSet:
 		return p.applyForceFullNextSet(event)
-	case amadeus.EventDMailGenerated:
+	case domain.EventDMailGenerated:
 		return p.applyDMailGenerated(event)
-	case amadeus.EventInboxConsumed:
+	case domain.EventInboxConsumed:
 		return p.applyInboxConsumed(event)
-	case amadeus.EventDMailCommented:
+	case domain.EventDMailCommented:
 		return p.applyDMailCommented(event)
-	case amadeus.EventArchivePruned:
+	case domain.EventArchivePruned:
 		return p.applyArchivePruned(event)
-	case amadeus.EventConvergenceDetected:
+	case domain.EventConvergenceDetected:
 		return nil // informational only, no projection needed
 	default:
 		return nil // unknown events are ignored for forward compatibility
@@ -49,7 +50,7 @@ func (p *Projector) Apply(event amadeus.Event) error {
 // so that rebuilt state exactly reflects the event stream.
 // NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed
 // because inbox.consumed events contain only metadata, not the full D-Mail content.
-func (p *Projector) Rebuild(events []amadeus.Event) error {
+func (p *Projector) Rebuild(events []domain.Event) error {
 	// Clear all projection directories
 	for _, sub := range []string{".run", "archive", "outbox"} {
 		dir := filepath.Join(p.Store.Root, sub)
@@ -72,16 +73,16 @@ func (p *Projector) Rebuild(events []amadeus.Event) error {
 	return nil
 }
 
-func (p *Projector) applyCheckCompleted(event amadeus.Event) error {
-	var data amadeus.CheckCompletedData
+func (p *Projector) applyCheckCompleted(event domain.Event) error {
+	var data domain.CheckCompletedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal CheckCompletedData: %w", err)
 	}
 	return p.Store.SaveLatest(data.Result)
 }
 
-func (p *Projector) applyBaselineUpdated(event amadeus.Event) error {
-	var data amadeus.BaselineUpdatedData
+func (p *Projector) applyBaselineUpdated(event domain.Event) error {
+	var data domain.BaselineUpdatedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal BaselineUpdatedData: %w", err)
 	}
@@ -95,7 +96,7 @@ func (p *Projector) applyBaselineUpdated(event amadeus.Event) error {
 	return p.Store.SaveBaseline(latest)
 }
 
-func (p *Projector) applyForceFullNextSet(event amadeus.Event) error {
+func (p *Projector) applyForceFullNextSet(event domain.Event) error {
 	latest, err := p.Store.LoadLatest()
 	if err != nil {
 		return fmt.Errorf("load latest for ForceFullNext: %w", err)
@@ -104,8 +105,8 @@ func (p *Projector) applyForceFullNextSet(event amadeus.Event) error {
 	return p.Store.SaveLatest(latest)
 }
 
-func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
-	var data amadeus.DMailGeneratedData
+func (p *Projector) applyDMailGenerated(event domain.Event) error {
+	var data domain.DMailGeneratedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailGeneratedData: %w", err)
 	}
@@ -137,8 +138,8 @@ func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
 // NOTE: This only updates consumed.json, not archive/. Inbox D-Mails are copied
 // to archive/ at scan time (ScanInbox), not via event replay. This is intentional:
 // the event payload contains only metadata, not the full D-Mail content.
-func (p *Projector) applyInboxConsumed(event amadeus.Event) error {
-	var data amadeus.InboxConsumedData
+func (p *Projector) applyInboxConsumed(event domain.Event) error {
+	var data domain.InboxConsumedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal InboxConsumedData: %w", err)
 	}
@@ -151,8 +152,8 @@ func (p *Projector) applyInboxConsumed(event amadeus.Event) error {
 	return p.Store.SaveConsumed([]amadeus.ConsumedRecord{record})
 }
 
-func (p *Projector) applyDMailCommented(event amadeus.Event) error {
-	var data amadeus.DMailCommentedData
+func (p *Projector) applyDMailCommented(event domain.Event) error {
+	var data domain.DMailCommentedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailCommentedData: %w", err)
 	}
@@ -169,8 +170,8 @@ func (p *Projector) applyDMailCommented(event amadeus.Event) error {
 	return p.Store.SaveSyncState(state)
 }
 
-func (p *Projector) applyArchivePruned(event amadeus.Event) error {
-	var data amadeus.ArchivePrunedData
+func (p *Projector) applyArchivePruned(event domain.Event) error {
+	var data domain.ArchivePrunedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal ArchivePrunedData: %w", err)
 	}

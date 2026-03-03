@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -573,10 +574,10 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	eventsDir := filepath.Join(gateDir, "events")
 	today := time.Now().UTC().Format("2006-01-02")
 
-	cleanData, _ := json.Marshal(amadeus.CheckCompletedData{
+	cleanData, _ := json.Marshal(domain.CheckCompletedData{
 		Result: amadeus.CheckResult{DMails: nil},
 	})
-	driftData, _ := json.Marshal(amadeus.CheckCompletedData{
+	driftData, _ := json.Marshal(domain.CheckCompletedData{
 		Result: amadeus.CheckResult{DMails: []string{"feedback-001"}},
 	})
 	now := time.Now().UTC().Format(time.RFC3339)
