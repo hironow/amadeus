@@ -408,17 +408,7 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 +-- internal/eventsource/     Event store infrastructure (JSONL append-only)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI docs generation
-+-- Root package (amadeus)    Types, interfaces, pure functions, go:embed
-|   +-- amadeus.go            DriftError, ExitCode, CheckOptions
-|   +-- config.go             Config type, DefaultConfig, ValidateConfig
-|   +-- convergence.go        Pure convergence algorithm
-|   +-- dmail.go              DMail types, ParseDMail, MarshalDMail, ValidateDMail
-|   +-- event.go              Event envelope, EventType constants
-|   +-- scoring.go            Pure scoring calculation
-|   +-- state.go              CheckType, CheckResult, StateReader interface
-|   +-- claude.go             ClaudeRunner interface, go:embed templates
-|   +-- logger.go             Structured logger (noop default)
-|   +-- telemetry.go          OTel tracer (noop default)
++-- doc.go                    Package declaration (root-zero: all code in internal/)
 +-- templates/                AI prompt templates ({en,ja})
 |   +-- skills/               D-Mail SKILL.md templates
 +-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)

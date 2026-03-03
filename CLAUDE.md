@@ -6,22 +6,13 @@
 
 ## Repository Structure (ADR 0016: 3-Layer Separation)
 
-Dependency direction: `internal/cmd` → `internal/session` → `internal/eventsource` → `amadeus` (root)
+Dependency direction: `internal/cmd` → `internal/usecase` → `internal/session` → `internal/eventsource` → `internal/domain`
 
-### Root package `amadeus` — types, constants, pure functions, go:embed
+### Root package — `doc.go` only (root-zero: all code moved to internal/)
 
-- `amadeus.go` — DriftError, ExitCode, CheckOptions
-- `config.go` — Config type, DefaultConfig, ValidateConfig (LoadConfig is in cmd)
-- `convergence.go` — pure convergence algorithm
-- `dmail.go` — DMail types, ParseDMail, MarshalDMail, ValidateDMail (pure)
-- `event.go` — Event envelope, EventType constants, NewEvent, EventStore interface, EventApplier interface
-- `git.go` — MergedPR type, Git interface
-- `scoring.go` — pure scoring calculation
-- `state.go` — CheckType, CheckResult, StateReader interface, SkillTemplateFS (go:embed)
-- `sync.go` — SyncState, CommentRecord, PendingComment types
-- `claude.go` — ClaudeRunner interface, go:embed templates, prompt building (pure)
-- `logger.go` — structured logger (root infrastructure per S0005)
-- `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
+### `internal/domain/` — types, constants, pure functions, go:embed
+
+All former root package contents now reside here (types, interfaces, event/command/policy, go:embed templates, pure functions).
 
 ### `internal/eventsource/` — event store infrastructure
 
