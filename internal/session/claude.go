@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // DivergenceMeterAllowedTools is the minimal tool set for divergence evaluation.
@@ -42,6 +42,6 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 }
 
 // DefaultClaudeRunner returns the default ClaudeRunner that invokes the real Claude CLI.
-func DefaultClaudeRunner() amadeus.ClaudeRunner {
+func DefaultClaudeRunner() domain.ClaudeRunner {
 	return &defaultClaudeRunner{}
 }

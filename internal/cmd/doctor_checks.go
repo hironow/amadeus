@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
@@ -207,7 +206,7 @@ func runDoctor(ctx context.Context, configPath string, repoRoot string) []Doctor
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
 func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
-	_, span := platform.Tracer.Start(ctx, "amadeus.doctor")
+	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 
 	var results []DoctorCheckResult
@@ -364,12 +363,12 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 			invalid = append(invalid, fmt.Sprintf("%s: read error", name))
 			continue
 		}
-		dmail, parseErr := amadeus.ParseDMail(data)
+		dmail, parseErr := domain.ParseDMail(data)
 		if parseErr != nil {
 			invalid = append(invalid, fmt.Sprintf("%s: %v", name, parseErr))
 			continue
 		}
-		if errs := amadeus.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 			invalid = append(invalid, fmt.Sprintf("%s: %s", name, strings.Join(errs, "; ")))
 		}
 	}
@@ -440,7 +439,7 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return DoctorCheckResult{
 			Name:    "Config",
@@ -448,7 +447,7 @@ func checkConfig(path string) DoctorCheckResult {
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
-	if errs := amadeus.ValidateConfig(cfg); len(errs) > 0 {
+	if errs := domain.ValidateConfig(cfg); len(errs) > 0 {
 		return DoctorCheckResult{
 			Name:    "Config",
 			Status:  CheckFail,

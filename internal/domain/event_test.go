@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 )
 
@@ -74,10 +73,10 @@ func TestEventTypeConstants(t *testing.T) {
 func TestCheckCompletedDataMarshalRoundTrip(t *testing.T) {
 	// given
 	data := domain.CheckCompletedData{
-		Result: amadeus.CheckResult{
+		Result: domain.CheckResult{
 			CheckedAt:  time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC),
 			Commit:     "abc123",
-			Type:       amadeus.CheckTypeDiff,
+			Type:       domain.CheckTypeDiff,
 			Divergence: 0.42,
 		},
 	}
@@ -104,11 +103,11 @@ func TestCheckCompletedDataMarshalRoundTrip(t *testing.T) {
 func TestDMailGeneratedDataMarshalRoundTrip(t *testing.T) {
 	// given
 	data := domain.DMailGeneratedData{
-		DMail: amadeus.DMail{
+		DMail: domain.DMail{
 			Name:        "feedback-001",
-			Kind:        amadeus.KindFeedback,
+			Kind:        domain.KindFeedback,
 			Description: "test",
-			Severity:    amadeus.SeverityMedium,
+			Severity:    domain.SeverityMedium,
 		},
 	}
 
@@ -132,7 +131,7 @@ func TestInboxConsumedDataMarshalRoundTrip(t *testing.T) {
 	// given
 	data := domain.InboxConsumedData{
 		Name:   "report-001",
-		Kind:   amadeus.KindReport,
+		Kind:   domain.KindReport,
 		Source: "report-001.md",
 	}
 
@@ -376,12 +375,12 @@ func TestValidateEvent_MultipleErrors(t *testing.T) {
 func TestConvergenceDetectedDataMarshalRoundTrip(t *testing.T) {
 	// given
 	data := domain.ConvergenceDetectedData{
-		Alert: amadeus.ConvergenceAlert{
+		Alert: domain.ConvergenceAlert{
 			Target:   "auth",
 			Count:    5,
 			Window:   14,
 			DMails:   []string{"feedback-001", "feedback-002"},
-			Severity: amadeus.SeverityHigh,
+			Severity: domain.SeverityHigh,
 		},
 	}
 

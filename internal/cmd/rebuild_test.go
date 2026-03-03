@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
@@ -34,10 +33,10 @@ func TestRebuildCommand_RebuildsProjectionsFromEvents(t *testing.T) {
 	// Write a CheckCompleted event to JSONL
 	now := time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC)
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
-		Result: amadeus.CheckResult{
+		Result: domain.CheckResult{
 			CheckedAt:  now,
 			Commit:     "abc123",
-			Type:       amadeus.CheckTypeFull,
+			Type:       domain.CheckTypeFull,
 			Divergence: 0.42,
 		},
 	}, now)

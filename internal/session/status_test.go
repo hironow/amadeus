@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
@@ -95,10 +94,10 @@ func TestStatus_WithEvents(t *testing.T) {
 	now := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
 	// Create 2 check.completed events: one clean, one with drift
-	cleanResult := amadeus.CheckResult{
+	cleanResult := domain.CheckResult{
 		CheckedAt:  now,
 		Commit:     "abc123",
-		Type:       amadeus.CheckTypeDiff,
+		Type:       domain.CheckTypeDiff,
 		Divergence: 0.05,
 		DMails:     nil,
 	}
@@ -109,10 +108,10 @@ func TestStatus_WithEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	driftResult := amadeus.CheckResult{
+	driftResult := domain.CheckResult{
 		CheckedAt:  now.Add(time.Hour),
 		Commit:     "def456",
-		Type:       amadeus.CheckTypeDiff,
+		Type:       domain.CheckTypeDiff,
 		Divergence: 0.35,
 		DMails:     []string{"feedback-001"},
 	}
@@ -125,12 +124,12 @@ func TestStatus_WithEvents(t *testing.T) {
 
 	// Create a convergence event
 	convergenceEv, err := domain.NewEvent(domain.EventConvergenceDetected, domain.ConvergenceDetectedData{
-		Alert: amadeus.ConvergenceAlert{
+		Alert: domain.ConvergenceAlert{
 			Target:   "internal/session",
 			Count:    3,
 			Window:   30,
 			DMails:   []string{"feedback-001", "feedback-002", "feedback-003"},
-			Severity: amadeus.SeverityHigh,
+			Severity: domain.SeverityHigh,
 		},
 	}, now.Add(2*time.Hour))
 	if err != nil {

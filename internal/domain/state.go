@@ -1,4 +1,4 @@
-package amadeus
+package domain
 
 import (
 	"embed"

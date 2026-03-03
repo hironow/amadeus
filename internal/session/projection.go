@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 )
 
@@ -17,8 +16,8 @@ var _ domain.EventApplier = (*Projector)(nil)
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
 	Store       *ProjectionStore
-	OutboxStore amadeus.OutboxStore // transactional outbox for D-Mail delivery
-	rebuilding  bool                // true during Rebuild to skip outbox writes
+	OutboxStore domain.OutboxStore // transactional outbox for D-Mail delivery
+	rebuilding  bool               // true during Rebuild to skip outbox writes
 }
 
 // Apply processes a single event and updates the relevant projections.
@@ -116,7 +115,7 @@ func (p *Projector) applyDMailGenerated(event domain.Event) error {
 		return p.Store.SaveDMailToArchive(data.DMail)
 	}
 	// Normal mode: transactional outbox (Stage → Flush to archive/ + outbox/).
-	marshaledData, err := amadeus.MarshalDMail(data.DMail)
+	marshaledData, err := domain.MarshalDMail(data.DMail)
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
@@ -143,13 +142,13 @@ func (p *Projector) applyInboxConsumed(event domain.Event) error {
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal InboxConsumedData: %w", err)
 	}
-	record := amadeus.ConsumedRecord{
+	record := domain.ConsumedRecord{
 		Name:       data.Name,
 		Kind:       data.Kind,
 		ConsumedAt: event.Timestamp,
 		Source:     data.Source,
 	}
-	return p.Store.SaveConsumed([]amadeus.ConsumedRecord{record})
+	return p.Store.SaveConsumed([]domain.ConsumedRecord{record})
 }
 
 func (p *Projector) applyDMailCommented(event domain.Event) error {
@@ -162,7 +161,7 @@ func (p *Projector) applyDMailCommented(event domain.Event) error {
 		return fmt.Errorf("load sync state: %w", err)
 	}
 	key := data.DMail + ":" + data.IssueID
-	state.CommentedDMails[key] = amadeus.CommentRecord{
+	state.CommentedDMails[key] = domain.CommentRecord{
 		DMail:       data.DMail,
 		IssueID:     data.IssueID,
 		CommentedAt: event.Timestamp,

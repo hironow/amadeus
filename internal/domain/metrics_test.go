@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 )
 
 func makeCheckEvent(dmails []string) domain.Event {
 	data, _ := json.Marshal(domain.CheckCompletedData{
-		Result: amadeus.CheckResult{DMails: dmails},
+		Result: domain.CheckResult{DMails: dmails},
 	})
 	return domain.Event{ID: "test", Type: domain.EventCheckCompleted, Timestamp: time.Now(), Data: data}
 }

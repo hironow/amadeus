@@ -2,26 +2,24 @@ package domain
 
 import (
 	"time"
-
-	amadeus "github.com/hironow/amadeus"
 )
 
 // CheckAggregate encapsulates the domain logic for amadeus check operations.
 // It owns the check count, force-full-next flag, and previous result state,
 // enforcing invariants and producing events as return values (no side effects).
 type CheckAggregate struct {
-	config        amadeus.Config
+	config        Config
 	checkCount    int
 	forceFullNext bool
 }
 
 // NewCheckAggregate creates a new CheckAggregate with the given config.
-func NewCheckAggregate(cfg amadeus.Config) *CheckAggregate {
+func NewCheckAggregate(cfg Config) *CheckAggregate {
 	return &CheckAggregate{config: cfg}
 }
 
 // Restore hydrates the aggregate from a persisted CheckResult projection.
-func (a *CheckAggregate) Restore(result amadeus.CheckResult) {
+func (a *CheckAggregate) Restore(result CheckResult) {
 	a.checkCount = result.CheckCountSinceFull
 	a.forceFullNext = result.ForceFullNext
 }
@@ -74,7 +72,7 @@ func (a *CheckAggregate) ShouldPromoteToFull(previousDivergence, currentDivergen
 // RecordCheck produces events for a completed check result.
 // For full checks, it also produces a baseline.updated event.
 // The caller is responsible for persisting the returned events.
-func (a *CheckAggregate) RecordCheck(result amadeus.CheckResult, now time.Time) ([]Event, error) {
+func (a *CheckAggregate) RecordCheck(result CheckResult, now time.Time) ([]Event, error) {
 	result.CheckCountSinceFull = a.checkCount
 	result.ForceFullNext = a.forceFullNext
 
@@ -84,7 +82,7 @@ func (a *CheckAggregate) RecordCheck(result amadeus.CheckResult, now time.Time) 
 	}
 	events := []Event{checkEv}
 
-	if result.Type == amadeus.CheckTypeFull && !result.GateDenied {
+	if result.Type == CheckTypeFull && !result.GateDenied {
 		baselineEv, bErr := NewEvent(EventBaselineUpdated, BaselineUpdatedData{
 			Commit: result.Commit, Divergence: result.Divergence,
 		}, now)

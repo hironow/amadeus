@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
@@ -18,17 +17,17 @@ import (
 // Amadeus is the main orchestrator that wires Phase 1 (ReadingSteiner),
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
-	Config      amadeus.Config
-	Store       amadeus.StateReader
+	Config      domain.Config
+	Store       domain.StateReader
 	Events      domain.EventStore   // nil skips event persistence (Projector still required for writes)
 	Projector   domain.EventApplier // nil skips projection updates (Events still required for writes)
-	Git         amadeus.Git
-	RepoDir     string               // repository root directory
-	Claude      amadeus.ClaudeRunner // nil falls back to the default Claude runner
+	Git         domain.Git
+	RepoDir     string              // repository root directory
+	Claude      domain.ClaudeRunner // nil falls back to the default Claude runner
 	Logger      *domain.Logger
 	DataOut     io.Writer              // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver    amadeus.Approver       // nil = no gate (auto-approve)
-	Notifier    amadeus.Notifier       // nil = no notifications
+	Approver    domain.Approver        // nil = no gate (auto-approve)
+	Notifier    domain.Notifier        // nil = no notifications
 	ReviewCmd   string                 // code review command (empty = skip)
 	ClaudeCmd   string                 // Claude CLI command (empty = "claude")
 	ClaudeModel string                 // Claude model for review fix (empty = "opus")
@@ -37,7 +36,7 @@ type Amadeus struct {
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
-func (a *Amadeus) claudeRunner() amadeus.ClaudeRunner {
+func (a *Amadeus) claudeRunner() domain.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
@@ -122,8 +121,8 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 //   - Phase 2: Claude evaluates divergence, DivergenceMeter scores it
 //   - Phase 3: D-Mail generation and routing
 //   - Phase 4: World Line Convergence detection
-func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error {
-	ctx, span := platform.Tracer.Start(ctx, "amadeus.check",
+func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error {
+	ctx, span := platform.Tracer.Start(ctx, "domain.check",
 		trace.WithAttributes(
 			attribute.Bool("check.dry_run", opts.DryRun),
 		))
@@ -231,7 +230,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		noShiftResult := previous
 		noShiftResult.Commit = currentCommit
 		noShiftResult.CheckedAt = now
-		noShiftResult.Type = amadeus.CheckTypeDiff
+		noShiftResult.Type = domain.CheckTypeDiff
 		noShiftResult.PRsEvaluated = nil
 		noShiftResult.DMails = nil
 		noShiftResult.ConvergenceAlerts = nil
@@ -249,8 +248,8 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 			}
 		} else if opts.Quiet {
 			a.dataOut("%s (%s) 0 D-Mails",
-				amadeus.FormatDivergence(previous.Divergence*100),
-				amadeus.FormatDelta(previous.Divergence, previous.Divergence))
+				domain.FormatDivergence(previous.Divergence*100),
+				domain.FormatDelta(previous.Divergence, previous.Divergence))
 		}
 		return nil
 	}
@@ -280,7 +279,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 
 	var prompt string
 	if fullCheck {
-		prompt, err = amadeus.BuildFullCheckPrompt(a.Config.Lang, amadeus.FullCheckParams{
+		prompt, err = domain.BuildFullCheckPrompt(a.Config.Lang, domain.FullCheckParams{
 			CodebaseStructure: report.CodebaseStructure,
 			AllADRs:           allADRs,
 			RecentDoDs:        allDoDs,
@@ -292,12 +291,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		for _, pr := range report.MergedPRs {
 			prTitles = append(prTitles, pr.Title)
 		}
-		issueIDs := amadeus.ExtractIssueIDs(prTitles...)
+		issueIDs := domain.ExtractIssueIDs(prTitles...)
 		linkedDoDs := ""
 		if len(issueIDs) > 0 {
 			linkedDoDs = allDoDs
 		}
-		prompt, err = amadeus.BuildDiffCheckPrompt(a.Config.Lang, amadeus.DiffCheckParams{
+		prompt, err = domain.BuildDiffCheckPrompt(a.Config.Lang, domain.DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
 			RelevantADRs:   allADRs,
@@ -326,13 +325,13 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		return fmt.Errorf("phase 2 (claude): %w", err)
 	}
 
-	claudeResp, err := amadeus.ParseClaudeResponse(rawResp)
+	claudeResp, err := domain.ParseClaudeResponse(rawResp)
 	if err != nil {
 		span2.End()
 		return fmt.Errorf("phase 2 (parse): %w", err)
 	}
 
-	meter := &amadeus.DivergenceMeter{Config: a.Config}
+	meter := &domain.DivergenceMeter{Config: a.Config}
 	meterResult := meter.ProcessResponse(claudeResp)
 
 	span2.AddEvent("divergence.evaluated", trace.WithAttributes(
@@ -385,11 +384,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 	if !gateApproved {
 		// Emit check.completed event to maintain ES invariant.
 		a.Aggregate.AdvanceCheckCount(fullCheck)
-		checkType := amadeus.CheckTypeDiff
+		checkType := domain.CheckTypeDiff
 		if fullCheck {
-			checkType = amadeus.CheckTypeFull
+			checkType = domain.CheckTypeFull
 		}
-		gateDeniedResult := amadeus.CheckResult{
+		gateDeniedResult := domain.CheckResult{
 			CheckedAt:  now,
 			Commit:     currentCommit,
 			Type:       checkType,
@@ -412,21 +411,21 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 	}
 
 	_, span3 := platform.Tracer.Start(ctx, "dmail")
-	var dmails []amadeus.DMail
+	var dmails []domain.DMail
 	for _, candidate := range meterResult.DMailCandidates {
-		name, err := a.Store.NextDMailName(amadeus.KindFeedback)
+		name, err := a.Store.NextDMailName(domain.KindFeedback)
 		if err != nil {
 			span3.End()
 			return fmt.Errorf("phase 3 (dmail name): %w", err)
 		}
-		dmail := amadeus.DMail{
-			SchemaVersion: amadeus.DMailSchemaVersion,
+		dmail := domain.DMail{
+			SchemaVersion: domain.DMailSchemaVersion,
 			Name:          name,
-			Kind:          amadeus.KindFeedback,
+			Kind:          domain.KindFeedback,
 			Description:   candidate.Description,
 			Issues:        candidate.Issues,
 			Severity:      meterResult.Divergence.Severity,
-			Action:        amadeus.DMailAction(candidate.Action),
+			Action:        domain.DMailAction(candidate.Action),
 			Targets:       candidate.Targets,
 			Metadata: map[string]string{
 				"created_at": now.Format(time.RFC3339),
@@ -435,15 +434,15 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		}
 		if dmail.Action == "" {
 			switch meterResult.Divergence.Severity {
-			case amadeus.SeverityHigh:
-				dmail.Action = amadeus.ActionEscalate
-			case amadeus.SeverityMedium:
-				dmail.Action = amadeus.ActionRetry
+			case domain.SeverityHigh:
+				dmail.Action = domain.ActionEscalate
+			case domain.SeverityMedium:
+				dmail.Action = domain.ActionRetry
 			default:
-				dmail.Action = amadeus.ActionResolve
+				dmail.Action = domain.ActionResolve
 			}
 		}
-		if errs := amadeus.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
 			continue
 		}
@@ -466,9 +465,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 
 	// Phase 4: World Line Convergence detection
 	allDMails, convergenceErr := a.Store.LoadAllDMails()
-	var convergenceAlerts []amadeus.ConvergenceAlert
+	var convergenceAlerts []domain.ConvergenceAlert
 	if convergenceErr == nil {
-		convergenceAlerts = amadeus.AnalyzeConvergence(allDMails, a.Config.Convergence, now)
+		convergenceAlerts = domain.AnalyzeConvergence(allDMails, a.Config.Convergence, now)
 		for _, alert := range convergenceAlerts {
 			cev, cerr := domain.NewEvent(domain.EventConvergenceDetected, domain.ConvergenceDetectedData{
 				Alert: alert,
@@ -497,12 +496,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 	}
 
 	a.Aggregate.AdvanceCheckCount(fullCheck)
-	checkType := amadeus.CheckTypeDiff
+	checkType := domain.CheckTypeDiff
 	if fullCheck {
-		checkType = amadeus.CheckTypeFull
+		checkType = domain.CheckTypeFull
 	}
 
-	result := amadeus.CheckResult{
+	result := domain.CheckResult{
 		CheckedAt:         now,
 		Commit:            currentCommit,
 		Type:              checkType,
@@ -553,7 +552,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 				fmt.Sprintf("Drift %.1f%% — %d D-Mail(s) sent",
 					result.Divergence*100, len(dmails)))
 		}
-		return &amadeus.DriftError{Divergence: result.Divergence, DMails: len(dmails)}
+		return &domain.DriftError{Divergence: result.Divergence, DMails: len(dmails)}
 	}
 	return nil
 }
@@ -582,18 +581,18 @@ func (a *Amadeus) writeDataJSON(v any) error {
 }
 
 // PrintCheckOutput renders the CLI display for a completed check.
-func (a *Amadeus) PrintCheckOutput(result amadeus.CheckResult, dmails []amadeus.DMail, previousDivergence float64) {
+func (a *Amadeus) PrintCheckOutput(result domain.CheckResult, dmails []domain.DMail, previousDivergence float64) {
 	a.dataOut("")
 	a.dataOut("Divergence: %s (%s)",
-		amadeus.FormatDivergence(result.Divergence*100),
-		amadeus.FormatDelta(result.Divergence, previousDivergence))
+		domain.FormatDivergence(result.Divergence*100),
+		domain.FormatDelta(result.Divergence, previousDivergence))
 
-	axisOrder := []amadeus.Axis{amadeus.AxisADR, amadeus.AxisDoD, amadeus.AxisDependency, amadeus.AxisImplicit}
-	axisNames := map[amadeus.Axis]string{
-		amadeus.AxisADR:        "ADR Integrity",
-		amadeus.AxisDoD:        "DoD Fulfillment",
-		amadeus.AxisDependency: "Dependency Integrity",
-		amadeus.AxisImplicit:   "Implicit Constraints",
+	axisOrder := []domain.Axis{domain.AxisADR, domain.AxisDoD, domain.AxisDependency, domain.AxisImplicit}
+	axisNames := map[domain.Axis]string{
+		domain.AxisADR:        "ADR Integrity",
+		domain.AxisDoD:        "DoD Fulfillment",
+		domain.AxisDependency: "Dependency Integrity",
+		domain.AxisImplicit:   "Implicit Constraints",
 	}
 
 	for _, axis := range axisOrder {
@@ -602,7 +601,7 @@ func (a *Amadeus) PrintCheckOutput(result amadeus.CheckResult, dmails []amadeus.
 			contribution := float64(score.Score) * weight
 			a.dataOut("  %-22s %s — %s",
 				axisNames[axis]+":",
-				amadeus.FormatDivergence(contribution),
+				domain.FormatDivergence(contribution),
 				score.Details)
 		}
 	}
@@ -621,9 +620,9 @@ func (a *Amadeus) PrintCheckOutput(result amadeus.CheckResult, dmails []amadeus.
 		for _, d := range dmails {
 			var prefix string
 			switch d.Severity {
-			case amadeus.SeverityHigh:
+			case domain.SeverityHigh:
 				prefix = "[HIGH]"
-			case amadeus.SeverityMedium:
+			case domain.SeverityMedium:
 				prefix = "[MED] "
 			default:
 				prefix = "[LOW] "
@@ -648,18 +647,18 @@ func (a *Amadeus) PrintCheckOutput(result amadeus.CheckResult, dmails []amadeus.
 }
 
 // PrintCheckOutputJSON writes the check result as JSON to DataOut.
-func (a *Amadeus) PrintCheckOutputJSON(result amadeus.CheckResult, dmails []amadeus.DMail, previousDivergence float64) error {
+func (a *Amadeus) PrintCheckOutputJSON(result domain.CheckResult, dmails []domain.DMail, previousDivergence float64) error {
 	convergenceAlerts := result.ConvergenceAlerts
 	if convergenceAlerts == nil {
-		convergenceAlerts = []amadeus.ConvergenceAlert{}
+		convergenceAlerts = []domain.ConvergenceAlert{}
 	}
 	output := struct {
-		Divergence        float64                            `json:"divergence"`
-		Delta             float64                            `json:"delta"`
-		Axes              map[amadeus.Axis]amadeus.AxisScore `json:"axes"`
-		ImpactRadius      []amadeus.ImpactEntry              `json:"impact_radius"`
-		DMails            []amadeus.DMail                    `json:"dmails"`
-		ConvergenceAlerts []amadeus.ConvergenceAlert         `json:"convergence_alerts"`
+		Divergence        float64                          `json:"divergence"`
+		Delta             float64                          `json:"delta"`
+		Axes              map[domain.Axis]domain.AxisScore `json:"axes"`
+		ImpactRadius      []domain.ImpactEntry             `json:"impact_radius"`
+		DMails            []domain.DMail                   `json:"dmails"`
+		ConvergenceAlerts []domain.ConvergenceAlert        `json:"convergence_alerts"`
 	}{
 		Divergence:        result.Divergence,
 		Delta:             result.Divergence - previousDivergence,
@@ -669,16 +668,16 @@ func (a *Amadeus) PrintCheckOutputJSON(result amadeus.CheckResult, dmails []amad
 		ConvergenceAlerts: convergenceAlerts,
 	}
 	if output.DMails == nil {
-		output.DMails = []amadeus.DMail{}
+		output.DMails = []domain.DMail{}
 	}
 	if output.ImpactRadius == nil {
-		output.ImpactRadius = []amadeus.ImpactEntry{}
+		output.ImpactRadius = []domain.ImpactEntry{}
 	}
 	return a.writeDataJSON(output)
 }
 
 // PrintCheckOutputQuiet renders a single-line summary for --quiet mode.
-func (a *Amadeus) PrintCheckOutputQuiet(result amadeus.CheckResult, dmails []amadeus.DMail, previousDivergence float64) {
+func (a *Amadeus) PrintCheckOutputQuiet(result domain.CheckResult, dmails []domain.DMail, previousDivergence float64) {
 	dmailLabel := "D-Mails"
 	if len(dmails) == 1 {
 		dmailLabel = "D-Mail"
@@ -690,15 +689,15 @@ func (a *Amadeus) PrintCheckOutputQuiet(result amadeus.CheckResult, dmails []ama
 	}
 
 	a.dataOut("%s (%s) %d %s%s",
-		amadeus.FormatDivergence(result.Divergence*100),
-		amadeus.FormatDelta(result.Divergence, previousDivergence),
+		domain.FormatDivergence(result.Divergence*100),
+		domain.FormatDelta(result.Divergence, previousDivergence),
 		len(dmails),
 		dmailLabel,
 		convergenceStr)
 }
 
 // loadCheckHistory returns CheckResults extracted from the event store.
-func (a *Amadeus) loadCheckHistory() ([]amadeus.CheckResult, error) {
+func (a *Amadeus) loadCheckHistory() ([]domain.CheckResult, error) {
 	if a.Events == nil {
 		return nil, nil
 	}
@@ -706,7 +705,7 @@ func (a *Amadeus) loadCheckHistory() ([]amadeus.CheckResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load events: %w", err)
 	}
-	var results []amadeus.CheckResult
+	var results []domain.CheckResult
 	for _, ev := range events {
 		if ev.Type != domain.EventCheckCompleted {
 			continue
@@ -740,10 +739,10 @@ func (a *Amadeus) PrintLog() error {
 	a.dataOut("History:")
 	for i, h := range history {
 		var delta string
-		if h.Type == amadeus.CheckTypeFull {
+		if h.Type == domain.CheckTypeFull {
 			delta = "(baseline)"
 		} else if i+1 < len(history) {
-			delta = "(" + amadeus.FormatDelta(h.Divergence, history[i+1].Divergence) + ")"
+			delta = "(" + domain.FormatDelta(h.Divergence, history[i+1].Divergence) + ")"
 		} else {
 			delta = "(first)"
 		}
@@ -756,7 +755,7 @@ func (a *Amadeus) PrintLog() error {
 			h.CheckedAt.Format("2006-01-02T15:04"),
 			h.Commit,
 			string(h.Type),
-			amadeus.FormatDivergence(h.Divergence*100),
+			domain.FormatDivergence(h.Divergence*100),
 			delta,
 			dmailCount,
 			dmailLabel)
@@ -773,9 +772,9 @@ func (a *Amadeus) PrintLog() error {
 		for _, d := range dmails {
 			var severityTag string
 			switch d.Severity {
-			case amadeus.SeverityHigh:
+			case domain.SeverityHigh:
 				severityTag = "[HIGH]"
-			case amadeus.SeverityMedium:
+			case domain.SeverityMedium:
 				severityTag = "[MED] "
 			default:
 				severityTag = "[LOW] "
@@ -783,13 +782,13 @@ func (a *Amadeus) PrintLog() error {
 			a.dataOut("  %s  %s %-10s %s",
 				d.Name,
 				severityTag,
-				string(amadeus.DMailSent),
+				string(domain.DMailSent),
 				d.Description)
 		}
 	}
 
 	// Convergence alerts from current archive
-	convergenceAlerts := amadeus.AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
+	convergenceAlerts := domain.AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
 	if len(convergenceAlerts) > 0 {
 		a.dataOut("")
 		a.dataOut("Convergence Alerts:")
@@ -824,10 +823,10 @@ func (a *Amadeus) PrintLog() error {
 // dmailJSONView is a JSON-specific view of a D-Mail with status.
 type dmailJSONView struct {
 	Name        string            `json:"name"`
-	Kind        amadeus.DMailKind `json:"kind"`
+	Kind        domain.DMailKind  `json:"kind"`
 	Description string            `json:"description"`
 	Issues      []string          `json:"issues,omitempty"`
-	Severity    amadeus.Severity  `json:"severity,omitempty"`
+	Severity    domain.Severity   `json:"severity,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 	Status      string            `json:"status"`
 }
@@ -847,10 +846,10 @@ func (a *Amadeus) PrintLogJSON() error {
 		return fmt.Errorf("load consumed: %w", err)
 	}
 	if consumed == nil {
-		consumed = []amadeus.ConsumedRecord{}
+		consumed = []domain.ConsumedRecord{}
 	}
 	if history == nil {
-		history = []amadeus.CheckResult{}
+		history = []domain.CheckResult{}
 	}
 
 	views := make([]dmailJSONView, len(dmails))
@@ -862,20 +861,20 @@ func (a *Amadeus) PrintLogJSON() error {
 			Issues:      d.Issues,
 			Severity:    d.Severity,
 			Metadata:    d.Metadata,
-			Status:      string(amadeus.DMailSent),
+			Status:      string(domain.DMailSent),
 		}
 	}
 
-	convergenceAlerts := amadeus.AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
+	convergenceAlerts := domain.AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
 	if convergenceAlerts == nil {
-		convergenceAlerts = []amadeus.ConvergenceAlert{}
+		convergenceAlerts = []domain.ConvergenceAlert{}
 	}
 
 	output := struct {
-		History           []amadeus.CheckResult      `json:"history"`
-		DMails            []dmailJSONView            `json:"dmails"`
-		Consumed          []amadeus.ConsumedRecord   `json:"consumed"`
-		ConvergenceAlerts []amadeus.ConvergenceAlert `json:"convergence_alerts"`
+		History           []domain.CheckResult      `json:"history"`
+		DMails            []dmailJSONView           `json:"dmails"`
+		Consumed          []domain.ConsumedRecord   `json:"consumed"`
+		ConvergenceAlerts []domain.ConvergenceAlert `json:"convergence_alerts"`
 	}{
 		History:           history,
 		DMails:            views,
@@ -889,13 +888,13 @@ func (a *Amadeus) PrintLogJSON() error {
 // Skips alerts whose target already has an existing convergence D-Mail in the archive
 // to prevent duplicate messages on repeated runs.
 // Returns the saved D-Mails and any error encountered during naming or writing.
-func (a *Amadeus) saveConvergenceDMails(alerts []amadeus.ConvergenceAlert) ([]amadeus.DMail, error) {
+func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]domain.DMail, error) {
 	// Build set of targets already covered by existing convergence D-Mails
 	coveredTargets := make(map[string]bool)
 	allDMails, err := a.Store.LoadAllDMails()
 	if err == nil {
 		for _, d := range allDMails {
-			if d.Kind == amadeus.KindConvergence {
+			if d.Kind == domain.KindConvergence {
 				for _, t := range d.Targets {
 					coveredTargets[t] = true
 				}
@@ -903,8 +902,8 @@ func (a *Amadeus) saveConvergenceDMails(alerts []amadeus.ConvergenceAlert) ([]am
 		}
 	}
 
-	convergenceDMails := amadeus.GenerateConvergenceDMails(alerts)
-	var saved []amadeus.DMail
+	convergenceDMails := domain.GenerateConvergenceDMails(alerts)
+	var saved []domain.DMail
 	for _, cd := range convergenceDMails {
 		// Skip if all targets are already covered
 		allCovered := true
@@ -918,7 +917,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []amadeus.ConvergenceAlert) ([]am
 			continue
 		}
 
-		cdName, err := a.Store.NextDMailName(amadeus.KindConvergence)
+		cdName, err := a.Store.NextDMailName(domain.KindConvergence)
 		if err != nil {
 			return saved, fmt.Errorf("convergence dmail name: %w", err)
 		}
@@ -963,7 +962,7 @@ func (a *Amadeus) PrintSync() error {
 		return fmt.Errorf("load all dmails: %w", err)
 	}
 
-	var pendingComments []amadeus.PendingComment
+	var pendingComments []domain.PendingComment
 	for _, d := range allDMails {
 		if len(d.Issues) == 0 {
 			continue
@@ -973,34 +972,34 @@ func (a *Amadeus) PrintSync() error {
 			if _, commented := syncState.CommentedDMails[key]; commented {
 				continue
 			}
-			pendingComments = append(pendingComments, amadeus.PendingComment{
+			pendingComments = append(pendingComments, domain.PendingComment{
 				DMail:       d.Name,
 				IssueID:     issueID,
-				Status:      string(amadeus.DMailSent),
+				Status:      string(domain.DMailSent),
 				Description: d.Description,
 			})
 		}
 	}
 	if pendingComments == nil {
-		pendingComments = []amadeus.PendingComment{}
+		pendingComments = []domain.PendingComment{}
 	}
 
-	output := amadeus.SyncOutput{
+	output := domain.SyncOutput{
 		PendingComments: pendingComments,
 	}
 	return a.writeDataJSON(output)
 }
 
 // weightForAxis returns the configured weight for a given axis.
-func weightForAxis(axis amadeus.Axis, w amadeus.Weights) float64 {
+func weightForAxis(axis domain.Axis, w domain.Weights) float64 {
 	switch axis {
-	case amadeus.AxisADR:
+	case domain.AxisADR:
 		return w.ADRIntegrity
-	case amadeus.AxisDoD:
+	case domain.AxisDoD:
 		return w.DoDFulfillment
-	case amadeus.AxisDependency:
+	case domain.AxisDependency:
 		return w.DependencyIntegrity
-	case amadeus.AxisImplicit:
+	case domain.AxisImplicit:
 		return w.ImplicitConstraints
 	default:
 		return 0

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
@@ -59,7 +58,7 @@ func newCheckCommand() *cobra.Command {
 			}
 
 			if lang != "" {
-				if !amadeus.ValidLang(lang) {
+				if !domain.ValidLang(lang) {
 					return fmt.Errorf("unsupported language: %s (supported: ja, en)", lang)
 				}
 				cfg.Lang = lang
@@ -80,23 +79,23 @@ func newCheckCommand() *cobra.Command {
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
 			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
 
-			var approver amadeus.Approver
+			var approver domain.Approver
 			switch {
 			case autoApprove:
-				approver = &amadeus.AutoApprover{}
+				approver = &domain.AutoApprover{}
 			case approveCmd != "":
 				approver = session.NewCmdApprover(approveCmd)
 			default:
-				approver = &amadeus.AutoApprover{} // default: no gate
+				approver = &domain.AutoApprover{} // default: no gate
 			}
 
 			// Wire notifier
 			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
-			var notifier amadeus.Notifier
+			var notifier domain.Notifier
 			if notifyCmd != "" {
 				notifier = session.NewCmdNotifier(notifyCmd)
 			} else {
-				notifier = &amadeus.NopNotifier{}
+				notifier = &domain.NopNotifier{}
 			}
 
 			reviewCmd, _ := cmd.Flags().GetString("review-cmd")
@@ -118,7 +117,7 @@ func newCheckCommand() *cobra.Command {
 			// COMMAND → usecase → Aggregate → EVENT
 			return usecase.RunCheck(cmd.Context(), domain.ExecuteCheckCommand{
 				RepoPath: repoRoot,
-			}, amadeus.CheckOptions{
+			}, domain.CheckOptions{
 				Full:   full,
 				DryRun: dryRun,
 				Quiet:  quiet,

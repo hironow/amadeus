@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestCmdNotifier_Timeout(t *testing.T) {
@@ -93,7 +93,7 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	err := n.Notify(context.Background(), "Title", "Message")
 
 	// then: should return ErrUnsupportedOS sentinel
-	if err != amadeus.ErrUnsupportedOS {
-		t.Errorf("err = %v, want amadeus.ErrUnsupportedOS", err)
+	if err != domain.ErrUnsupportedOS {
+		t.Errorf("err = %v, want domain.ErrUnsupportedOS", err)
 	}
 }

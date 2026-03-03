@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"go.opentelemetry.io/otel"
@@ -53,7 +52,7 @@ func initGateDirForTest(t *testing.T, root string) {
 		}
 	}
 	// Write default config
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +64,7 @@ func initGateDirForTest(t *testing.T, root string) {
 	// Write SKILL.md files from embedded templates
 	for _, name := range []string{"dmail-sendable", "dmail-readable"} {
 		tmplPath := "templates/skills/" + name + "/SKILL.md"
-		content, readErr := amadeus.SkillTemplateFS.ReadFile(tmplPath)
+		content, readErr := domain.SkillTemplateFS.ReadFile(tmplPath)
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -232,7 +231,7 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 func TestCheckConfig_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(path, data, 0o644)
 	result := checkConfig(path)
@@ -269,7 +268,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// Create .gate/ with config
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 
@@ -307,7 +306,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	exec.Command("git", "init", dir).Run()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 
@@ -316,11 +315,11 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	// when
 	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir)
 
-	// then: amadeus.doctor span should exist
+	// then: domain.doctor span should exist
 	spans := exp.GetSpans()
 	found := false
 	for _, s := range spans {
-		if s.Name == "amadeus.doctor" {
+		if s.Name == "domain.doctor" {
 			found = true
 			// Should have 10 doctor.check events (one per check)
 			eventCount := 0
@@ -335,7 +334,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("expected 'amadeus.doctor' span")
+		t.Errorf("expected 'domain.doctor' span")
 	}
 }
 
@@ -436,7 +435,7 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 	exec.Command("git", "init", dir).Run()
@@ -484,14 +483,14 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 	initGateDirForTest(t, root)
 	// Write a valid D-Mail directly to archive
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test",
-		Severity:      amadeus.SeverityHigh,
+		Severity:      domain.SeverityHigh,
 	}
-	data, err := amadeus.MarshalDMail(dmail)
+	data, err := domain.MarshalDMail(dmail)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -576,10 +575,10 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	today := time.Now().UTC().Format("2006-01-02")
 
 	cleanData, _ := json.Marshal(domain.CheckCompletedData{
-		Result: amadeus.CheckResult{DMails: nil},
+		Result: domain.CheckResult{DMails: nil},
 	})
 	driftData, _ := json.Marshal(domain.CheckCompletedData{
-		Result: amadeus.CheckResult{DMails: []string{"feedback-001"}},
+		Result: domain.CheckResult{DMails: []string{"feedback-001"}},
 	})
 	now := time.Now().UTC().Format(time.RFC3339)
 	lines := []string{

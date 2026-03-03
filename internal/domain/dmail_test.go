@@ -1,10 +1,10 @@
-package amadeus_test
+package domain_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestParseDMail_Valid(t *testing.T) {
@@ -23,14 +23,14 @@ metadata:
 
 The auth module violates the JWT requirement.
 `
-	dmail, err := amadeus.ParseDMail([]byte(raw))
+	dmail, err := domain.ParseDMail([]byte(raw))
 	if err != nil {
 		t.Fatalf("ParseDMail failed: %v", err)
 	}
 	if dmail.Name != "feedback-001" {
 		t.Errorf("expected name feedback-001, got %s", dmail.Name)
 	}
-	if dmail.Kind != amadeus.KindFeedback {
+	if dmail.Kind != domain.KindFeedback {
 		t.Errorf("expected kind feedback, got %s", dmail.Kind)
 	}
 	if dmail.Description != "ADR-003 violation detected" {
@@ -39,7 +39,7 @@ The auth module violates the JWT requirement.
 	if len(dmail.Issues) != 1 || dmail.Issues[0] != "MY-42" {
 		t.Errorf("expected issues [MY-42], got %v", dmail.Issues)
 	}
-	if dmail.Severity != amadeus.SeverityHigh {
+	if dmail.Severity != domain.SeverityHigh {
 		t.Errorf("expected severity high, got %s", dmail.Severity)
 	}
 	if dmail.Metadata["created_at"] != "2026-02-20T12:00:00Z" {
@@ -57,14 +57,14 @@ kind: feedback
 description: "minimal"
 ---
 `
-	dmail, err := amadeus.ParseDMail([]byte(raw))
+	dmail, err := domain.ParseDMail([]byte(raw))
 	if err != nil {
 		t.Fatalf("ParseDMail failed: %v", err)
 	}
 	if dmail.Name != "feedback-001" {
 		t.Errorf("expected name feedback-001, got %s", dmail.Name)
 	}
-	if dmail.Kind != amadeus.KindFeedback {
+	if dmail.Kind != domain.KindFeedback {
 		t.Errorf("expected kind feedback, got %s", dmail.Kind)
 	}
 	if len(dmail.Issues) != 0 {
@@ -80,7 +80,7 @@ func TestParseDMail_InvalidYAML(t *testing.T) {
 name: [invalid
 ---
 `
-	_, err := amadeus.ParseDMail([]byte(raw))
+	_, err := domain.ParseDMail([]byte(raw))
 	if err == nil {
 		t.Error("expected error for invalid YAML")
 	}
@@ -88,7 +88,7 @@ name: [invalid
 
 func TestParseDMail_MissingDelimiters(t *testing.T) {
 	raw := `no frontmatter here`
-	_, err := amadeus.ParseDMail([]byte(raw))
+	_, err := domain.ParseDMail([]byte(raw))
 	if err == nil {
 		t.Error("expected error for missing delimiters")
 	}
@@ -102,11 +102,11 @@ description: "legacy uppercase severity"
 severity: HIGH
 ---
 `
-	dmail, err := amadeus.ParseDMail([]byte(raw))
+	dmail, err := domain.ParseDMail([]byte(raw))
 	if err != nil {
 		t.Fatalf("ParseDMail failed: %v", err)
 	}
-	if dmail.Severity != amadeus.SeverityHigh {
+	if dmail.Severity != domain.SeverityHigh {
 		t.Errorf("expected severity 'high', got %q", dmail.Severity)
 	}
 }
@@ -119,27 +119,27 @@ description: "mixed case"
 severity: Medium
 ---
 `
-	dmail, err := amadeus.ParseDMail([]byte(raw))
+	dmail, err := domain.ParseDMail([]byte(raw))
 	if err != nil {
 		t.Fatalf("ParseDMail failed: %v", err)
 	}
-	if dmail.Severity != amadeus.SeverityMedium {
+	if dmail.Severity != domain.SeverityMedium {
 		t.Errorf("expected severity 'medium', got %q", dmail.Severity)
 	}
 }
 
 func TestMarshalDMail_RoundTrip(t *testing.T) {
-	original := amadeus.DMail{
+	original := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "ADR violation",
 		Issues:      []string{"MY-42"},
-		Severity:    amadeus.SeverityHigh,
+		Severity:    domain.SeverityHigh,
 		Metadata:    map[string]string{"created_at": "2026-02-20T12:00:00Z"},
 		Body:        "# Details\n\nSome markdown content.\n",
 	}
 
-	data, err := amadeus.MarshalDMail(original)
+	data, err := domain.MarshalDMail(original)
 	if err != nil {
 		t.Fatalf("MarshalDMail failed: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestMarshalDMail_RoundTrip(t *testing.T) {
 	}
 
 	// round-trip
-	parsed, err := amadeus.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail round-trip failed: %v", err)
 	}
@@ -186,7 +186,7 @@ targets:
 
 Body text.
 `
-	dmail, err := amadeus.ParseDMail([]byte(raw))
+	dmail, err := domain.ParseDMail([]byte(raw))
 	if err != nil {
 		t.Fatalf("ParseDMail failed: %v", err)
 	}
@@ -199,19 +199,19 @@ Body text.
 }
 
 func TestMarshalDMail_Targets_RoundTrip(t *testing.T) {
-	original := amadeus.DMail{
+	original := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "with targets",
 		Targets:     []string{"auth/session.go", "api/handler.go"},
 		Body:        "Details\n",
 	}
 
-	data, err := amadeus.MarshalDMail(original)
+	data, err := domain.MarshalDMail(original)
 	if err != nil {
 		t.Fatalf("MarshalDMail failed: %v", err)
 	}
-	parsed, err := amadeus.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail round-trip failed: %v", err)
 	}
@@ -224,13 +224,13 @@ func TestMarshalDMail_Targets_RoundTrip(t *testing.T) {
 }
 
 func TestMarshalDMail_OmitsEmptyTargets(t *testing.T) {
-	original := amadeus.DMail{
+	original := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "no extras",
 	}
 
-	data, err := amadeus.MarshalDMail(original)
+	data, err := domain.MarshalDMail(original)
 	if err != nil {
 		t.Fatalf("MarshalDMail failed: %v", err)
 	}
@@ -241,29 +241,29 @@ func TestMarshalDMail_OmitsEmptyTargets(t *testing.T) {
 }
 
 func TestValidateDMail_Valid(t *testing.T) {
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "ADR violation detected",
-		Severity:      amadeus.SeverityHigh,
+		Severity:      domain.SeverityHigh,
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors, got %v", errs)
 	}
 }
 
 func TestValidateDMail_AllKinds(t *testing.T) {
-	for _, kind := range []amadeus.DMailKind{amadeus.KindFeedback, amadeus.KindSpecification, amadeus.KindReport, amadeus.KindConvergence, amadeus.KindCIResult} {
-		dmail := amadeus.DMail{
-			SchemaVersion: amadeus.DMailSchemaVersion,
+	for _, kind := range []domain.DMailKind{domain.KindFeedback, domain.KindSpecification, domain.KindReport, domain.KindConvergence, domain.KindCIResult} {
+		dmail := domain.DMail{
+			SchemaVersion: domain.DMailSchemaVersion,
 			Name:          "test-001",
 			Kind:          kind,
 			Description:   "test",
-			Severity:      amadeus.SeverityLow,
+			Severity:      domain.SeverityLow,
 		}
-		errs := amadeus.ValidateDMail(dmail)
+		errs := domain.ValidateDMail(dmail)
 		if len(errs) != 0 {
 			t.Errorf("kind %s: expected no errors, got %v", kind, errs)
 		}
@@ -271,49 +271,49 @@ func TestValidateDMail_AllKinds(t *testing.T) {
 }
 
 func TestValidateDMail_MissingName(t *testing.T) {
-	dmail := amadeus.DMail{
-		Kind:        amadeus.KindFeedback,
+	dmail := domain.DMail{
+		Kind:        domain.KindFeedback,
 		Description: "test",
-		Severity:    amadeus.SeverityHigh,
+		Severity:    domain.SeverityHigh,
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing name")
 	}
 }
 
 func TestValidateDMail_MissingKind(t *testing.T) {
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
 		Description: "test",
-		Severity:    amadeus.SeverityHigh,
+		Severity:    domain.SeverityHigh,
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing kind")
 	}
 }
 
 func TestValidateDMail_InvalidKind(t *testing.T) {
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.DMailKind("invalid"),
+		Kind:        domain.DMailKind("invalid"),
 		Description: "test",
-		Severity:    amadeus.SeverityHigh,
+		Severity:    domain.SeverityHigh,
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for invalid kind")
 	}
 }
 
 func TestValidateDMail_MissingDescription(t *testing.T) {
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:     "feedback-001",
-		Kind:     amadeus.KindFeedback,
-		Severity: amadeus.SeverityHigh,
+		Kind:     domain.KindFeedback,
+		Severity: domain.SeverityHigh,
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing description")
 	}
@@ -321,59 +321,59 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 
 func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 	// severity is optional — inbox reports from external tools may omit it
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test",
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for missing severity, got %v", errs)
 	}
 }
 
 func TestValidateDMail_InvalidSeverity(t *testing.T) {
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "test",
-		Severity:    amadeus.Severity("critical"),
+		Severity:    domain.Severity("critical"),
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for invalid severity")
 	}
 }
 
 func TestValidateDMail_MultipleErrors(t *testing.T) {
-	dmail := amadeus.DMail{}
-	errs := amadeus.ValidateDMail(dmail)
+	dmail := domain.DMail{}
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) < 3 {
 		t.Errorf("expected at least 3 errors for empty DMail, got %d: %v", len(errs), errs)
 	}
 }
 
 func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "test",
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing dmail-schema-version")
 	}
 }
 
 func TestValidateDMail_UnsupportedSchemaVersion(t *testing.T) {
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		SchemaVersion: "99",
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test",
 	}
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for unsupported dmail-schema-version")
 	}
@@ -381,16 +381,16 @@ func TestValidateDMail_UnsupportedSchemaVersion(t *testing.T) {
 
 func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
 	// given: two identical D-Mails
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "ADR violation",
 		Body:        "Details here.\n",
 	}
 
 	// when
-	key1 := amadeus.DMailIdempotencyKey(dmail)
-	key2 := amadeus.DMailIdempotencyKey(dmail)
+	key1 := domain.DMailIdempotencyKey(dmail)
+	key2 := domain.DMailIdempotencyKey(dmail)
 
 	// then: same input → same key
 	if key1 != key2 {
@@ -403,22 +403,22 @@ func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
 
 func TestDMailIdempotencyKey_DifferentContent(t *testing.T) {
 	// given: two D-Mails with different bodies
-	dmail1 := amadeus.DMail{
+	dmail1 := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "ADR violation",
 		Body:        "Details v1.\n",
 	}
-	dmail2 := amadeus.DMail{
+	dmail2 := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "ADR violation",
 		Body:        "Details v2.\n",
 	}
 
 	// when
-	key1 := amadeus.DMailIdempotencyKey(dmail1)
-	key2 := amadeus.DMailIdempotencyKey(dmail2)
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
 
 	// then: different content → different key
 	if key1 == key2 {
@@ -428,21 +428,21 @@ func TestDMailIdempotencyKey_DifferentContent(t *testing.T) {
 
 func TestMarshalDMail_IdempotencyKey(t *testing.T) {
 	// given
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "ADR violation",
 		Body:        "Details here.\n",
 	}
 
 	// when
-	data, err := amadeus.MarshalDMail(dmail)
+	data, err := domain.MarshalDMail(dmail)
 	if err != nil {
 		t.Fatalf("MarshalDMail: %v", err)
 	}
 
 	// then: round-trip preserves idempotency_key in metadata
-	parsed, err := amadeus.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail: %v", err)
 	}
@@ -450,7 +450,7 @@ func TestMarshalDMail_IdempotencyKey(t *testing.T) {
 	if !ok {
 		t.Fatal("expected idempotency_key in metadata")
 	}
-	expected := amadeus.DMailIdempotencyKey(dmail)
+	expected := domain.DMailIdempotencyKey(dmail)
 	if key != expected {
 		t.Errorf("idempotency_key: got %q, want %q", key, expected)
 	}
@@ -458,21 +458,21 @@ func TestMarshalDMail_IdempotencyKey(t *testing.T) {
 
 func TestMarshalDMail_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given: D-Mail with existing metadata
-	dmail := amadeus.DMail{
+	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        amadeus.KindFeedback,
+		Kind:        domain.KindFeedback,
 		Description: "ADR violation",
 		Metadata:    map[string]string{"created_at": "2026-02-28T12:00:00Z"},
 	}
 
 	// when
-	data, err := amadeus.MarshalDMail(dmail)
+	data, err := domain.MarshalDMail(dmail)
 	if err != nil {
 		t.Fatalf("MarshalDMail: %v", err)
 	}
 
 	// then: both metadata keys present
-	parsed, err := amadeus.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail: %v", err)
 	}
@@ -489,7 +489,7 @@ func TestExtractIssueIDs_SingleID(t *testing.T) {
 	text := "feat: add CollectADRs for reading ADR markdown files (MY-302)"
 
 	// when
-	ids := amadeus.ExtractIssueIDs(text)
+	ids := domain.ExtractIssueIDs(text)
 
 	// then
 	if len(ids) != 1 {
@@ -505,7 +505,7 @@ func TestExtractIssueIDs_MultipleIDsInOneText(t *testing.T) {
 	text := "fix: resolve MY-241 and MY-302 conflicts"
 
 	// when
-	ids := amadeus.ExtractIssueIDs(text)
+	ids := domain.ExtractIssueIDs(text)
 
 	// then
 	if len(ids) != 2 {
@@ -522,7 +522,7 @@ func TestExtractIssueIDs_DeduplicatesAcrossTexts(t *testing.T) {
 	text2 := "test: verify MY-302 behavior"
 
 	// when
-	ids := amadeus.ExtractIssueIDs(text1, text2)
+	ids := domain.ExtractIssueIDs(text1, text2)
 
 	// then
 	if len(ids) != 1 {
@@ -538,7 +538,7 @@ func TestExtractIssueIDs_NoIDs(t *testing.T) {
 	text := "refactor: clean up code style"
 
 	// when
-	ids := amadeus.ExtractIssueIDs(text)
+	ids := domain.ExtractIssueIDs(text)
 
 	// then
 	if len(ids) != 0 {
@@ -548,7 +548,7 @@ func TestExtractIssueIDs_NoIDs(t *testing.T) {
 
 func TestExtractIssueIDs_EmptyInput(t *testing.T) {
 	// when
-	ids := amadeus.ExtractIssueIDs()
+	ids := domain.ExtractIssueIDs()
 
 	// then
 	if len(ids) != 0 {
@@ -561,7 +561,7 @@ func TestExtractIssueIDs_SortedOutput(t *testing.T) {
 	text := "MY-305 then MY-241 then MY-302"
 
 	// when
-	ids := amadeus.ExtractIssueIDs(text)
+	ids := domain.ExtractIssueIDs(text)
 
 	// then
 	if len(ids) != 3 {
@@ -582,7 +582,7 @@ func TestExtractIssueIDs_MultipleTexts(t *testing.T) {
 	}
 
 	// when
-	ids := amadeus.ExtractIssueIDs(titles...)
+	ids := domain.ExtractIssueIDs(titles...)
 
 	// then
 	if len(ids) != 2 {
@@ -598,7 +598,7 @@ func TestExtractIssueIDs_NonMyPrefix(t *testing.T) {
 	text := "fix: resolve AM-123 and OPS-45 issues"
 
 	// when
-	ids := amadeus.ExtractIssueIDs(text)
+	ids := domain.ExtractIssueIDs(text)
 
 	// then
 	if len(ids) != 2 {
@@ -611,15 +611,15 @@ func TestExtractIssueIDs_NonMyPrefix(t *testing.T) {
 
 func TestValidateDMail_CIResultKind(t *testing.T) {
 	// given: D-Mail with ci-result kind
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "ci-result-pr42-run1",
-		Kind:          amadeus.KindCIResult,
+		Kind:          domain.KindCIResult,
 		Description:   "GitHub Actions CI run for PR #42",
 	}
 
 	// when
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 
 	// then
 	if len(errs) != 0 {
@@ -629,43 +629,43 @@ func TestValidateDMail_CIResultKind(t *testing.T) {
 
 func TestParseDMail_ActionField_RoundTrip(t *testing.T) {
 	// given: D-Mail with action field
-	original := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-action-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "Evaluation with retry action",
-		Action:        amadeus.ActionRetry,
+		Action:        domain.ActionRetry,
 		Body:          "Implementation needs revision.\n",
 	}
 
 	// when: marshal then parse
-	data, err := amadeus.MarshalDMail(original)
+	data, err := domain.MarshalDMail(original)
 	if err != nil {
 		t.Fatalf("MarshalDMail failed: %v", err)
 	}
-	parsed, err := amadeus.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail round-trip failed: %v", err)
 	}
 
 	// then: action field preserved
-	if parsed.Action != amadeus.ActionRetry {
-		t.Errorf("expected action %q, got %q", amadeus.ActionRetry, parsed.Action)
+	if parsed.Action != domain.ActionRetry {
+		t.Errorf("expected action %q, got %q", domain.ActionRetry, parsed.Action)
 	}
 }
 
 func TestValidateDMail_InvalidAction(t *testing.T) {
 	// given: D-Mail with invalid action
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test",
-		Action:        amadeus.DMailAction("invalid-action"),
+		Action:        domain.DMailAction("invalid-action"),
 	}
 
 	// when
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 
 	// then
 	if len(errs) == 0 {
@@ -685,15 +685,15 @@ func TestValidateDMail_InvalidAction(t *testing.T) {
 
 func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
 	// given: D-Mail without action (action is optional)
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test",
 	}
 
 	// when
-	errs := amadeus.ValidateDMail(dmail)
+	errs := domain.ValidateDMail(dmail)
 
 	// then
 	if len(errs) != 0 {
@@ -702,15 +702,15 @@ func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
 }
 
 func TestValidateDMail_AllActions(t *testing.T) {
-	for _, action := range []amadeus.DMailAction{amadeus.ActionRetry, amadeus.ActionEscalate, amadeus.ActionResolve} {
-		dmail := amadeus.DMail{
-			SchemaVersion: amadeus.DMailSchemaVersion,
+	for _, action := range []domain.DMailAction{domain.ActionRetry, domain.ActionEscalate, domain.ActionResolve} {
+		dmail := domain.DMail{
+			SchemaVersion: domain.DMailSchemaVersion,
 			Name:          "test-001",
-			Kind:          amadeus.KindFeedback,
+			Kind:          domain.KindFeedback,
 			Description:   "test",
 			Action:        action,
 		}
-		errs := amadeus.ValidateDMail(dmail)
+		errs := domain.ValidateDMail(dmail)
 		if len(errs) != 0 {
 			t.Errorf("action %s: expected no errors, got %v", action, errs)
 		}
@@ -719,21 +719,21 @@ func TestValidateDMail_AllActions(t *testing.T) {
 
 func TestParseDMail_PriorityField_RoundTrip(t *testing.T) {
 	// given: D-Mail with priority field
-	original := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "spec-priority-001",
-		Kind:          amadeus.KindSpecification,
+		Kind:          domain.KindSpecification,
 		Description:   "High priority specification",
 		Priority:      2,
 		Body:          "Implement authentication module.\n",
 	}
 
 	// when: marshal then parse
-	data, err := amadeus.MarshalDMail(original)
+	data, err := domain.MarshalDMail(original)
 	if err != nil {
 		t.Fatalf("MarshalDMail failed: %v", err)
 	}
-	parsed, err := amadeus.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail round-trip failed: %v", err)
 	}
@@ -746,15 +746,15 @@ func TestParseDMail_PriorityField_RoundTrip(t *testing.T) {
 
 func TestParseDMail_ZeroPriority_OmittedInMarshal(t *testing.T) {
 	// given: D-Mail without priority (zero value)
-	original := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test without prio field",
 	}
 
 	// when
-	data, err := amadeus.MarshalDMail(original)
+	data, err := domain.MarshalDMail(original)
 	if err != nil {
 		t.Fatalf("MarshalDMail failed: %v", err)
 	}
@@ -774,7 +774,7 @@ func TestExtractIssueIDs_MixedPrefixes(t *testing.T) {
 	}
 
 	// when
-	ids := amadeus.ExtractIssueIDs(titles...)
+	ids := domain.ExtractIssueIDs(titles...)
 
 	// then
 	if len(ids) != 2 {

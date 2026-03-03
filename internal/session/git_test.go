@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestParseMergedPRs_MergeCommit(t *testing.T) {
@@ -86,4 +86,4 @@ func TestParseMergedPRs_NoDuplicates(t *testing.T) {
 }
 
 // Verify parseMergedPRs returns correct type.
-var _ []amadeus.MergedPR = parseMergedPRs("")
+var _ []domain.MergedPR = parseMergedPRs("")

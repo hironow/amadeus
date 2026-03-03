@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +36,7 @@ func newValidateCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}
-			errs := amadeus.ValidateConfig(cfg)
+			errs := domain.ValidateConfig(cfg)
 			if len(errs) > 0 {
 				for _, e := range errs {
 					fmt.Fprintf(cmd.ErrOrStderr(), "  [FAIL] %s\n", e)

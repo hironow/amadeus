@@ -3,7 +3,6 @@ package usecase
 import (
 	"testing"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
@@ -12,7 +11,7 @@ func TestPrintSync_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
 	cmd := domain.RunSyncCommand{RepoPath: ""}
 	a := &session.Amadeus{
-		Config: amadeus.DefaultConfig(),
+		Config: domain.DefaultConfig(),
 		Logger: domain.NewLogger(nil, false),
 	}
 

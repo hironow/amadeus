@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"gopkg.in/yaml.v3"
 )
 
-// Compile-time check that ProjectionStore implements amadeus.StateReader.
-var _ amadeus.StateReader = (*ProjectionStore)(nil)
+// Compile-time check that ProjectionStore implements domain.StateReader.
+var _ domain.StateReader = (*ProjectionStore)(nil)
 
 // ProjectionStore manages reading and writing materialized projection files within the .gate/ directory.
 type ProjectionStore struct {
@@ -60,7 +60,7 @@ func InitGateDir(root string) error {
 		skillPath := filepath.Join(destDir, "SKILL.md")
 		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
 			tmplPath := path.Join("templates", "skills", name, "SKILL.md")
-			content, readErr := amadeus.SkillTemplateFS.ReadFile(tmplPath)
+			content, readErr := domain.SkillTemplateFS.ReadFile(tmplPath)
 			if readErr != nil {
 				return fmt.Errorf("read skill template %s: %w", name, readErr)
 			}
@@ -72,7 +72,7 @@ func InitGateDir(root string) error {
 
 	configPath := filepath.Join(root, "config.yaml")
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
-		cfg := amadeus.DefaultConfig()
+		cfg := domain.DefaultConfig()
 		data, err := yaml.Marshal(cfg)
 		if err != nil {
 			return err
@@ -150,19 +150,19 @@ func migrateLegacyState(root string) error {
 }
 
 // SaveLatest writes the check result as the latest state.
-func (s *ProjectionStore) SaveLatest(result amadeus.CheckResult) error {
+func (s *ProjectionStore) SaveLatest(result domain.CheckResult) error {
 	return s.writeJSON(filepath.Join(s.Root, ".run", "latest.json"), result)
 }
 
 // SaveBaseline writes the check result as the baseline state.
-func (s *ProjectionStore) SaveBaseline(result amadeus.CheckResult) error {
+func (s *ProjectionStore) SaveBaseline(result domain.CheckResult) error {
 	return s.writeJSON(filepath.Join(s.Root, ".run", "baseline.json"), result)
 }
 
 // LoadLatest reads the latest check result from .run/latest.json.
 // If the file does not exist, it returns an empty CheckResult with no error.
-func (s *ProjectionStore) LoadLatest() (amadeus.CheckResult, error) {
-	var result amadeus.CheckResult
+func (s *ProjectionStore) LoadLatest() (domain.CheckResult, error) {
+	var result domain.CheckResult
 	data, err := os.ReadFile(filepath.Join(s.Root, ".run", "latest.json"))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {

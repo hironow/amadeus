@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hironow/amadeus"
 	cmd "github.com/hironow/amadeus/internal/cmd"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func run() int {
 	root.SetArgs(args)
 
 	err := root.ExecuteContext(context.Background())
-	code := amadeus.ExitCode(err)
+	code := domain.ExitCode(err)
 	if code == 1 {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 	} else if code == 2 {

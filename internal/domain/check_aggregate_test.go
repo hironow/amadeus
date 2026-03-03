@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestCheckAggregate_ShouldFullCheck_ForceFlag(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
 
 	// when — force flag overrides everything
 	result := agg.ShouldFullCheck(true)
@@ -23,7 +22,7 @@ func TestCheckAggregate_ShouldFullCheck_ForceFlag(t *testing.T) {
 
 func TestCheckAggregate_ShouldFullCheck_IntervalReached(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.FullCheck.Interval = 3
 	agg := domain.NewCheckAggregate(cfg)
 	// Simulate 3 diff checks
@@ -42,7 +41,7 @@ func TestCheckAggregate_ShouldFullCheck_IntervalReached(t *testing.T) {
 
 func TestCheckAggregate_ShouldFullCheck_BelowInterval(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.FullCheck.Interval = 5
 	agg := domain.NewCheckAggregate(cfg)
 
@@ -57,7 +56,7 @@ func TestCheckAggregate_ShouldFullCheck_BelowInterval(t *testing.T) {
 
 func TestCheckAggregate_AdvanceCheckCount_Diff(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
 
 	// when
 	agg.AdvanceCheckCount(false)
@@ -71,7 +70,7 @@ func TestCheckAggregate_AdvanceCheckCount_Diff(t *testing.T) {
 
 func TestCheckAggregate_AdvanceCheckCount_FullResetsToZero(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
 	agg.AdvanceCheckCount(false)
 	agg.AdvanceCheckCount(false)
 
@@ -86,7 +85,7 @@ func TestCheckAggregate_AdvanceCheckCount_FullResetsToZero(t *testing.T) {
 
 func TestCheckAggregate_ShouldPromoteToFull(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.FullCheck.OnDivergenceJump = 0.05
 	agg := domain.NewCheckAggregate(cfg)
 
@@ -109,7 +108,7 @@ func TestCheckAggregate_ShouldPromoteToFull(t *testing.T) {
 
 func TestCheckAggregate_ShouldFullCheck_ForceFullNext(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
 	agg.SetForceFullNext(true)
 
 	// when
@@ -123,8 +122,8 @@ func TestCheckAggregate_ShouldFullCheck_ForceFullNext(t *testing.T) {
 
 func TestCheckAggregate_Restore(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
-	prev := amadeus.CheckResult{
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	prev := domain.CheckResult{
 		CheckCountSinceFull: 3,
 		ForceFullNext:       true,
 		Divergence:          0.42,
@@ -144,11 +143,11 @@ func TestCheckAggregate_Restore(t *testing.T) {
 
 func TestCheckAggregate_RecordCheck_ProducesEvents(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
-	result := amadeus.CheckResult{
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	result := domain.CheckResult{
 		CheckedAt:  time.Now().UTC(),
 		Commit:     "abc123",
-		Type:       amadeus.CheckTypeDiff,
+		Type:       domain.CheckTypeDiff,
 		Divergence: 0.15,
 	}
 
@@ -169,11 +168,11 @@ func TestCheckAggregate_RecordCheck_ProducesEvents(t *testing.T) {
 
 func TestCheckAggregate_RecordCheck_GateDeniedFullCheckSkipsBaseline(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
-	result := amadeus.CheckResult{
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	result := domain.CheckResult{
 		CheckedAt:  time.Now().UTC(),
 		Commit:     "abc123",
-		Type:       amadeus.CheckTypeFull,
+		Type:       domain.CheckTypeFull,
 		Divergence: 0.15,
 		GateDenied: true,
 	}
@@ -195,11 +194,11 @@ func TestCheckAggregate_RecordCheck_GateDeniedFullCheckSkipsBaseline(t *testing.
 
 func TestCheckAggregate_RecordCheck_FullCheckProducesBaselineEvent(t *testing.T) {
 	// given
-	agg := domain.NewCheckAggregate(amadeus.DefaultConfig())
-	result := amadeus.CheckResult{
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	result := domain.CheckResult{
 		CheckedAt:  time.Now().UTC(),
 		Commit:     "abc123",
-		Type:       amadeus.CheckTypeFull,
+		Type:       domain.CheckTypeFull,
 		Divergence: 0.15,
 	}
 

@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 
 	_ "modernc.org/sqlite"
 )
 
-// Compile-time check that SQLiteOutboxStore implements amadeus.OutboxStore.
-var _ amadeus.OutboxStore = (*SQLiteOutboxStore)(nil)
+// Compile-time check that SQLiteOutboxStore implements domain.OutboxStore.
+var _ domain.OutboxStore = (*SQLiteOutboxStore)(nil)
 
 // SQLiteOutboxStore implements OutboxStore using a SQLite database as the
 // transactional write-ahead log. Staged D-Mails are flushed to archive/ and

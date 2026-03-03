@@ -1,11 +1,11 @@
-package amadeus_test
+package domain_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestParseClaudeResponse_Valid(t *testing.T) {
@@ -24,12 +24,12 @@ func TestParseClaudeResponse_Valid(t *testing.T) {
 		],
 		"reasoning": "Minor tensions detected"
 	}`
-	resp, err := amadeus.ParseClaudeResponse([]byte(raw))
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
 	if err != nil {
 		t.Fatalf("ParseClaudeResponse failed: %v", err)
 	}
-	if resp.Axes[amadeus.AxisADR].Score != 15 {
-		t.Errorf("expected ADR score 15, got %d", resp.Axes[amadeus.AxisADR].Score)
+	if resp.Axes[domain.AxisADR].Score != 15 {
+		t.Errorf("expected ADR score 15, got %d", resp.Axes[domain.AxisADR].Score)
 	}
 	if len(resp.DMails) != 1 {
 		t.Fatalf("expected 1 D-Mail, got %d", len(resp.DMails))
@@ -40,7 +40,7 @@ func TestParseClaudeResponse_Valid(t *testing.T) {
 }
 
 func TestParseClaudeResponse_InvalidJSON(t *testing.T) {
-	_, err := amadeus.ParseClaudeResponse([]byte("not json"))
+	_, err := domain.ParseClaudeResponse([]byte("not json"))
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -64,7 +64,7 @@ func TestParseClaudeResponse_WithImpactRadius(t *testing.T) {
 	}`
 
 	// when
-	resp, err := amadeus.ParseClaudeResponse([]byte(raw))
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
 
 	// then
 	if err != nil {
@@ -95,7 +95,7 @@ func TestParseClaudeResponse_WithoutImpactRadius_BackwardCompatible(t *testing.T
 	}`
 
 	// when
-	resp, err := amadeus.ParseClaudeResponse([]byte(raw))
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
 
 	// then
 	if err != nil {
@@ -107,13 +107,13 @@ func TestParseClaudeResponse_WithoutImpactRadius_BackwardCompatible(t *testing.T
 }
 
 func TestBuildDiffCheckPrompt(t *testing.T) {
-	params := amadeus.DiffCheckParams{
+	params := domain.DiffCheckParams{
 		PreviousScores: `{"divergence": 0.133}`,
 		PRDiffs:        "diff --git a/auth.go ...",
 		RelevantADRs:   "ADR-003: Use JWT for auth",
 		LinkedDoDs:     "Issue #42: Session timeout must be configurable",
 	}
-	prompt, err := amadeus.BuildDiffCheckPrompt("ja", params)
+	prompt, err := domain.BuildDiffCheckPrompt("ja", params)
 	if err != nil {
 		t.Fatalf("BuildDiffCheckPrompt failed: %v", err)
 	}
@@ -129,13 +129,13 @@ func TestBuildDiffCheckPrompt(t *testing.T) {
 
 func TestBuildDiffCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
 	// given
-	params := amadeus.DiffCheckParams{
+	params := domain.DiffCheckParams{
 		PreviousScores: `{"divergence": 0.1}`,
 		PRDiffs:        "diff --git a/auth.go ...",
 	}
 
 	// when
-	prompt, err := amadeus.BuildDiffCheckPrompt("ja", params)
+	prompt, err := domain.BuildDiffCheckPrompt("ja", params)
 
 	// then
 	if err != nil {
@@ -148,12 +148,12 @@ func TestBuildDiffCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
 
 func TestBuildFullCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
 	// given
-	params := amadeus.FullCheckParams{
+	params := domain.FullCheckParams{
 		CodebaseStructure: "src/",
 	}
 
 	// when
-	prompt, err := amadeus.BuildFullCheckPrompt("ja", params)
+	prompt, err := domain.BuildFullCheckPrompt("ja", params)
 
 	// then
 	if err != nil {
@@ -165,13 +165,13 @@ func TestBuildFullCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
 }
 
 func TestBuildFullCheckPrompt(t *testing.T) {
-	params := amadeus.FullCheckParams{
+	params := domain.FullCheckParams{
 		CodebaseStructure: "src/\n  auth/\n  cart/",
 		AllADRs:           "ADR-001: Use Go\nADR-003: JWT auth",
 		RecentDoDs:        "Issue #42: Session timeout",
 		DependencyMap:     "auth -> cart: forbidden",
 	}
-	prompt, err := amadeus.BuildFullCheckPrompt("ja", params)
+	prompt, err := domain.BuildFullCheckPrompt("ja", params)
 	if err != nil {
 		t.Fatalf("BuildFullCheckPrompt failed: %v", err)
 	}
@@ -185,13 +185,13 @@ func TestBuildFullCheckPrompt(t *testing.T) {
 
 func TestBuildDiffCheckPrompt_En(t *testing.T) {
 	// given
-	params := amadeus.DiffCheckParams{
+	params := domain.DiffCheckParams{
 		PreviousScores: `{"divergence": 0.1}`,
 		PRDiffs:        "diff --git a/auth.go ...",
 	}
 
 	// when
-	prompt, err := amadeus.BuildDiffCheckPrompt("en", params)
+	prompt, err := domain.BuildDiffCheckPrompt("en", params)
 
 	// then
 	if err != nil {
@@ -207,12 +207,12 @@ func TestBuildDiffCheckPrompt_En(t *testing.T) {
 
 func TestBuildFullCheckPrompt_En(t *testing.T) {
 	// given
-	params := amadeus.FullCheckParams{
+	params := domain.FullCheckParams{
 		CodebaseStructure: "src/",
 	}
 
 	// when
-	prompt, err := amadeus.BuildFullCheckPrompt("en", params)
+	prompt, err := domain.BuildFullCheckPrompt("en", params)
 
 	// then
 	if err != nil {
@@ -225,13 +225,13 @@ func TestBuildFullCheckPrompt_En(t *testing.T) {
 
 func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 	// given
-	params := amadeus.DiffCheckParams{
+	params := domain.DiffCheckParams{
 		PreviousScores: `{"divergence": 0.1}`,
 		PRDiffs:        "diff --git a/auth.go ...",
 	}
 
 	// when
-	_, err := amadeus.BuildDiffCheckPrompt("fr", params)
+	_, err := domain.BuildDiffCheckPrompt("fr", params)
 
 	// then
 	if err == nil {
@@ -269,12 +269,12 @@ func TestFakeClaudeRunner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp, err := amadeus.ParseClaudeResponse(raw)
+	resp, err := domain.ParseClaudeResponse(raw)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
-	if resp.Axes[amadeus.AxisADR].Score != 10 {
-		t.Errorf("expected ADR score 10, got %d", resp.Axes[amadeus.AxisADR].Score)
+	if resp.Axes[domain.AxisADR].Score != 10 {
+		t.Errorf("expected ADR score 10, got %d", resp.Axes[domain.AxisADR].Score)
 	}
 	if resp.Reasoning != "fake response" {
 		t.Errorf("expected reasoning 'fake response', got %q", resp.Reasoning)

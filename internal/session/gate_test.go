@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
@@ -20,13 +19,13 @@ import (
 
 type fakeGit struct {
 	commit string
-	prs    []amadeus.MergedPR
+	prs    []domain.MergedPR
 	diff   string
 }
 
-func (g *fakeGit) CurrentCommit() (string, error)                      { return g.commit, nil }
-func (g *fakeGit) MergedPRsSince(_ string) ([]amadeus.MergedPR, error) { return g.prs, nil }
-func (g *fakeGit) DiffSince(_ string) (string, error)                  { return g.diff, nil }
+func (g *fakeGit) CurrentCommit() (string, error)                     { return g.commit, nil }
+func (g *fakeGit) MergedPRsSince(_ string) ([]domain.MergedPR, error) { return g.prs, nil }
+func (g *fakeGit) DiffSince(_ string) (string, error)                 { return g.diff, nil }
 
 type fakeClaude struct {
 	response string
@@ -37,29 +36,29 @@ func (c *fakeClaude) Run(_ context.Context, _ string) ([]byte, error) {
 }
 
 type fakeStateReader struct {
-	latest    amadeus.CheckResult
+	latest    domain.CheckResult
 	dmailSeq  int
-	allDMails []amadeus.DMail
+	allDMails []domain.DMail
 }
 
-func (s *fakeStateReader) LoadLatest() (amadeus.CheckResult, error) {
+func (s *fakeStateReader) LoadLatest() (domain.CheckResult, error) {
 	return s.latest, nil
 }
-func (s *fakeStateReader) ScanInbox() ([]amadeus.DMail, error) {
+func (s *fakeStateReader) ScanInbox() ([]domain.DMail, error) {
 	return nil, nil
 }
-func (s *fakeStateReader) NextDMailName(_ amadeus.DMailKind) (string, error) {
+func (s *fakeStateReader) NextDMailName(_ domain.DMailKind) (string, error) {
 	s.dmailSeq++
 	return fmt.Sprintf("test-dmail-%03d", s.dmailSeq), nil
 }
-func (s *fakeStateReader) LoadAllDMails() ([]amadeus.DMail, error) {
+func (s *fakeStateReader) LoadAllDMails() ([]domain.DMail, error) {
 	return s.allDMails, nil
 }
-func (s *fakeStateReader) LoadConsumed() ([]amadeus.ConsumedRecord, error) {
+func (s *fakeStateReader) LoadConsumed() ([]domain.ConsumedRecord, error) {
 	return nil, nil
 }
-func (s *fakeStateReader) LoadSyncState() (amadeus.SyncState, error) {
-	return amadeus.SyncState{}, nil
+func (s *fakeStateReader) LoadSyncState() (domain.SyncState, error) {
+	return domain.SyncState{}, nil
 }
 
 type fakeEventStore struct {
@@ -139,7 +138,7 @@ func claudeResponseWithDrift() string {
 	}`
 }
 
-func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeus.Notifier) *session.Amadeus {
+func newGateTestAmadeus(t *testing.T, approver domain.Approver, notifier domain.Notifier) *session.Amadeus {
 	t.Helper()
 	// Create a minimal gate dir with required structure
 	root := t.TempDir()
@@ -151,19 +150,19 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
 
-	cfg := amadeus.Config{
+	cfg := domain.Config{
 		Lang: "en",
-		FullCheck: amadeus.FullCheckConfig{
+		FullCheck: domain.FullCheckConfig{
 			Interval: 10,
 		},
 	}
 	return &session.Amadeus{
 		Config: cfg,
 		Store: &fakeStateReader{
-			latest: amadeus.CheckResult{
+			latest: domain.CheckResult{
 				CheckedAt:  time.Now().Add(-1 * time.Hour),
 				Commit:     "abc123",
-				Type:       amadeus.CheckTypeDiff,
+				Type:       domain.CheckTypeDiff,
 				Divergence: 0.05,
 			},
 		},
@@ -171,7 +170,7 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 		Projector: projector,
 		Git: &fakeGit{
 			commit: "def456",
-			prs:    []amadeus.MergedPR{{Number: "#1", Title: "test PR"}},
+			prs:    []domain.MergedPR{{Number: "#1", Title: "test PR"}},
 			diff:   "diff --git a/file.go b/file.go\n--- a/file.go\n+++ b/file.go\n@@ -1 +1 @@\n-old\n+new",
 		},
 		Claude:    &fakeClaude{response: claudeResponseWithDrift()},
@@ -207,9 +206,9 @@ func claudeResponseWithDriftAndAction(action string) string {
 }
 
 // extractDMailsFromEvents extracts DMails from dmail.generated events.
-func extractDMailsFromEvents(t *testing.T, events []domain.Event) []amadeus.DMail {
+func extractDMailsFromEvents(t *testing.T, events []domain.Event) []domain.DMail {
 	t.Helper()
-	var dmails []amadeus.DMail
+	var dmails []domain.DMail
 	for _, ev := range events {
 		if ev.Type != domain.EventDMailGenerated {
 			continue
@@ -228,13 +227,13 @@ func extractDMailsFromEvents(t *testing.T, events []domain.Event) []amadeus.DMai
 func TestRunCheck_GateApproved_GeneratesDMails(t *testing.T) {
 	// given: AutoApprover always approves
 	notifier := &fakeNotifier{}
-	a := newGateTestAmadeus(t, &amadeus.AutoApprover{}, notifier)
+	a := newGateTestAmadeus(t, &domain.AutoApprover{}, notifier)
 
 	// when
-	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+	err := a.RunCheck(context.Background(), domain.CheckOptions{})
 
 	// then: should return DriftError (dmails generated)
-	var driftErr *amadeus.DriftError
+	var driftErr *domain.DriftError
 	if !errors.As(err, &driftErr) {
 		t.Fatalf("expected DriftError, got: %v", err)
 	}
@@ -251,12 +250,12 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 	// given: denyApprover always denies
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a := newGateTestAmadeus(t, &denyApprover{}, &amadeus.NopNotifier{})
+	a := newGateTestAmadeus(t, &denyApprover{}, &domain.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
 
 	// when
-	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+	err := a.RunCheck(context.Background(), domain.CheckOptions{})
 
 	// then: should return nil (no DriftError — D-Mails skipped)
 	if err != nil {
@@ -291,10 +290,10 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 	// given: errorApprover returns an error
 	gateErr := errors.New("approval service unavailable")
-	a := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &amadeus.NopNotifier{})
+	a := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &domain.NopNotifier{})
 
 	// when
-	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+	err := a.RunCheck(context.Background(), domain.CheckOptions{})
 
 	// then: should fail closed (return the error)
 	if err == nil {
@@ -310,13 +309,13 @@ func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 
 func TestRunCheck_NilApprover_AutoApproves(t *testing.T) {
 	// given: nil Approver should skip gate entirely (backward compatible)
-	a := newGateTestAmadeus(t, nil, &amadeus.NopNotifier{})
+	a := newGateTestAmadeus(t, nil, &domain.NopNotifier{})
 
 	// when
-	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+	err := a.RunCheck(context.Background(), domain.CheckOptions{})
 
 	// then: should return DriftError (dmails generated, gate skipped)
-	var driftErr *amadeus.DriftError
+	var driftErr *domain.DriftError
 	if !errors.As(err, &driftErr) {
 		t.Fatalf("expected DriftError, got: %v", err)
 	}
@@ -330,15 +329,15 @@ func TestRunCheck_FeedbackDMail_DefaultAction_BasedOnSeverity(t *testing.T) {
 	// With zero-value config thresholds, divergence 0.0 >= MediumMax 0.0 → SeverityHigh → ActionEscalate.
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a := newGateTestAmadeus(t, &amadeus.AutoApprover{}, &amadeus.NopNotifier{})
+	a := newGateTestAmadeus(t, &domain.AutoApprover{}, &domain.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
 
 	// when
-	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+	err := a.RunCheck(context.Background(), domain.CheckOptions{})
 
 	// then: should return DriftError
-	var driftErr *amadeus.DriftError
+	var driftErr *domain.DriftError
 	if !errors.As(err, &driftErr) {
 		t.Fatalf("expected DriftError, got: %v", err)
 	}
@@ -349,8 +348,8 @@ func TestRunCheck_FeedbackDMail_DefaultAction_BasedOnSeverity(t *testing.T) {
 		t.Fatal("expected at least one feedback D-Mail in events")
 	}
 	for _, dmail := range dmails {
-		if dmail.Action != amadeus.ActionEscalate {
-			t.Errorf("expected default action %q for high severity, got %q", amadeus.ActionEscalate, dmail.Action)
+		if dmail.Action != domain.ActionEscalate {
+			t.Errorf("expected default action %q for high severity, got %q", domain.ActionEscalate, dmail.Action)
 		}
 	}
 }
@@ -359,16 +358,16 @@ func TestRunCheck_FeedbackDMail_ExplicitAction_FromCandidate(t *testing.T) {
 	// given: Claude response with explicit action "retry" on the candidate
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a := newGateTestAmadeus(t, &amadeus.AutoApprover{}, &amadeus.NopNotifier{})
+	a := newGateTestAmadeus(t, &domain.AutoApprover{}, &domain.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
 	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("retry")}
 
 	// when
-	err := a.RunCheck(context.Background(), amadeus.CheckOptions{})
+	err := a.RunCheck(context.Background(), domain.CheckOptions{})
 
 	// then: should return DriftError
-	var driftErr *amadeus.DriftError
+	var driftErr *domain.DriftError
 	if !errors.As(err, &driftErr) {
 		t.Fatalf("expected DriftError, got: %v", err)
 	}
@@ -379,8 +378,8 @@ func TestRunCheck_FeedbackDMail_ExplicitAction_FromCandidate(t *testing.T) {
 		t.Fatal("expected at least one feedback D-Mail in events")
 	}
 	for _, dmail := range dmails {
-		if dmail.Action != amadeus.ActionRetry {
-			t.Errorf("expected explicit action %q from candidate, got %q", amadeus.ActionRetry, dmail.Action)
+		if dmail.Action != domain.ActionRetry {
+			t.Errorf("expected explicit action %q from candidate, got %q", domain.ActionRetry, dmail.Action)
 		}
 	}
 }

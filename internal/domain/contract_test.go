@@ -1,6 +1,6 @@
 //go:build contract
 
-package amadeus
+package domain
 
 import (
 	"os"

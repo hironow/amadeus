@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
 )
 
@@ -14,7 +13,7 @@ func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +37,7 @@ func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 		return nil
 	})
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +66,7 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 		})
 	}
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +91,7 @@ func TestPolicyEngine_HandlerError(t *testing.T) {
 		return fmt.Errorf("handler failed")
 	})
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)

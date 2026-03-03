@@ -1,14 +1,14 @@
-package amadeus_test
+package domain_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestDefaultConfig(t *testing.T) {
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	if cfg.Weights.ADRIntegrity != 0.4 {
 		t.Errorf("expected ADR weight 0.4, got %f", cfg.Weights.ADRIntegrity)
 	}
@@ -22,10 +22,10 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestValidateConfig_DefaultIsValid(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) != 0 {
@@ -35,11 +35,11 @@ func TestValidateConfig_DefaultIsValid(t *testing.T) {
 
 func TestValidateConfig_WeightsSumNot1(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Weights.ADRIntegrity = 0.5 // sum = 0.5+0.3+0.2+0.1 = 1.1
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) == 0 {
@@ -58,11 +58,11 @@ func TestValidateConfig_WeightsSumNot1(t *testing.T) {
 
 func TestValidateConfig_NegativeWeight(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Weights.ADRIntegrity = -0.1
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) == 0 {
@@ -72,12 +72,12 @@ func TestValidateConfig_NegativeWeight(t *testing.T) {
 
 func TestValidateConfig_ThresholdsOutOfOrder(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Thresholds.LowMax = 0.6
 	cfg.Thresholds.MediumMax = 0.3
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) == 0 {
@@ -96,11 +96,11 @@ func TestValidateConfig_ThresholdsOutOfOrder(t *testing.T) {
 
 func TestValidateConfig_PerAxisOverrideOutOfRange(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.PerAxisOverride.ADRForceHigh = 150
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) == 0 {
@@ -110,11 +110,11 @@ func TestValidateConfig_PerAxisOverrideOutOfRange(t *testing.T) {
 
 func TestValidateConfig_FullCheckIntervalZero(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.FullCheck.Interval = 0
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) == 0 {
@@ -124,11 +124,11 @@ func TestValidateConfig_FullCheckIntervalZero(t *testing.T) {
 
 func TestValidateConfig_DivergenceJumpNegative(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.FullCheck.OnDivergenceJump = -0.1
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) == 0 {
@@ -138,13 +138,13 @@ func TestValidateConfig_DivergenceJumpNegative(t *testing.T) {
 
 func TestValidateConfig_MultipleErrors(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Weights.ADRIntegrity = -0.1
 	cfg.Thresholds.LowMax = 0.8
 	cfg.FullCheck.Interval = 0
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	if len(errs) < 3 {
@@ -154,7 +154,7 @@ func TestValidateConfig_MultipleErrors(t *testing.T) {
 
 func TestValidLang_Ja(t *testing.T) {
 	// when
-	result := amadeus.ValidLang("ja")
+	result := domain.ValidLang("ja")
 
 	// then
 	if !result {
@@ -164,7 +164,7 @@ func TestValidLang_Ja(t *testing.T) {
 
 func TestValidLang_En(t *testing.T) {
 	// when
-	result := amadeus.ValidLang("en")
+	result := domain.ValidLang("en")
 
 	// then
 	if !result {
@@ -174,7 +174,7 @@ func TestValidLang_En(t *testing.T) {
 
 func TestValidLang_Unknown(t *testing.T) {
 	// when
-	result := amadeus.ValidLang("fr")
+	result := domain.ValidLang("fr")
 
 	// then
 	if result {
@@ -184,7 +184,7 @@ func TestValidLang_Unknown(t *testing.T) {
 
 func TestValidLang_Empty(t *testing.T) {
 	// when
-	result := amadeus.ValidLang("")
+	result := domain.ValidLang("")
 
 	// then
 	if result {
@@ -194,7 +194,7 @@ func TestValidLang_Empty(t *testing.T) {
 
 func TestDefaultConfig_LangIsJa(t *testing.T) {
 	// when
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 
 	// then
 	if cfg.Lang != "ja" {
@@ -204,11 +204,11 @@ func TestDefaultConfig_LangIsJa(t *testing.T) {
 
 func TestValidateConfig_ConvergenceWindowDaysZero(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Convergence.WindowDays = 0
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	found := false
@@ -225,11 +225,11 @@ func TestValidateConfig_ConvergenceWindowDaysZero(t *testing.T) {
 
 func TestValidateConfig_ConvergenceThresholdZero(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Convergence.Threshold = 0
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	found := false
@@ -246,11 +246,11 @@ func TestValidateConfig_ConvergenceThresholdZero(t *testing.T) {
 
 func TestValidateConfig_InvalidLang(t *testing.T) {
 	// given
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Lang = "fr"
 
 	// when
-	errs := amadeus.ValidateConfig(cfg)
+	errs := domain.ValidateConfig(cfg)
 
 	// then
 	found := false
