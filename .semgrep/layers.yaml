@@ -231,3 +231,46 @@ rules:
     paths:
       include:
         - "/internal/session/**"
+
+  # --- Rule 10: cmd must not import session directly (migration target) ---
+
+  - id: layer-cmd-no-import-session
+    languages: [go]
+    message: |
+      cmd 層から session 層への直接 import は禁止です（移行中は WARNING）。
+      usecase 層を経由してください。
+      依存方向: cmd → usecase → session（cmd → session は禁止）
+      Ref: /Users/nino/tap/refs/todos/09-domain-usecase-layer-unification.md
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/session"
+    paths:
+      include:
+        - "/internal/cmd/**"
+
+  # --- Rule 11: internal must not import root package (root-zero migration) ---
+
+  - id: layer-no-root-package-import
+    languages: [go]
+    message: |
+      internal/ から root パッケージへの import は移行対象です（移行中は WARNING）。
+      root パッケージの型・関数は internal/domain へ移動中です。
+      移動完了後は internal/domain を import してください。
+      Ref: /Users/nino/tap/refs/todos/12-root-zero-migration-plan.md
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "github.com/hironow/amadeus"
+          - pattern: |
+              import $_ALIAS "github.com/hironow/amadeus"
+    paths:
+      include:
+        - "/internal/**"
