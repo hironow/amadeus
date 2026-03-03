@@ -77,12 +77,20 @@ vet:
 semgrep:
     semgrep scan --config .semgrep/ --error --severity ERROR .
 
+# Verify root package contains only doc.go (no code at root)
+root-guard:
+    @if ls *.go 2>/dev/null | grep -qv '^doc\.go$'; then \
+        echo "ERROR: root package may only contain doc.go. Found:" >&2; \
+        ls *.go | grep -v '^doc\.go$' >&2; \
+        exit 1; \
+    fi
+
 # Lint (fmt check + vet + markdown lint)
-lint: vet semgrep lint-md
+lint: vet semgrep root-guard lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
-check: fmt vet semgrep test
+check: fmt vet semgrep root-guard test
 
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:
