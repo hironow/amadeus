@@ -1,4 +1,4 @@
-package cmd
+package integration_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/amadeus/internal/cmd"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
@@ -50,7 +51,7 @@ func TestRebuildCommand_RebuildsProjectionsFromEvents(t *testing.T) {
 	}
 
 	// when: run rebuild command from the temp dir
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	var stderr bytes.Buffer
 	root.SetErr(&stderr)
 	root.SetArgs([]string{"rebuild", "--config", filepath.Join(gateDir, "config.yaml")})
@@ -104,7 +105,7 @@ func TestRebuildCommand_EmptyEventsSucceeds(t *testing.T) {
 	}
 
 	// when: run rebuild
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	var stderr bytes.Buffer
 	root.SetErr(&stderr)
 	root.SetArgs([]string{"rebuild"})

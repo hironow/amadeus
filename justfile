@@ -78,11 +78,11 @@ semgrep:
     semgrep scan --config .semgrep/ --error --severity ERROR .
 
 # Lint (fmt check + vet + markdown lint)
-lint: vet lint-md
+lint: vet semgrep lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
-check: fmt vet test
+check: fmt vet semgrep test
 
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:

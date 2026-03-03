@@ -77,4 +77,3 @@ func countDirFiles(gateDir string, sub string) int {
 	}
 	return count
 }
-

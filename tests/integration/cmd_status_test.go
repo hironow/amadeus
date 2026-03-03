@@ -1,4 +1,4 @@
-package cmd
+package integration_test
 
 import (
 	"bytes"
@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/amadeus/internal/cmd"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestStatusCmd_Registered(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// when
 	statusCmd, _, err := root.Find([]string{"status"})
@@ -42,14 +43,14 @@ func TestStatusCmd_FailsWithoutGateDir(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"status"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"status"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should fail with init guidance
 	if execErr == nil {
@@ -78,15 +79,15 @@ func TestStatusCmd_TextOutput(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status"})
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetArgs([]string{"status"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should succeed
 	if execErr != nil {
@@ -135,15 +136,15 @@ func TestStatusCmd_JSONOutput(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status", "-o", "json"})
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetArgs([]string{"status", "-o", "json"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should succeed with valid JSON on stdout
 	if execErr != nil {
@@ -170,15 +171,15 @@ func TestStatusCmd_WithPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status", dir})
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetArgs([]string{"status", dir})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should succeed
 	if execErr != nil {

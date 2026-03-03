@@ -276,3 +276,27 @@ rules:
     paths:
       include:
         - "/internal/platform/**"
+
+  # --- Rule 12: domain must not import stdlib I/O packages ---
+
+  - id: layer-domain-no-stdlib-io
+    languages: [go]
+    message: |
+      domain 層で I/O stdlib パッケージの import は禁止です。
+      domain は pure functions のみ。I/O は session 層で行ってください。
+      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: "^(os|os/exec|net|net/http|database/sql)$"
+    paths:
+      include:
+        - "/internal/domain/**"
+      exclude:
+        - "*_test.go"
