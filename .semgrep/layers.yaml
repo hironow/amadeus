@@ -297,7 +297,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: "^(os|os/exec|net|net/http|database/sql|context)$"
+          regex: "^(io|os|os/exec|net|net/http|database/sql|context)$"
     paths:
       include:
         - "/internal/domain/**"
