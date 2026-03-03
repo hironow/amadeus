@@ -19,64 +19,34 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CheckStatus represents the outcome of a single doctor check.
-type CheckStatus int
-
-const (
-	CheckOK CheckStatus = iota
-	CheckFail
-	CheckSkip
-)
-
-// DoctorCheckResult holds the outcome of a single doctor check.
-type DoctorCheckResult struct {
-	Name    string
-	Status  CheckStatus
-	Message string
-}
-
-// StatusLabel returns a display string for the check status.
-func (s CheckStatus) StatusLabel() string {
-	switch s {
-	case CheckOK:
-		return "OK"
-	case CheckFail:
-		return "FAIL"
-	case CheckSkip:
-		return "SKIP"
-	default:
-		return "?"
-	}
-}
-
 // execCommand is a package-level variable for creating exec.Cmd.
 // Override in tests to mock command execution.
 var execCommand = exec.CommandContext
 
 // checkTool verifies that a CLI tool is installed and executable.
-func checkTool(ctx context.Context, name string) DoctorCheckResult {
+func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 	path, err := exec.LookPath(name)
 	if err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    name,
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: "command not found",
 		}
 	}
 
 	out, err := execCommand(ctx, path, "--version").Output()
 	if err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    name,
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("found at %s but --version failed: %v", path, err),
 		}
 	}
 
 	version := strings.TrimSpace(strings.Split(string(out), "\n")[0])
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    name,
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s (%s)", path, version),
 	}
 }
@@ -84,59 +54,59 @@ func checkTool(ctx context.Context, name string) DoctorCheckResult {
 // checkGitRepo verifies the given directory is inside a git repository.
 // Uses exec.Command directly (not execCommand) because cmd.Dir must be set,
 // and tests use real git repos via git init.
-func checkGitRepo(dir string) DoctorCheckResult {
+func checkGitRepo(dir string) domain.DoctorCheckResult {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	cmd.Dir = dir
 	if err := cmd.Run(); err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Git Repository",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s is not a git repository", dir),
 		}
 	}
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "Git Repository",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s is a git repository", dir),
 	}
 }
 
 // checkGateDir verifies .gate/ directory exists and is writable.
-func checkGateDir(repoRoot string) DoctorCheckResult {
+func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 	dir := filepath.Join(repoRoot, ".gate")
 	info, err := os.Stat(dir)
 	if err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    ".gate/",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: "not found — run 'amadeus init' first",
 		}
 	}
 	if !info.IsDir() {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    ".gate/",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s exists but is not a directory", dir),
 		}
 	}
 	probe := filepath.Join(dir, ".doctor_probe")
 	if err := os.WriteFile(probe, []byte("ok"), 0o644); err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    ".gate/",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("not writable: %v", err),
 		}
 	}
 	if err := os.Remove(probe); err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    ".gate/",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("probe cleanup failed: %v", err),
 		}
 	}
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    ".gate/",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s writable", dir),
 	}
 }
@@ -144,13 +114,13 @@ func checkGateDir(repoRoot string) DoctorCheckResult {
 // checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
+func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckResult {
 	cmd := execCommand(ctx, claudeCmd, "mcp", "list")
 	out, err := cmd.Output()
 	if err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Linear MCP",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("claude mcp list failed: %v", err),
 		}
 	}
@@ -158,23 +128,23 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) DoctorCheckResult {
 	output := strings.ToLower(string(out))
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "linear") && strings.Contains(line, "✓") && strings.Contains(line, "connected") {
-			return DoctorCheckResult{
+			return domain.DoctorCheckResult{
 				Name:    "Linear MCP",
-				Status:  CheckOK,
+				Status:  domain.CheckOK,
 				Message: "Linear MCP connected",
 			}
 		}
 	}
 
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "Linear MCP",
-		Status:  CheckFail,
+		Status:  domain.CheckFail,
 		Message: "Linear MCP not found or not connected in claude mcp list output",
 	}
 }
 
 // checkSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
-func checkSkillMD(repoRoot string) DoctorCheckResult {
+func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 	skillsDir := filepath.Join(repoRoot, ".gate", "skills")
 	required := []string{"dmail-sendable", "dmail-readable"}
 	var missing []string
@@ -185,31 +155,31 @@ func checkSkillMD(repoRoot string) DoctorCheckResult {
 		}
 	}
 	if len(missing) > 0 {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "SKILL.md",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("missing: %s — run 'amadeus init'", strings.Join(missing, ", ")),
 		}
 	}
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "SKILL.md",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s (dmail-sendable, dmail-readable)", skillsDir),
 	}
 }
 
 // runDoctor executes all health checks and returns the results.
 // Uses "claude" as the default Claude CLI command name.
-func runDoctor(ctx context.Context, configPath string, repoRoot string) []DoctorCheckResult {
+func runDoctor(ctx context.Context, configPath string, repoRoot string) []domain.DoctorCheckResult {
 	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude")
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
+func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []domain.DoctorCheckResult {
 	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 
-	var results []DoctorCheckResult
+	var results []domain.DoctorCheckResult
 
 	// 1. git binary
 	results = append(results, checkTool(ctx, "git"))
@@ -240,10 +210,10 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkSuccessRate(filepath.Join(repoRoot, ".gate")))
 
 	// 10. Linear MCP (skip if claude unavailable)
-	if claudeResult.Status != CheckOK {
-		results = append(results, DoctorCheckResult{
+	if claudeResult.Status != domain.CheckOK {
+		results = append(results, domain.DoctorCheckResult{
 			Name:    "Linear MCP",
-			Status:  CheckSkip,
+			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
 	} else {
@@ -261,33 +231,33 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 }
 
 // checkEventStore verifies events/ directory exists and all JSONL files are parseable.
-func checkEventStore(gateRoot string) DoctorCheckResult {
+func checkEventStore(gateRoot string) domain.DoctorCheckResult {
 	eventsDir := filepath.Join(gateRoot, "events")
 	if _, err := os.Stat(eventsDir); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return DoctorCheckResult{
+			return domain.DoctorCheckResult{
 				Name:    "Event Store",
-				Status:  CheckSkip,
+				Status:  domain.CheckSkip,
 				Message: "no events directory — run 'amadeus init'",
 			}
 		}
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Event Store",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("stat events: %v", err),
 		}
 	}
 	count, err := countEventStoreEntries(eventsDir)
 	if err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Event Store",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("parse error: %v", err),
 		}
 	}
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "Event Store",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d event(s) loaded", count),
 	}
 }
@@ -324,20 +294,20 @@ func countEventStoreEntries(eventsDir string) (int, error) {
 }
 
 // checkDMailSchema validates all D-Mails in archive/ conform to schema v1.
-func checkDMailSchema(gateRoot string) DoctorCheckResult {
+func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 	archiveDir := filepath.Join(gateRoot, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return DoctorCheckResult{
+			return domain.DoctorCheckResult{
 				Name:    "D-Mail Schema",
-				Status:  CheckSkip,
+				Status:  domain.CheckSkip,
 				Message: "no archive directory",
 			}
 		}
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "D-Mail Schema",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("read archive: %v", err),
 		}
 	}
@@ -349,9 +319,9 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 		}
 	}
 	if len(mdFiles) == 0 {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "D-Mail Schema",
-			Status:  CheckSkip,
+			Status:  domain.CheckSkip,
 			Message: "no D-Mails in archive",
 		}
 	}
@@ -374,27 +344,27 @@ func checkDMailSchema(gateRoot string) DoctorCheckResult {
 	}
 
 	if len(invalid) > 0 {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "D-Mail Schema",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%d/%d invalid: %s", len(invalid), len(mdFiles), strings.Join(invalid, ", ")),
 		}
 	}
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "D-Mail Schema",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d D-Mail(s) valid", len(mdFiles)),
 	}
 }
 
 // checkSuccessRate calculates and reports the event-based success rate.
-func checkSuccessRate(gateDir string) DoctorCheckResult {
+func checkSuccessRate(gateDir string) domain.DoctorCheckResult {
 	store := session.NewEventStore(gateDir)
 	events, err := store.LoadAll()
 	if err != nil || len(events) == 0 {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "success-rate",
-			Status:  CheckOK,
+			Status:  domain.CheckOK,
 			Message: "no events",
 		}
 	}
@@ -415,48 +385,48 @@ func checkSuccessRate(gateDir string) DoctorCheckResult {
 		}
 	}
 
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "success-rate",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: domain.FormatSuccessRate(rate, clean, total),
 	}
 }
 
 // checkConfig validates that config.yaml exists and can be loaded.
-func checkConfig(path string) DoctorCheckResult {
+func checkConfig(path string) domain.DoctorCheckResult {
 	if _, err := os.Stat(path); err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Config",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Config",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
 	cfg := domain.DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Config",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
 		}
 	}
 	if errs := domain.ValidateConfig(cfg); len(errs) > 0 {
-		return DoctorCheckResult{
+		return domain.DoctorCheckResult{
 			Name:    "Config",
-			Status:  CheckFail,
+			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %s", path, strings.Join(errs, "; ")),
 		}
 	}
-	return DoctorCheckResult{
+	return domain.DoctorCheckResult{
 		Name:    "Config",
-		Status:  CheckOK,
+		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s loaded and validated", path),
 	}
 }

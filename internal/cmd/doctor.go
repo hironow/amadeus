@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +48,12 @@ type jsonCheck struct {
 	Message string `json:"message"`
 }
 
-func printDoctorJSON(w io.Writer, results []DoctorCheckResult) error {
+func printDoctorJSON(w io.Writer, results []domain.DoctorCheckResult) error {
 	checks := make([]jsonCheck, len(results))
 	hasFail := false
 	for i, r := range results {
 		checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message}
-		if r.Status == CheckFail {
+		if r.Status == domain.CheckFail {
 			hasFail = true
 		}
 	}
@@ -69,11 +70,11 @@ func printDoctorJSON(w io.Writer, results []DoctorCheckResult) error {
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []DoctorCheckResult) error {
+func printDoctorText(w io.Writer, results []domain.DoctorCheckResult) error {
 	hasFail := false
 	for _, r := range results {
 		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
-		if r.Status == CheckFail {
+		if r.Status == domain.CheckFail {
 			hasFail = true
 		}
 	}

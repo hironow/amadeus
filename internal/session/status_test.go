@@ -163,7 +163,7 @@ func TestStatus_WithEvents(t *testing.T) {
 
 func TestStatus_FormatText(t *testing.T) {
 	// given
-	report := session.StatusReport{
+	report := domain.StatusReport{
 		LastCheck:    time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		Divergence:   0.15,
 		CheckCount:   8,
@@ -202,7 +202,7 @@ func TestStatus_FormatText(t *testing.T) {
 
 func TestStatus_FormatText_NoChecks(t *testing.T) {
 	// given — zero-value report
-	report := session.StatusReport{}
+	report := domain.StatusReport{}
 
 	// when
 	text := report.FormatText()
@@ -218,7 +218,7 @@ func TestStatus_FormatText_NoChecks(t *testing.T) {
 
 func TestStatus_FormatJSON(t *testing.T) {
 	// given
-	report := session.StatusReport{
+	report := domain.StatusReport{
 		LastCheck:    time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		Divergence:   0.15,
 		CheckCount:   8,

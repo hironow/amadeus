@@ -82,12 +82,12 @@ func initGateDirForTest(t *testing.T, root string) {
 
 func TestCheckStatusLabel(t *testing.T) {
 	tests := []struct {
-		status CheckStatus
+		status domain.CheckStatus
 		want   string
 	}{
-		{CheckOK, "OK"},
-		{CheckFail, "FAIL"},
-		{CheckSkip, "SKIP"},
+		{domain.CheckOK, "OK"},
+		{domain.CheckFail, "FAIL"},
+		{domain.CheckSkip, "SKIP"},
 	}
 	for _, tt := range tests {
 		if got := tt.status.StatusLabel(); got != tt.want {
@@ -99,8 +99,8 @@ func TestCheckStatusLabel(t *testing.T) {
 func TestCheckTool_Exists(t *testing.T) {
 	ctx := context.Background()
 	result := checkTool(ctx, "git")
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK for 'git', got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK for 'git', got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Message, "git") {
 		t.Errorf("expected message to contain path, got: %s", result.Message)
@@ -110,8 +110,8 @@ func TestCheckTool_Exists(t *testing.T) {
 func TestCheckTool_NotFound(t *testing.T) {
 	ctx := context.Background()
 	result := checkTool(ctx, "nonexistent-tool-xyz-12345")
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if result.Message != "command not found" {
 		t.Errorf("expected 'command not found', got: %s", result.Message)
@@ -125,16 +125,16 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 		t.Fatalf("git init: %v", err)
 	}
 	result := checkGitRepo(dir)
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckGitRepo_NotRepo(t *testing.T) {
 	dir := t.TempDir()
 	result := checkGitRepo(dir)
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -143,16 +143,16 @@ func TestCheckGateDir_Exists(t *testing.T) {
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	result := checkGateDir(dir)
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
 	result := checkGateDir(dir)
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -169,8 +169,8 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -187,8 +187,8 @@ func TestCheckLinearMCP_NotConnected(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -205,8 +205,8 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -223,8 +223,8 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail for disconnected, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for disconnected, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -235,15 +235,15 @@ func TestCheckConfig_Valid(t *testing.T) {
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(path, data, 0o644)
 	result := checkConfig(path)
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckConfig_NotFound(t *testing.T) {
 	result := checkConfig("/nonexistent/config.yaml")
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -252,8 +252,8 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 	path := filepath.Join(dir, "config.yaml")
 	os.WriteFile(path, []byte(`{{{invalid`), 0o644)
 	result := checkConfig(path)
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -348,8 +348,8 @@ func TestCheckSkillMD_BothExist(t *testing.T) {
 	result := checkSkillMD(dir)
 
 	// then
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -364,8 +364,8 @@ func TestCheckSkillMD_MissingSendable(t *testing.T) {
 	result := checkSkillMD(dir)
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Message, "dmail-sendable") {
 		t.Errorf("expected message to mention dmail-sendable, got: %s", result.Message)
@@ -380,8 +380,8 @@ func TestCheckSkillMD_NoGateDir(t *testing.T) {
 	result := checkSkillMD(dir)
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -413,7 +413,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	}
 
 	// then: SKILL.md check should be present and OK
-	var skillResult DoctorCheckResult
+	var skillResult domain.DoctorCheckResult
 	found := false
 	for _, r := range results {
 		if r.Name == "SKILL.md" {
@@ -425,8 +425,8 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	if !found {
 		t.Fatal("expected SKILL.md check in doctor results")
 	}
-	if skillResult.Status != CheckOK {
-		t.Errorf("expected SKILL.md CheckOK, got %v: %s", skillResult.Status, skillResult.Message)
+	if skillResult.Status != domain.CheckOK {
+		t.Errorf("expected SKILL.md domain.CheckOK, got %v: %s", skillResult.Status, skillResult.Message)
 	}
 }
 
@@ -447,14 +447,14 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz")
 
 	// then
-	var mcpResult DoctorCheckResult
+	var mcpResult domain.DoctorCheckResult
 	for _, r := range results {
 		if r.Name == "Linear MCP" {
 			mcpResult = r
 			break
 		}
 	}
-	if mcpResult.Status != CheckSkip {
+	if mcpResult.Status != domain.CheckSkip {
 		t.Errorf("expected Linear MCP SKIP when claude unavailable, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
 	if !strings.Contains(mcpResult.Message, "claude not available") {
@@ -472,8 +472,8 @@ func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then: skip — no D-Mails to validate
-	if result.Status != CheckSkip {
-		t.Errorf("expected CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckSkip {
+		t.Errorf("expected domain.CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -502,8 +502,8 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -519,8 +519,8 @@ func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail for invalid D-Mail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for invalid D-Mail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -533,8 +533,8 @@ func TestCheckDMailSchema_NoGateDir(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then: skip — archive doesn't exist yet
-	if result.Status != CheckSkip {
-		t.Errorf("expected CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckSkip {
+		t.Errorf("expected domain.CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -551,8 +551,8 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then: FAIL — permission error should not be masked
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail for permission error, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for permission error, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -600,8 +600,8 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	for _, r := range results {
 		if r.Name == "success-rate" {
 			found = true
-			if r.Status != CheckOK {
-				t.Errorf("expected CheckOK, got %v", r.Status)
+			if r.Status != domain.CheckOK {
+				t.Errorf("expected domain.CheckOK, got %v", r.Status)
 			}
 			if !strings.Contains(r.Message, "66.7%") || !strings.Contains(r.Message, "(2/3)") {
 				t.Errorf("unexpected message: %s", r.Message)
