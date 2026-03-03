@@ -13,7 +13,7 @@ func TestPrintSync_InvalidCommand(t *testing.T) {
 	cmd := domain.RunSyncCommand{RepoPath: ""}
 	a := &session.Amadeus{
 		Config: amadeus.DefaultConfig(),
-		Logger: amadeus.NewLogger(nil, false),
+		Logger: domain.NewLogger(nil, false),
 	}
 
 	// when
@@ -33,7 +33,7 @@ func TestRebuild_InvalidCommand(t *testing.T) {
 	cmd := domain.RebuildCommand{RepoPath: ""}
 
 	// when
-	err := Rebuild(cmd, nil, nil, amadeus.NewLogger(nil, false))
+	err := Rebuild(cmd, nil, nil, domain.NewLogger(nil, false))
 
 	// then
 	if err == nil {

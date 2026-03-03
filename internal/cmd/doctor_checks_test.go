@@ -12,6 +12,7 @@ import (
 
 	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -25,11 +26,11 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	amadeus.Tracer = tp.Tracer("amadeus-test")
+	platform.Tracer = tp.Tracer("amadeus-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		amadeus.Tracer = prev.Tracer("amadeus")
+		platform.Tracer = prev.Tracer("amadeus")
 	})
 	return exp
 }

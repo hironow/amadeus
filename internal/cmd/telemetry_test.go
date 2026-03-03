@@ -8,7 +8,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
@@ -17,7 +17,7 @@ func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	shutdown := initTracer("test-svc", "0.0.1")
 	defer shutdown(context.Background())
 
-	_, span := amadeus.Tracer.Start(context.Background(), "test-span")
+	_, span := platform.Tracer.Start(context.Background(), "test-span")
 	defer span.End()
 
 	if span.IsRecording() {
@@ -35,15 +35,15 @@ func TestMultiExporter_BothReceive(t *testing.T) {
 	)
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := amadeus.Tracer
-	amadeus.Tracer = tp.Tracer("amadeus-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("amadeus-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		amadeus.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 
-	_, span := amadeus.Tracer.Start(context.Background(), "multi-span")
+	_, span := platform.Tracer.Start(context.Background(), "multi-span")
 	span.End()
 
 	if len(exp1.GetSpans()) == 0 {

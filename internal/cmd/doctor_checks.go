@@ -13,6 +13,7 @@ import (
 
 	"github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -206,7 +207,7 @@ func runDoctor(ctx context.Context, configPath string, repoRoot string) []Doctor
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
 func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []DoctorCheckResult {
-	_, span := amadeus.Tracer.Start(ctx, "amadeus.doctor")
+	_, span := platform.Tracer.Start(ctx, "amadeus.doctor")
 	defer span.End()
 
 	var results []DoctorCheckResult

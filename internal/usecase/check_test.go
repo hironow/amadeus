@@ -17,7 +17,7 @@ func TestRunCheck_InvalidCommand(t *testing.T) {
 	opts := amadeus.CheckOptions{}
 	a := &session.Amadeus{
 		Config: amadeus.DefaultConfig(),
-		Logger: amadeus.NewLogger(nil, false),
+		Logger: domain.NewLogger(nil, false),
 	}
 
 	// when
@@ -52,7 +52,7 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 		Config: amadeus.DefaultConfig(),
 		Store:  store,
 		Events: eventStore,
-		Logger: amadeus.NewLogger(nil, false),
+		Logger: domain.NewLogger(nil, false),
 	}
 
 	// pre-conditions

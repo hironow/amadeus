@@ -176,7 +176,7 @@ func newGateTestAmadeus(t *testing.T, approver amadeus.Approver, notifier amadeu
 		},
 		Claude:    &fakeClaude{response: claudeResponseWithDrift()},
 		RepoDir:   root,
-		Logger:    amadeus.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Approver:  approver,
 		Notifier:  notifier,
 		Aggregate: domain.NewCheckAggregate(cfg),

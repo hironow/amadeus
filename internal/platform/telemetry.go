@@ -1,4 +1,4 @@
-package amadeus
+package platform
 
 import (
 	"go.opentelemetry.io/otel/metric"

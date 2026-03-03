@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +44,7 @@ func NewRootCommand() *cobra.Command {
 		Version:       Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			logger := amadeus.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger := domain.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("amadeus", Version)
 			shutdownMeter = initMeter("amadeus", Version)
@@ -95,11 +95,11 @@ func NewRootCommand() *cobra.Command {
 	return cmd
 }
 
-// loggerFrom extracts the *amadeus.Logger from the cobra command context.
+// loggerFrom extracts the *domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
-func loggerFrom(cmd *cobra.Command) *amadeus.Logger {
-	if l, ok := cmd.Context().Value(loggerKey).(*amadeus.Logger); ok {
+func loggerFrom(cmd *cobra.Command) *domain.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(*domain.Logger); ok {
 		return l
 	}
-	return amadeus.NewLogger(cmd.ErrOrStderr(), false)
+	return domain.NewLogger(cmd.ErrOrStderr(), false)
 }

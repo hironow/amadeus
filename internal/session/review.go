@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 const maxReviewGateCycles = 3
@@ -63,13 +63,13 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 // Returns (true, nil) if review passes or is skipped (empty reviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger *amadeus.Logger, budget ...int) (bool, error) {
+func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger *domain.Logger, budget ...int) (bool, error) {
 	if strings.TrimSpace(reviewCmd) == "" {
 		return true, nil
 	}
 
 	if logger == nil {
-		logger = amadeus.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 
 	maxCycles := maxReviewGateCycles
@@ -125,7 +125,7 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, timeoutSec int, logger *amadeus.Logger) error {
+func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, timeoutSec int, logger *domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)

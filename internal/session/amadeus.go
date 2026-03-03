@@ -10,6 +10,7 @@ import (
 
 	amadeus "github.com/hironow/amadeus"
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -24,7 +25,7 @@ type Amadeus struct {
 	Git         amadeus.Git
 	RepoDir     string               // repository root directory
 	Claude      amadeus.ClaudeRunner // nil falls back to the default Claude runner
-	Logger      *amadeus.Logger
+	Logger      *domain.Logger
 	DataOut     io.Writer              // machine-readable output (stdout); Logger is for human progress (stderr)
 	Approver    amadeus.Approver       // nil = no gate (auto-approve)
 	Notifier    amadeus.Notifier       // nil = no notifications
@@ -122,7 +123,7 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 //   - Phase 3: D-Mail generation and routing
 //   - Phase 4: World Line Convergence detection
 func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error {
-	ctx, span := amadeus.Tracer.Start(ctx, "amadeus.check",
+	ctx, span := platform.Tracer.Start(ctx, "amadeus.check",
 		trace.WithAttributes(
 			attribute.Bool("check.dry_run", opts.DryRun),
 		))
@@ -185,7 +186,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 	rs := &ReadingSteiner{Git: a.Git}
 	var report ShiftReport
 
-	_, span1 := amadeus.Tracer.Start(ctx, "reading_steiner")
+	_, span1 := platform.Tracer.Start(ctx, "reading_steiner")
 	if fullCheck {
 		report, err = rs.DetectShiftFull(a.RepoDir)
 		if err != nil {
@@ -241,7 +242,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		if err := a.emit(events...); err != nil {
 			return fmt.Errorf("emit check (no shift): %w", err)
 		}
-		domain.RecordCheck(ctx, "clean")
+		platform.RecordCheck(ctx, "clean")
 		if opts.JSON {
 			if err := a.PrintCheckOutputJSON(previous, nil, previous.Divergence); err != nil {
 				return fmt.Errorf("write JSON output: %w", err)
@@ -261,7 +262,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		}
 	}
 
-	_, span2 := amadeus.Tracer.Start(ctx, "divergence_meter")
+	_, span2 := platform.Tracer.Start(ctx, "divergence_meter")
 
 	repoRoot := a.RepoDir
 	allADRs, adrErr := CollectADRs(repoRoot)
@@ -403,14 +404,14 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		if err := a.emit(events...); err != nil {
 			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
-		domain.RecordCheck(ctx, "drift")
+		platform.RecordCheck(ctx, "drift")
 		if !opts.Quiet {
 			a.Logger.Info("Gate denied — D-Mail generation skipped")
 		}
 		return nil
 	}
 
-	_, span3 := amadeus.Tracer.Start(ctx, "dmail")
+	_, span3 := platform.Tracer.Start(ctx, "dmail")
 	var dmails []amadeus.DMail
 	for _, candidate := range meterResult.DMailCandidates {
 		name, err := a.Store.NextDMailName(amadeus.KindFeedback)
@@ -521,9 +522,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts amadeus.CheckOptions) error
 		return fmt.Errorf("emit check completed: %w", err)
 	}
 	if len(dmails) > 0 {
-		domain.RecordCheck(ctx, "drift")
+		platform.RecordCheck(ctx, "drift")
 	} else {
-		domain.RecordCheck(ctx, "clean")
+		platform.RecordCheck(ctx, "clean")
 	}
 
 	if opts.JSON {
