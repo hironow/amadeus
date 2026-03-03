@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -36,21 +36,8 @@ func newMarkCommentedCommand() *cobra.Command {
 				return fmt.Errorf("stat .gate directory: %w", err)
 			}
 
-			store := session.NewProjectionStore(divRoot)
-
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
-			}
-			defer outboxStore.Close()
-
-			a := &session.Amadeus{
-				Store:     store,
-				Events:    session.NewEventStore(divRoot),
-				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
-				Logger:    loggerFrom(cmd),
-			}
-			if err := a.MarkCommented(dmailName, issueID); err != nil {
+			logger := loggerFrom(cmd)
+			if err := usecase.MarkCommented(divRoot, logger, dmailName, issueID); err != nil {
 				return fmt.Errorf("mark commented: %w", err)
 			}
 

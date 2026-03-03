@@ -36,3 +36,15 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	// Session restores aggregate state from persisted projection internally
 	return a.RunCheck(ctx, opts)
 }
+
+// RunCheckFromParams constructs an Amadeus from AmadeusParams and runs the check pipeline.
+// This is the cmd-facing entry point that eliminates session imports from cmd.
+func RunCheckFromParams(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions, params AmadeusParams) error {
+	result, err := buildAmadeus(params)
+	if err != nil {
+		return fmt.Errorf("build amadeus: %w", err)
+	}
+	defer result.Cleanup()
+
+	return RunCheck(ctx, cmd, opts, result.Amadeus)
+}

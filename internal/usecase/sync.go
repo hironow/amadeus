@@ -15,3 +15,15 @@ func PrintSync(cmd domain.RunSyncCommand, a *session.Amadeus) error {
 	}
 	return a.PrintSync()
 }
+
+// PrintSyncFromParams constructs an Amadeus from AmadeusParams and runs the sync pipeline.
+// This is the cmd-facing entry point that eliminates session imports from cmd.
+func PrintSyncFromParams(cmd domain.RunSyncCommand, params AmadeusParams) error {
+	result, err := buildAmadeus(params)
+	if err != nil {
+		return fmt.Errorf("build amadeus: %w", err)
+	}
+	defer result.Cleanup()
+
+	return PrintSync(cmd, result.Amadeus)
+}

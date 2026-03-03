@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +29,7 @@ func newSyncCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
-			if err := session.InitGateDir(divRoot); err != nil {
+			if err := usecase.InitGate(divRoot); err != nil {
 				return fmt.Errorf("init gate dir: %w", err)
 			}
 
@@ -43,25 +42,15 @@ func newSyncCommand() *cobra.Command {
 			}
 
 			logger := loggerFrom(cmd)
-			store := session.NewProjectionStore(divRoot)
 
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
-			}
-			defer outboxStore.Close()
-
-			a := &session.Amadeus{
-				Config:    cfg,
-				Store:     store,
-				Events:    session.NewEventStore(divRoot),
-				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
-				Logger:    logger,
-				DataOut:   cmd.OutOrStdout(),
-			}
-			return usecase.PrintSync(domain.RunSyncCommand{
+			return usecase.PrintSyncFromParams(domain.RunSyncCommand{
 				RepoPath: repoRoot,
-			}, a)
+			}, usecase.AmadeusParams{
+				GateDir: divRoot,
+				Config:  cfg,
+				Logger:  logger,
+				DataOut: cmd.OutOrStdout(),
+			})
 		},
 	}
 

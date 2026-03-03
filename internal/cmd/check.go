@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -41,11 +40,11 @@ func newCheckCommand() *cobra.Command {
 			if !dryRun {
 				bins = append(bins, "claude")
 			}
-			if preErr := session.PreflightCheck(bins...); preErr != nil {
+			if preErr := usecase.PreflightCheck(bins...); preErr != nil {
 				return preErr
 			}
 
-			if err := session.InitGateDir(divRoot); err != nil {
+			if err := usecase.InitGate(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 
@@ -66,15 +65,6 @@ func newCheckCommand() *cobra.Command {
 
 			logger := loggerFrom(cmd)
 
-			store := session.NewProjectionStore(divRoot)
-			eventStore := session.NewEventStore(divRoot)
-
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
-			}
-			defer outboxStore.Close()
-
 			// Wire approver
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
 			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
@@ -84,7 +74,7 @@ func newCheckCommand() *cobra.Command {
 			case autoApprove:
 				approver = &domain.AutoApprover{}
 			case approveCmd != "":
-				approver = session.NewCmdApprover(approveCmd)
+				approver = usecase.NewCmdApprover(approveCmd)
 			default:
 				approver = &domain.AutoApprover{} // default: no gate
 			}
@@ -93,36 +83,32 @@ func newCheckCommand() *cobra.Command {
 			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
 			var notifier domain.Notifier
 			if notifyCmd != "" {
-				notifier = session.NewCmdNotifier(notifyCmd)
+				notifier = usecase.NewCmdNotifier(notifyCmd)
 			} else {
 				notifier = &domain.NopNotifier{}
 			}
 
 			reviewCmd, _ := cmd.Flags().GetString("review-cmd")
 
-			a := &session.Amadeus{
-				Config:    cfg,
-				Store:     store,
-				Events:    eventStore,
-				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
-				Git:       session.NewGitClient(repoRoot),
-				RepoDir:   repoRoot,
-				Logger:    logger,
-				DataOut:   cmd.OutOrStdout(),
-				Approver:  approver,
-				Notifier:  notifier,
-				ReviewCmd: reviewCmd,
-			}
-
 			// COMMAND → usecase → Aggregate → EVENT
-			return usecase.RunCheck(cmd.Context(), domain.ExecuteCheckCommand{
+			return usecase.RunCheckFromParams(cmd.Context(), domain.ExecuteCheckCommand{
 				RepoPath: repoRoot,
 			}, domain.CheckOptions{
 				Full:   full,
 				DryRun: dryRun,
 				Quiet:  quiet,
 				JSON:   jsonOut,
-			}, a)
+			}, usecase.AmadeusParams{
+				GateDir:   divRoot,
+				RepoDir:   repoRoot,
+				Config:    cfg,
+				Logger:    logger,
+				DataOut:   cmd.OutOrStdout(),
+				Approver:  approver,
+				Notifier:  notifier,
+				ReviewCmd: reviewCmd,
+				WithGit:   true,
+			})
 		},
 	}
 

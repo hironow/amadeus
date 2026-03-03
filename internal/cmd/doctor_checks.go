@@ -13,7 +13,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
@@ -359,29 +359,12 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 
 // checkSuccessRate calculates and reports the event-based success rate.
 func checkSuccessRate(gateDir string) domain.DoctorCheckResult {
-	store := session.NewEventStore(gateDir)
-	events, err := store.LoadAll()
-	if err != nil || len(events) == 0 {
+	rate, clean, total, err := usecase.ComputeSuccessRate(gateDir)
+	if err != nil || total == 0 {
 		return domain.DoctorCheckResult{
 			Name:    "success-rate",
 			Status:  domain.CheckOK,
 			Message: "no events",
-		}
-	}
-
-	rate := domain.SuccessRate(events)
-	var clean, total int
-	for _, ev := range events {
-		if ev.Type != domain.EventCheckCompleted {
-			continue
-		}
-		var data domain.CheckCompletedData
-		if err := json.Unmarshal(ev.Data, &data); err != nil {
-			continue
-		}
-		total++
-		if len(data.Result.DMails) == 0 {
-			clean++
 		}
 	}
 

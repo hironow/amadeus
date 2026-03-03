@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 )
 
 // newStatusCommand creates the status subcommand that displays operational status.
@@ -43,7 +43,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
 
-			report := session.Status(divRoot)
+			report := usecase.GetStatus(divRoot)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {
