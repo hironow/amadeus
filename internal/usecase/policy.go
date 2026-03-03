@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
@@ -33,7 +32,7 @@ func (e *PolicyEngine) Register(trigger domain.EventType, handler PolicyHandler)
 }
 
 // Dispatch sends an event to all handlers registered for its type.
-// Handlers execute sequentially; the first error stops dispatch.
+// Best-effort: handler errors are logged but never block event processing.
 func (e *PolicyEngine) Dispatch(ctx context.Context, event domain.Event) error {
 	handlers, ok := e.handlers[event.Type]
 	if !ok {
@@ -41,7 +40,9 @@ func (e *PolicyEngine) Dispatch(ctx context.Context, event domain.Event) error {
 	}
 	for _, h := range handlers {
 		if err := h(ctx, event); err != nil {
-			return fmt.Errorf("policy dispatch %s: %w", event.Type, err)
+			if e.logger != nil {
+				e.logger.Debug("policy dispatch %s: %v", event.Type, err)
+			}
 		}
 	}
 	return nil

@@ -84,11 +84,16 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	}
 }
 
-func TestPolicyEngine_HandlerError(t *testing.T) {
-	// given
+func TestPolicyEngine_HandlerError_BestEffort(t *testing.T) {
+	// given: two handlers — first fails, second succeeds
 	engine := NewPolicyEngine(nil)
+	var secondFired bool
 	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		return fmt.Errorf("handler failed")
+	})
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
+		secondFired = true
+		return nil
 	})
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{Commit: "abc123"},
@@ -100,9 +105,12 @@ func TestPolicyEngine_HandlerError(t *testing.T) {
 	// when
 	dispatchErr := engine.Dispatch(context.Background(), ev)
 
-	// then: first handler error stops dispatch
-	if dispatchErr == nil {
-		t.Fatal("expected error from handler")
+	// then: best-effort — error swallowed, all handlers execute, nil returned
+	if dispatchErr != nil {
+		t.Fatalf("expected nil (best-effort), got: %v", dispatchErr)
+	}
+	if !secondFired {
+		t.Fatal("second handler should fire even after first handler error")
 	}
 }
 
