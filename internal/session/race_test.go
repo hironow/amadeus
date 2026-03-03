@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -74,7 +74,7 @@ func TestRace_OutboxStore_ConcurrentMultiStore(t *testing.T) {
 // TestRace_Logger_ConcurrentWrite verifies that Logger's mutex protects
 // concurrent log writes.
 func TestRace_Logger_ConcurrentWrite(t *testing.T) {
-	logger := domain.NewLogger(nil, false)
+	logger := platform.NewLogger(nil, false)
 
 	var wg sync.WaitGroup
 	for i := range 20 {

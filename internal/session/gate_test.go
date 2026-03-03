@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/port"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -138,7 +140,7 @@ func claudeResponseWithDrift() string {
 	}`
 }
 
-func newGateTestAmadeus(t *testing.T, approver domain.Approver, notifier domain.Notifier) *session.Amadeus {
+func newGateTestAmadeus(t *testing.T, approver port.Approver, notifier port.Notifier) *session.Amadeus {
 	t.Helper()
 	// Create a minimal gate dir with required structure
 	root := t.TempDir()
@@ -175,7 +177,7 @@ func newGateTestAmadeus(t *testing.T, approver domain.Approver, notifier domain.
 		},
 		Claude:    &fakeClaude{response: claudeResponseWithDrift()},
 		RepoDir:   root,
-		Logger:    domain.NewLogger(io.Discard, false),
+		Logger:    platform.NewLogger(io.Discard, false),
 		Approver:  approver,
 		Notifier:  notifier,
 		Aggregate: domain.NewCheckAggregate(cfg),
@@ -227,7 +229,7 @@ func extractDMailsFromEvents(t *testing.T, events []domain.Event) []domain.DMail
 func TestRunCheck_GateApproved_GeneratesDMails(t *testing.T) {
 	// given: AutoApprover always approves
 	notifier := &fakeNotifier{}
-	a := newGateTestAmadeus(t, &domain.AutoApprover{}, notifier)
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, notifier)
 
 	// when
 	err := a.RunCheck(context.Background(), domain.CheckOptions{})
@@ -250,7 +252,7 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 	// given: denyApprover always denies
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a := newGateTestAmadeus(t, &denyApprover{}, &domain.NopNotifier{})
+	a := newGateTestAmadeus(t, &denyApprover{}, &port.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
 
@@ -290,7 +292,7 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 	// given: errorApprover returns an error
 	gateErr := errors.New("approval service unavailable")
-	a := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &domain.NopNotifier{})
+	a := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &port.NopNotifier{})
 
 	// when
 	err := a.RunCheck(context.Background(), domain.CheckOptions{})
@@ -309,7 +311,7 @@ func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 
 func TestRunCheck_NilApprover_AutoApproves(t *testing.T) {
 	// given: nil Approver should skip gate entirely (backward compatible)
-	a := newGateTestAmadeus(t, nil, &domain.NopNotifier{})
+	a := newGateTestAmadeus(t, nil, &port.NopNotifier{})
 
 	// when
 	err := a.RunCheck(context.Background(), domain.CheckOptions{})
@@ -329,7 +331,7 @@ func TestRunCheck_FeedbackDMail_DefaultAction_BasedOnSeverity(t *testing.T) {
 	// With zero-value config thresholds, divergence 0.0 >= MediumMax 0.0 → SeverityHigh → ActionEscalate.
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a := newGateTestAmadeus(t, &domain.AutoApprover{}, &domain.NopNotifier{})
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
 
@@ -358,7 +360,7 @@ func TestRunCheck_FeedbackDMail_ExplicitAction_FromCandidate(t *testing.T) {
 	// given: Claude response with explicit action "retry" on the candidate
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a := newGateTestAmadeus(t, &domain.AutoApprover{}, &domain.NopNotifier{})
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
 	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("retry")}

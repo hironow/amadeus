@@ -64,7 +64,7 @@ func initGateDirForTest(t *testing.T, root string) {
 	// Write SKILL.md files from embedded templates
 	for _, name := range []string{"dmail-sendable", "dmail-readable"} {
 		tmplPath := "templates/skills/" + name + "/SKILL.md"
-		content, readErr := domain.SkillTemplateFS.ReadFile(tmplPath)
+		content, readErr := platform.SkillTemplateFS.ReadFile(tmplPath)
 		if readErr != nil {
 			t.Fatal(readErr)
 		}

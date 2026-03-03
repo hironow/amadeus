@@ -1,12 +1,8 @@
 package domain
 
 import (
-	"embed"
 	"time"
 )
-
-//go:embed templates/skills/*/SKILL.md
-var SkillTemplateFS embed.FS
 
 // StateReader is the port interface for reading materialized projection state.
 type StateReader interface {

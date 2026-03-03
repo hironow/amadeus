@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,12 +29,6 @@ type EventApplier interface {
 
 	// Rebuild replays all events to regenerate projections from scratch.
 	Rebuild(events []Event) error
-}
-
-// EventDispatcher dispatches domain events to policy handlers.
-// Implemented by usecase.PolicyEngine; injected into session via Amadeus struct.
-type EventDispatcher interface {
-	Dispatch(ctx context.Context, event Event) error
 }
 
 // EventType identifies the kind of domain event.

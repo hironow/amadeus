@@ -1,11 +1,16 @@
-package domain
+package platform
 
 import (
 	"fmt"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
+
+// compile-time interface check
+var _ domain.Logger = (*Logger)(nil)
 
 // Logger provides structured, timestamped log output.
 // All methods are safe for concurrent use.

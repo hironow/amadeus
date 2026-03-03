@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -14,10 +15,10 @@ type AmadeusParams struct {
 	GateDir     string
 	RepoDir     string
 	Config      domain.Config
-	Logger      *domain.Logger
+	Logger      domain.Logger
 	DataOut     io.Writer
-	Approver    domain.Approver
-	Notifier    domain.Notifier
+	Approver    port.Approver
+	Notifier    port.Notifier
 	ReviewCmd   string
 	ClaudeCmd   string
 	ClaudeModel string

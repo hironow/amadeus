@@ -2,15 +2,21 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
 
 // registerCheckPolicies registers POLICY handlers for check events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
-func registerCheckPolicies(engine *PolicyEngine, logger *domain.Logger) {
+func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger) {
 	engine.Register(domain.EventCheckCompleted, func(_ context.Context, event domain.Event) error {
-		logger.Debug("policy: check completed (type=%s)", event.Type)
+		var data domain.CheckCompletedData
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			logger.Debug("policy: check completed parse error: %v", err)
+			return nil
+		}
+		logger.Info("policy: check completed (divergence=%.2f, commit=%s)", data.Result.Divergence, data.Result.Commit)
 		return nil
 	})
 

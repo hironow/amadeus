@@ -4,7 +4,11 @@ import (
 	"context"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 )
+
+// Compile-time check: PolicyEngine implements port.EventDispatcher.
+var _ port.EventDispatcher = (*PolicyEngine)(nil)
 
 // PolicyHandler processes a domain event as part of a policy reaction.
 // WHEN [EVENT] THEN [handler logic].
@@ -14,11 +18,11 @@ type PolicyHandler func(ctx context.Context, event domain.Event) error
 // This connects the POLICY registry (domain.Policies) to executable handlers.
 type PolicyEngine struct {
 	handlers map[domain.EventType][]PolicyHandler
-	logger   *domain.Logger
+	logger   domain.Logger
 }
 
 // NewPolicyEngine creates a PolicyEngine. Pass nil logger for silent operation.
-func NewPolicyEngine(logger *domain.Logger) *PolicyEngine {
+func NewPolicyEngine(logger domain.Logger) *PolicyEngine {
 	return &PolicyEngine{
 		handlers: make(map[domain.EventType][]PolicyHandler),
 		logger:   logger,

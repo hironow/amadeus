@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -12,7 +13,7 @@ func TestPrintSync_InvalidCommand(t *testing.T) {
 	cmd := domain.RunSyncCommand{RepoPath: ""}
 	a := &session.Amadeus{
 		Config: domain.DefaultConfig(),
-		Logger: domain.NewLogger(nil, false),
+		Logger: platform.NewLogger(nil, false),
 	}
 
 	// when
@@ -32,7 +33,7 @@ func TestRebuild_InvalidCommand(t *testing.T) {
 	cmd := domain.RebuildCommand{RepoPath: ""}
 
 	// when
-	err := Rebuild(cmd, nil, nil, domain.NewLogger(nil, false))
+	err := Rebuild(cmd, nil, nil, platform.NewLogger(nil, false))
 
 	// then
 	if err == nil {

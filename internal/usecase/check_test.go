@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -16,7 +17,7 @@ func TestRunCheck_InvalidCommand(t *testing.T) {
 	opts := domain.CheckOptions{}
 	a := &session.Amadeus{
 		Config: domain.DefaultConfig(),
-		Logger: domain.NewLogger(nil, false),
+		Logger: platform.NewLogger(nil, false),
 	}
 
 	// when
@@ -51,7 +52,7 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 		Config: domain.DefaultConfig(),
 		Store:  store,
 		Events: eventStore,
-		Logger: domain.NewLogger(nil, false),
+		Logger: platform.NewLogger(nil, false),
 	}
 
 	// pre-conditions

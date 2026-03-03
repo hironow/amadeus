@@ -1,4 +1,5 @@
-// Package domain contains pure functions with no I/O and no context.Context.
-// All functions in this package must be deterministic and side-effect free.
-// I/O operations belong in the session layer; orchestration belongs in usecase.
+// Package domain contains pure types, events, commands, policies, aggregates,
+// and domain logic. No I/O syscalls, no context.Context.
+// Context-aware port interfaces live in internal/port.
+// Infrastructure (logger, telemetry) lives in internal/platform.
 package domain

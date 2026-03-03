@@ -9,7 +9,7 @@ import (
 
 // Rebuild replays events to regenerate projection files.
 // Validates the RebuildCommand and performs the rebuild.
-func Rebuild(cmd domain.RebuildCommand, events domain.EventStore, projector domain.EventApplier, logger *domain.Logger) error {
+func Rebuild(cmd domain.RebuildCommand, events domain.EventStore, projector domain.EventApplier, logger domain.Logger) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -32,7 +32,7 @@ func Rebuild(cmd domain.RebuildCommand, events domain.EventStore, projector doma
 // RebuildFromDir constructs event store, projection store, and outbox store
 // from a gate directory, then replays events to regenerate projections.
 // This is the cmd-facing entry point that eliminates session imports from cmd.
-func RebuildFromDir(cmd domain.RebuildCommand, gateDir string, logger *domain.Logger) error {
+func RebuildFromDir(cmd domain.RebuildCommand, gateDir string, logger domain.Logger) error {
 	eventStore := session.NewEventStore(gateDir)
 	store := session.NewProjectionStore(gateDir)
 

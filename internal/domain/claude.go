@@ -1,16 +1,9 @@
 package domain
 
 import (
-	"bytes"
-	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
-	"text/template"
 )
-
-//go:embed templates/*.md.tmpl
-var templateFS embed.FS
 
 // ImpactEntry represents a single entry in the impact radius map.
 type ImpactEntry struct {
@@ -53,18 +46,6 @@ type FullCheckParams struct {
 	DependencyMap     string
 }
 
-// BuildDiffCheckPrompt renders the diff_check template for the given language.
-func BuildDiffCheckPrompt(lang string, params DiffCheckParams) (string, error) {
-	name := fmt.Sprintf("templates/diff_check_%s.md.tmpl", lang)
-	return renderTemplate(name, params)
-}
-
-// BuildFullCheckPrompt renders the full_check template for the given language.
-func BuildFullCheckPrompt(lang string, params FullCheckParams) (string, error) {
-	name := fmt.Sprintf("templates/full_check_%s.md.tmpl", lang)
-	return renderTemplate(name, params)
-}
-
 // ParseClaudeResponse parses raw JSON bytes into a ClaudeResponse.
 func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
 	var resp ClaudeResponse
@@ -72,22 +53,4 @@ func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
 		return resp, fmt.Errorf("failed to parse Claude response: %w", err)
 	}
 	return resp, nil
-}
-
-// ClaudeRunner executes the Claude CLI and returns raw JSON output.
-type ClaudeRunner interface {
-	Run(ctx context.Context, prompt string) ([]byte, error)
-}
-
-// renderTemplate parses and executes a template from the embedded filesystem.
-func renderTemplate(name string, data any) (string, error) {
-	tmpl, err := template.ParseFS(templateFS, name)
-	if err != nil {
-		return "", fmt.Errorf("parse template %s: %w", name, err)
-	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("execute template %s: %w", name, err)
-	}
-	return buf.String(), nil
 }

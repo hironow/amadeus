@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 )
 
 // psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.
@@ -95,6 +95,6 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		)
 		return factory(ctx, "powershell", "-NoProfile", "-Command", script).Run()
 	default:
-		return domain.ErrUnsupportedOS
+		return port.ErrUnsupportedOS
 	}
 }

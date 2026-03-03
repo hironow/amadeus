@@ -2,21 +2,23 @@ rules:
   # ==========================================================================
   # Layer dependency direction enforcement (CANONICAL — identical across all tools)
   #
-  # 6-layer architecture:
+  # 7-layer architecture:
   #   internal/cmd         — cobra CLI (top layer)
   #   internal/usecase     — orchestration (COMMAND, Aggregate, POLICY dispatch)
   #   internal/session     — I/O orchestration (filesystem, network, subprocess)
   #   internal/eventsource — event store infrastructure
+  #   internal/port        — context-aware interface contracts + trivial defaults
   #   internal/platform    — cross-cutting infrastructure (logger, telemetry, metrics)
   #   internal/domain      — pure functions, types, interfaces (no I/O, no context)
   #
   # Allowed dependency directions:
-  #   cmd      → usecase, domain
-  #   usecase  → session, domain
-  #   session  → eventsource, domain
+  #   cmd         → usecase, port, platform, domain
+  #   usecase     → session, port, domain
+  #   session     → eventsource, port, platform, domain
   #   eventsource → domain
-  #   platform → domain
-  #   domain   → (nothing internal)
+  #   port        → domain (+ stdlib)
+  #   platform    → domain (+ stdlib)
+  #   domain      → (nothing internal, stdlib only)
   #
   # PROHIBITED reverse directions are enforced below.
   #
@@ -60,7 +62,7 @@ rules:
     languages: [go]
     message: |
       session 層から cmd 層への import は禁止です。
-      session は eventsource, domain のみ import できます。
+      session は eventsource, port, platform, domain を import できます。
       Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
     severity: ERROR
     patterns:
@@ -93,7 +95,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|eventsource|usecase|platform)"
+          regex: ".*/internal/(session|cmd|eventsource|usecase|platform|port)"
     paths:
       include:
         - "/internal/domain/**"
@@ -115,7 +117,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase)"
+          regex: ".*/internal/(session|cmd|usecase|port|platform)"
     paths:
       include:
         - "/internal/eventsource/**"
@@ -149,7 +151,7 @@ rules:
     languages: [go]
     message: |
       usecase 層から cmd 層への import は禁止です。
-      usecase は session, domain を import できます。
+      usecase は session, port, domain を import できます。
       Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
     severity: ERROR
     patterns:
@@ -193,7 +195,7 @@ rules:
     languages: [go]
     message: |
       session 層から usecase 層への import は禁止です。
-      session は eventsource, domain のみ import できます。
+      session は eventsource, port, platform, domain を import できます。
       Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
     severity: ERROR
     patterns:
@@ -249,7 +251,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: "^github\\.com/hironow/phonewave$"
+          regex: "^github\\.com/hironow/amadeus$"
     paths:
       include:
         - "/internal/**"
@@ -272,7 +274,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|eventsource)"
+          regex: ".*/internal/(session|cmd|usecase|eventsource|port)"
     paths:
       include:
         - "/internal/platform/**"
@@ -284,6 +286,7 @@ rules:
     message: |
       domain 層で I/O stdlib パッケージの import は禁止です。
       domain は pure functions のみ。I/O は session 層で行ってください。
+      context.Context を使う interface は port 層に配置してください。
       Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
     severity: ERROR
     patterns:
@@ -294,9 +297,31 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: "^(os|os/exec|net|net/http|database/sql)$"
+          regex: "^(os|os/exec|net|net/http|database/sql|context)$"
     paths:
       include:
         - "/internal/domain/**"
       exclude:
         - "*_test.go"
+
+  # --- Rule 13: port must not import upper layers ---
+
+  - id: layer-port-no-import-upper
+    languages: [go]
+    message: |
+      port 層から上位層への import は禁止です。
+      port は domain (+ stdlib: context, errors 等) のみ import できます。
+      具体的な I/O 実装は session, platform 層に配置してください。
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/(session|cmd|usecase|eventsource|platform)"
+    paths:
+      include:
+        - "/internal/port/**"

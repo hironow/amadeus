@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"gopkg.in/yaml.v3"
 )
 
@@ -60,7 +61,7 @@ func InitGateDir(root string) error {
 		skillPath := filepath.Join(destDir, "SKILL.md")
 		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
 			tmplPath := path.Join("templates", "skills", name, "SKILL.md")
-			content, readErr := domain.SkillTemplateFS.ReadFile(tmplPath)
+			content, readErr := platform.SkillTemplateFS.ReadFile(tmplPath)
 			if readErr != nil {
 				return fmt.Errorf("read skill template %s: %w", name, readErr)
 			}

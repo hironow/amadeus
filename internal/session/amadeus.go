@@ -10,6 +10,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -23,20 +24,20 @@ type Amadeus struct {
 	Projector   domain.EventApplier // nil skips projection updates (Events still required for writes)
 	Git         domain.Git
 	RepoDir     string              // repository root directory
-	Claude      domain.ClaudeRunner // nil falls back to the default Claude runner
-	Logger      *domain.Logger
+	Claude      port.ClaudeRunner // nil falls back to the default Claude runner
+	Logger      domain.Logger
 	DataOut     io.Writer              // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver    domain.Approver        // nil = no gate (auto-approve)
-	Notifier    domain.Notifier        // nil = no notifications
+	Approver    port.Approver          // nil = no gate (auto-approve)
+	Notifier    port.Notifier          // nil = no notifications
 	ReviewCmd   string                 // code review command (empty = skip)
 	ClaudeCmd   string                 // Claude CLI command (empty = "claude")
 	ClaudeModel string                 // Claude model for review fix (empty = "opus")
 	Aggregate   *domain.CheckAggregate // domain logic aggregate (injected by usecase layer)
-	Dispatcher  domain.EventDispatcher // policy dispatch (injected by usecase layer; nil = no dispatch)
+	Dispatcher  port.EventDispatcher   // policy dispatch (injected by usecase layer; nil = no dispatch)
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
-func (a *Amadeus) claudeRunner() domain.ClaudeRunner {
+func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
@@ -279,7 +280,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error 
 
 	var prompt string
 	if fullCheck {
-		prompt, err = domain.BuildFullCheckPrompt(a.Config.Lang, domain.FullCheckParams{
+		prompt, err = platform.BuildFullCheckPrompt(a.Config.Lang, domain.FullCheckParams{
 			CodebaseStructure: report.CodebaseStructure,
 			AllADRs:           allADRs,
 			RecentDoDs:        allDoDs,
@@ -296,7 +297,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error 
 		if len(issueIDs) > 0 {
 			linkedDoDs = allDoDs
 		}
-		prompt, err = domain.BuildDiffCheckPrompt(a.Config.Lang, domain.DiffCheckParams{
+		prompt, err = platform.BuildDiffCheckPrompt(a.Config.Lang, domain.DiffCheckParams{
 			PreviousScores: string(prevJSON),
 			PRDiffs:        report.Diff,
 			RelevantADRs:   allADRs,

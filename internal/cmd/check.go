@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -69,23 +70,23 @@ func newCheckCommand() *cobra.Command {
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
 			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
 
-			var approver domain.Approver
+			var approver port.Approver
 			switch {
 			case autoApprove:
-				approver = &domain.AutoApprover{}
+				approver = &port.AutoApprover{}
 			case approveCmd != "":
 				approver = usecase.NewCmdApprover(approveCmd)
 			default:
-				approver = &domain.AutoApprover{} // default: no gate
+				approver = &port.AutoApprover{} // default: no gate
 			}
 
 			// Wire notifier
 			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
-			var notifier domain.Notifier
+			var notifier port.Notifier
 			if notifyCmd != "" {
 				notifier = usecase.NewCmdNotifier(notifyCmd)
 			} else {
-				notifier = &domain.NopNotifier{}
+				notifier = &port.NopNotifier{}
 			}
 
 			reviewCmd, _ := cmd.Flags().GetString("review-cmd")

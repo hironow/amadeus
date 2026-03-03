@@ -8,7 +8,7 @@ import (
 )
 
 // RunLog prints the divergence log in human-readable format.
-func RunLog(gateDir string, cfg domain.Config, dataOut io.Writer, logger *domain.Logger) error {
+func RunLog(gateDir string, cfg domain.Config, dataOut io.Writer, logger domain.Logger) error {
 	result, err := buildAmadeus(AmadeusParams{
 		GateDir: gateDir,
 		Config:  cfg,
@@ -24,7 +24,7 @@ func RunLog(gateDir string, cfg domain.Config, dataOut io.Writer, logger *domain
 }
 
 // RunLogJSON prints the divergence log in JSON format.
-func RunLogJSON(gateDir string, cfg domain.Config, dataOut io.Writer, logger *domain.Logger) error {
+func RunLogJSON(gateDir string, cfg domain.Config, dataOut io.Writer, logger domain.Logger) error {
 	result, err := buildAmadeus(AmadeusParams{
 		GateDir: gateDir,
 		Config:  cfg,
