@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -27,9 +28,12 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	a.Aggregate = agg
 
 	// Wire policy engine (WHEN [EVENT] THEN [handler])
-	// Handlers will be registered here as policies are implemented.
 	engine := NewPolicyEngine(a.Logger)
-	registerCheckPolicies(engine, a.Logger)
+	notifier := a.Notifier
+	if notifier == nil {
+		notifier = &port.NopNotifier{}
+	}
+	registerCheckPolicies(engine, a.Logger, notifier)
 	a.Dispatcher = engine
 
 	// Delegate to session I/O pipeline
