@@ -33,7 +33,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 			return nil, fmt.Errorf("outbox store: create dir %s: %w", dir, err)
 		}
 	}
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", dbPath) // nosemgrep: d4-sql-open-without-defer-close -- stored in struct, closed via Close()
 	if err != nil {
 		return nil, fmt.Errorf("outbox store: open db: %w", err)
 	}

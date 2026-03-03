@@ -185,7 +185,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error 
 	rs := &ReadingSteiner{Git: a.Git}
 	var report ShiftReport
 
-	_, span1 := platform.Tracer.Start(ctx, "reading_steiner")
+	_, span1 := platform.Tracer.Start(ctx, "reading_steiner") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
 	if fullCheck {
 		report, err = rs.DetectShiftFull(a.RepoDir)
 		if err != nil {
@@ -261,7 +261,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error 
 		}
 	}
 
-	_, span2 := platform.Tracer.Start(ctx, "divergence_meter")
+	_, span2 := platform.Tracer.Start(ctx, "divergence_meter") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
 
 	repoRoot := a.RepoDir
 	allADRs, adrErr := CollectADRs(repoRoot)
@@ -410,7 +410,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error 
 		return nil
 	}
 
-	_, span3 := platform.Tracer.Start(ctx, "dmail")
+	_, span3 := platform.Tracer.Start(ctx, "dmail") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch and at line 464
 	var dmails []domain.DMail
 	for _, candidate := range meterResult.DMailCandidates {
 		name, err := a.Store.NextDMailName(domain.KindFeedback)
