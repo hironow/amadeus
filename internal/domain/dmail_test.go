@@ -766,6 +766,62 @@ func TestParseDMail_ZeroPriority_OmittedInMarshal(t *testing.T) {
 	}
 }
 
+// MY-346: legacy linear_issue_id field is silently dropped on parse.
+// This is a finalized non-backward-compatible change: no migration is provided.
+func TestParseDMail_LegacyLinearIssueID_SilentDrop(t *testing.T) {
+	// given: a D-Mail with the removed linear_issue_id field
+	raw := `---
+name: "feedback-001"
+kind: feedback
+description: "legacy format with linear_issue_id"
+linear_issue_id: "MY-42"
+---
+
+Body text.
+`
+	// when
+	dmail, err := domain.ParseDMail([]byte(raw))
+
+	// then: parse succeeds, linear_issue_id is silently dropped
+	if err != nil {
+		t.Fatalf("ParseDMail should not error on legacy linear_issue_id: %v", err)
+	}
+	if dmail.Name != "feedback-001" {
+		t.Errorf("expected name feedback-001, got %s", dmail.Name)
+	}
+	// Issues should be empty (linear_issue_id is not migrated to Issues)
+	if len(dmail.Issues) != 0 {
+		t.Errorf("expected empty issues (linear_issue_id should be dropped), got %v", dmail.Issues)
+	}
+}
+
+// MY-346: new Issues[] field coexists with legacy linear_issue_id gracefully.
+// If both are present, only Issues[] is used.
+func TestParseDMail_LegacyLinearIssueID_WithNewIssues(t *testing.T) {
+	// given: a D-Mail with both old and new fields
+	raw := `---
+name: "feedback-001"
+kind: feedback
+description: "both old and new fields"
+linear_issue_id: "MY-42"
+issues:
+  - MY-303
+---
+
+Body text.
+`
+	// when
+	dmail, err := domain.ParseDMail([]byte(raw))
+
+	// then: parse succeeds, only Issues[] is populated
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+	if len(dmail.Issues) != 1 || dmail.Issues[0] != "MY-303" {
+		t.Errorf("expected issues [MY-303], got %v", dmail.Issues)
+	}
+}
+
 func TestExtractIssueIDs_MixedPrefixes(t *testing.T) {
 	// given
 	titles := []string{
