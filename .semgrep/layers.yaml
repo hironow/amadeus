@@ -55,6 +55,7 @@ rules:
       exclude:
         - "/internal/**"
         - "/cmd/**"
+        - "/tests/**"
 
   # --- Rule 2: Session must not import cmd ---
 
