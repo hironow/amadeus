@@ -43,7 +43,7 @@ func TestMultiExporter_BothReceive(t *testing.T) {
 		platform.Tracer = oldTracer
 	})
 
-	_, span := platform.Tracer.Start(context.Background(), "multi-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended
+	_, span := platform.Tracer.Start(context.Background(), "multi-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended [permanent]
 	span.End()
 
 	if len(exp1.GetSpans()) == 0 {

@@ -95,7 +95,7 @@ root-guard:
     fi
 
 # Lint (fmt check + vet + markdown lint)
-lint: vet semgrep root-guard lint-md
+lint: vet semgrep root-guard nosemgrep-audit lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
@@ -180,6 +180,32 @@ test-scenario: check-go
 # Run all scenario tests
 test-scenario-all: check-go
     mise exec -- go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
+
+# Audit nosemgrep annotations: require [permanent] or [expires: YYYY-MM-DD] tag
+nosemgrep-audit:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rc=0
+    today=$(date +%Y-%m-%d)
+    while IFS= read -r line; do
+        file=$(echo "$line" | cut -d: -f1)
+        lineno=$(echo "$line" | cut -d: -f2)
+        if echo "$line" | grep -q '\[permanent\]'; then
+            continue
+        fi
+        if echo "$line" | grep -qoE '\[expires: [0-9]{4}-[0-9]{2}-[0-9]{2}\]'; then
+            expiry=$(echo "$line" | grep -oE '\[expires: [0-9]{4}-[0-9]{2}-[0-9]{2}\]' | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            if [[ "$expiry" < "$today" || "$expiry" == "$today" ]]; then
+                echo "EXPIRED: $file:$lineno (expired $expiry)" >&2
+                rc=1
+            fi
+        else
+            echo "MISSING TAG: $file:$lineno — add [permanent] or [expires: YYYY-MM-DD]" >&2
+            rc=1
+        fi
+    done < <(grep -rn "nosemgrep:" --include="*.go" . || true)
+    if [ $rc -eq 0 ]; then echo "nosemgrep-audit: all annotations tagged"; fi
+    exit $rc
 
 # Clean build artifacts
 clean:

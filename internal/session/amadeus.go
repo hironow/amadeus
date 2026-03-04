@@ -159,7 +159,7 @@ func (a *Amadeus) buildCheckPrompt(report ShiftReport, fullCheck bool, previous 
 // runDivergenceMeter runs Phase 2b: executes Claude, parses the response,
 // scores with DivergenceMeter, and handles divergence jump detection.
 func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullCheck bool, previous domain.CheckResult, quiet bool) (domain.MeterResult, error) {
-	_, span2 := platform.Tracer.Start(ctx, "divergence_meter") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
+	_, span2 := platform.Tracer.Start(ctx, "divergence_meter") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 
 	rawResp, err := a.claudeRunner().Run(ctx, prompt)
 	if err != nil {
@@ -213,7 +213,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 // generateDMails runs Phase 3: creates D-Mail entities from meter candidates,
 // validates them, and emits dmail-generated events.
 func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterResult, now time.Time) ([]domain.DMail, error) {
-	_, span3 := platform.Tracer.Start(ctx, "dmail") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
+	_, span3 := platform.Tracer.Start(ctx, "dmail") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 	var dmails []domain.DMail
 	for _, candidate := range meterResult.DMailCandidates {
 		name, err := a.Store.NextDMailName(domain.KindFeedback)
@@ -303,7 +303,7 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 	var report ShiftReport
 	var err error
 
-	_, span1 := platform.Tracer.Start(ctx, "reading_steiner") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
+	_, span1 := platform.Tracer.Start(ctx, "reading_steiner") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 	if fullCheck {
 		report, err = rs.DetectShiftFull(a.RepoDir)
 		if err != nil {

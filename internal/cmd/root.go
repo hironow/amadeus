@@ -41,7 +41,7 @@ func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "amadeus",
 		Short:         "Divergence meter for your codebase",
-		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
+		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output [permanent]
 		SilenceUsage:  true,
 		Version:       Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

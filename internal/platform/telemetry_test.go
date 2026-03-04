@@ -27,7 +27,7 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestSetupTestTracer_RecordsSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	_, span := Tracer.Start(context.Background(), "recording-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended
+	_, span := Tracer.Start(context.Background(), "recording-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended [permanent]
 	span.End()
 
 	spans := exp.GetSpans()
