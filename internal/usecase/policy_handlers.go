@@ -31,18 +31,25 @@ func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier 
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Convergence detection is part of the check flow;
+	// check.completed provides the user-facing summary.
 	engine.Register(domain.EventConvergenceDetected, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: convergence detected (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "convergence.detected", "handled")
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Inbox consumption is an intermediate processing step.
 	engine.Register(domain.EventInboxConsumed, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: inbox consumed (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "inbox.consumed", "handled")
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// D-Mail generation is an intermediate step before delivery.
 	engine.Register(domain.EventDMailGenerated, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail generated (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "dmail.generated", "handled")
