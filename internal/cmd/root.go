@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -44,6 +45,12 @@ func NewRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		Version:       Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			cfgPath, _ := cmd.Flags().GetString("config")
+			if cfgPath != "" {
+				applyOtelEnv(filepath.Dir(cfgPath))
+			} else {
+				applyOtelEnv(".gate")
+			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
