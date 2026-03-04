@@ -44,3 +44,13 @@ func (*NopNotifier) Notify(_ context.Context, _, _ string) error { return nil }
 type ClaudeRunner interface {
 	Run(ctx context.Context, prompt string) ([]byte, error)
 }
+
+// PolicyMetrics records policy handler execution metrics.
+type PolicyMetrics interface {
+	RecordPolicyEvent(ctx context.Context, eventType string, status string)
+}
+
+// NopPolicyMetrics is a no-op metrics recorder for tests and quiet mode.
+type NopPolicyMetrics struct{}
+
+func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
