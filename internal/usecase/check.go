@@ -33,7 +33,7 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
-	registerCheckPolicies(engine, a.Logger, notifier)
+	registerCheckPolicies(engine, a.Logger, notifier, &port.NopPolicyMetrics{})
 	a.Dispatcher = engine
 
 	// Delegate to session I/O pipeline

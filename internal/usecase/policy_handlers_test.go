@@ -31,7 +31,7 @@ func TestPolicyHandler_CheckCompleted_InfoOutput(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{})
+	registerCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -65,7 +65,7 @@ func TestPolicyHandler_CheckCompleted_NotifiesSideEffect(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
 	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, spy)
+	registerCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -101,7 +101,7 @@ func TestPolicyHandler_ConvergenceDetected_DebugOnly_NoInfoOutput(t *testing.T) 
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{})
+	registerCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",

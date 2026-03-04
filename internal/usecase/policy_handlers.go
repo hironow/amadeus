@@ -12,7 +12,7 @@ import (
 
 // registerCheckPolicies registers POLICY handlers for check events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
-func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier) {
+func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
 	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, event domain.Event) error {
 		var data domain.CheckCompletedData
 		if err := json.Unmarshal(event.Data, &data); err != nil {
