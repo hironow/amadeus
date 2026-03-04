@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/port"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
@@ -107,6 +108,7 @@ func newCheckCommand() *cobra.Command {
 				DataOut:   cmd.OutOrStdout(),
 				Approver:  approver,
 				Notifier:  notifier,
+				Metrics:   &platform.OTelPolicyMetrics{},
 				ReviewCmd: reviewCmd,
 				WithGit:   true,
 			})

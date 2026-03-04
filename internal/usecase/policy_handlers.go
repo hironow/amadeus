@@ -27,21 +27,25 @@ func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier 
 				data.Result.Divergence, data.Result.Commit)); err != nil {
 			logger.Debug("policy: notify error: %v", err)
 		}
+		metrics.RecordPolicyEvent(ctx, "check.completed", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventConvergenceDetected, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventConvergenceDetected, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: convergence detected (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "convergence.detected", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventInboxConsumed, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventInboxConsumed, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: inbox consumed (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "inbox.consumed", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventDMailGenerated, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventDMailGenerated, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail generated (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "dmail.generated", "handled")
 		return nil
 	})
 }

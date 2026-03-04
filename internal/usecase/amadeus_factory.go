@@ -19,6 +19,7 @@ type AmadeusParams struct {
 	DataOut     io.Writer
 	Approver    port.Approver
 	Notifier    port.Notifier
+	Metrics     port.PolicyMetrics
 	ReviewCmd   string
 	ClaudeCmd   string
 	ClaudeModel string
@@ -54,6 +55,7 @@ func buildAmadeus(p AmadeusParams) (*buildResult, error) {
 		DataOut:     p.DataOut,
 		Approver:    p.Approver,
 		Notifier:    p.Notifier,
+		Metrics:     p.Metrics,
 		ReviewCmd:   p.ReviewCmd,
 		ClaudeCmd:   p.ClaudeCmd,
 		ClaudeModel: p.ClaudeModel,

@@ -29,6 +29,7 @@ type Amadeus struct {
 	DataOut     io.Writer              // machine-readable output (stdout); Logger is for human progress (stderr)
 	Approver    port.Approver          // nil = no gate (auto-approve)
 	Notifier    port.Notifier          // nil = no notifications
+	Metrics     port.PolicyMetrics     // nil = no policy metrics
 	ReviewCmd   string                 // code review command (empty = skip)
 	ClaudeCmd   string                 // Claude CLI command (empty = "claude")
 	ClaudeModel string                 // Claude model for review fix (empty = "opus")
