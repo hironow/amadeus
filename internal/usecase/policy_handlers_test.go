@@ -199,12 +199,13 @@ func TestPolicyHandler_DMailGenerated_RecordsMetrics(t *testing.T) {
 	}
 }
 
-func TestPolicyHandler_ConvergenceDetected_DebugOnly_NoInfoOutput(t *testing.T) {
-	// given: Debug-only handler should NOT produce output when verbose=false
+func TestPolicyHandler_ConvergenceDetected_NotifiesSideEffect(t *testing.T) {
+	// given
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
+	spy := &spyNotifier{}
 	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	registerCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",
@@ -216,9 +217,15 @@ func TestPolicyHandler_ConvergenceDetected_DebugOnly_NoInfoOutput(t *testing.T) 
 	// when
 	engine.Dispatch(context.Background(), ev)
 
-	// then: no output
-	output := buf.String()
-	if output != "" {
-		t.Errorf("expected no output for Debug-only handler with verbose=false, got: %s", output)
+	// then: Notify should have been called once
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 Notify call, got %d", len(spy.calls))
+	}
+	call := spy.calls[0]
+	if !strings.Contains(call.title, "Amadeus") {
+		t.Errorf("expected title to contain 'Amadeus', got: %s", call.title)
+	}
+	if !strings.Contains(call.message, "Convergence") {
+		t.Errorf("expected message to contain 'Convergence', got: %s", call.message)
 	}
 }

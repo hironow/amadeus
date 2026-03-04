@@ -31,11 +31,15 @@ func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier 
 		return nil
 	})
 
-	// POLICY CONTRACT: observation-only — debug log + metrics.
-	// Convergence detection is part of the check flow;
-	// check.completed provides the user-facing summary.
+	// POLICY: convergence.detected → notify + metrics.
+	// Convergence detection indicates a recurring pattern — notify user.
 	engine.Register(domain.EventConvergenceDetected, func(ctx context.Context, event domain.Event) error {
-		logger.Debug("policy: convergence detected (type=%s)", event.Type)
+		logger.Info("policy: convergence detected (type=%s)", event.Type)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Amadeus", "Convergence detected"); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
 		metrics.RecordPolicyEvent(ctx, "convergence.detected", "handled")
 		return nil
 	})
