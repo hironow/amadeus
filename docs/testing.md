@@ -1,0 +1,68 @@
+# Testing Strategy
+
+## Test Layers
+
+| Layer | Directory | Build Tag | Dependencies | CI |
+|-------|-----------|-----------|-------------|-----|
+| Unit | `internal/*/` | none | none | always |
+| Integration | `tests/integration/` | none | SQLite | always |
+| Scenario | `tests/scenario/` | `scenario` | fake-claude, fake-gh, all 4 tool binaries | CI default (L1+L2) |
+| E2E | `tests/e2e/` | `e2e` | Docker, real services | manual / nightly |
+
+## Unit Tests
+
+- Located in `internal/*/` alongside production code
+- No build tags required
+- Minimize mock usage; prefer real code
+- Run: `go test ./internal/... -count=1`
+
+## Integration Tests
+
+- Located in `tests/integration/`
+- Test component interactions with real SQLite
+- Run: `go test ./tests/integration/... -count=1`
+
+## Scenario Tests
+
+- Located in `tests/scenario/`
+- Build tag: `//go:build scenario`
+- Requires all 4 sibling tool repos at the same parent directory
+- TestMain builds all 4 binaries + fake-claude + fake-gh
+- Override sibling paths with env vars: `PHONEWAVE_REPO`, `SIGHTJACK_REPO`, `PAINTRESS_REPO`, `AMADEUS_REPO`
+
+### Test Levels
+
+| Level | Focus | Timeout |
+|-------|-------|---------|
+| L1 | Single closed loop | 120s |
+| L2 | Multi-issue scenarios | 180s |
+| L3 | Concurrent operations | 300s |
+| L4 | Fault injection, recovery | 600s |
+
+Run: `just test-scenario` (L1+L2) or `just test-scenario-all`
+
+## E2E Tests
+
+- Located in `tests/e2e/`
+- Build tag: `//go:build e2e`
+- Docker compose based (`tests/e2e/compose-e2e.yaml`)
+- All dependencies must be real — mocks are strictly prohibited
+- Run: `just test-e2e` (requires Docker)
+
+## Running Tests
+
+```bash
+# Unit + integration (default CI)
+just test
+
+# Scenario tests (L1+L2, CI default)
+just test-scenario
+
+# E2E (requires Docker)
+just test-e2e
+
+# All semgrep rules
+just semgrep
+just semgrep-test
+just semgrep-warnings
+```

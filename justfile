@@ -73,9 +73,18 @@ fmt:
 vet:
     go vet ./...
 
-# Run semgrep rules
+# Run semgrep rules (ERROR only — blocks CI)
 semgrep:
     semgrep scan --config .semgrep/ --error --severity ERROR .
+
+# Run semgrep WARNING rules (informational — does not block CI)
+semgrep-warnings:
+    semgrep scan --config .semgrep/ --severity WARNING .
+
+# Test semgrep rules against known-bad fixtures
+semgrep-test:
+    semgrep scan --test --config .semgrep/cobra.yaml .semgrep/cobra.go
+    semgrep scan --test --config .semgrep/shared-adr.yaml .semgrep/shared-adr.go
 
 # Verify root package contains only doc.go (no code at root)
 root-guard:

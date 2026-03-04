@@ -5,10 +5,10 @@ import (
 	"github.com/hironow/amadeus/internal/eventsource"
 )
 
-// NewEventStore creates an event store for the given gate directory.
-// Derives the events path from the gate root.
-func NewEventStore(gateDir string) domain.EventStore {
-	return eventsource.NewFileEventStore(eventsource.EventsDir(gateDir))
+// NewEventStore creates an event store for the given state directory.
+// Derives the events path from the state root.
+func NewEventStore(stateDir string) domain.EventStore {
+	return eventsource.NewFileEventStore(eventsource.EventsDir(stateDir))
 }
 
 // NewEventStoreFromEventsDir creates an event store from an explicit events directory path.
@@ -16,9 +16,9 @@ func NewEventStoreFromEventsDir(eventsDir string) domain.EventStore {
 	return eventsource.NewFileEventStore(eventsDir)
 }
 
-// EventsDir returns the events directory path for a gate root.
-func EventsDir(gateDir string) string {
-	return eventsource.EventsDir(gateDir)
+// EventsDir returns the events directory path for a state root.
+func EventsDir(stateDir string) string {
+	return eventsource.EventsDir(stateDir)
 }
 
 // ListExpiredEventFiles returns .jsonl event file names older than the given days.
