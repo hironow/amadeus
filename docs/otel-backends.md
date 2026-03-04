@@ -47,10 +47,31 @@ Format: `KEY=VALUE` with `${VAR}` expansion and `#` comments.
 
 ## Weave Verification
 
+### Manual
+
 1. `export WANDB_API_KEY=your-key-here`
 2. `amadeus init --otel-backend=weave --otel-entity=my-team --otel-project=my-project /path/to/repo`
 3. `amadeus check /path/to/repo`
 4. Open `https://wandb.ai/<entity>/<project>/weave` and verify spans appear
+
+### Automated (Live Test)
+
+```bash
+export WANDB_API_KEY=your-key-here
+just test-weave-live
+```
+
+`TestWeave_LiveTraceDelivery` sends a minimal span to the real Weave OTLP
+endpoint and verifies the exporter completes without error. Skipped when
+`WANDB_API_KEY` is not set.
+
+| Attribute | Value |
+|-----------|-------|
+| OTLP Endpoint | `https://trace.wandb.ai/otel` |
+| Service Name | `amadeus` |
+| Span Name | `live-weave-verification` |
+| `test.tool` | `amadeus` |
+| `test.type` | `live-verification` |
 
 ## GenAI Semantic Conventions
 
