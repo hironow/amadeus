@@ -65,7 +65,6 @@ Pass --execute to actually remove the files.`,
 			}
 
 			divRoot := filepath.Join(repoRoot, ".gate")
-			eventsDir := filepath.Join(divRoot, "events")
 			errW := cmd.ErrOrStderr()
 
 			// Extract file names for output.
@@ -89,7 +88,7 @@ Pass --execute to actually remove the files.`,
 					EventFiles:        result.EventCandidates,
 				}
 				if execute {
-					totalCount, execErr := usecase.ExecutePrune(result, divRoot, eventsDir)
+					totalCount, execErr := usecase.ExecutePrune(result, divRoot, divRoot)
 					if execErr != nil {
 						return execErr
 					}
@@ -151,7 +150,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			// usecase → execute prune + emit event
-			totalCount, err := usecase.ExecutePrune(result, divRoot, eventsDir)
+			totalCount, err := usecase.ExecutePrune(result, divRoot, divRoot)
 			if err != nil {
 				return err
 			}

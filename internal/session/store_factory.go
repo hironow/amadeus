@@ -11,11 +11,6 @@ func NewEventStore(stateDir string) domain.EventStore {
 	return eventsource.NewFileEventStore(eventsource.EventsDir(stateDir))
 }
 
-// NewEventStoreFromEventsDir creates an event store from an explicit events directory path.
-func NewEventStoreFromEventsDir(eventsDir string) domain.EventStore {
-	return eventsource.NewFileEventStore(eventsDir)
-}
-
 // EventsDir returns the events directory path for a state root.
 func EventsDir(stateDir string) string {
 	return eventsource.EventsDir(stateDir)

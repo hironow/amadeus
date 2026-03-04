@@ -44,7 +44,7 @@ func CollectPruneCandidates(cmd domain.ArchivePruneCommand) (*PruneResult, error
 
 // ExecutePrune deletes the collected candidates, prunes flushed outbox rows,
 // and emits an archive.pruned event.
-func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
+func ExecutePrune(result *PruneResult, gateDir, stateDir string) (int, error) {
 	totalCount := 0
 
 	if len(result.ArchiveCandidates) > 0 {
@@ -75,7 +75,7 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	}
 	paths = append(paths, result.EventCandidates...)
 
-	eventStore := session.NewEventStoreFromEventsDir(eventsDir)
+	eventStore := session.NewEventStore(stateDir)
 	ev, evErr := domain.NewEvent(domain.EventArchivePruned, domain.ArchivePrunedData{
 		Paths: paths,
 		Count: totalCount,
