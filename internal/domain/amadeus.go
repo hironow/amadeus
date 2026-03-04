@@ -32,6 +32,21 @@ func ExitCode(err error) int {
 	return 1
 }
 
+// ShouldAutoRebuild decides whether projections should be rebuilt from events.
+// projectionEmpty indicates that no projection state exists (CheckedAt is zero).
+// hasInboxConsumedEvents indicates that inbox-consumed events are present;
+// rebuilding with such events risks data loss, so rebuild is skipped.
+// Returns true only when projections are empty and no inbox-consumed events exist.
+func ShouldAutoRebuild(projectionEmpty bool, hasInboxConsumedEvents bool) bool {
+	if !projectionEmpty {
+		return false
+	}
+	if hasInboxConsumedEvents {
+		return false
+	}
+	return true
+}
+
 // CheckOptions controls how RunCheck operates.
 type CheckOptions struct {
 	Full   bool

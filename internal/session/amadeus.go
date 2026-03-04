@@ -86,7 +86,8 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	if err != nil {
 		return fmt.Errorf("check latest for auto-rebuild: %w", err)
 	}
-	if !latest.CheckedAt.IsZero() {
+	projectionEmpty := latest.CheckedAt.IsZero()
+	if !projectionEmpty {
 		return nil // projections exist, no rebuild needed
 	}
 	events, err := a.Events.LoadAll()
@@ -96,16 +97,19 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	if len(events) == 0 {
 		return nil // no events to replay
 	}
-	// Inbox-consumed events contain only metadata, not the full D-Mail content.
-	// Rebuild clears archive/ and outbox/, so inbox-sourced D-Mails would be
-	// permanently lost. Skip auto-rebuild and recommend explicit rebuild.
+	// Check for inbox-consumed events that would risk data loss on rebuild.
+	hasInboxConsumed := false
 	for _, ev := range events {
 		if ev.Type == domain.EventInboxConsumed {
-			if !quiet {
-				a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
-			}
-			return nil
+			hasInboxConsumed = true
+			break
 		}
+	}
+	if !domain.ShouldAutoRebuild(projectionEmpty, hasInboxConsumed) {
+		if !quiet && hasInboxConsumed {
+			a.Logger.Info("auto-rebuild skipped: inbox-consumed events exist; use 'amadeus rebuild' to avoid data loss")
+		}
+		return nil
 	}
 	if !quiet {
 		a.Logger.Info("projections missing, rebuilding from %d event(s)", len(events))
@@ -434,14 +438,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error 
 			Body: candidate.Detail,
 		}
 		if dmail.Action == "" {
-			switch meterResult.Divergence.Severity {
-			case domain.SeverityHigh:
-				dmail.Action = domain.ActionEscalate
-			case domain.SeverityMedium:
-				dmail.Action = domain.ActionRetry
-			default:
-				dmail.Action = domain.ActionResolve
-			}
+			dmail.Action = domain.DefaultDMailAction(meterResult.Divergence.Severity)
 		}
 		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
@@ -598,7 +595,7 @@ func (a *Amadeus) PrintCheckOutput(result domain.CheckResult, dmails []domain.DM
 
 	for _, axis := range axisOrder {
 		if score, ok := result.Axes[axis]; ok {
-			weight := weightForAxis(axis, a.Config.Weights)
+			weight := domain.WeightForAxis(axis, a.Config.Weights)
 			contribution := float64(score.Score) * weight
 			a.dataOut("  %-22s %s — %s",
 				axisNames[axis]+":",
@@ -890,37 +887,24 @@ func (a *Amadeus) PrintLogJSON() error {
 // to prevent duplicate messages on repeated runs.
 // Returns the saved D-Mails and any error encountered during naming or writing.
 func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]domain.DMail, error) {
-	// Build set of targets already covered by existing convergence D-Mails
-	coveredTargets := make(map[string]bool)
+	// Load existing D-Mails for dedup (I/O)
 	allDMails, err := a.Store.LoadAllDMails()
-	if err == nil {
-		for _, d := range allDMails {
-			if d.Kind == domain.KindConvergence {
-				for _, t := range d.Targets {
-					coveredTargets[t] = true
-				}
-			}
-		}
+	if err != nil {
+		allDMails = nil // tolerate load failure; proceed without dedup
 	}
 
-	convergenceDMails := domain.GenerateConvergenceDMails(alerts)
+	// Filter alerts using domain logic (pure)
+	uncovered := domain.FilterUncoveredConvergenceAlerts(allDMails, alerts)
+
+	// Generate D-Mails from uncovered alerts (pure)
+	convergenceDMails := domain.GenerateConvergenceDMails(uncovered)
+
+	// Persist generated D-Mails (I/O)
 	var saved []domain.DMail
 	for _, cd := range convergenceDMails {
-		// Skip if all targets are already covered
-		allCovered := true
-		for _, t := range cd.Targets {
-			if !coveredTargets[t] {
-				allCovered = false
-				break
-			}
-		}
-		if allCovered {
-			continue
-		}
-
-		cdName, err := a.Store.NextDMailName(domain.KindConvergence)
-		if err != nil {
-			return saved, fmt.Errorf("convergence dmail name: %w", err)
+		cdName, nameErr := a.Store.NextDMailName(domain.KindConvergence)
+		if nameErr != nil {
+			return saved, fmt.Errorf("convergence dmail name: %w", nameErr)
 		}
 		cd.Name = cdName
 		ev, evErr := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{DMail: cd}, time.Now().UTC())
@@ -931,10 +915,6 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}
 		saved = append(saved, cd)
-		// Mark newly saved targets as covered
-		for _, t := range cd.Targets {
-			coveredTargets[t] = true
-		}
 	}
 	return saved, nil
 }
@@ -991,18 +971,3 @@ func (a *Amadeus) PrintSync() error {
 	return a.writeDataJSON(output)
 }
 
-// weightForAxis returns the configured weight for a given axis.
-func weightForAxis(axis domain.Axis, w domain.Weights) float64 {
-	switch axis {
-	case domain.AxisADR:
-		return w.ADRIntegrity
-	case domain.AxisDoD:
-		return w.DoDFulfillment
-	case domain.AxisDependency:
-		return w.DependencyIntegrity
-	case domain.AxisImplicit:
-		return w.ImplicitConstraints
-	default:
-		return 0
-	}
-}

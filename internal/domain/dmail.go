@@ -107,6 +107,19 @@ var validSeverities = map[Severity]bool{
 	SeverityHigh:   true,
 }
 
+// DefaultDMailAction returns the default DMailAction for a given severity.
+// Used when a D-Mail candidate does not specify an explicit action.
+func DefaultDMailAction(severity Severity) DMailAction {
+	switch severity {
+	case SeverityHigh:
+		return ActionEscalate
+	case SeverityMedium:
+		return ActionRetry
+	default:
+		return ActionResolve
+	}
+}
+
 // ValidateDMail checks that a DMail conforms to D-Mail schema v1.
 // Returns a list of validation errors (empty if valid).
 func ValidateDMail(dmail DMail) []string {

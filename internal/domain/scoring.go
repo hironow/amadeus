@@ -168,6 +168,22 @@ func FormatDelta(current, previous float64) string {
 	return fmt.Sprintf("%f", delta)
 }
 
+// WeightForAxis returns the configured weight for a given axis.
+func WeightForAxis(axis Axis, w Weights) float64 {
+	switch axis {
+	case AxisADR:
+		return w.ADRIntegrity
+	case AxisDoD:
+		return w.DoDFulfillment
+	case AxisDependency:
+		return w.DependencyIntegrity
+	case AxisImplicit:
+		return w.ImplicitConstraints
+	default:
+		return 0
+	}
+}
+
 // MeterResult holds the complete output of Phase 2 scoring orchestration.
 type MeterResult struct {
 	Divergence      DivergenceResult

@@ -95,6 +95,26 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 	return alerts
 }
 
+// FilterUncoveredConvergenceAlerts removes alerts whose target is already covered
+// by an existing convergence D-Mail, preventing duplicate convergence messages.
+func FilterUncoveredConvergenceAlerts(existing []DMail, alerts []ConvergenceAlert) []ConvergenceAlert {
+	coveredTargets := make(map[string]bool)
+	for _, d := range existing {
+		if d.Kind == KindConvergence {
+			for _, t := range d.Targets {
+				coveredTargets[t] = true
+			}
+		}
+	}
+	var uncovered []ConvergenceAlert
+	for _, alert := range alerts {
+		if !coveredTargets[alert.Target] {
+			uncovered = append(uncovered, alert)
+		}
+	}
+	return uncovered
+}
+
 // GenerateConvergenceDMails creates D-Mail entries for HIGH severity convergence alerts.
 func GenerateConvergenceDMails(alerts []ConvergenceAlert) []DMail {
 	var dmails []DMail
