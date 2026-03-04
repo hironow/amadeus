@@ -14,7 +14,7 @@ func OtelEnvContent(backend, entity, project string) (string, error) {
 			return "", fmt.Errorf("weave requires --otel-entity and --otel-project")
 		}
 		return fmt.Sprintf(
-			"OTEL_EXPORTER_OTLP_ENDPOINT=https://trace.wandb.ai\n"+
+			"OTEL_EXPORTER_OTLP_ENDPOINT=https://trace.wandb.ai/otel\n"+
 				"OTEL_EXPORTER_OTLP_HEADERS=wandb-api-key=${WANDB_API_KEY}\n"+
 				"OTEL_RESOURCE_ATTRIBUTES=wandb.entity=%s,wandb.project=%s\n",
 			entity, project), nil

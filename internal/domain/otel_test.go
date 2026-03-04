@@ -26,7 +26,7 @@ func TestOtelEnvContent_Weave_Valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(content, "OTEL_EXPORTER_OTLP_ENDPOINT=https://trace.wandb.ai") {
+	if !strings.Contains(content, "OTEL_EXPORTER_OTLP_ENDPOINT=https://trace.wandb.ai/otel") {
 		t.Errorf("weave content missing endpoint: %q", content)
 	}
 	if !strings.Contains(content, "OTEL_EXPORTER_OTLP_HEADERS=wandb-api-key=${WANDB_API_KEY}") {
