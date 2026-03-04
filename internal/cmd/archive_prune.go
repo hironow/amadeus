@@ -14,7 +14,7 @@ import (
 
 func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "archive-prune",
+		Use:   "archive-prune [path]",
 		Short: "Prune old archived files",
 		Long: `Prune archived d-mail files and expired event files.
 
