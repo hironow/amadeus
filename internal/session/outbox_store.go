@@ -147,8 +147,9 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	}
 
 	if len(items) == 0 {
+		// Nothing to flush — rollback the empty transaction.
 		conn.ExecContext(ctx, "ROLLBACK") //nolint:errcheck
-		committed = true
+		committed = true                  // suppress deferred rollback
 		return 0, nil
 	}
 
@@ -156,6 +157,7 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	for _, it := range items {
 		archivePath := filepath.Join(s.archiveDir, it.name)
 		if writeErr := atomicWrite(archivePath, it.data); writeErr != nil {
+			// Per-item failure: increment retry_count and continue.
 			conn.ExecContext(ctx, //nolint:errcheck
 				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
 			continue
