@@ -40,13 +40,13 @@ func TestRace_OutboxStore_ConcurrentMultiStore(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 
-	storeA, err := session.NewOutboxStoreForGateDir(root)
+	storeA, err := session.NewOutboxStoreForDir(root)
 	if err != nil {
 		t.Fatalf("create store A: %v", err)
 	}
 	defer storeA.Close()
 
-	storeB, err := session.NewOutboxStoreForGateDir(root)
+	storeB, err := session.NewOutboxStoreForDir(root)
 	if err != nil {
 		t.Fatalf("create store B: %v", err)
 	}

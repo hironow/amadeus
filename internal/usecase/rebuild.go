@@ -36,7 +36,7 @@ func RebuildFromDir(cmd domain.RebuildCommand, gateDir string, logger domain.Log
 	eventStore := session.NewEventStore(gateDir)
 	store := session.NewProjectionStore(gateDir)
 
-	outboxStore, err := session.NewOutboxStoreForGateDir(gateDir)
+	outboxStore, err := session.NewOutboxStoreForDir(gateDir)
 	if err != nil {
 		return fmt.Errorf("outbox store: %w", err)
 	}

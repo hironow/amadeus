@@ -38,7 +38,7 @@ func buildAmadeus(p AmadeusParams) (*buildResult, error) {
 	store := session.NewProjectionStore(p.GateDir)
 	eventStore := session.NewEventStore(p.GateDir)
 
-	outboxStore, err := session.NewOutboxStoreForGateDir(p.GateDir)
+	outboxStore, err := session.NewOutboxStoreForDir(p.GateDir)
 	if err != nil {
 		return nil, fmt.Errorf("outbox store: %w", err)
 	}
