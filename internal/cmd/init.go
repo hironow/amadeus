@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +33,7 @@ func newInitCommand() *cobra.Command {
 			if otelBackend != "" {
 				otelEntity, _ := cmd.Flags().GetString("otel-entity")
 				otelProject, _ := cmd.Flags().GetString("otel-project")
-				content, otelErr := domain.OtelEnvContent(otelBackend, otelEntity, otelProject)
+				content, otelErr := platform.OtelEnvContent(otelBackend, otelEntity, otelProject)
 				if otelErr != nil {
 					return otelErr
 				}
