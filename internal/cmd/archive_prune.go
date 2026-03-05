@@ -70,7 +70,7 @@ Pass --execute to actually remove the files.`,
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			errW := cmd.ErrOrStderr()
 
 			// Extract file names for output.

@@ -5,6 +5,9 @@ import (
 	"fmt"
 )
 
+// StateDir is the name of the amadeus state directory (e.g. "<repo>/.gate").
+const StateDir = ".gate"
+
 // DriftError is returned by RunCheck when drift is detected (D-Mails generated).
 // Callers can use errors.As to distinguish drift from runtime errors.
 type DriftError struct {

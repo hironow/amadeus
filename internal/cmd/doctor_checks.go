@@ -77,7 +77,7 @@ func checkGitRepo(dir string) domain.DoctorCheckResult {
 
 // checkGateDir verifies .gate/ directory exists and is writable.
 func checkGateDir(repoRoot string) domain.DoctorCheckResult {
-	dir := filepath.Join(repoRoot, ".gate")
+	dir := filepath.Join(repoRoot, domain.StateDir)
 	info, err := os.Stat(dir)
 	if err != nil {
 		return domain.DoctorCheckResult{
@@ -155,7 +155,7 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckRes
 
 // checkSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
 func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
-	skillsDir := filepath.Join(repoRoot, ".gate", "skills")
+	skillsDir := filepath.Join(repoRoot, domain.StateDir, "skills")
 	required := []string{"dmail-sendable", "dmail-readable"}
 	var missing []string
 	for _, name := range required {
@@ -212,13 +212,13 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkSkillMD(repoRoot))
 
 	// 7. Event Store integrity
-	results = append(results, checkEventStore(filepath.Join(repoRoot, ".gate")))
+	results = append(results, checkEventStore(filepath.Join(repoRoot, domain.StateDir)))
 
 	// 8. D-Mail schema v1 validation
-	results = append(results, checkDMailSchema(filepath.Join(repoRoot, ".gate")))
+	results = append(results, checkDMailSchema(filepath.Join(repoRoot, domain.StateDir)))
 
 	// 9. Success rate (informational)
-	results = append(results, checkSuccessRate(filepath.Join(repoRoot, ".gate"), logger))
+	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
 
 	// 10. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != domain.CheckOK {

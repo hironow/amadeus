@@ -31,7 +31,7 @@ func newCheckCommand() *cobra.Command {
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
 			// Pre-flight check: ensure init has been run
 			if _, statErr := os.Stat(divRoot); statErr != nil {

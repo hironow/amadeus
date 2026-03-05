@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +20,7 @@ func newCleanCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			stateDir := filepath.Join(repoRoot, ".gate")
+			stateDir := filepath.Join(repoRoot, domain.StateDir)
 
 			info, statErr := os.Stat(stateDir)
 			if statErr != nil || !info.IsDir() {

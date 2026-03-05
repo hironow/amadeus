@@ -24,7 +24,7 @@ func newValidateCommand() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				configPath = filepath.Join(repoRoot, ".gate", "config.yaml")
+				configPath = filepath.Join(repoRoot, domain.StateDir, "config.yaml")
 			}
 			if _, err := os.Stat(configPath); err != nil {
 				if errors.Is(err, fs.ErrNotExist) {

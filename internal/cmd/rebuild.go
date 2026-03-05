@@ -24,7 +24,7 @@ func newRebuildCommand() *cobra.Command {
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			logger := loggerFrom(cmd)
 
 			// Composition root: wire stores directly

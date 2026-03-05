@@ -24,7 +24,7 @@ func newDoctorCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}

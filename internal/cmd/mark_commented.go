@@ -29,7 +29,7 @@ func newMarkCommentedCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
 			if _, err := os.Stat(divRoot); err != nil {
 				if errors.Is(err, fs.ErrNotExist) {

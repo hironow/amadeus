@@ -49,7 +49,7 @@ func NewRootCommand() *cobra.Command {
 			if cfgPath != "" {
 				applyOtelEnv(filepath.Dir(cfgPath))
 			} else {
-				applyOtelEnv(".gate")
+				applyOtelEnv(domain.StateDir)
 			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)

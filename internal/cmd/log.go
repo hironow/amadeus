@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +25,7 @@ func newLogCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")

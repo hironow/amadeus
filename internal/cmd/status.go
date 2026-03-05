@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 )
@@ -39,7 +40,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}

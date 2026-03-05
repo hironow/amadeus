@@ -22,7 +22,7 @@ func CollectPruneCandidates(cmd domain.ArchivePruneCommand, archiveOps port.Arch
 		return nil, fmt.Errorf("command validation: %w", errs[0])
 	}
 
-	divRoot := filepath.Join(cmd.RepoPath, ".gate")
+	divRoot := filepath.Join(cmd.RepoPath, domain.StateDir)
 	archiveDir := filepath.Join(divRoot, "archive")
 	maxAge := time.Duration(cmd.Days) * 24 * time.Hour
 
