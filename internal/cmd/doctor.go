@@ -46,13 +46,14 @@ type jsonCheck struct {
 	Name    string `json:"name"`
 	Status  string `json:"status"`
 	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
 }
 
 func printDoctorJSON(w io.Writer, results []domain.DoctorCheckResult) error {
 	checks := make([]jsonCheck, len(results))
 	hasFail := false
 	for i, r := range results {
-		checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message}
+		checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message, Hint: r.Hint}
 		if r.Status == domain.CheckFail {
 			hasFail = true
 		}
@@ -74,6 +75,9 @@ func printDoctorText(w io.Writer, results []domain.DoctorCheckResult) error {
 	hasFail := false
 	for _, r := range results {
 		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		if r.Hint != "" {
+			fmt.Fprintf(w, "         %-16s hint: %s\n", "", r.Hint)
+		}
 		if r.Status == domain.CheckFail {
 			hasFail = true
 		}

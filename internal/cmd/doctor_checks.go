@@ -31,6 +31,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: "command not found",
+			Hint:    fmt.Sprintf("install %s and ensure it is in PATH", name),
 		}
 	}
 
@@ -40,6 +41,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("found at %s but --version failed: %v", path, err),
+			Hint:    fmt.Sprintf("%s may be corrupted; reinstall it", name),
 		}
 	}
 
@@ -62,6 +64,7 @@ func checkGitRepo(dir string) domain.DoctorCheckResult {
 			Name:    "Git Repository",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s is not a git repository", dir),
+			Hint:    `run "git init" or navigate to a git repository`,
 		}
 	}
 	return domain.DoctorCheckResult{
@@ -80,6 +83,7 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: "not found — run 'amadeus init' first",
+			Hint:    `run "amadeus init" first`,
 		}
 	}
 	if !info.IsDir() {
@@ -87,6 +91,7 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s exists but is not a directory", dir),
+			Hint:    `remove the .gate file and run "amadeus init"`,
 		}
 	}
 	probe := filepath.Join(dir, ".doctor_probe")
@@ -95,6 +100,7 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("not writable: %v", err),
+			Hint:    "check file permissions on the .gate/ directory",
 		}
 	}
 	if err := os.Remove(probe); err != nil {
@@ -102,6 +108,7 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("probe cleanup failed: %v", err),
+			Hint:    "check file permissions on the .gate/ directory",
 		}
 	}
 	return domain.DoctorCheckResult{
@@ -122,6 +129,7 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckRes
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("claude mcp list failed: %v", err),
+			Hint:    `ensure Claude CLI is authenticated with "claude login"`,
 		}
 	}
 
@@ -140,6 +148,7 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckRes
 		Name:    "Linear MCP",
 		Status:  domain.CheckFail,
 		Message: "Linear MCP not found or not connected in claude mcp list output",
+		Hint:    `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`,
 	}
 }
 
@@ -159,6 +168,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 			Name:    "SKILL.md",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("missing: %s — run 'amadeus init'", strings.Join(missing, ", ")),
+			Hint:    `run "amadeus init" to regenerate skill files`,
 		}
 	}
 	return domain.DoctorCheckResult{
@@ -245,6 +255,7 @@ func checkEventStore(gateRoot string) domain.DoctorCheckResult {
 			Name:    "Event Store",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("stat events: %v", err),
+			Hint:    `run "amadeus init" to create the events directory`,
 		}
 	}
 	count, err := countEventStoreEntries(eventsDir)
@@ -253,6 +264,7 @@ func checkEventStore(gateRoot string) domain.DoctorCheckResult {
 			Name:    "Event Store",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("parse error: %v", err),
+			Hint:    "check event files in .gate/events/ for corruption",
 		}
 	}
 	return domain.DoctorCheckResult{
@@ -309,6 +321,7 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 			Name:    "D-Mail Schema",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("read archive: %v", err),
+			Hint:    "check file permissions on the .gate/archive/ directory",
 		}
 	}
 
@@ -348,6 +361,7 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 			Name:    "D-Mail Schema",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%d/%d invalid: %s", len(invalid), len(mdFiles), strings.Join(invalid, ", ")),
+			Hint:    "re-send affected D-Mails or manually fix the frontmatter",
 		}
 	}
 	return domain.DoctorCheckResult{
@@ -382,6 +396,7 @@ func checkConfig(path string) domain.DoctorCheckResult {
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
+			Hint:    `run "amadeus init" to create config.yaml`,
 		}
 	}
 	data, err := os.ReadFile(path)
@@ -390,6 +405,7 @@ func checkConfig(path string) domain.DoctorCheckResult {
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
+			Hint:    "check file permissions on config.yaml",
 		}
 	}
 	cfg := domain.DefaultConfig()
@@ -398,6 +414,7 @@ func checkConfig(path string) domain.DoctorCheckResult {
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
+			Hint:    "fix YAML syntax in config.yaml",
 		}
 	}
 	if errs := domain.ValidateConfig(cfg); len(errs) > 0 {
@@ -405,6 +422,7 @@ func checkConfig(path string) domain.DoctorCheckResult {
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %s", path, strings.Join(errs, "; ")),
+			Hint:    `check config.yaml values; run "amadeus init" to regenerate`,
 		}
 	}
 	return domain.DoctorCheckResult{

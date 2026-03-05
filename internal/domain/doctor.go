@@ -14,6 +14,7 @@ type DoctorCheckResult struct {
 	Name    string
 	Status  CheckStatus
 	Message string
+	Hint    string // optional remediation hint shown on failure
 }
 
 // StatusLabel returns a display string for the check status.
