@@ -181,10 +181,10 @@ func (p *Projector) applyArchivePruned(event domain.Event) error {
 		if strings.Contains(name, "/") || strings.Contains(name, "\\") || name == ".." {
 			continue
 		}
-		// Only delete archive/ files. Event files (.jsonl) are the source of
-		// truth and must never be deleted by a projection handler — the CLI
+		// Only delete archive/ files. Event files are the source of truth
+		// and must never be deleted by a projection handler — the CLI
 		// archive-prune command handles event file deletion directly.
-		if strings.HasSuffix(name, ".jsonl") {
+		if strings.HasSuffix(name, ".jsonl") { // nosemgrep: layer-session-no-event-persistence — guard to protect event files from deletion, not event persistence [permanent]
 			continue
 		}
 		os.Remove(filepath.Join(archiveDir, name))

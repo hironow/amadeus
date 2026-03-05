@@ -20,10 +20,15 @@ cmd              --> usecase, session, usecase/port, platform, domain  (composit
 usecase          --> usecase/port, domain                              (output port only)
 usecase/port     --> domain (+ stdlib)                                 (interface contracts)
 session          --> eventsource, usecase/port, platform, domain       (adapter impl)
-eventsource      --> domain                                            (interface-adapter: event persistence)
+eventsource      --> domain                                            (event persistence adapter)
 platform         --> domain (+ stdlib)                                 (cross-cutting infra)
 domain           --> (nothing internal, stdlib only)                   (pure types/logic)
 ```
+
+`eventsource` is the event persistence adapter based on the [AWS Event Sourcing pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/event-sourcing.html).
+Its responsibility is limited to append, load, and replay of domain events.
+Event store implementation MUST NOT exist outside `internal/eventsource`.
+`session` uses `eventsource` as a client but does not implement event persistence itself.
 
 Key constraints enforced by semgrep (ERROR severity):
 - `usecase --> session` PROHIBITED (must use output port interfaces)

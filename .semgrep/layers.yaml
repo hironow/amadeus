@@ -107,7 +107,7 @@ rules:
   - id: layer-eventsource-no-import-upper
     languages: [go]
     message: |
-      eventsource 層 (interface-adapter: event persistence) から上位層への import は禁止です。
+      eventsource 層 (event persistence adapter, AWS Event Sourcing pattern) から上位層への import は禁止です。
       eventsource → domain のみ。
       Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
     severity: ERROR
@@ -526,3 +526,22 @@ rules:
     message: |
       filepath.Join での state dir literal ".gate" 直書きは禁止です。
       domain.StateDir 定数を使用してください。
+
+  # --- Rule: session must not implement event persistence (todo 73) ---
+  - id: layer-session-no-event-persistence
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: '\.jsonl'
+    paths:
+      include:
+        - "/internal/session/"
+      exclude:
+        - "*_test.go"
+        - "store_factory.go"
+    message: |
+      session 層で .jsonl ファイル操作は禁止です。
+      event persistence は internal/eventsource に限定してください (AWS Event Sourcing pattern)。
+      修正手順:
+      1. event persistence ロジックを internal/eventsource へ移動する
+      2. session は store_factory.go 経由で eventsource を利用する
+      Ref: docs/conformance.md
