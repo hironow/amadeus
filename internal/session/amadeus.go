@@ -97,7 +97,7 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 	))
 	now := time.Now().UTC()
 	for _, d := range consumed {
-		ev, evErr := domain.NewEvent(domain.EventInboxConsumed, domain.InboxConsumedData{
+		ev, evErr := a.Aggregate.RecordInboxConsumed(domain.InboxConsumedData{
 			Name:   d.Name,
 			Kind:   d.Kind,
 			Source: d.Name + ".md",
@@ -174,7 +174,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			timeoutSec = 0
 		}
 	}
-	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "claude.invoke",
+	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "claude.invoke", // nosemgrep: adr0003-otel-span-without-defer-end — End() called explicitly after Run() [permanent]
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
 				attribute.String("claude.model", model),
@@ -213,11 +213,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			a.Logger.Info("Divergence jump detected (%.2f -> %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
-		a.Aggregate.SetForceFullNext(true)
-		ev, evErr := domain.NewEvent(domain.EventForceFullNextSet, domain.ForceFullNextSetData{
-			PreviousDivergence: previous.Divergence,
-			CurrentDivergence:  meterResult.Divergence.Value,
-		}, time.Now().UTC())
+		ev, evErr := a.Aggregate.RecordForceFullNextSet(previous.Divergence, meterResult.Divergence.Value, time.Now().UTC())
 		if evErr != nil {
 			span2.End()
 			return domain.MeterResult{}, fmt.Errorf("create force_full_next event: %w", evErr)
@@ -264,7 +260,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
 			continue
 		}
-		ev, evErr := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{DMail: dmail}, now)
+		ev, evErr := a.Aggregate.RecordDMailGenerated(dmail, now)
 		if evErr != nil {
 			span3.End()
 			return nil, fmt.Errorf("phase 3 (create event): %w", evErr)
@@ -293,9 +289,7 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 	}
 	convergenceAlerts := domain.AnalyzeConvergence(allDMails, a.Config.Convergence, now)
 	for _, alert := range convergenceAlerts {
-		cev, cerr := domain.NewEvent(domain.EventConvergenceDetected, domain.ConvergenceDetectedData{
-			Alert: alert,
-		}, now)
+		cev, cerr := a.Aggregate.RecordConvergenceDetected(alert, now)
 		if cerr != nil {
 			return nil, nil, fmt.Errorf("phase 4 (create convergence event): %w", cerr)
 		}
@@ -663,7 +657,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 			return saved, fmt.Errorf("convergence dmail name: %w", nameErr)
 		}
 		cd.Name = cdName
-		ev, evErr := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{DMail: cd}, time.Now().UTC())
+		ev, evErr := a.Aggregate.RecordDMailGenerated(cd, time.Now().UTC())
 		if evErr != nil {
 			return saved, fmt.Errorf("create convergence event: %w", evErr)
 		}
@@ -677,10 +671,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 
 // MarkCommented records that a D-Mail x Issue pair has been posted as a comment.
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
-	now := time.Now().UTC()
-	ev, err := domain.NewEvent(domain.EventDMailCommented, domain.DMailCommentedData{
-		DMail: dmailName, IssueID: issueID,
-	}, now)
+	ev, err := a.Aggregate.RecordDMailCommented(dmailName, issueID, time.Now().UTC())
 	if err != nil {
 		return fmt.Errorf("create comment event: %w", err)
 	}

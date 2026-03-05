@@ -69,6 +69,37 @@ func (a *CheckAggregate) ShouldPromoteToFull(previousDivergence, currentDivergen
 	return delta >= a.config.FullCheck.OnDivergenceJump
 }
 
+// RecordInboxConsumed produces an inbox.consumed event.
+func (a *CheckAggregate) RecordInboxConsumed(data InboxConsumedData, now time.Time) (Event, error) {
+	return NewEvent(EventInboxConsumed, data, now)
+}
+
+// RecordForceFullNextSet produces a force_full_next.set event and sets the flag.
+func (a *CheckAggregate) RecordForceFullNextSet(prevDiv, currDiv float64, now time.Time) (Event, error) {
+	a.forceFullNext = true
+	return NewEvent(EventForceFullNextSet, ForceFullNextSetData{
+		PreviousDivergence: prevDiv,
+		CurrentDivergence:  currDiv,
+	}, now)
+}
+
+// RecordDMailGenerated produces a dmail.generated event.
+func (a *CheckAggregate) RecordDMailGenerated(dmail DMail, now time.Time) (Event, error) {
+	return NewEvent(EventDMailGenerated, DMailGeneratedData{DMail: dmail}, now)
+}
+
+// RecordConvergenceDetected produces a convergence.detected event.
+func (a *CheckAggregate) RecordConvergenceDetected(alert ConvergenceAlert, now time.Time) (Event, error) {
+	return NewEvent(EventConvergenceDetected, ConvergenceDetectedData{Alert: alert}, now)
+}
+
+// RecordDMailCommented produces a dmail.commented event.
+func (a *CheckAggregate) RecordDMailCommented(dmailName, issueID string, now time.Time) (Event, error) {
+	return NewEvent(EventDMailCommented, DMailCommentedData{
+		DMail: dmailName, IssueID: issueID,
+	}, now)
+}
+
 // RecordCheck produces events for a completed check result.
 // For full checks, it also produces a baseline.updated event.
 // The caller is responsible for persisting the returned events.
