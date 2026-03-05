@@ -153,7 +153,7 @@ rules:
     languages: [go]
     message: |
       usecase 層から cmd 層への import は禁止です。
-      usecase は session, port, domain を import できます。
+      usecase は usecase/port, domain のみ import できます（session は禁止: layer-usecase-no-import-session）。
       Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
     severity: ERROR
     patterns:
