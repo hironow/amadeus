@@ -8,6 +8,7 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +26,9 @@ func newInitCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); err == nil {
 				return fmt.Errorf("%s already exists", divRoot)
 			}
-			if err := session.InitGateDir(divRoot); err != nil {
-				return fmt.Errorf("init .gate: %w", err)
+			initCmd := domain.InitCommand{RepoRoot: repoRoot}
+			if err := usecase.RunInit(initCmd, &session.InitAdapter{}); err != nil {
+				return fmt.Errorf("init: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)
 

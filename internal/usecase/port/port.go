@@ -11,6 +11,11 @@ import (
 // ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
 var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
+// InitRunner handles state directory initialization I/O.
+type InitRunner interface {
+	InitGateDir(stateDir string) error
+}
+
 // EventDispatcher dispatches domain events to policy handlers.
 // Implemented by usecase.PolicyEngine; injected into session via Amadeus struct.
 type EventDispatcher interface {
