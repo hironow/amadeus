@@ -441,19 +441,12 @@ Linear Issues -----------> Git Repository -----------> .gate/
 
 ## What / Why / How
 
-| Aspect | Description |
-|--------|-------------|
-| **What** | Post-merge integrity verification system that measures codebase divergence from intended design |
-| **Why** | Detect architectural drift early and route corrective actions before design debt compounds |
-| **How** | Scan merged PRs → Claude evaluates against ADRs/DoDs → score 4 divergence axes → route D-Mails by severity |
-| **Input** | Git log (merged PRs), ADRs, DoDs, codebase source |
-| **Output** | Divergence scores, corrective D-Mails to downstream tools |
-| **Telemetry** | OTel spans: `amadeus.check`, `reading_steiner`, `divergence_meter`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
-| **External Systems** | Claude Code subprocess, Git, OTel exporter (Jaeger/Weave) |
+See [docs/conformance.md](docs/conformance.md) for the full conformance table (single source).
 
 ## Documentation
 
 - [docs/](docs/README.md) — Full documentation index
+- [docs/conformance.md](docs/conformance.md) — What/Why/How conformance table
 - [docs/gate-directory.md](docs/gate-directory.md) — `.gate/` directory structure
 - [docs/policies.md](docs/policies.md) — Event → Policy mapping
 - [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
