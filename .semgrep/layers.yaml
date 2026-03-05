@@ -455,3 +455,33 @@ rules:
         - "*_test.go"
     message: |
       曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
+
+  # --- Rule 19: Session layer must not reference aggregate types directly ---
+
+  - id: session-no-aggregate-type
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\*?domain\.\w+Aggregate'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層で *domain.*Aggregate 型の直接使用は禁止です。
+      usecase/port の EventEmitter / StateProvider interface を経由してください。
+
+  # --- Rule 20: Session layer must not call aggregate methods ---
+
+  - id: session-no-aggregate-method-call
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\.Aggregate\.\w+\('
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層から aggregate のメソッド直接呼び出しは禁止です。
+      usecase/port の EventEmitter / StateProvider interface を経由してください。

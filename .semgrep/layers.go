@@ -227,6 +227,24 @@ type TaskOrchestrator struct{}
 // ok: no-ambiguous-type-names
 type ReviewEngine struct{}
 
+// --- Rule 19: session-no-aggregate-type ---
+
+// ruleid: session-no-aggregate-type
+var badAgg *domain.CheckAggregate
+
+// ok: session-no-aggregate-type
+var goodEmitter port.CheckEventEmitter
+
+// --- Rule 20: session-no-aggregate-method-call ---
+
+// ruleid: session-no-aggregate-method-call
+func badAggCall(p struct{ Aggregate interface{ RecordCheck() } }) {
+	p.Aggregate.RecordCheck()
+}
+
+// ok: session-no-aggregate-method-call
+func goodEmitterCall(e port.CheckEventEmitter) {}
+
 // suppress unused import warnings for test fixture
 var (
 	_ = fmt.Sprintf
