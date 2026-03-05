@@ -32,6 +32,18 @@ jobs:
       - name: Test (race)
         run: go test ./... -race -count=1 -short
 
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install semgrep
+        run: pip install semgrep
+
+      - name: Run semgrep
+        run: semgrep --config .semgrep/ internal/ --error
+
   docs-check:
     runs-on: ubuntu-latest
     steps:
@@ -48,3 +60,26 @@ jobs:
 
       - name: Check for uncommitted doc changes
         run: git diff --exit-code docs/cli/
+
+      - name: Check dead links in docs
+        run: |
+          ok=true
+          for f in $(find docs/ README.md -name '*.md' 2>/dev/null); do
+            dir=$(dirname "$f")
+            grep -oE '\[([^]]*)\]\(([^)]+)\)' "$f" | grep -oE '\(([^)]+)\)' | tr -d '()' | grep -v '^http' | grep -v '^#' | while read -r link; do
+              target="$dir/$link"
+              target="${target%%#*}"
+              if [ ! -f "$target" ] && [ ! -d "$target" ]; then
+                echo "DEAD LINK: $f -> $link (resolved: $target)"
+                echo "DEAD_LINK_FOUND=true" >> "$GITHUB_ENV"
+              fi
+            done
+          done
+          if [ "${DEAD_LINK_FOUND:-}" = "true" ]; then exit 1; fi
+
+      - name: Check forbidden vocabulary in docs
+        run: |
+          if grep -rn 'LINEAR_API_KEY' docs/ README.md internal/ 2>/dev/null | grep -v '_test\.go' | grep -v '\.semgrep/'; then
+            echo "ERROR: Found LINEAR_API_KEY reference"
+            exit 1
+          fi

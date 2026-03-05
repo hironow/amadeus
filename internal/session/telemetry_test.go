@@ -104,6 +104,20 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 			if !modelFound {
 				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
 			}
+
+			// Cross-tool conformance: claude.model and claude.timeout_sec must be present
+			conformanceAttrs := []string{"claude.model", "claude.timeout_sec"}
+			for _, key := range conformanceAttrs {
+				var attrFound bool
+				for _, attr := range s.Attributes {
+					if string(attr.Key) == key {
+						attrFound = true
+					}
+				}
+				if !attrFound {
+					t.Errorf("missing cross-tool conformance attribute %q on claude.invoke span", key)
+				}
+			}
 		}
 	}
 	if !invokeFound {

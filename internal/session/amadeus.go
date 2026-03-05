@@ -171,6 +171,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
 				attribute.String("claude.model", model),
+				attribute.Int("claude.timeout_sec", 0),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
