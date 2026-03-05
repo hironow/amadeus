@@ -83,7 +83,7 @@ func InitGateDir(root string) error {
 		}
 	}
 	gitignorePath := filepath.Join(root, ".gitignore")
-	requiredEntries := []string{".run/", "outbox/", "inbox/"}
+	requiredEntries := []string{".run/", "outbox/", "inbox/", ".otel.env"}
 	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
 		content := strings.Join(requiredEntries, "\n") + "\n"
 		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {
