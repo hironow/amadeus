@@ -10,7 +10,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
-	"github.com/hironow/amadeus/internal/port"
+	"github.com/hironow/amadeus/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -405,7 +405,16 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 //   - Phase 2: Claude evaluates divergence, DivergenceMeter scores it
 //   - Phase 3: D-Mail generation and routing
 //   - Phase 4: World Line Convergence detection
-func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions) error {
+//
+// agg and dispatcher are injected by the usecase layer (composition root wiring).
+// If agg is non-nil it replaces the existing Aggregate; same for dispatcher.
+func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *domain.CheckAggregate, dispatcher port.EventDispatcher) error {
+	if agg != nil {
+		a.Aggregate = agg
+	}
+	if dispatcher != nil {
+		a.Dispatcher = dispatcher
+	}
 	ctx, span := platform.Tracer.Start(ctx, "domain.check",
 		trace.WithAttributes(
 			attribute.Bool("check.dry_run", opts.DryRun),

@@ -109,3 +109,29 @@ type Git interface {
 	// DiffSince returns the unified diff between the given commit and HEAD.
 	DiffSince(since string) (string, error)
 }
+
+// PruneCandidate represents a file eligible for pruning.
+type PruneCandidate struct {
+	Path    string
+	ModTime time.Time
+}
+
+// ArchiveOps handles file pruning and lifecycle operations.
+// Implemented by session-layer adapter; injected into usecase by cmd.
+type ArchiveOps interface {
+	FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandidate, error)
+	PruneFiles(candidates []PruneCandidate) (int, error)
+	ListExpiredEventFiles(stateDir string, days int) ([]string, error)
+	PruneEventFiles(stateDir string, files []string) ([]string, error)
+	PruneFlushedOutbox(root string) (int, error)
+}
+
+// Orchestrator is the session-layer I/O orchestration interface.
+// Implemented by session.Amadeus; injected into usecase by cmd (composition root).
+type Orchestrator interface {
+	RunCheck(ctx context.Context, opts domain.CheckOptions, agg *domain.CheckAggregate, dispatcher EventDispatcher) error
+	PrintSync() error
+	PrintLog() error
+	PrintLogJSON() error
+	MarkCommented(dmailName, issueID string) error
+}

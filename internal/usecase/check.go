@@ -5,54 +5,37 @@ import (
 	"fmt"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/port"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // RunCheck orchestrates the amadeus check pipeline.
 // This is the reference implementation of COMMAND → Aggregate → EVENT:
 //  1. Validate the ExecuteCheckCommand
 //  2. Create and restore CheckAggregate from persisted state
-//  3. Inject aggregate into session for domain decisions
-//  4. Delegate I/O pipeline to session
-func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions, a *session.Amadeus) error {
+//  3. Wire policy engine (WHEN [EVENT] THEN [handler])
+//  4. Delegate I/O pipeline to session via port.Orchestrator
+func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions,
+	pipeline port.Orchestrator, cfg domain.Config, logger domain.Logger,
+	notifier port.Notifier, metrics port.PolicyMetrics) error {
 	// COMMAND validation
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
 
 	// Create aggregate with config
-	agg := domain.NewCheckAggregate(a.Config)
-
-	// Inject aggregate into session (session uses it for domain decisions)
-	a.Aggregate = agg
+	agg := domain.NewCheckAggregate(cfg)
 
 	// Wire policy engine (WHEN [EVENT] THEN [handler])
-	engine := NewPolicyEngine(a.Logger)
-	notifier := a.Notifier
+	engine := NewPolicyEngine(logger)
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
-	metrics := a.Metrics
 	if metrics == nil {
 		metrics = &port.NopPolicyMetrics{}
 	}
-	registerCheckPolicies(engine, a.Logger, notifier, metrics)
-	a.Dispatcher = engine
+	registerCheckPolicies(engine, logger, notifier, metrics)
 
-	// Delegate to session I/O pipeline
+	// Delegate to session I/O pipeline via Orchestrator interface
 	// Session restores aggregate state from persisted projection internally
-	return a.RunCheck(ctx, opts)
-}
-
-// RunCheckFromParams constructs an Amadeus from AmadeusParams and runs the check pipeline.
-// This is the cmd-facing entry point that eliminates session imports from cmd.
-func RunCheckFromParams(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions, params AmadeusParams) error {
-	result, err := buildAmadeus(params)
-	if err != nil {
-		return fmt.Errorf("build amadeus: %w", err)
-	}
-	defer result.Cleanup()
-
-	return RunCheck(ctx, cmd, opts, result.Amadeus)
+	return pipeline.RunCheck(ctx, opts, agg, engine)
 }

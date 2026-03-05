@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,8 @@ func newDoctorCommand() *cobra.Command {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
 
-			results := runDoctor(cmd.Context(), configPath, repoRoot)
+			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
+			results := runDoctor(cmd.Context(), configPath, repoRoot, logger)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)

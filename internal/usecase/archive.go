@@ -6,18 +6,18 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // PruneResult holds the outcome of an archive prune operation.
 type PruneResult struct {
-	ArchiveCandidates []session.PruneCandidate
+	ArchiveCandidates []port.PruneCandidate
 	EventCandidates   []string
 }
 
 // CollectPruneCandidates finds files eligible for pruning.
 // Validates the ArchivePruneCommand before collecting candidates.
-func CollectPruneCandidates(cmd domain.ArchivePruneCommand) (*PruneResult, error) {
+func CollectPruneCandidates(cmd domain.ArchivePruneCommand, archiveOps port.ArchiveOps) (*PruneResult, error) {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return nil, fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -26,12 +26,12 @@ func CollectPruneCandidates(cmd domain.ArchivePruneCommand) (*PruneResult, error
 	archiveDir := filepath.Join(divRoot, "archive")
 	maxAge := time.Duration(cmd.Days) * 24 * time.Hour
 
-	archiveCandidates, err := session.FindPruneCandidates(archiveDir, maxAge)
+	archiveCandidates, err := archiveOps.FindPruneCandidates(archiveDir, maxAge)
 	if err != nil {
 		return nil, fmt.Errorf("find prune candidates: %w", err)
 	}
 
-	eventCandidates, err := session.ListExpiredEventFiles(divRoot, cmd.Days)
+	eventCandidates, err := archiveOps.ListExpiredEventFiles(divRoot, cmd.Days)
 	if err != nil {
 		return nil, fmt.Errorf("find expired event files: %w", err)
 	}
@@ -44,11 +44,11 @@ func CollectPruneCandidates(cmd domain.ArchivePruneCommand) (*PruneResult, error
 
 // ExecutePrune deletes the collected candidates, prunes flushed outbox rows,
 // and emits an archive.pruned event.
-func ExecutePrune(result *PruneResult, gateDir, stateDir string) (int, error) {
+func ExecutePrune(result *PruneResult, eventStore port.EventStore, archiveOps port.ArchiveOps, stateDir string, logger domain.Logger) (int, error) {
 	totalCount := 0
 
 	if len(result.ArchiveCandidates) > 0 {
-		count, err := session.PruneFiles(result.ArchiveCandidates)
+		count, err := archiveOps.PruneFiles(result.ArchiveCandidates)
 		if err != nil {
 			return totalCount, fmt.Errorf("prune archive: %w", err)
 		}
@@ -56,7 +56,7 @@ func ExecutePrune(result *PruneResult, gateDir, stateDir string) (int, error) {
 	}
 
 	if len(result.EventCandidates) > 0 {
-		deleted, err := session.PruneEventFiles(gateDir, result.EventCandidates)
+		deleted, err := archiveOps.PruneEventFiles(stateDir, result.EventCandidates)
 		if err != nil {
 			return totalCount, fmt.Errorf("prune event files: %w", err)
 		}
@@ -64,7 +64,7 @@ func ExecutePrune(result *PruneResult, gateDir, stateDir string) (int, error) {
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
-	if pruned, pruneErr := session.PruneFlushedOutbox(gateDir); pruneErr == nil && pruned > 0 {
+	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(stateDir); pruneErr == nil && pruned > 0 {
 		totalCount += pruned
 	}
 
@@ -75,7 +75,6 @@ func ExecutePrune(result *PruneResult, gateDir, stateDir string) (int, error) {
 	}
 	paths = append(paths, result.EventCandidates...)
 
-	eventStore := session.NewEventStore(stateDir)
 	ev, evErr := domain.NewEvent(domain.EventArchivePruned, domain.ArchivePrunedData{
 		Paths: paths,
 		Count: totalCount,

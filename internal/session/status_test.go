@@ -17,7 +17,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(baseDir, &domain.NopLogger{})
 
 	// then
 	if report.CheckCount != 0 {
@@ -70,7 +70,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(baseDir, &domain.NopLogger{})
 
 	// then
 	if report.InboxCount != 2 {
@@ -89,7 +89,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := session.NewEventStore(baseDir)
+	store := session.NewEventStore(baseDir, &domain.NopLogger{})
 
 	now := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
@@ -141,7 +141,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(baseDir, &domain.NopLogger{})
 
 	// then
 	if report.CheckCount != 2 {

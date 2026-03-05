@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/platform"
-	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ func newInitCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); err == nil {
 				return fmt.Errorf("%s already exists", divRoot)
 			}
-			if err := usecase.InitGate(divRoot); err != nil {
+			if err := session.InitGateDir(divRoot); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)

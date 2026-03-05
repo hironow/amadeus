@@ -85,6 +85,8 @@ semgrep-warnings:
 semgrep-test:
     semgrep scan --test --config .semgrep/cobra.yaml .semgrep/cobra.go
     semgrep scan --test --config .semgrep/shared-adr.yaml .semgrep/shared-adr.go
+    semgrep scan --test --config .semgrep/layers.yaml .semgrep/layers.go
+    semgrep scan --test --config .semgrep/stdio.yaml .semgrep/stdio.go
 
 # Verify root package contains only doc.go (no code at root)
 root-guard:

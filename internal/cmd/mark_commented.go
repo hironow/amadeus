@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +38,29 @@ func newMarkCommentedCommand() *cobra.Command {
 			}
 
 			logger := loggerFrom(cmd)
-			if err := usecase.MarkCommented(divRoot, logger, dmailName, issueID); err != nil {
+
+			// Composition root: wire session.Amadeus
+			store := session.NewProjectionStore(divRoot)
+			eventStore := session.NewEventStore(divRoot, logger)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
+			}
+			defer outbox.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
+			cfg := domain.DefaultConfig()
+
+			a := &session.Amadeus{
+				Config:    cfg,
+				Store:     store,
+				Events:    eventStore,
+				Projector: projector,
+				Logger:    logger,
+				Aggregate: domain.NewCheckAggregate(cfg),
+			}
+
+			if err := a.MarkCommented(dmailName, issueID); err != nil {
 				return fmt.Errorf("mark commented: %w", err)
 			}
 

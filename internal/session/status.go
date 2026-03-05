@@ -11,7 +11,7 @@ import (
 
 // Status collects current operational status from the event store and filesystem.
 // gateDir is the .gate/ directory path (e.g. "<repo>/.gate").
-func Status(gateDir string) domain.StatusReport {
+func Status(gateDir string, logger domain.Logger) domain.StatusReport {
 	var report domain.StatusReport
 
 	// Count inbox files
@@ -21,7 +21,7 @@ func Status(gateDir string) domain.StatusReport {
 	report.ArchiveCount = countDirFiles(gateDir, "archive")
 
 	// Load all events for check stats
-	store := NewEventStore(gateDir)
+	store := NewEventStore(gateDir, logger)
 	allEvents, err := store.LoadAll()
 	if err != nil || len(allEvents) == 0 {
 		return report

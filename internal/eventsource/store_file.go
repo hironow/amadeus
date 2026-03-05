@@ -16,12 +16,13 @@ import (
 // FileEventStore implements EventStore using daily JSONL files in a directory.
 // Each file is named YYYY-MM-DD.jsonl and contains one JSON event per line.
 type FileEventStore struct {
-	dir string
+	dir    string
+	logger domain.Logger
 }
 
 // NewFileEventStore creates a FileEventStore rooted at the given directory.
-func NewFileEventStore(dir string) *FileEventStore {
-	return &FileEventStore{dir: dir}
+func NewFileEventStore(dir string, logger domain.Logger) *FileEventStore {
+	return &FileEventStore{dir: dir, logger: logger}
 }
 
 // Append persists events as JSONL lines to the daily file based on each event's timestamp.
@@ -114,9 +115,9 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, error) {
 				continue
 			}
 			var ev domain.Event
-			if err := json.Unmarshal(line, &ev); err != nil {
-				f.Close()
-				return nil, fmt.Errorf("parse event in %s: %w", name, err)
+			if jsonErr := json.Unmarshal(line, &ev); jsonErr != nil {
+				s.logger.Warn("corrupt event line in %s, skipping: %v", name, jsonErr)
+				continue
 			}
 			if !after.IsZero() && !ev.Timestamp.After(after) {
 				continue

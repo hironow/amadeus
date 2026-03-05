@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/port"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // Compile-time check: PolicyEngine implements port.EventDispatcher.

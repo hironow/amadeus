@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/hironow/amadeus/internal/port"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // DivergenceMeterAllowedTools is the minimal tool set for divergence evaluation.

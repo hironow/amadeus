@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -39,10 +39,31 @@ func newLogCommand() *cobra.Command {
 			}
 
 			logger := loggerFrom(cmd)
-			if jsonOut {
-				return usecase.RunLogJSON(divRoot, cfg, cmd.OutOrStdout(), logger)
+
+			// Composition root: wire session.Amadeus
+			store := session.NewProjectionStore(divRoot)
+			eventStore := session.NewEventStore(divRoot, logger)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
 			}
-			return usecase.RunLog(divRoot, cfg, cmd.OutOrStdout(), logger)
+			defer outbox.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
+
+			a := &session.Amadeus{
+				Config:    cfg,
+				Store:     store,
+				Events:    eventStore,
+				Projector: projector,
+				Logger:    logger,
+				DataOut:   cmd.OutOrStdout(),
+			}
+
+			if jsonOut {
+				return a.PrintLogJSON()
+			}
+			return a.PrintLog()
 		},
 	}
 

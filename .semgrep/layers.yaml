@@ -3,28 +3,29 @@ rules:
   # Layer dependency direction enforcement (CANONICAL — identical across all tools)
   #
   # 7-layer architecture:
-  #   internal/cmd         — cobra CLI (top layer)
-  #   internal/usecase     — orchestration (COMMAND, Aggregate, POLICY dispatch)
-  #   internal/session     — I/O orchestration (filesystem, network, subprocess)
-  #   internal/eventsource — event store infrastructure
-  #   internal/port        — context-aware interface contracts + trivial defaults
-  #   internal/platform    — cross-cutting infrastructure (logger, telemetry, metrics)
-  #   internal/domain      — pure functions, types, interfaces (no I/O, no context)
+  #   internal/cmd            — cobra CLI, composition root (top layer)
+  #   internal/usecase        — orchestration (COMMAND, Aggregate, POLICY dispatch)
+  #   internal/usecase/port   — context-aware interface contracts + trivial defaults
+  #   internal/session        — I/O orchestration (filesystem, network, subprocess)
+  #   internal/eventsource    — event store infrastructure
+  #   internal/platform       — cross-cutting infrastructure (logger, telemetry, metrics)
+  #   internal/domain         — pure functions, types, interfaces (no I/O, no context)
   #
-  # Allowed dependency directions:
-  #   cmd         → usecase, port, platform, domain
-  #   usecase     → session, port, domain
-  #   session     → eventsource, port, platform, domain
-  #   eventsource → domain
-  #   port        → domain (+ stdlib)
-  #   platform    → domain (+ stdlib)
-  #   domain      → (nothing internal, stdlib only)
+  # Allowed dependency directions (dependency inversion applied):
+  #   cmd            → usecase, session, usecase/port, platform, domain (composition root)
+  #   usecase        → usecase/port, domain (output port interface only)
+  #   usecase/port   → domain (+ stdlib)
+  #   session        → eventsource, usecase/port, platform, domain (adapter implementation)
+  #   eventsource    → domain
+  #   platform       → domain (+ stdlib)
+  #   domain         → (nothing internal, stdlib only)
   #
   # PROHIBITED reverse directions are enforced below.
   #
   # Note: cmd → domain is ALLOWED (type/interface references, pure method calls).
-  #       cmd → session is PROHIBITED (must go through usecase).
+  #       cmd → session is ALLOWED (composition root wiring).
   #       cmd → eventsource is PROHIBITED (ADR S0008).
+  #       usecase → session is PROHIBITED (must use output port interfaces).
   #
   # Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
   #      phonewave docs/adr/S0008-cmd-eventsource-import-prohibition.md
@@ -96,7 +97,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|eventsource|usecase|platform|port)"
+          regex: ".*/internal/(session|cmd|eventsource|usecase|platform)"
     paths:
       include:
         - "/internal/domain/**"
@@ -118,7 +119,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|port|platform)"
+          regex: ".*/internal/(session|cmd|usecase|platform)"
     paths:
       include:
         - "/internal/eventsource/**"
@@ -195,8 +196,9 @@ rules:
   - id: layer-session-no-import-usecase
     languages: [go]
     message: |
-      session 層から usecase 層への import は禁止です。
-      session は eventsource, port, platform, domain を import できます。
+      session 層から usecase 本体への import は禁止です。
+      session は usecase/port (Output Port) のみ import 可能です。
+      session は eventsource, usecase/port, port, platform, domain を import できます。
       Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
     severity: ERROR
     patterns:
@@ -207,20 +209,19 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/usecase"
+          regex: ".*/internal/usecase(/(?!port).*)?$"
     paths:
       include:
         - "/internal/session/**"
 
-  # --- Rule 9: cmd must not import session directly ---
+  # --- Rule 9: usecase must not import session (dependency inversion) ---
 
-  - id: layer-cmd-no-import-session
+  - id: layer-usecase-no-import-session
     languages: [go]
     message: |
-      cmd 層から session 層への直接 import は禁止です。
-      usecase 層を経由してください。
-      依存方向: cmd → usecase → session（cmd → session は禁止）
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      usecase 層から session 層への直接 import は禁止です。
+      usecase/port の Output Port interface を経由してください。
+      wiring は cmd (composition root) で行います。
     severity: ERROR
     patterns:
       - pattern-either:
@@ -233,7 +234,10 @@ rules:
           regex: ".*/internal/session"
     paths:
       include:
-        - "/internal/cmd/**"
+        - "/internal/usecase/**"
+      exclude:
+        - "/internal/usecase/port/**"
+        - "*_test.go"
 
   # --- Rule 10: internal must not import root package ---
 
@@ -275,7 +279,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|eventsource|port)"
+          regex: ".*/internal/(session|cmd|usecase|eventsource)"
     paths:
       include:
         - "/internal/platform/**"
@@ -340,13 +344,27 @@ rules:
           regex: ".*/internal/(session|cmd|usecase|eventsource|platform)"
     paths:
       include:
-        - "/internal/port/**"
+        - "/internal/usecase/port/**"
+
+  # --- Rule 13b: Prevent re-import of deprecated internal/port ---
+
+  - id: no-import-old-port
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '"[^"]+/internal/port"'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      internal/port は廃止済みです。internal/usecase/port を使用してください。
 
   # --- Rule 14: No vendor vocabulary in domain ---
 
   - id: domain-no-vendor-vocabulary
     languages: [go]
-    severity: WARNING
+    severity: ERROR
     pattern-regex: '(LinearConfig|ClaudeConfig|Wandb|Jaeger)'
     message: |
       domain 層に vendor 固有の語彙が含まれています。
@@ -362,7 +380,7 @@ rules:
 
   - id: session-no-direct-new-event
     languages: [go]
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: domain.NewEvent(...)
     paths:
@@ -374,11 +392,26 @@ rules:
       session 層から domain.NewEvent() の直接呼び出しは禁止です。
       event 生成は usecase 層の aggregate 経由で行ってください。
 
+  # --- Rule: No direct aggregate creation in session layer ---
+
+  - id: session-no-direct-new-aggregate
+    languages: [go]
+    severity: ERROR
+    pattern-regex: 'domain\.New\w+Aggregate\('
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層から domain.New*Aggregate() の直接呼び出しは禁止です。
+      aggregate の生成は usecase 層で行い、session にはパラメータとして渡してください。
+
   # --- Rule 16: No I/O contract interface in domain layer ---
 
   - id: domain-no-io-contract-interface
     languages: [go]
-    severity: WARNING
+    severity: ERROR
     pattern-regex: 'type\s+\w*(Store|Reader|Repository|Recorder|Writer|Gateway)\s+interface'
     paths:
       include:
@@ -413,7 +446,7 @@ rules:
 
   - id: no-ambiguous-type-names
     languages: [go]
-    severity: WARNING
+    severity: ERROR
     pattern-regex: 'type\s+\w*(Manager|Service|Helper|Util|Impl|Base|Facade)\s+'
     paths:
       include:

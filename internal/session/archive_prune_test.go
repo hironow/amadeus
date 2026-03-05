@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 func TestFindPruneCandidates_DirNotExist(t *testing.T) {
@@ -159,7 +161,7 @@ func TestPruneFiles_DeletesFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	candidates := []PruneCandidate{
+	candidates := []port.PruneCandidate{
 		{Path: f1, ModTime: time.Now()},
 		{Path: f2, ModTime: time.Now()},
 	}

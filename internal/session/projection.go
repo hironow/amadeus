@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/port"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // Compile-time check that Projector implements domain.EventApplier.

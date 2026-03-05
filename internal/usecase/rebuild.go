@@ -4,8 +4,7 @@ import (
 	"fmt"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/port"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // Rebuild replays events to regenerate projection files.
@@ -28,22 +27,4 @@ func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain
 
 	logger.Info("rebuild complete")
 	return nil
-}
-
-// RebuildFromDir constructs event store, projection store, and outbox store
-// from a gate directory, then replays events to regenerate projections.
-// This is the cmd-facing entry point that eliminates session imports from cmd.
-func RebuildFromDir(cmd domain.RebuildCommand, gateDir string, logger domain.Logger) error {
-	eventStore := session.NewEventStore(gateDir)
-	store := session.NewProjectionStore(gateDir)
-
-	outboxStore, err := session.NewOutboxStoreForDir(gateDir)
-	if err != nil {
-		return fmt.Errorf("outbox store: %w", err)
-	}
-	defer outboxStore.Close()
-
-	projector := &session.Projector{Store: store, OutboxStore: outboxStore}
-
-	return Rebuild(cmd, eventStore, projector, logger)
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -180,12 +181,12 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 
 // runDoctor executes all health checks and returns the results.
 // Uses "claude" as the default Claude CLI command name.
-func runDoctor(ctx context.Context, configPath string, repoRoot string) []domain.DoctorCheckResult {
-	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude")
+func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheckResult {
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude", logger)
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string) []domain.DoctorCheckResult {
+func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger) []domain.DoctorCheckResult {
 	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 
@@ -217,7 +218,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, ".gate")))
 
 	// 9. Success rate (informational)
-	results = append(results, checkSuccessRate(filepath.Join(repoRoot, ".gate")))
+	results = append(results, checkSuccessRate(filepath.Join(repoRoot, ".gate"), logger))
 
 	// 10. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != domain.CheckOK {
@@ -372,8 +373,9 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 }
 
 // checkSuccessRate calculates and reports the event-based success rate.
-func checkSuccessRate(gateDir string) domain.DoctorCheckResult {
-	rate, clean, total, err := usecase.ComputeSuccessRate(gateDir)
+func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheckResult {
+	eventStore := session.NewEventStore(gateDir, logger)
+	rate, clean, total, err := usecase.ComputeSuccessRate(eventStore)
 	if err != nil || total == 0 {
 		return domain.DoctorCheckResult{
 			Name:    "success-rate",

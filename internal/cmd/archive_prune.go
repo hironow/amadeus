@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -41,6 +43,7 @@ Pass --execute to actually remove the files.`,
 			dryRunExplicit := cmd.Flags().Changed("dry-run")
 			yes, _ := cmd.Flags().GetBool("yes")
 			outputFmt, _ := cmd.Flags().GetString("output")
+			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
 
 			if execute && dryRunExplicit {
 				return fmt.Errorf("--execute and --dry-run are mutually exclusive")
@@ -58,8 +61,11 @@ Pass --execute to actually remove the files.`,
 				Yes:      yes,
 			}
 
+			// Composition root: wire ArchiveOps and EventStore
+			archiveOps := session.NewArchiveOps()
+
 			// COMMAND → usecase (collect candidates)
-			result, err := usecase.CollectPruneCandidates(pruneCmd)
+			result, err := usecase.CollectPruneCandidates(pruneCmd, archiveOps)
 			if err != nil {
 				return err
 			}
@@ -88,7 +94,8 @@ Pass --execute to actually remove the files.`,
 					EventFiles:        result.EventCandidates,
 				}
 				if execute {
-					totalCount, execErr := usecase.ExecutePrune(result, divRoot, divRoot)
+					eventStore := session.NewEventStore(divRoot, logger)
+					totalCount, execErr := usecase.ExecutePrune(result, eventStore, archiveOps, divRoot, logger)
 					if execErr != nil {
 						return execErr
 					}
@@ -150,7 +157,8 @@ Pass --execute to actually remove the files.`,
 			}
 
 			// usecase → execute prune + emit event
-			totalCount, err := usecase.ExecutePrune(result, divRoot, divRoot)
+			eventStore := session.NewEventStore(divRoot, logger)
+			totalCount, err := usecase.ExecutePrune(result, eventStore, archiveOps, divRoot, logger)
 			if err != nil {
 				return err
 			}

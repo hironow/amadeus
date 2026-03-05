@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -25,9 +27,20 @@ func newRebuildCommand() *cobra.Command {
 			divRoot := filepath.Join(repoRoot, ".gate")
 			logger := loggerFrom(cmd)
 
-			return usecase.RebuildFromDir(domain.RebuildCommand{
+			// Composition root: wire stores directly
+			eventStore := session.NewEventStore(divRoot, logger)
+			store := session.NewProjectionStore(divRoot)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
+			}
+			defer outbox.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
+
+			return usecase.Rebuild(domain.RebuildCommand{
 				RepoPath: repoRoot,
-			}, divRoot, logger)
+			}, eventStore, projector, logger)
 		},
 	}
 

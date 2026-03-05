@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/amadeus/internal/port"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.

@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 func TestPrintSync_InvalidCommand(t *testing.T) {
@@ -44,12 +46,25 @@ func TestRebuild_InvalidCommand(t *testing.T) {
 	}
 }
 
+// fakeArchiveOps implements port.ArchiveOps for tests.
+type fakeArchiveOps struct{}
+
+func (*fakeArchiveOps) FindPruneCandidates(_ string, _ time.Duration) ([]port.PruneCandidate, error) {
+	return nil, nil
+}
+func (*fakeArchiveOps) PruneFiles(_ []port.PruneCandidate) (int, error) { return 0, nil }
+func (*fakeArchiveOps) ListExpiredEventFiles(_ string, _ int) ([]string, error) {
+	return nil, nil
+}
+func (*fakeArchiveOps) PruneEventFiles(_ string, _ []string) ([]string, error) { return nil, nil }
+func (*fakeArchiveOps) PruneFlushedOutbox(_ string) (int, error)               { return 0, nil }
+
 func TestCollectPruneCandidates_InvalidCommand(t *testing.T) {
 	// given: missing Days
 	cmd := domain.ArchivePruneCommand{RepoPath: "/tmp/test", Days: 0}
 
 	// when
-	_, err := CollectPruneCandidates(cmd)
+	_, err := CollectPruneCandidates(cmd, &fakeArchiveOps{})
 
 	// then
 	if err == nil {
@@ -65,7 +80,7 @@ func TestCollectPruneCandidates_InvalidRepoPath(t *testing.T) {
 	cmd := domain.ArchivePruneCommand{RepoPath: "", Days: 30}
 
 	// when
-	_, err := CollectPruneCandidates(cmd)
+	_, err := CollectPruneCandidates(cmd, &fakeArchiveOps{})
 
 	// then
 	if err == nil {

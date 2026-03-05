@@ -110,7 +110,7 @@ func TestStatusCmd_JSONOutput(t *testing.T) {
 	}
 
 	// Add a check event
-	store := session.NewEventStore(gateDir)
+	store := session.NewEventStore(gateDir, &domain.NopLogger{})
 	now := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{

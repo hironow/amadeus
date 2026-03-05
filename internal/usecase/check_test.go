@@ -9,19 +9,22 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 func TestRunCheck_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
 	cmd := domain.ExecuteCheckCommand{RepoPath: ""}
 	opts := domain.CheckOptions{}
+	cfg := domain.DefaultConfig()
+	logger := platform.NewLogger(nil, false)
 	a := &session.Amadeus{
-		Config: domain.DefaultConfig(),
-		Logger: platform.NewLogger(nil, false),
+		Config: cfg,
+		Logger: logger,
 	}
 
 	// when
-	err := RunCheck(context.Background(), cmd, opts, a)
+	err := RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	// then: command validation should fail
 	if err == nil {
@@ -44,15 +47,17 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 	}
 
 	store := session.NewProjectionStore(gateDir)
-	eventStore := session.NewEventStore(gateDir)
+	eventStore := session.NewEventStore(gateDir, &domain.NopLogger{})
 
 	cmd := domain.ExecuteCheckCommand{RepoPath: tmpDir}
 	opts := domain.CheckOptions{DryRun: true}
+	cfg := domain.DefaultConfig()
+	logger := platform.NewLogger(nil, false)
 	a := &session.Amadeus{
-		Config: domain.DefaultConfig(),
+		Config: cfg,
 		Store:  store,
 		Events: eventStore,
-		Logger: platform.NewLogger(nil, false),
+		Logger: logger,
 	}
 
 	// pre-conditions
@@ -64,7 +69,7 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 	}
 
 	// when: RunCheck will fail at Git operations (not configured), but wiring happens first
-	_ = RunCheck(context.Background(), cmd, opts, a)
+	_ = RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	// then: aggregate and dispatcher should have been injected
 	if a.Aggregate == nil {
