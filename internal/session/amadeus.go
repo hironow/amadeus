@@ -33,8 +33,8 @@ type Amadeus struct {
 	ReviewCmd   string                 // code review command (empty = skip)
 	ClaudeCmd   string                 // Claude CLI command (empty = "claude")
 	ClaudeModel string                 // Claude model for review fix (empty = "opus")
-	Aggregate   *domain.CheckAggregate // domain logic aggregate (injected by usecase layer)
-	Dispatcher  port.EventDispatcher   // policy dispatch (injected by usecase layer; nil = no dispatch)
+	Emitter     port.CheckEventEmitter // event production + persistence + dispatch (injected by usecase layer)
+	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
@@ -45,36 +45,14 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	return DefaultClaudeRunner()
 }
 
-// emit appends events to the event store and applies them to projections.
-// At least one of Events or Projector must be non-nil; otherwise emit returns
-// an error to prevent silent data loss.
-func (a *Amadeus) emit(events ...domain.Event) error {
-	if a.Events == nil && a.Projector == nil {
-		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
-	}
-	if a.Events != nil {
-		if err := a.Events.Append(events...); err != nil {
-			return fmt.Errorf("append events: %w", err)
-		}
-	}
-	if a.Projector != nil {
-		for _, ev := range events {
-			if err := a.Projector.Apply(ev); err != nil {
-				return fmt.Errorf("apply event %s: %w", ev.Type, err)
-			}
-		}
-	}
-	// Dispatch events to policy handlers (best-effort: log and continue on error)
-	if a.Dispatcher != nil {
-		for _, ev := range events {
-			if err := a.Dispatcher.Dispatch(context.Background(), ev); err != nil {
-				if a.Logger != nil {
-					a.Logger.Warn("policy dispatch %s: %v", ev.Type, err)
-				}
-			}
-		}
-	}
-	return nil
+// EventStore returns the event persistence store.
+func (a *Amadeus) EventStore() port.EventStore {
+	return a.Events
+}
+
+// EventApplier returns the projection applier.
+func (a *Amadeus) EventApplier() domain.EventApplier {
+	return a.Projector
 }
 
 // consumeInbox runs Phase 0: scans the inbox for inbound D-Mails and emits
@@ -97,15 +75,11 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 	))
 	now := time.Now().UTC()
 	for _, d := range consumed {
-		ev, evErr := a.Aggregate.RecordInboxConsumed(domain.InboxConsumedData{
+		if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
 			Name:   d.Name,
 			Kind:   d.Kind,
 			Source: d.Name + ".md",
-		}, now)
-		if evErr != nil {
-			return fmt.Errorf("create inbox event: %w", evErr)
-		}
-		if err := a.emit(ev); err != nil {
+		}, now); err != nil {
 			return fmt.Errorf("emit inbox consumed: %w", err)
 		}
 	}
@@ -204,7 +178,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 	))
 
 	// Defer full scan to next run on large divergence jump
-	if !fullCheck && a.Aggregate.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
+	if !fullCheck && a.State.ShouldPromoteToFull(previous.Divergence, meterResult.Divergence.Value) {
 		span2.AddEvent("divergence.jump", trace.WithAttributes(
 			attribute.Float64("divergence.previous", previous.Divergence),
 			attribute.Float64("divergence.current", meterResult.Divergence.Value),
@@ -213,12 +187,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			a.Logger.Info("Divergence jump detected (%.2f -> %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
-		ev, evErr := a.Aggregate.RecordForceFullNextSet(previous.Divergence, meterResult.Divergence.Value, time.Now().UTC())
-		if evErr != nil {
-			span2.End()
-			return domain.MeterResult{}, fmt.Errorf("create force_full_next event: %w", evErr)
-		}
-		if err := a.emit(ev); err != nil {
+		if err := a.Emitter.EmitForceFullNextSet(previous.Divergence, meterResult.Divergence.Value, time.Now().UTC()); err != nil {
 			span2.End()
 			return domain.MeterResult{}, fmt.Errorf("emit force_full_next: %w", err)
 		}
@@ -260,12 +229,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
 			continue
 		}
-		ev, evErr := a.Aggregate.RecordDMailGenerated(dmail, now)
-		if evErr != nil {
-			span3.End()
-			return nil, fmt.Errorf("phase 3 (create event): %w", evErr)
-		}
-		if err := a.emit(ev); err != nil {
+		if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
 			span3.End()
 			return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
 		}
@@ -289,11 +253,7 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 	}
 	convergenceAlerts := domain.AnalyzeConvergence(allDMails, a.Config.Convergence, now)
 	for _, alert := range convergenceAlerts {
-		cev, cerr := a.Aggregate.RecordConvergenceDetected(alert, now)
-		if cerr != nil {
-			return nil, nil, fmt.Errorf("phase 4 (create convergence event): %w", cerr)
-		}
-		if err := a.emit(cev); err != nil {
+		if err := a.Emitter.EmitConvergenceDetected(alert, now); err != nil {
 			return nil, nil, fmt.Errorf("phase 4 (emit convergence event): %w", err)
 		}
 	}
@@ -307,12 +267,12 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 // detectShift runs Phase 1: ReadingSteiner shift detection.
 // Returns the shift report, whether a full check was performed, and any error.
 func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, fullMode bool, quiet bool) (ShiftReport, bool, error) {
-	fullCheck := a.Aggregate.ShouldFullCheck(fullMode)
-	if a.Aggregate.ForceFullNext() {
+	fullCheck := a.State.ShouldFullCheck(fullMode)
+	if a.State.ForceFullNext() {
 		if !quiet {
 			a.Logger.Info("Full scan triggered by previous divergence jump")
 		}
-		a.Aggregate.SetForceFullNext(false) // consumed
+		a.State.SetForceFullNext(false) // consumed
 	}
 
 	rs := &ReadingSteiner{Git: a.Git}
@@ -406,14 +366,13 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 //   - Phase 3: D-Mail generation and routing
 //   - Phase 4: World Line Convergence detection
 //
-// agg and dispatcher are injected by the usecase layer (composition root wiring).
-// If agg is non-nil it replaces the existing Aggregate; same for dispatcher.
-func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *domain.CheckAggregate, dispatcher port.EventDispatcher) error {
-	if agg != nil {
-		a.Aggregate = agg
+// emitter and state are injected by the usecase layer (composition root wiring).
+func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitter port.CheckEventEmitter, state port.CheckStateProvider) error {
+	if emitter != nil {
+		a.Emitter = emitter
 	}
-	if dispatcher != nil {
-		a.Dispatcher = dispatcher
+	if state != nil {
+		a.State = state
 	}
 	ctx, span := platform.Tracer.Start(ctx, "domain.check",
 		trace.WithAttributes(
@@ -434,8 +393,8 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 		return fmt.Errorf("load previous state: %w", err)
 	}
 
-	// Restore aggregate from persisted state (usecase layer sets up Aggregate)
-	a.Aggregate.Restore(previous)
+	// Restore aggregate state from persisted projection
+	a.State.Restore(previous)
 
 	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state)
 	if !opts.DryRun {
@@ -457,7 +416,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 		if err != nil {
 			return fmt.Errorf("get current commit: %w", err)
 		}
-		a.Aggregate.AdvanceCheckCount(fullCheck)
+		a.State.AdvanceCheckCount(fullCheck)
 		now := time.Now().UTC()
 		noShiftResult := previous
 		noShiftResult.Commit = currentCommit
@@ -466,11 +425,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 		noShiftResult.PRsEvaluated = nil
 		noShiftResult.DMails = nil
 		noShiftResult.ConvergenceAlerts = nil
-		events, evErr := a.Aggregate.RecordCheck(noShiftResult, now)
-		if evErr != nil {
-			return fmt.Errorf("record check (no shift): %w", evErr)
-		}
-		if err := a.emit(events...); err != nil {
+		if err := a.Emitter.EmitCheck(noShiftResult, now); err != nil {
 			return fmt.Errorf("emit check (no shift): %w", err)
 		}
 		platform.RecordCheck(ctx, "clean")
@@ -532,7 +487,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 
 	if !gateApproved {
 		// Emit check.completed event to maintain ES invariant.
-		a.Aggregate.AdvanceCheckCount(fullCheck)
+		a.State.AdvanceCheckCount(fullCheck)
 		checkType := domain.CheckTypeDiff
 		if fullCheck {
 			checkType = domain.CheckTypeFull
@@ -545,11 +500,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 			Axes:       meterResult.Divergence.Axes,
 			GateDenied: true,
 		}
-		events, evErr := a.Aggregate.RecordCheck(gateDeniedResult, now)
-		if evErr != nil {
-			return fmt.Errorf("record check (gate denied): %w", evErr)
-		}
-		if err := a.emit(events...); err != nil {
+		if err := a.Emitter.EmitCheck(gateDeniedResult, now); err != nil {
 			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
 		platform.RecordCheck(ctx, "drift")
@@ -579,7 +530,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 		dmailNames = append(dmailNames, d.Name)
 	}
 
-	a.Aggregate.AdvanceCheckCount(fullCheck)
+	a.State.AdvanceCheckCount(fullCheck)
 	checkType := domain.CheckTypeDiff
 	if fullCheck {
 		checkType = domain.CheckTypeFull
@@ -597,11 +548,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, agg *d
 		ConvergenceAlerts: convergenceAlerts,
 	}
 
-	checkEvents, evErr := a.Aggregate.RecordCheck(result, now)
-	if evErr != nil {
-		return fmt.Errorf("record check: %w", evErr)
-	}
-	if err := a.emit(checkEvents...); err != nil {
+	if err := a.Emitter.EmitCheck(result, now); err != nil {
 		return fmt.Errorf("emit check completed: %w", err)
 	}
 	if len(dmails) > 0 {
@@ -666,11 +613,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 			return saved, fmt.Errorf("convergence dmail name: %w", nameErr)
 		}
 		cd.Name = cdName
-		ev, evErr := a.Aggregate.RecordDMailGenerated(cd, time.Now().UTC())
-		if evErr != nil {
-			return saved, fmt.Errorf("create convergence event: %w", evErr)
-		}
-		if err := a.emit(ev); err != nil {
+		if err := a.Emitter.EmitDMailGenerated(cd, time.Now().UTC()); err != nil {
 			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}
 		saved = append(saved, cd)
@@ -680,10 +623,6 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 
 // MarkCommented records that a D-Mail x Issue pair has been posted as a comment.
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
-	ev, err := a.Aggregate.RecordDMailCommented(dmailName, issueID, time.Now().UTC())
-	if err != nil {
-		return fmt.Errorf("create comment event: %w", err)
-	}
-	return a.emit(ev)
+	return a.Emitter.EmitDMailCommented(dmailName, issueID, time.Now().UTC())
 }
 

@@ -35,7 +35,7 @@ func TestRunCheck_InvalidCommand(t *testing.T) {
 	}
 }
 
-func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
+func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	// given: valid command with minimal real deps (temp dir with .gate/)
 	tmpDir := t.TempDir()
 	gateDir := filepath.Join(tmpDir, ".gate")
@@ -61,21 +61,21 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 	}
 
 	// pre-conditions
-	if a.Aggregate != nil {
-		t.Fatal("aggregate should be nil before RunCheck")
+	if a.Emitter != nil {
+		t.Fatal("emitter should be nil before RunCheck")
 	}
-	if a.Dispatcher != nil {
-		t.Fatal("dispatcher should be nil before RunCheck")
+	if a.State != nil {
+		t.Fatal("state should be nil before RunCheck")
 	}
 
 	// when: RunCheck will fail at Git operations (not configured), but wiring happens first
 	_ = RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
-	// then: aggregate and dispatcher should have been injected
-	if a.Aggregate == nil {
-		t.Fatal("aggregate should be injected after RunCheck")
+	// then: emitter and state should have been injected
+	if a.Emitter == nil {
+		t.Fatal("emitter should be injected after RunCheck")
 	}
-	if a.Dispatcher == nil {
-		t.Fatal("dispatcher should be injected after RunCheck")
+	if a.State == nil {
+		t.Fatal("state should be injected after RunCheck")
 	}
 }

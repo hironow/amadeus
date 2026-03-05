@@ -120,7 +120,7 @@ func newCheckCommand() *cobra.Command {
 				ReviewCmd: reviewCmd,
 			}
 
-			// COMMAND → usecase → Aggregate → EVENT
+			// COMMAND → usecase → EventEmitter → EVENT
 			return usecase.RunCheck(cmd.Context(), domain.ExecuteCheckCommand{
 				RepoPath: repoRoot,
 			}, domain.CheckOptions{

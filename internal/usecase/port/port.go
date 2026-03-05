@@ -126,12 +126,39 @@ type ArchiveOps interface {
 	PruneFlushedOutbox(root string) (int, error)
 }
 
+// CheckEventEmitter wraps aggregate event production + persistence + projection + dispatch.
+// Implemented in usecase layer, injected into session by usecase.RunCheck.
+// Emit chain: agg.Record*() → store.Append() → projector.Apply() → dispatch (best-effort).
+type CheckEventEmitter interface {
+	EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error
+	EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error
+	EmitDMailGenerated(dmail domain.DMail, now time.Time) error
+	EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error
+	EmitDMailCommented(dmailName, issueID string, now time.Time) error
+	EmitCheck(result domain.CheckResult, now time.Time) error
+}
+
+// CheckStateProvider provides aggregate state read/write without exposing the aggregate type.
+// Implemented in usecase layer, injected into session by usecase.RunCheck.
+type CheckStateProvider interface {
+	ShouldFullCheck(forceFlag bool) bool
+	ForceFullNext() bool
+	SetForceFullNext(v bool)
+	ShouldPromoteToFull(prevDiv, currDiv float64) bool
+	AdvanceCheckCount(fullCheck bool)
+	Restore(result domain.CheckResult)
+}
+
 // Orchestrator is the session-layer I/O orchestration interface.
 // Implemented by session.Amadeus; injected into usecase by cmd (composition root).
 type Orchestrator interface {
-	RunCheck(ctx context.Context, opts domain.CheckOptions, agg *domain.CheckAggregate, dispatcher EventDispatcher) error
+	RunCheck(ctx context.Context, opts domain.CheckOptions, emitter CheckEventEmitter, state CheckStateProvider) error
 	PrintSync() error
 	PrintLog() error
 	PrintLogJSON() error
 	MarkCommented(dmailName, issueID string) error
+	// EventStore returns the event persistence store.
+	EventStore() EventStore
+	// EventApplier returns the projection applier.
+	EventApplier() domain.EventApplier
 }

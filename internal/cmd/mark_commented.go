@@ -10,6 +10,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -51,13 +52,16 @@ func newMarkCommentedCommand() *cobra.Command {
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 			cfg := domain.DefaultConfig()
 
+			agg := domain.NewCheckAggregate(cfg)
+			emitter := usecase.NewCheckEventEmitter(agg, eventStore, projector, nil, logger)
+
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
 				Events:    eventStore,
 				Projector: projector,
 				Logger:    logger,
-				Aggregate: domain.NewCheckAggregate(cfg),
+				Emitter:   emitter,
 			}
 
 			if err := a.MarkCommented(dmailName, issueID); err != nil {

@@ -11,7 +11,7 @@ import (
 // RunCheck orchestrates the amadeus check pipeline.
 // This is the reference implementation of COMMAND → Aggregate → EVENT:
 //  1. Validate the ExecuteCheckCommand
-//  2. Create and restore CheckAggregate from persisted state
+//  2. Create CheckAggregate, wrap in EventEmitter + StateManager
 //  3. Wire policy engine (WHEN [EVENT] THEN [handler])
 //  4. Delegate I/O pipeline to session via port.Orchestrator
 func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions,
@@ -35,7 +35,11 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	}
 	registerCheckPolicies(engine, logger, notifier, metrics)
 
+	// Create EventEmitter + StateManager wrapping the aggregate
+	emitter := NewCheckEventEmitter(agg, pipeline.EventStore(), pipeline.EventApplier(), engine, logger)
+	state := NewCheckStateProvider(agg)
+
 	// Delegate to session I/O pipeline via Orchestrator interface
 	// Session restores aggregate state from persisted projection internally
-	return pipeline.RunCheck(ctx, opts, agg, engine)
+	return pipeline.RunCheck(ctx, opts, emitter, state)
 }

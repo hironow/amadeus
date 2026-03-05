@@ -90,6 +90,90 @@ func (p *fakeProjector) Rebuild(_ []domain.Event) error {
 	return nil
 }
 
+// testCheckEventEmitter implements port.CheckEventEmitter for session tests.
+// It wraps the aggregate + event store + projector without usecase import.
+type testCheckEventEmitter struct {
+	agg       *domain.CheckAggregate
+	store     port.EventStore
+	projector domain.EventApplier
+}
+
+func (e *testCheckEventEmitter) emit(events ...domain.Event) error {
+	if e.store != nil {
+		if err := e.store.Append(events...); err != nil {
+			return err
+		}
+	}
+	if e.projector != nil {
+		for _, ev := range events {
+			if err := e.projector.Apply(ev); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (e *testCheckEventEmitter) EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error {
+	ev, err := e.agg.RecordInboxConsumed(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error {
+	ev, err := e.agg.RecordForceFullNextSet(prevDiv, currDiv, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitDMailGenerated(dmail domain.DMail, now time.Time) error {
+	ev, err := e.agg.RecordDMailGenerated(dmail, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error {
+	ev, err := e.agg.RecordConvergenceDetected(alert, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitDMailCommented(dmailName, issueID string, now time.Time) error {
+	ev, err := e.agg.RecordDMailCommented(dmailName, issueID, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Time) error {
+	events, err := e.agg.RecordCheck(result, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(events...)
+}
+
+// testCheckStateProvider implements port.CheckStateManager for session tests.
+type testCheckStateProvider struct {
+	agg *domain.CheckAggregate
+}
+
+func (m *testCheckStateProvider) ShouldFullCheck(forceFlag bool) bool       { return m.agg.ShouldFullCheck(forceFlag) }
+func (m *testCheckStateProvider) ForceFullNext() bool                       { return m.agg.ForceFullNext() }
+func (m *testCheckStateProvider) SetForceFullNext(v bool)                   { m.agg.SetForceFullNext(v) }
+func (m *testCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool { return m.agg.ShouldPromoteToFull(prev, curr) }
+func (m *testCheckStateProvider) AdvanceCheckCount(fullCheck bool)          { m.agg.AdvanceCheckCount(fullCheck) }
+func (m *testCheckStateProvider) Restore(result domain.CheckResult)         { m.agg.Restore(result) }
+
 type denyApprover struct{}
 
 func (*denyApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
@@ -140,7 +224,7 @@ func claudeResponseWithDrift() string {
 	}`
 }
 
-func newGateTestAmadeus(t *testing.T, approver port.Approver, notifier port.Notifier) (*session.Amadeus, *domain.CheckAggregate) {
+func newGateTestAmadeus(t *testing.T, approver port.Approver, notifier port.Notifier) *session.Amadeus {
 	t.Helper()
 	// Create a minimal gate dir with required structure
 	root := t.TempDir()
@@ -159,6 +243,8 @@ func newGateTestAmadeus(t *testing.T, approver port.Approver, notifier port.Noti
 		},
 	}
 	agg := domain.NewCheckAggregate(cfg)
+	emitter := &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	state := &testCheckStateProvider{agg: agg}
 	a := &session.Amadeus{
 		Config: cfg,
 		Store: &fakeStateReader{
@@ -181,8 +267,10 @@ func newGateTestAmadeus(t *testing.T, approver port.Approver, notifier port.Noti
 		Logger:   platform.NewLogger(io.Discard, false),
 		Approver: approver,
 		Notifier: notifier,
+		Emitter:  emitter,
+		State:    state,
 	}
-	return a, agg
+	return a
 }
 
 // claudeResponseWithDriftAndAction returns a canned Claude response
@@ -230,10 +318,10 @@ func extractDMailsFromEvents(t *testing.T, events []domain.Event) []domain.DMail
 func TestRunCheck_GateApproved_GeneratesDMails(t *testing.T) {
 	// given: AutoApprover always approves
 	notifier := &fakeNotifier{}
-	a, agg := newGateTestAmadeus(t, &port.AutoApprover{}, notifier)
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, notifier)
 
 	// when
-	err := a.RunCheck(context.Background(), domain.CheckOptions{}, agg, nil)
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
 
 	// then: should return DriftError (dmails generated)
 	var driftErr *domain.DriftError
@@ -253,12 +341,16 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 	// given: denyApprover always denies
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a, agg := newGateTestAmadeus(t, &denyApprover{}, &port.NopNotifier{})
+	a := newGateTestAmadeus(t, &denyApprover{}, &port.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
 
 	// when
-	err := a.RunCheck(context.Background(), domain.CheckOptions{}, agg, nil)
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
 
 	// then: should return nil (no DriftError — D-Mails skipped)
 	if err != nil {
@@ -293,10 +385,10 @@ func TestRunCheck_GateDenied_NoDMails(t *testing.T) {
 func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 	// given: errorApprover returns an error
 	gateErr := errors.New("approval service unavailable")
-	a, agg := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &port.NopNotifier{})
+	a := newGateTestAmadeus(t, &errorApprover{err: gateErr}, &port.NopNotifier{})
 
 	// when
-	err := a.RunCheck(context.Background(), domain.CheckOptions{}, agg, nil)
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
 
 	// then: should fail closed (return the error)
 	if err == nil {
@@ -312,10 +404,10 @@ func TestRunCheck_GateError_FailsClosed(t *testing.T) {
 
 func TestRunCheck_NilApprover_AutoApproves(t *testing.T) {
 	// given: nil Approver should skip gate entirely (backward compatible)
-	a, agg := newGateTestAmadeus(t, nil, &port.NopNotifier{})
+	a := newGateTestAmadeus(t, nil, &port.NopNotifier{})
 
 	// when
-	err := a.RunCheck(context.Background(), domain.CheckOptions{}, agg, nil)
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
 
 	// then: should return DriftError (dmails generated, gate skipped)
 	var driftErr *domain.DriftError
@@ -332,12 +424,16 @@ func TestRunCheck_FeedbackDMail_DefaultAction_BasedOnSeverity(t *testing.T) {
 	// With zero-value config thresholds, divergence 0.0 >= MediumMax 0.0 → SeverityHigh → ActionEscalate.
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a, agg := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
 
 	// when
-	err := a.RunCheck(context.Background(), domain.CheckOptions{}, agg, nil)
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
 
 	// then: should return DriftError
 	var driftErr *domain.DriftError
@@ -361,13 +457,17 @@ func TestRunCheck_FeedbackDMail_ExplicitAction_FromCandidate(t *testing.T) {
 	// given: Claude response with explicit action "retry" on the candidate
 	events := &fakeEventStore{}
 	projector := &fakeProjector{}
-	a, agg := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
 	a.Events = events
 	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
 	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("retry")}
 
 	// when
-	err := a.RunCheck(context.Background(), domain.CheckOptions{}, agg, nil)
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
 
 	// then: should return DriftError
 	var driftErr *domain.DriftError

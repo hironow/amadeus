@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
@@ -29,6 +30,48 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	return exp
 }
 
+// testInternalCheckEventEmitter implements port.CheckEventEmitter for internal session tests.
+type testInternalCheckEventEmitter struct {
+	agg *domain.CheckAggregate
+}
+
+func (e *testInternalCheckEventEmitter) EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error {
+	_, err := e.agg.RecordInboxConsumed(data, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error {
+	_, err := e.agg.RecordForceFullNextSet(prevDiv, currDiv, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitDMailGenerated(dmail domain.DMail, now time.Time) error {
+	_, err := e.agg.RecordDMailGenerated(dmail, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error {
+	_, err := e.agg.RecordConvergenceDetected(alert, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitDMailCommented(dmailName, issueID string, now time.Time) error {
+	_, err := e.agg.RecordDMailCommented(dmailName, issueID, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Time) error {
+	_, err := e.agg.RecordCheck(result, now)
+	return err
+}
+
+// testInternalCheckStateProvider implements port.CheckStateManager for internal session tests.
+type testInternalCheckStateProvider struct {
+	agg *domain.CheckAggregate
+}
+
+func (m *testInternalCheckStateProvider) ShouldFullCheck(forceFlag bool) bool       { return m.agg.ShouldFullCheck(forceFlag) }
+func (m *testInternalCheckStateProvider) ForceFullNext() bool                       { return m.agg.ForceFullNext() }
+func (m *testInternalCheckStateProvider) SetForceFullNext(v bool)                   { m.agg.SetForceFullNext(v) }
+func (m *testInternalCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool { return m.agg.ShouldPromoteToFull(prev, curr) }
+func (m *testInternalCheckStateProvider) AdvanceCheckCount(fullCheck bool)          { m.agg.AdvanceCheckCount(fullCheck) }
+func (m *testInternalCheckStateProvider) Restore(result domain.CheckResult)         { m.agg.Restore(result) }
+
 // fakeClaudeRunner returns a fixed JSON response for testing.
 type fakeClaudeRunner struct {
 	response []byte
@@ -52,11 +95,14 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 		"impact_radius": []
 	}`)
 
+	cfg := domain.DefaultConfig()
+	agg := domain.NewCheckAggregate(cfg)
 	a := &Amadeus{
-		Config:    domain.DefaultConfig(),
-		Claude:    &fakeClaudeRunner{response: fakeResp},
-		Logger:    &domain.NopLogger{},
-		Aggregate: domain.NewCheckAggregate(domain.DefaultConfig()),
+		Config:  cfg,
+		Claude:  &fakeClaudeRunner{response: fakeResp},
+		Logger:  &domain.NopLogger{},
+		Emitter: &testInternalCheckEventEmitter{agg: agg},
+		State:   &testInternalCheckStateProvider{agg: agg},
 	}
 
 	ctx, span := platform.Tracer.Start(context.Background(), "test.parent")
