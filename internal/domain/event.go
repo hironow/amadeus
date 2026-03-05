@@ -10,18 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// EventStore is the append-only event persistence interface.
-type EventStore interface {
-	// Append persists one or more events. Validation is performed before any writes.
-	Append(events ...Event) error
-
-	// LoadAll returns all events in chronological order.
-	LoadAll() ([]Event, error)
-
-	// LoadSince returns events with timestamps after the given time.
-	LoadSince(after time.Time) ([]Event, error)
-}
-
 // EventApplier applies domain events to update materialized projections.
 type EventApplier interface {
 	// Apply processes a single event and updates the relevant projections.

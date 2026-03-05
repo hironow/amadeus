@@ -1,13 +1,13 @@
 package session
 
 import (
-	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/eventsource"
+	"github.com/hironow/amadeus/internal/port"
 )
 
 // NewEventStore creates an event store for the given state directory.
 // Derives the events path from the state root.
-func NewEventStore(stateDir string) domain.EventStore {
+func NewEventStore(stateDir string) port.EventStore {
 	return eventsource.NewFileEventStore(eventsource.EventsDir(stateDir))
 }
 

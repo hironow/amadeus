@@ -12,11 +12,12 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/port"
 	"gopkg.in/yaml.v3"
 )
 
-// Compile-time check that ProjectionStore implements domain.StateReader.
-var _ domain.StateReader = (*ProjectionStore)(nil)
+// Compile-time check that ProjectionStore implements port.StateReader.
+var _ port.StateReader = (*ProjectionStore)(nil)
 
 // ProjectionStore manages reading and writing materialized projection files within the .gate/ directory.
 type ProjectionStore struct {

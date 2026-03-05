@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 )
 
 type ShiftReport struct {
@@ -17,7 +18,7 @@ type ShiftReport struct {
 }
 
 type ReadingSteiner struct {
-	Git domain.Git
+	Git port.Git
 }
 
 func (rs *ReadingSteiner) DetectShift(sinceCommit string) (ShiftReport, error) {

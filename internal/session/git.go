@@ -8,15 +8,16 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 )
 
-// GitClient implements domain.Git using subprocess execution.
+// GitClient implements port.Git using subprocess execution.
 type GitClient struct {
 	Dir string
 }
 
-// Compile-time check that GitClient implements domain.Git.
-var _ domain.Git = (*GitClient)(nil)
+// Compile-time check that GitClient implements port.Git.
+var _ port.Git = (*GitClient)(nil)
 
 func NewGitClient(dir string) *GitClient {
 	return &GitClient{Dir: dir}

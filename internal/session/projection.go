@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 )
 
 // Compile-time check that Projector implements domain.EventApplier.
@@ -16,7 +17,7 @@ var _ domain.EventApplier = (*Projector)(nil)
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
 	Store       *ProjectionStore
-	OutboxStore domain.OutboxStore // transactional outbox for D-Mail delivery
+	OutboxStore port.OutboxStore // transactional outbox for D-Mail delivery
 	rebuilding  bool               // true during Rebuild to skip outbox writes
 }
 

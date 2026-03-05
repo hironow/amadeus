@@ -19,10 +19,10 @@ import (
 // Phase 2 (DivergenceMeter via Claude), and Phase 3 (D-Mail generation).
 type Amadeus struct {
 	Config      domain.Config
-	Store       domain.StateReader
-	Events      domain.EventStore   // nil skips event persistence (Projector still required for writes)
+	Store       port.StateReader
+	Events      port.EventStore     // nil skips event persistence (Projector still required for writes)
 	Projector   domain.EventApplier // nil skips projection updates (Events still required for writes)
-	Git         domain.Git
+	Git         port.Git
 	RepoDir     string              // repository root directory
 	Claude      port.ClaudeRunner // nil falls back to the default Claude runner
 	Logger      domain.Logger

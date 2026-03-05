@@ -357,3 +357,68 @@ rules:
       exclude:
         - "*_test.go"
         - "/internal/domain/doc.go"
+
+  # --- Rule 15: No direct domain.NewEvent() in session layer ---
+
+  - id: session-no-direct-new-event
+    languages: [go]
+    severity: WARNING
+    patterns:
+      - pattern: domain.NewEvent(...)
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層から domain.NewEvent() の直接呼び出しは禁止です。
+      event 生成は usecase 層の aggregate 経由で行ってください。
+
+  # --- Rule 16: No I/O contract interface in domain layer ---
+
+  - id: domain-no-io-contract-interface
+    languages: [go]
+    severity: WARNING
+    pattern-regex: 'type\s+\w*(Store|Reader|Repository|Recorder|Writer|Gateway)\s+interface'
+    paths:
+      include:
+        - "/internal/domain/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/domain/doc.go"
+    message: |
+      domain 層に I/O 契約 interface の定義は禁止です。
+      I/O 契約は port 層に配置してください。
+
+  # --- Rule 17: No shell exec command ---
+
+  - id: no-shell-exec-command
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: exec.Command("sh", "-c", ...)
+      - pattern: exec.Command("bash", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "bash", "-c", ...)
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      shell 経由のコマンド実行は禁止です。
+      exec.Command で直接実行可能ファイルを指定してください。
+
+  # --- Rule 18: No ambiguous type names ---
+
+  - id: no-ambiguous-type-names
+    languages: [go]
+    severity: WARNING
+    pattern-regex: 'type\s+\w*(Manager|Service|Helper|Util|Impl|Base|Facade)\s+'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。

@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/port"
 	"github.com/hironow/amadeus/internal/session"
 )
 
 // Rebuild replays events to regenerate projection files.
 // Validates the RebuildCommand and performs the rebuild.
-func Rebuild(cmd domain.RebuildCommand, events domain.EventStore, projector domain.EventApplier, logger domain.Logger) error {
+func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}

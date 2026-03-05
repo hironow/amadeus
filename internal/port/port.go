@@ -3,6 +3,7 @@ package port
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
@@ -54,3 +55,57 @@ type PolicyMetrics interface {
 type NopPolicyMetrics struct{}
 
 func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
+
+// EventStore is the append-only event persistence interface.
+type EventStore interface {
+	// Append persists one or more events. Validation is performed before any writes.
+	Append(events ...domain.Event) error
+
+	// LoadAll returns all events in chronological order.
+	LoadAll() ([]domain.Event, error)
+
+	// LoadSince returns events with timestamps after the given time.
+	LoadSince(after time.Time) ([]domain.Event, error)
+}
+
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
+}
+
+// StateReader is the interface for reading materialized projection state.
+type StateReader interface {
+	// LoadLatest returns the most recent check result.
+	LoadLatest() (domain.CheckResult, error)
+
+	// ScanInbox consumes inbound D-Mails from the inbox directory.
+	ScanInbox() ([]domain.DMail, error)
+
+	// NextDMailName generates a unique D-Mail name for the given kind.
+	NextDMailName(kind domain.DMailKind) (string, error)
+
+	// LoadAllDMails returns all D-Mails from the archive.
+	LoadAllDMails() ([]domain.DMail, error)
+
+	// LoadConsumed returns consumed inbox records.
+	LoadConsumed() ([]domain.ConsumedRecord, error)
+
+	// LoadSyncState returns the current sync state.
+	LoadSyncState() (domain.SyncState, error)
+}
+
+// Git is the interface for repository version control operations.
+type Git interface {
+	// CurrentCommit returns the short SHA of the current HEAD.
+	CurrentCommit() (string, error)
+
+	// MergedPRsSince returns merged PRs between the given commit and HEAD.
+	MergedPRsSince(since string) ([]domain.MergedPR, error)
+
+	// DiffSince returns the unified diff between the given commit and HEAD.
+	DiffSince(since string) (string, error)
+}
