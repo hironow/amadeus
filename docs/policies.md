@@ -14,10 +14,10 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 | Policy Name | WHEN [EVENT] | THEN [COMMAND] | Side Effects |
 |---|---|---|---|
-| CheckCompletedGenerateDMail | check.completed | GenerateDMail | Log (Info) + Desktop notification (5s timeout) |
-| ConvergenceDetectedNotify | convergence.detected | NotifyConvergence | Log (Debug) |
-| InboxConsumedUpdateProjection | inbox.consumed | UpdateProjection | Log (Debug) |
-| DMailGeneratedFlushOutbox | dmail.generated | FlushOutbox | Log (Debug) |
+| CheckCompletedGenerateDMail | check.completed | GenerateDMail | Log (Info) + Desktop Notify + Metrics |
+| ConvergenceDetectedNotify | convergence.detected | NotifyConvergence | Log (Info) + Desktop Notify + Metrics |
+| InboxConsumedUpdateProjection | inbox.consumed | UpdateProjection | Log (Debug) + Metrics |
+| DMailGeneratedFlushOutbox | dmail.generated | FlushOutbox | Log (Debug) + Metrics |
 
 ## Event Payload Format
 
@@ -35,5 +35,5 @@ No retry, no dead-letter queue, no error propagation to callers.
 
 ## Skeleton Handlers
 
-ConvergenceDetectedNotify, InboxConsumedUpdateProjection,
-and DMailGeneratedFlushOutbox are logging-only placeholders.
+InboxConsumedUpdateProjection and DMailGeneratedFlushOutbox are observation-only placeholders
+(Debug log + Metrics, no notification).
