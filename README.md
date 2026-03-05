@@ -439,6 +439,14 @@ Linear Issues -----------> Git Repository -----------> .gate/
                   (specification)                      archive/ (immutable)
 ```
 
+## Documentation
+
+- [docs/](docs/README.md) — Full documentation index
+- [docs/gate-directory.md](docs/gate-directory.md) — `.gate/` directory structure
+- [docs/policies.md](docs/policies.md) — Event → Policy mapping
+- [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/adr/](docs/adr/README.md) — Architecture Decision Records
+
 ## Prerequisites
 
 - Go 1.26+

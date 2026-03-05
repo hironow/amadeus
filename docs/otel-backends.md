@@ -75,8 +75,8 @@ endpoint and verifies the exporter completes without error. Skipped when
 
 ## GenAI Semantic Conventions
 
-amadeus does not invoke LLMs directly and does not emit `gen_ai.*` span attributes.
-Tools that invoke Claude (sightjack, paintress) emit:
+amadeus emits GenAI semantic convention attributes on `claude.invoke` spans
+during the DivergenceMeter phase (Phase 2b):
 
 - `gen_ai.operation.name=chat`
 - `gen_ai.system=anthropic`

@@ -305,6 +305,21 @@ rules:
       exclude:
         - "*_test.go"
 
+  # --- Rule 13a: No direct Linear API access ---
+
+  - id: no-direct-linear-api
+    languages: [go]
+    severity: ERROR
+    pattern-regex: 'api\.linear\.app'
+    message: |
+      Direct Linear API access is prohibited.
+      Use MCP via Claude instead.
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+
   # --- Rule 13: port must not import upper layers ---
 
   - id: layer-port-no-import-upper
@@ -326,3 +341,19 @@ rules:
     paths:
       include:
         - "/internal/port/**"
+
+  # --- Rule 14: No vendor vocabulary in domain ---
+
+  - id: domain-no-vendor-vocabulary
+    languages: [go]
+    severity: WARNING
+    pattern-regex: '(LinearConfig|ClaudeConfig|Wandb|Jaeger)'
+    message: |
+      domain 層に vendor 固有の語彙が含まれています。
+      汎用的な名前を使用してください（例: IssueTrackerConfig, AIAssistantConfig）。
+    paths:
+      include:
+        - "/internal/domain/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/domain/doc.go"

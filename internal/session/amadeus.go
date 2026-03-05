@@ -162,7 +162,20 @@ func (a *Amadeus) buildCheckPrompt(report ShiftReport, fullCheck bool, previous 
 func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullCheck bool, previous domain.CheckResult, quiet bool) (domain.MeterResult, error) {
 	_, span2 := platform.Tracer.Start(ctx, "divergence_meter") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 
-	rawResp, err := a.claudeRunner().Run(ctx, prompt)
+	// claude.invoke span wraps the Claude CLI execution with GenAI semconv attributes.
+	model := a.ClaudeModel
+	if model == "" {
+		model = "opus"
+	}
+	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "claude.invoke",
+		trace.WithAttributes(
+			append([]attribute.KeyValue{
+				attribute.String("claude.model", model),
+			}, platform.GenAISpanAttrs(model)...)...,
+		),
+	)
+	rawResp, err := a.claudeRunner().Run(invokeCtx, prompt)
+	invokeSpan.End()
 	if err != nil {
 		span2.End()
 		return domain.MeterResult{}, fmt.Errorf("phase 2 (claude): %w", err)
