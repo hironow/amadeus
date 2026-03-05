@@ -81,3 +81,34 @@ during the DivergenceMeter phase (Phase 2b):
 - `gen_ai.operation.name=chat`
 - `gen_ai.system=anthropic`
 - `gen_ai.request.model=<model>`
+
+## Cross-Tool OTel Conformance
+
+All 4 tools (phonewave, sightjack, paintress, amadeus) share a common OTel emission contract.
+Each tool's telemetry tests verify conformance to prevent drift.
+
+### Root Span
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| Span name | Yes | Tool-specific operation name |
+| `otel.status_code` | Yes | OK on success, ERROR on failure |
+
+### claude.invoke Span (sightjack, paintress, amadeus only)
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `claude.model` | Yes | Model name (e.g. "opus") |
+| `claude.timeout_sec` | Yes | Timeout in seconds (context deadline or config) |
+| `gen_ai.operation.name` | Yes | Always "chat" |
+| `gen_ai.system` | Yes | Always "anthropic" |
+| `gen_ai.request.model` | Yes | Model name |
+
+### Verification
+
+Each tool runs conformance checks in CI via `go test`:
+
+- phonewave: `internal/session/daemon_otel_test.go`
+- sightjack: `tests/integration/telemetry_test.go`
+- paintress: `internal/session/telemetry_test.go`
+- amadeus: `internal/session/telemetry_test.go`

@@ -167,11 +167,18 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 	if model == "" {
 		model = "opus"
 	}
+	timeoutSec := 0
+	if deadline, ok := ctx.Deadline(); ok {
+		timeoutSec = int(time.Until(deadline).Seconds())
+		if timeoutSec < 0 {
+			timeoutSec = 0
+		}
+	}
 	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
 				attribute.String("claude.model", model),
-				attribute.Int("claude.timeout_sec", 0),
+				attribute.Int("claude.timeout_sec", timeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
