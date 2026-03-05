@@ -7,6 +7,7 @@ import (
 )
 
 // NewEventStore creates an event store for the given state directory.
+// eventsource is the interface-adapter layer for event persistence (clean-architecture).
 // Derives the events path from the state root.
 func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)

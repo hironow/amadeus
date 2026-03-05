@@ -107,7 +107,7 @@ rules:
   - id: layer-eventsource-no-import-upper
     languages: [go]
     message: |
-      eventsource 層から上位層への import は禁止です。
+      eventsource 層 (interface-adapter: event persistence) から上位層への import は禁止です。
       eventsource → domain のみ。
       Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
     severity: ERROR

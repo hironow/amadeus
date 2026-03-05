@@ -20,7 +20,7 @@ cmd              --> usecase, session, usecase/port, platform, domain  (composit
 usecase          --> usecase/port, domain                              (output port only)
 usecase/port     --> domain (+ stdlib)                                 (interface contracts)
 session          --> eventsource, usecase/port, platform, domain       (adapter impl)
-eventsource      --> domain                                            (event store infra)
+eventsource      --> domain                                            (interface-adapter: event persistence)
 platform         --> domain (+ stdlib)                                 (cross-cutting infra)
 domain           --> (nothing internal, stdlib only)                   (pure types/logic)
 ```
