@@ -1,4 +1,5 @@
 package cmd
+// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
 
 import (
 	"os"

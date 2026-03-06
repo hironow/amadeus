@@ -1,4 +1,5 @@
 package session
+// white-box-reason: OTel instrumentation: tests unexported tracer setup and span attribute verification
 
 import (
 	"context"
