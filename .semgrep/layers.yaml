@@ -27,9 +27,9 @@ rules:
   #       cmd → eventsource is PROHIBITED (ADR S0008).
   #       usecase → session is PROHIBITED (must use output port interfaces).
   #
-  # Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+  # Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
   #      Shared ADR S0008 — cmd-eventsource-import-prohibition
-  #      Shared ADR S0017 — aggregate-root-and-usecase-layer
+  #      Shared ADR S0015 — aggregate-root-and-usecase-layer
   # ==========================================================================
 
   # --- Rule 1: Root package must not import internal/ ---
@@ -39,7 +39,7 @@ rules:
     message: |
       root パッケージから internal/ への import は禁止です。
       root は doc.go のみ（go:embed が必要な場合を除く）。
-      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -65,7 +65,7 @@ rules:
     message: |
       session 層から cmd 層への import は禁止です。
       session は eventsource, port, platform, domain を import できます。
-      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -87,7 +87,7 @@ rules:
     message: |
       domain 層から上位層への import は禁止です。
       domain は pure functions のみ（I/O なし、context.Context なし）。
-      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -109,7 +109,7 @@ rules:
     message: |
       eventsource 層 (event persistence adapter, AWS Event Sourcing pattern) から上位層への import は禁止です。
       eventsource → domain のみ。
-      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -147,14 +147,14 @@ rules:
       include:
         - "/internal/cmd/**"
 
-  # --- Rule 6: usecase must not import cmd (ADR S0017) ---
+  # --- Rule 6: usecase must not import cmd (ADR S0015) ---
 
   - id: layer-usecase-no-import-cmd
     languages: [go]
     message: |
       usecase 層から cmd 層への import は禁止です。
       usecase は usecase/port, domain のみ import できます（session は禁止: layer-usecase-no-import-session）。
-      Ref: Shared ADR S0017 — aggregate-root-and-usecase-layer
+      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -169,14 +169,14 @@ rules:
       include:
         - "/internal/usecase/**"
 
-  # --- Rule 7: usecase must not import eventsource directly (ADR S0017) ---
+  # --- Rule 7: usecase must not import eventsource directly (ADR S0015) ---
 
   - id: layer-usecase-no-import-eventsource
     languages: [go]
     message: |
       usecase 層から eventsource 層への直接 import は禁止です。
       session 層のファクトリ関数を経由してください。
-      Ref: Shared ADR S0017 — aggregate-root-and-usecase-layer
+      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -191,7 +191,7 @@ rules:
       include:
         - "/internal/usecase/**"
 
-  # --- Rule 8: session must not import usecase (ADR S0017) ---
+  # --- Rule 8: session must not import usecase (ADR S0015) ---
 
   - id: layer-session-no-import-usecase
     languages: [go]
@@ -199,7 +199,7 @@ rules:
       session 層から usecase 本体への import は禁止です。
       session は usecase/port (Output Port) のみ import 可能です。
       session は eventsource, usecase/port, port, platform, domain を import できます。
-      Ref: Shared ADR S0017 — aggregate-root-and-usecase-layer
+      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -269,7 +269,7 @@ rules:
       platform 層から上位層への import は禁止です。
       platform は domain のみ import できます。
       platform は cross-cutting infrastructure（logger, telemetry, metrics）のみ。
-      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -292,7 +292,7 @@ rules:
       domain 層で I/O stdlib パッケージの import は禁止です。
       domain は pure functions のみ。I/O は session 層で行ってください。
       context.Context を使う interface は port 層に配置してください。
-      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:

@@ -9,7 +9,7 @@ rules:
   # Not covered (no static enforcement):
   # - ADR 0000 (governance), ADR 0002 (stdio — see stdio.yaml)
   # - ADR 0004 (data format), ADR 0006 (build config)
-  # - ADRs S0011-S0031 (see layers.yaml / adr.yaml in each tool)
+  # - ADRs S0009-S0029 (see layers.yaml / adr.yaml in each tool)
   #
   # Ref: refs/shared-adr/ (canonical source for shared ADRs)
   # ==========================================================================
