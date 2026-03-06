@@ -405,7 +405,7 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 |   +-- sync_io.go            Sync state persistence
 |   +-- hook.go               Git hook file management
 |   +-- archive_prune.go      Archive file discovery/deletion
-+-- internal/eventsource/     Event store infrastructure (JSONL append-only)
++-- internal/eventsource/     Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI docs generation
 +-- doc.go                    Package declaration (root-zero: all code in internal/)
