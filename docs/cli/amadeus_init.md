@@ -9,7 +9,10 @@ amadeus init [path] [flags]
 ### Options
 
 ```
-  -h, --help   help for init
+  -h, --help                  help for init
+      --otel-backend string   OTel backend: jaeger, weave
+      --otel-entity string    Weave entity/team (required for weave)
+      --otel-project string   Weave project (required for weave)
 ```
 
 ### Options inherited from parent commands
@@ -23,4 +26,5 @@ amadeus init [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+

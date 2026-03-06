@@ -10,7 +10,7 @@ By default, runs in dry-run mode showing what would be deleted.
 Pass --execute to actually remove the files.
 
 ```
-amadeus archive-prune [flags]
+amadeus archive-prune [path] [flags]
 ```
 
 ### Examples
@@ -53,4 +53,5 @@ amadeus archive-prune [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+
