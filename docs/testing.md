@@ -49,6 +49,28 @@ Run: `just test-scenario` (L1+L2) or `just test-scenario-all`
 - All dependencies must be real — mocks are strictly prohibited
 - Run: `just test-e2e` (requires Docker)
 
+## Public API Test Policy
+
+Unit tests prefer **external test packages** (`package xxx_test`) over white-box packages (`package xxx`). External tests exercise only the public API surface, which:
+
+- Validates the API contract that external consumers depend on
+- Catches accidental API breakage through compilation
+- Permits internal refactoring without test changes
+- Reduces coupling between tests and implementation details
+
+White-box tests (`package xxx`) are reserved for cases that require access to unexported symbols (e.g., testing internal state machines, concurrency internals). Bridge constructors in `export_test.go` files expose specific unexported symbols for external tests when needed.
+
+### CI Enforcement
+
+The `package-audit` CI job enforces minimum external test ratios:
+
+| Scope | Threshold |
+|-------|-----------|
+| `internal/` | >= 70% |
+| `internal/session/` | >= 75% |
+
+Run locally: `just test-package-audit`
+
 ## Running Tests
 
 ```bash
