@@ -27,9 +27,9 @@ rules:
   #       cmd → eventsource is PROHIBITED (ADR S0008).
   #       usecase → session is PROHIBITED (must use output port interfaces).
   #
-  # Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
-  #      phonewave docs/adr/S0008-cmd-eventsource-import-prohibition.md
-  #      phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+  # Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
+  #      Shared ADR S0008 — cmd-eventsource-import-prohibition
+  #      Shared ADR S0017 — aggregate-root-and-usecase-layer
   # ==========================================================================
 
   # --- Rule 1: Root package must not import internal/ ---
@@ -39,7 +39,7 @@ rules:
     message: |
       root パッケージから internal/ への import は禁止です。
       root は doc.go のみ（go:embed が必要な場合を除く）。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -65,7 +65,7 @@ rules:
     message: |
       session 層から cmd 層への import は禁止です。
       session は eventsource, port, platform, domain を import できます。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -87,7 +87,7 @@ rules:
     message: |
       domain 層から上位層への import は禁止です。
       domain は pure functions のみ（I/O なし、context.Context なし）。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -109,7 +109,7 @@ rules:
     message: |
       eventsource 層 (event persistence adapter, AWS Event Sourcing pattern) から上位層への import は禁止です。
       eventsource → domain のみ。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -132,7 +132,7 @@ rules:
       cmd 層から eventsource 層への直接 import は禁止です。
       usecase 層のファクトリ関数を経由してください。
       依存方向: cmd → usecase → session → eventsource（cmd → eventsource は禁止）
-      Ref: phonewave docs/adr/S0008-cmd-eventsource-import-prohibition.md
+      Ref: Shared ADR S0008 — cmd-eventsource-import-prohibition
     severity: ERROR
     patterns:
       - pattern-either:
@@ -154,7 +154,7 @@ rules:
     message: |
       usecase 層から cmd 層への import は禁止です。
       usecase は usecase/port, domain のみ import できます（session は禁止: layer-usecase-no-import-session）。
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      Ref: Shared ADR S0017 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -176,7 +176,7 @@ rules:
     message: |
       usecase 層から eventsource 層への直接 import は禁止です。
       session 層のファクトリ関数を経由してください。
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      Ref: Shared ADR S0017 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -199,7 +199,7 @@ rules:
       session 層から usecase 本体への import は禁止です。
       session は usecase/port (Output Port) のみ import 可能です。
       session は eventsource, usecase/port, port, platform, domain を import できます。
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      Ref: Shared ADR S0017 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -269,7 +269,7 @@ rules:
       platform 層から上位層への import は禁止です。
       platform は domain のみ import できます。
       platform は cross-cutting infrastructure（logger, telemetry, metrics）のみ。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -292,7 +292,7 @@ rules:
       domain 層で I/O stdlib パッケージの import は禁止です。
       domain は pure functions のみ。I/O は session 層で行ってください。
       context.Context を使う interface は port 層に配置してください。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0005 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:

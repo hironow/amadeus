@@ -4,33 +4,31 @@
 
 | Range | Scope | Description |
 |-------|-------|-------------|
-| 0000-0005 | Shared (canonical: phonewave) | Cross-tool decisions. All 4 tools follow these. |
+| 0000-0005 | Shared | Cross-tool decisions. All 4 tools follow these. |
 | 0006+ (per tool) | Tool-specific | Each tool numbers its own ADRs starting from 0006. |
-| S00XX | Shared additions (canonical: phonewave) | Post-initial shared decisions added during alignment. |
+| S00XX | Shared additions | Post-initial shared decisions added during alignment. |
 
-- **Shared ADRs (0000-0005)** live only in phonewave `docs/adr/`. Other tools reference them but do not copy them.
+- **Shared ADRs** are maintained in `refs/shared-adr/` (tap parent repository). Individual tools reference them by ID but do not copy them.
 - **Tool-specific ADRs (0006+)** live in each tool's own `docs/adr/` with numbering starting at 0006.
-- **S-series ADRs** are shared decisions added after the initial 0000-0005 set. They also live only in phonewave.
 - Semgrep rules enforcing shared ADRs are copied to each tool's `.semgrep/shared-adr.yaml`.
 
-## Shared ADRs (canonical: phonewave)
+## Shared ADRs (canonical: refs/shared-adr/)
 
-0000-0005 are reserved. Canonical versions live in `phonewave/docs/adr/`.
+| # | Decision |
+|---|----------|
+| 0000 | Cross-Tool Decision Index |
+| 0001 | cobra CLI framework adoption |
+| 0002 | stdio convention (stdout=data, stderr=logs) |
+| 0003 | OpenTelemetry noop-default + OTLP HTTP |
+| 0004 | D-Mail Schema v1 specification |
+| 0005 | fsnotify-based file watch daemon |
 
-| # | Decision | Linear |
-|---|----------|--------|
-| 0001 | cobra CLI framework adoption | MY-329 |
-| 0002 | stdio convention (stdout=data, stderr=logs) | MY-339 |
-| 0003 | OpenTelemetry noop-default + OTLP HTTP | — |
-| 0004 | D-Mail Schema v1 specification | MY-352, MY-353 |
-| 0005 | fsnotify daemon design | — |
-
-## S-series Shared ADRs (canonical: phonewave)
-
-Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverability.
+## S-series Shared ADRs (canonical: refs/shared-adr/)
 
 | # | Decision | Status |
 |---|----------|--------|
+| S0005 | Root infrastructure and layer conventions | Accepted |
+| S0008 | cmd-eventsource import prohibition | Accepted |
 | S0011 | SQLite WAL cooperative model for concurrent CLI | Accepted |
 | S0012 | Reference data management pattern | Accepted |
 | S0013 | COMMAND naming convention (imperative present tense) | Accepted |
@@ -49,6 +47,9 @@ Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverab
 | S0026 | Domain Model Maturity Assessment | Accepted |
 | S0027 | RDRA Gap Resolution — D-Mail Protocol Extension | Accepted |
 | S0028 | CLI Argument Design (Actual Implementation) | Accepted |
+| S0029 | OTel env-file backend configuration | Accepted |
+| S0030 | Usecase-adapter dependency inversion | Accepted |
+| S0031 | Parse-don't-validate commands | Accepted |
 
 ## amadeus-specific ADRs
 

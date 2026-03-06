@@ -233,6 +233,7 @@ docs-check:
     @! grep -rn 'internal/port[^/]' docs/ internal/domain/doc.go 2>/dev/null || (echo "ERROR: stale internal/port references found" && exit 1)
     @! grep -n 'usecase は session' .semgrep/layers.yaml 2>/dev/null || (echo "ERROR: stale usecase->session allowance in semgrep" && exit 1)
     @! grep -rin 'eventsource.*廃止\|eventsource.*吸収\|eventsource.*session.*移' docs/ 2>/dev/null || (echo "ERROR: stale eventsource terminology — eventsource is retained per todo 73" && exit 1)
+    @bash scripts/check_adr_refs.sh
     @echo "docs-check passed"
 
 # Audit white-box-reason comments on same-package test files
