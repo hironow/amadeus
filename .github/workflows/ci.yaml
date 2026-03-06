@@ -124,3 +124,22 @@ jobs:
             echo "ERROR: Found LINEAR_API_KEY reference"
             exit 1
           fi
+
+      - name: README truth check
+        run: |
+          fail=0
+          if grep -qE '^\+-- templates/' README.md 2>/dev/null; then
+            echo "FAIL: README references root templates/ (should be internal/platform/templates/)"
+            fail=1
+          fi
+          for dir in internal/cmd internal/domain internal/usecase internal/usecase/port internal/session internal/eventsource internal/platform; do
+            if [ ! -d "$dir" ]; then
+              echo "FAIL: $dir does not exist"
+              fail=1
+            fi
+          done
+          if [ ! -f doc.go ]; then
+            echo "FAIL: doc.go missing"
+            fail=1
+          fi
+          exit $fail
