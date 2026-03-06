@@ -258,5 +258,3 @@ test-package-rationale-audit:
 clean:
     rm -rf dist/ coverage.out
     go clean
-    rm -rf dist/
-    go clean

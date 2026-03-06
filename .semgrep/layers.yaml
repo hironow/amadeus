@@ -3,22 +3,22 @@ rules:
   # Layer dependency direction enforcement (CANONICAL — identical across all tools)
   #
   # 7-layer architecture:
-  #   internal/cmd            — cobra CLI, composition root (top layer)
-  #   internal/usecase        — orchestration (COMMAND, Aggregate, POLICY dispatch)
-  #   internal/usecase/port   — context-aware interface contracts + trivial defaults
-  #   internal/session        — I/O orchestration (filesystem, network, subprocess)
-  #   internal/eventsource    — event store infrastructure
-  #   internal/platform       — cross-cutting infrastructure (logger, telemetry, metrics)
-  #   internal/domain         — pure functions, types, interfaces (no I/O, no context)
+  #   internal/cmd              — cobra CLI (top layer)
+  #   internal/usecase          — orchestration (COMMAND, Aggregate, POLICY dispatch)
+  #   internal/usecase/port     — context-aware interface contracts + trivial defaults
+  #   internal/session          — I/O orchestration (filesystem, network, subprocess)
+  #   internal/eventsource      — event store infrastructure
+  #   internal/platform         — cross-cutting infrastructure (logger, telemetry, metrics)
+  #   internal/domain           — pure functions, types, interfaces (no I/O, no context)
   #
   # Allowed dependency directions (dependency inversion applied):
-  #   cmd            → usecase, session, usecase/port, platform, domain (composition root)
-  #   usecase        → usecase/port, domain (output port interface only)
-  #   usecase/port   → domain (+ stdlib)
-  #   session        → eventsource, usecase/port, platform, domain (adapter implementation)
-  #   eventsource    → domain
-  #   platform       → domain (+ stdlib)
-  #   domain         → (nothing internal, stdlib only)
+  #   cmd              → usecase, session, usecase/port, platform, domain (composition root)
+  #   usecase          → usecase/port, domain (output port interface only)
+  #   session          → eventsource, usecase/port, platform, domain (adapter implementation)
+  #   eventsource      → domain
+  #   usecase/port     → domain (+ stdlib)
+  #   platform         → domain (+ stdlib)
+  #   domain           → (nothing internal, stdlib only)
   #
   # PROHIBITED reverse directions are enforced below.
   #
@@ -97,7 +97,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|eventsource|usecase|platform)"
+          regex: ".*/internal/(session|cmd|eventsource|usecase|platform|port)"
     paths:
       include:
         - "/internal/domain/**"
@@ -119,7 +119,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|platform)"
+          regex: ".*/internal/(session|cmd|usecase|port|platform)"
     paths:
       include:
         - "/internal/eventsource/**"
@@ -198,7 +198,7 @@ rules:
     message: |
       session 層から usecase 本体への import は禁止です。
       session は usecase/port (Output Port) のみ import 可能です。
-      session は eventsource, usecase/port, port, platform, domain を import できます。
+      session は eventsource, usecase/port, platform, domain を import できます。
       Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
@@ -279,7 +279,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|eventsource)"
+          regex: ".*/internal/(session|cmd|usecase|eventsource|port)"
     paths:
       include:
         - "/internal/platform/**"
@@ -345,20 +345,6 @@ rules:
     paths:
       include:
         - "/internal/usecase/port/**"
-
-  # --- Rule 13b: Prevent re-import of deprecated internal/port ---
-
-  - id: no-import-old-port
-    languages: [go]
-    severity: ERROR
-    pattern-regex: '"[^"]+/internal/port"'
-    paths:
-      include:
-        - "/internal/**"
-      exclude:
-        - "*_test.go"
-    message: |
-      internal/port は廃止済みです。internal/usecase/port を使用してください。
 
   # --- Rule 14: No vendor vocabulary in domain ---
 
@@ -456,7 +442,21 @@ rules:
     message: |
       曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
 
-  # --- Rule 19: Session layer must not reference aggregate types directly ---
+  # --- Rule 19: No import of deprecated internal/port ---
+
+  - id: no-import-old-port
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '"[^"]+/internal/port"'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      internal/port は廃止済みです。internal/usecase/port を使用してください。
+
+  # --- Rule 20: Session layer must not reference aggregate types directly ---
 
   - id: session-no-aggregate-type
     languages: [go]
@@ -471,7 +471,7 @@ rules:
       session 層で *domain.*Aggregate 型の直接使用は禁止です。
       usecase/port の EventEmitter / StateProvider interface を経由してください。
 
-  # --- Rule 20: Session layer must not call aggregate methods ---
+  # --- Rule 21: Session layer must not call aggregate methods ---
 
   - id: session-no-aggregate-method-call
     languages: [go]
@@ -486,7 +486,7 @@ rules:
       session 層から aggregate のメソッド直接呼び出しは禁止です。
       usecase/port の EventEmitter / StateProvider interface を経由してください。
 
-  # --- Rule 21: Domain must not use embed or text/template ---
+  # --- Rule 22: Domain must not use embed or text/template ---
 
   - id: domain-no-embed-template
     languages: [go]
@@ -509,7 +509,7 @@ rules:
       domain 層で embed / text/template の import は禁止です。
       template 責務は platform 層に配置してください。
 
-  # --- Rule 22: No state dir literal in filepath.Join ---
+  # --- Rule 23: No state dir literal in filepath.Join ---
 
   - id: no-state-dir-literal-in-path-join
     languages: [go]
