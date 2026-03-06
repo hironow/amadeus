@@ -40,7 +40,7 @@ func Status(gateDir string, logger domain.Logger) domain.StatusReport {
 			checkCount++
 			var data domain.CheckCompletedData
 			if err := json.Unmarshal(ev.Data, &data); err == nil {
-				if data.Result.CheckedAt.After(lastCheck) {
+				if data.Result.CheckedAt.After(lastCheck) { // nosemgrep: lod-excessive-dot-chain
 					lastCheck = data.Result.CheckedAt
 					lastDivergence = data.Result.Divergence
 				}

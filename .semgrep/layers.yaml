@@ -562,3 +562,20 @@ rules:
       1. New*() コンストラクタで validated domain primitives を受け取る
       2. Validate() メソッドを削除する
       理由: always-valid domain model (okite skill: parse-dont-validate)
+
+  # --- Rule: Law of Demeter dot-chain guard ---
+
+  - id: lod-excessive-dot-chain
+    languages: [go]
+    severity: WARNING
+    pattern-regex: '\b\w+\.\w+\.\w+\.\w+'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層で 3段以上の dot-chain が検出されました。
+      Tell-Don't-Ask 原則に従い、中間オブジェクトに委譲メソッドを追加してください。
+      誤検知の場合は nosemgrep を付与してください。
+      Ref: okite skill: law-of-demeter, tell-dont-ask
