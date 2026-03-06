@@ -79,6 +79,33 @@ Format: `// white-box-reason: <concise reason referencing unexported symbols>`
 
 The `package-audit` CI job and `just test-package-rationale-audit` enforce this requirement. New same-package test files without the comment will fail CI.
 
+## Quality Command Contract
+
+### Local Commands
+
+| Command | Purpose | Dependencies |
+|---------|---------|-------------|
+| `just lint` | Full lint pass | vet, semgrep, root-guard, nosemgrep-audit, lint-md |
+| `just check` | Pre-commit gate | fmt, vet, semgrep, root-guard, nosemgrep-audit, test, docs-check |
+| `just semgrep` | Semgrep ERROR rules | semgrep |
+| `just nosemgrep-audit` | Validate nosemgrep tags | grep/awk |
+| `just semgrep-test` | Test semgrep rules against fixtures | semgrep |
+
+### CI Jobs
+
+| Job | Steps |
+|-----|-------|
+| `semgrep` | `just semgrep` + `just nosemgrep-audit` + `just semgrep-test` |
+| `package-audit` | threshold check (inline) + `just test-package-rationale-audit` |
+| `test` | build + vet + test + race |
+| `docs-check` | docgen + dead links + vocabulary |
+
+### Failure Workflow
+
+1. `just lint` fails locally: fix the issue before committing.
+2. `just nosemgrep-audit` fails: add `[permanent]` or `[expires: YYYY-MM-DD]` tag to the nosemgrep annotation.
+3. `just semgrep` fails: fix the code or add a tagged nosemgrep annotation if false positive.
+
 ## Running Tests
 
 ```bash
