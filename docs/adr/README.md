@@ -8,11 +8,11 @@
 | 0006+ (per tool) | Tool-specific | Each tool numbers its own ADRs starting from 0006. |
 | S00XX | Shared additions | Post-initial shared decisions added during alignment. |
 
-- **Shared ADRs** are maintained in `refs/shared-adr/` (tap parent repository). Individual tools reference them by ID but do not copy them.
+- **Shared ADRs** are maintained in `docs/shared-adr/` within each tool repository. All four tools keep identical copies.
 - **Tool-specific ADRs (0006+)** live in each tool's own `docs/adr/` with numbering starting at 0006.
 - Semgrep rules enforcing shared ADRs are copied to each tool's `.semgrep/shared-adr.yaml`.
 
-## Shared ADRs (canonical: refs/shared-adr/)
+## Shared ADRs (see: [docs/shared-adr/](../shared-adr/))
 
 | # | Decision |
 |---|----------|
@@ -23,7 +23,7 @@
 | 0004 | D-Mail Schema v1 specification |
 | 0005 | fsnotify-based file watch daemon |
 
-## S-series Shared ADRs (canonical: refs/shared-adr/)
+## S-series Shared ADRs (see: [docs/shared-adr/](../shared-adr/))
 
 | # | Decision | Status |
 |---|----------|--------|
