@@ -44,6 +44,9 @@ jobs:
       - name: Install semgrep
         run: pip install semgrep
 
+      - name: Root layout check
+        run: just root-guard
+
       - name: Run semgrep
         run: just semgrep
 
