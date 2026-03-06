@@ -123,7 +123,7 @@ func TestStatusCmd_JSONOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Append(ev); err != nil {
+	if _, err := store.Append(ev); err != nil {
 		t.Fatal(err)
 	}
 

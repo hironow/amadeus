@@ -44,7 +44,7 @@ func (e *checkEventEmitter) emit(events ...domain.Event) error {
 		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
 	}
 	if e.store != nil {
-		if err := e.store.Append(events...); err != nil {
+		if _, err := e.store.Append(events...); err != nil {
 			return fmt.Errorf("append events: %w", err)
 		}
 	}

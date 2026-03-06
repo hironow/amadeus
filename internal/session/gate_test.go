@@ -67,15 +67,15 @@ type fakeEventStore struct {
 	events []domain.Event
 }
 
-func (e *fakeEventStore) Append(events ...domain.Event) error {
+func (e *fakeEventStore) Append(events ...domain.Event) (domain.AppendResult, error) {
 	e.events = append(e.events, events...)
-	return nil
+	return domain.AppendResult{}, nil
 }
-func (e *fakeEventStore) LoadAll() ([]domain.Event, error) {
-	return e.events, nil
+func (e *fakeEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
+	return e.events, domain.LoadResult{}, nil
 }
-func (e *fakeEventStore) LoadSince(_ time.Time) ([]domain.Event, error) {
-	return e.events, nil
+func (e *fakeEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResult, error) {
+	return e.events, domain.LoadResult{}, nil
 }
 
 type fakeProjector struct {
@@ -100,7 +100,7 @@ type testCheckEventEmitter struct {
 
 func (e *testCheckEventEmitter) emit(events ...domain.Event) error {
 	if e.store != nil {
-		if err := e.store.Append(events...); err != nil {
+		if _, err := e.store.Append(events...); err != nil {
 			return err
 		}
 	}

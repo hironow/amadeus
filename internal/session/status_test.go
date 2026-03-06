@@ -137,7 +137,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.Append(cleanEv, driftEv, convergenceEv); err != nil {
+	if _, err := store.Append(cleanEv, driftEv, convergenceEv); err != nil {
 		t.Fatal(err)
 	}
 

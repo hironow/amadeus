@@ -10,7 +10,7 @@ import (
 // ComputeSuccessRate loads all events from the event store and returns
 // the success rate, clean count, and total check count.
 func ComputeSuccessRate(store port.EventStore) (rate float64, clean int, total int, err error) {
-	events, loadErr := store.LoadAll()
+	events, _, loadErr := store.LoadAll()
 	if loadErr != nil {
 		return 0, 0, 0, loadErr
 	}

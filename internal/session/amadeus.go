@@ -67,7 +67,7 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	if !projectionEmpty {
 		return nil // projections exist, no rebuild needed
 	}
-	events, err := a.Events.LoadAll()
+	events, _, err := a.Events.LoadAll()
 	if err != nil {
 		return fmt.Errorf("load events for auto-rebuild: %w", err)
 	}

@@ -64,13 +64,13 @@ func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
 // EventStore is the append-only event persistence interface.
 type EventStore interface {
 	// Append persists one or more events. Validation is performed before any writes.
-	Append(events ...domain.Event) error
+	Append(events ...domain.Event) (domain.AppendResult, error)
 
 	// LoadAll returns all events in chronological order.
-	LoadAll() ([]domain.Event, error)
+	LoadAll() ([]domain.Event, domain.LoadResult, error)
 
 	// LoadSince returns events with timestamps after the given time.
-	LoadSince(after time.Time) ([]domain.Event, error)
+	LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error)
 }
 
 // OutboxStore is the transactional outbox interface for D-Mail delivery.

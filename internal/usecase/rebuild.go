@@ -12,7 +12,7 @@ import (
 func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
 	_ = cmd // command validated by construction; no fields accessed here
 
-	allEvents, err := events.LoadAll()
+	allEvents, _, err := events.LoadAll()
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
 	}
