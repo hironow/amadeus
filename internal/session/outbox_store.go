@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -127,11 +128,13 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 	// BEGIN IMMEDIATE acquires a RESERVED lock immediately, preventing
 	// the SHARED→EXCLUSIVE deadlock that occurs with DEFERRED transactions
 	// when two connections SELECT then UPDATE concurrently.
+	lockStart := time.Now()
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: begin immediate: %w", err)
 	}
+	span.SetAttributes(attribute.Int64("db.lock_wait_ms", time.Since(lockStart).Milliseconds()))
 	committed := false
 	defer func() {
 		if !committed {
@@ -177,18 +180,21 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 	}
 
 	flushed := 0
+	retryCount := 0
 	for _, it := range items {
 		archivePath := filepath.Join(s.archiveDir, it.name)
 		if writeErr := atomicWrite(archivePath, it.data); writeErr != nil {
 			// Per-item failure: increment retry_count and continue.
 			conn.ExecContext(ctx, //nolint:errcheck
 				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
+			retryCount++
 			continue
 		}
 		outboxPath := filepath.Join(s.outboxDir, it.name)
 		if writeErr := atomicWrite(outboxPath, it.data); writeErr != nil {
 			conn.ExecContext(ctx, //nolint:errcheck
 				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
+			retryCount++
 			continue
 		}
 		if _, err := conn.ExecContext(ctx, `UPDATE staged SET flushed = 1 WHERE name = ?`, it.name); err != nil {
@@ -205,6 +211,7 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
+	span.SetAttributes(attribute.Int("flush.retry.count", retryCount))
 	span.SetAttributes(attribute.Int("flush.success.count", flushed))
 	return flushed, nil
 }
