@@ -409,7 +409,7 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI docs generation
 +-- doc.go                    Package declaration (root-zero: all code in internal/)
-+-- templates/                AI prompt templates ({en,ja})
++-- internal/platform/templates/  AI prompt templates ({en,ja})
 |   +-- skills/               D-Mail SKILL.md templates
 +-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
 +-- tests/e2e/                Docker E2E tests (//go:build e2e)
