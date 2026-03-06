@@ -38,17 +38,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up just
+        uses: extractions/setup-just@v2
+
       - name: Install semgrep
         run: pip install semgrep
 
       - name: Run semgrep
-        run: semgrep --config .semgrep/ internal/ --error
+        run: just semgrep
+
+      - name: Audit nosemgrep annotations
+        run: just nosemgrep-audit
+
+      - name: Test semgrep rules
+        run: just semgrep-test
 
   package-audit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
 
       - name: Test package audit (external test ratio)
         run: |
@@ -68,19 +80,7 @@ jobs:
           audit_dir "internal/session" "internal/session/" 75
 
       - name: Test package rationale audit (white-box-reason comments)
-        run: |
-          missing=0
-          while IFS= read -r f; do
-            if ! grep -q 'white-box-reason:' "$f" 2>/dev/null; then
-              echo "MISSING white-box-reason: $f" >&2
-              missing=$((missing + 1))
-            fi
-          done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null)
-          if [ "$missing" -gt 0 ]; then
-            echo "FAIL: $missing same-package test file(s) missing white-box-reason comment" >&2
-            exit 1
-          fi
-          echo "OK: all same-package test files have white-box-reason comments"
+        run: just test-package-rationale-audit
 
   docs-check:
     runs-on: ubuntu-latest
