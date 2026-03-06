@@ -88,6 +88,20 @@ semgrep-test:
     semgrep scan --test --config .semgrep/layers.yaml .semgrep/layers.go
     semgrep scan --test --config .semgrep/stdio.yaml .semgrep/stdio.go
 
+# Audit test package convention (external vs same-package test functions)
+test-package-audit:
+    #!/usr/bin/env bash
+    audit_dir() {
+        local dir="$1" label="$2"
+        ext=$(grep -rl '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+        same=$(grep -rL '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+        total=$((ext + same))
+        if [ $total -gt 0 ]; then pct=$((ext * 100 / total)); else pct=0; fi
+        echo "$label: external $ext (${pct}%) / same $same ($((100 - pct))%)"
+    }
+    audit_dir "internal" "internal/"
+    audit_dir "internal/session" "internal/session/"
+
 # Verify root package contains only doc.go (no code at root)
 root-guard:
     @if ls *.go 2>/dev/null | grep -qv '^doc\.go$'; then \
