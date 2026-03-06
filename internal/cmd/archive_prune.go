@@ -54,12 +54,15 @@ Pass --execute to actually remove the files.`,
 				return err
 			}
 
-			pruneCmd := domain.ArchivePruneCommand{
-				RepoPath: repoRoot,
-				Days:     days,
-				DryRun:   !execute,
-				Yes:      yes,
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
 			}
+			d, dErr := domain.NewDays(days)
+			if dErr != nil {
+				return dErr
+			}
+			pruneCmd := domain.NewArchivePruneCommand(rp, d, !execute, yes)
 
 			// Composition root: wire ArchiveOps and EventStore
 			archiveOps := session.NewArchiveOps()

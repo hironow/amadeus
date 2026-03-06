@@ -16,22 +16,18 @@ type PruneResult struct {
 }
 
 // CollectPruneCandidates finds files eligible for pruning.
-// Validates the ArchivePruneCommand before collecting candidates.
+// The ArchivePruneCommand is already valid by construction (parse-don't-validate).
 func CollectPruneCandidates(cmd domain.ArchivePruneCommand, archiveOps port.ArchiveOps) (*PruneResult, error) {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return nil, fmt.Errorf("command validation: %w", errs[0])
-	}
-
-	divRoot := filepath.Join(cmd.RepoPath, domain.StateDir)
+	divRoot := filepath.Join(cmd.RepoPath().String(), domain.StateDir)
 	archiveDir := filepath.Join(divRoot, "archive")
-	maxAge := time.Duration(cmd.Days) * 24 * time.Hour
+	maxAge := time.Duration(cmd.Days().Int()) * 24 * time.Hour
 
 	archiveCandidates, err := archiveOps.FindPruneCandidates(archiveDir, maxAge)
 	if err != nil {
 		return nil, fmt.Errorf("find prune candidates: %w", err)
 	}
 
-	eventCandidates, err := archiveOps.ListExpiredEventFiles(divRoot, cmd.Days)
+	eventCandidates, err := archiveOps.ListExpiredEventFiles(divRoot, cmd.Days().Int())
 	if err != nil {
 		return nil, fmt.Errorf("find expired event files: %w", err)
 	}

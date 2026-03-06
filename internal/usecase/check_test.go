@@ -12,29 +12,6 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-func TestRunCheck_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := domain.ExecuteCheckCommand{RepoPath: ""}
-	opts := domain.CheckOptions{}
-	cfg := domain.DefaultConfig()
-	logger := platform.NewLogger(nil, false)
-	a := &session.Amadeus{
-		Config: cfg,
-		Logger: logger,
-	}
-
-	// when
-	err := RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
-
-	// then: command validation should fail
-	if err == nil {
-		t.Fatal("expected error for empty RepoPath")
-	}
-	if got := err.Error(); got != "command validation: RepoPath is required" {
-		t.Fatalf("unexpected error: %s", got)
-	}
-}
-
 func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	// given: valid command with minimal real deps (temp dir with .gate/)
 	tmpDir := t.TempDir()
@@ -49,7 +26,8 @@ func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	store := session.NewProjectionStore(gateDir)
 	eventStore := session.NewEventStore(gateDir, &domain.NopLogger{})
 
-	cmd := domain.ExecuteCheckCommand{RepoPath: tmpDir}
+	rp, _ := domain.NewRepoPath(tmpDir)
+	cmd := domain.NewExecuteCheckCommand(rp)
 	opts := domain.CheckOptions{DryRun: true}
 	cfg := domain.DefaultConfig()
 	logger := platform.NewLogger(nil, false)

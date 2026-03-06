@@ -38,9 +38,11 @@ func newRebuildCommand() *cobra.Command {
 
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 
-			return usecase.Rebuild(domain.RebuildCommand{
-				RepoPath: repoRoot,
-			}, eventStore, projector, logger)
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
+			}
+			return usecase.Rebuild(domain.NewRebuildCommand(rp), eventStore, projector, logger)
 		},
 	}
 

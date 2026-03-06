@@ -8,11 +8,9 @@ import (
 )
 
 // Rebuild replays events to regenerate projection files.
-// Validates the RebuildCommand and performs the rebuild.
+// The RebuildCommand is already valid by construction (parse-don't-validate).
 func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
+	_ = cmd // command validated by construction; no fields accessed here
 
 	allEvents, err := events.LoadAll()
 	if err != nil {

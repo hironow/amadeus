@@ -1,80 +1,84 @@
 package domain
 
-import "fmt"
-
 // ExecuteCheckCommand represents the intent to run an amadeus check.
 // Independent of cobra — framework concerns are separated at the cmd layer.
+// Fields are unexported; use NewExecuteCheckCommand to construct a valid instance.
 type ExecuteCheckCommand struct {
-	RepoPath string
+	repoPath RepoPath
 }
 
-// Validate checks that the command has valid required fields.
-func (c *ExecuteCheckCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	return errs
+// NewExecuteCheckCommand creates an ExecuteCheckCommand from validated primitives.
+func NewExecuteCheckCommand(repoPath RepoPath) ExecuteCheckCommand {
+	return ExecuteCheckCommand{repoPath: repoPath}
 }
+
+// RepoPath returns the validated repository path.
+func (c ExecuteCheckCommand) RepoPath() RepoPath { return c.repoPath }
 
 // RunSyncCommand represents the intent to synchronize PR comments and state.
+// Fields are unexported; use NewRunSyncCommand to construct a valid instance.
 type RunSyncCommand struct {
-	RepoPath string
+	repoPath RepoPath
 }
 
-// Validate checks that the command has valid required fields.
-func (c *RunSyncCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	return errs
+// NewRunSyncCommand creates a RunSyncCommand from validated primitives.
+func NewRunSyncCommand(repoPath RepoPath) RunSyncCommand {
+	return RunSyncCommand{repoPath: repoPath}
 }
+
+// RepoPath returns the validated repository path.
+func (c RunSyncCommand) RepoPath() RepoPath { return c.repoPath }
 
 // RebuildCommand represents the intent to rebuild amadeus state from events.
+// Fields are unexported; use NewRebuildCommand to construct a valid instance.
 type RebuildCommand struct {
-	RepoPath string
+	repoPath RepoPath
 }
 
-// Validate checks that the command has valid required fields.
-func (c *RebuildCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	return errs
+// NewRebuildCommand creates a RebuildCommand from validated primitives.
+func NewRebuildCommand(repoPath RepoPath) RebuildCommand {
+	return RebuildCommand{repoPath: repoPath}
 }
+
+// RepoPath returns the validated repository path.
+func (c RebuildCommand) RepoPath() RepoPath { return c.repoPath }
 
 // InitCommand represents the intent to initialize a .gate directory.
+// Fields are unexported; use NewInitCommand to construct a valid instance.
 type InitCommand struct {
-	RepoRoot string
+	repoRoot RepoPath
 }
 
-// Validate checks that the command has valid required fields.
-func (c *InitCommand) Validate() []error {
-	var errs []error
-	if c.RepoRoot == "" {
-		errs = append(errs, fmt.Errorf("RepoRoot is required"))
-	}
-	return errs
+// NewInitCommand creates an InitCommand from validated primitives.
+func NewInitCommand(repoRoot RepoPath) InitCommand {
+	return InitCommand{repoRoot: repoRoot}
 }
+
+// RepoRoot returns the validated repository root path.
+func (c InitCommand) RepoRoot() RepoPath { return c.repoRoot }
 
 // ArchivePruneCommand represents the intent to prune old archive files.
+// Fields are unexported; use NewArchivePruneCommand to construct a valid instance.
 type ArchivePruneCommand struct {
-	RepoPath string
-	Days     int
-	DryRun   bool
-	Yes      bool
+	repoPath RepoPath
+	days     Days
+	dryRun   bool
+	yes      bool
 }
 
-// Validate checks that the command has valid required fields.
-func (c *ArchivePruneCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	if c.Days <= 0 {
-		errs = append(errs, fmt.Errorf("Days must be positive"))
-	}
-	return errs
+// NewArchivePruneCommand creates an ArchivePruneCommand from validated primitives.
+func NewArchivePruneCommand(repoPath RepoPath, days Days, dryRun, yes bool) ArchivePruneCommand {
+	return ArchivePruneCommand{repoPath: repoPath, days: days, dryRun: dryRun, yes: yes}
 }
+
+// RepoPath returns the validated repository path.
+func (c ArchivePruneCommand) RepoPath() RepoPath { return c.repoPath }
+
+// Days returns the validated retention day count.
+func (c ArchivePruneCommand) Days() Days { return c.days }
+
+// DryRun returns whether to perform a dry run.
+func (c ArchivePruneCommand) DryRun() bool { return c.dryRun }
+
+// Yes returns whether to skip confirmation.
+func (c ArchivePruneCommand) Yes() bool { return c.yes }

@@ -23,7 +23,8 @@ func (s *stubInitRunner) InitGateDir(stateDir string) error {
 
 func TestRunInit_ValidCommand(t *testing.T) {
 	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{RepoRoot: "/tmp/repo"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp)
 
 	err := usecase.RunInit(cmd, runner)
 
@@ -39,23 +40,10 @@ func TestRunInit_ValidCommand(t *testing.T) {
 	}
 }
 
-func TestRunInit_EmptyRepoRoot(t *testing.T) {
-	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{RepoRoot: ""}
-
-	err := usecase.RunInit(cmd, runner)
-
-	if err == nil {
-		t.Fatal("expected error for empty RepoRoot")
-	}
-	if runner.called {
-		t.Fatal("expected InitGateDir not to be called")
-	}
-}
-
 func TestRunInit_RunnerError(t *testing.T) {
 	runner := &stubInitRunner{err: fmt.Errorf("disk full")}
-	cmd := domain.InitCommand{RepoRoot: "/tmp/repo"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp)
 
 	err := usecase.RunInit(cmd, runner)
 

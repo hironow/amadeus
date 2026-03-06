@@ -6,118 +6,52 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-func TestExecuteCheckCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.ExecuteCheckCommand{
-		RepoPath: "/tmp/repo",
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+func TestNewExecuteCheckCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewExecuteCheckCommand(rp)
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %s", cmd.RepoPath().String())
 	}
 }
 
-func TestExecuteCheckCommand_Validate_MissingRepoPath(t *testing.T) {
-	// given
-	cmd := domain.ExecuteCheckCommand{}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing RepoPath")
+func TestNewRunSyncCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewRunSyncCommand(rp)
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %s", cmd.RepoPath().String())
 	}
 }
 
-func TestRunSyncCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.RunSyncCommand{
-		RepoPath: "/tmp/repo",
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+func TestNewRebuildCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewRebuildCommand(rp)
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %s", cmd.RepoPath().String())
 	}
 }
 
-func TestRunSyncCommand_Validate_MissingRepoPath(t *testing.T) {
-	// given
-	cmd := domain.RunSyncCommand{}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing RepoPath")
+func TestNewInitCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp)
+	if cmd.RepoRoot().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %s", cmd.RepoRoot().String())
 	}
 }
 
-func TestRebuildCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.RebuildCommand{
-		RepoPath: "/tmp/repo",
+func TestNewArchivePruneCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	d, _ := domain.NewDays(30)
+	cmd := domain.NewArchivePruneCommand(rp, d, true, false)
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %s", cmd.RepoPath().String())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	if cmd.Days().Int() != 30 {
+		t.Errorf("expected 30, got %d", cmd.Days().Int())
 	}
-}
-
-func TestRebuildCommand_Validate_MissingRepoPath(t *testing.T) {
-	// given
-	cmd := domain.RebuildCommand{}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing RepoPath")
+	if !cmd.DryRun() {
+		t.Error("expected DryRun true")
 	}
-}
-
-func TestArchivePruneCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.ArchivePruneCommand{
-		RepoPath: "/tmp/repo",
-		Days:     30,
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
-	}
-}
-
-func TestArchivePruneCommand_Validate_InvalidDays(t *testing.T) {
-	// given
-	cmd := domain.ArchivePruneCommand{
-		RepoPath: "/tmp/repo",
-		Days:     0,
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for non-positive Days")
+	if cmd.Yes() {
+		t.Error("expected Yes false")
 	}
 }

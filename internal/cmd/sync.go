@@ -64,9 +64,11 @@ func newSyncCommand() *cobra.Command {
 				DataOut:   cmd.OutOrStdout(),
 			}
 
-			return usecase.PrintSync(domain.RunSyncCommand{
-				RepoPath: repoRoot,
-			}, a)
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
+			}
+			return usecase.PrintSync(domain.NewRunSyncCommand(rp), a)
 		},
 	}
 

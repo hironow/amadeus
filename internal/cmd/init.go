@@ -26,7 +26,11 @@ func newInitCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); err == nil {
 				return fmt.Errorf("%s already exists", divRoot)
 			}
-			initCmd := domain.InitCommand{RepoRoot: repoRoot}
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
+			}
+			initCmd := domain.NewInitCommand(rp)
 			if err := usecase.RunInit(initCmd, &session.InitAdapter{}); err != nil {
 				return fmt.Errorf("init: %w", err)
 			}
