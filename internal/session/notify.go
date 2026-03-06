@@ -85,7 +85,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 	case "windows":
 		script := fmt.Sprintf(
 			`Add-Type -AssemblyName System.Windows.Forms; `+
-				`$n = New-Object System.Windows.Forms.NotifyIcon; `+ // nosemgrep: lod-excessive-dot-chain
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+ // nosemgrep: lod-excessive-dot-chain [permanent]
 				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
 				`$n.BalloonTipTitle = '%s'; `+
 				`$n.BalloonTipText = '%s'; `+

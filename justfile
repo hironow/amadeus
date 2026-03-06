@@ -115,7 +115,7 @@ lint: vet semgrep root-guard nosemgrep-audit lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
-check: fmt vet semgrep root-guard test
+check: fmt vet semgrep root-guard nosemgrep-audit test docs-check
 
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:

@@ -42,7 +42,7 @@ func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.St
 			checkCount++
 			var data domain.CheckCompletedData
 			if err := json.Unmarshal(ev.Data, &data); err == nil {
-				if data.Result.CheckedAt.After(lastCheck) { // nosemgrep: lod-excessive-dot-chain
+				if data.Result.CheckedAt.After(lastCheck) { // nosemgrep: lod-excessive-dot-chain [permanent]
 					lastCheck = data.Result.CheckedAt
 					lastDivergence = data.Result.Divergence
 				}
