@@ -27,13 +27,16 @@ A semgrep rule `domain-no-validate-method` prevents reintroduction of `Validate(
 ## Consequences
 
 ### Positive
+
 - Invalid commands cannot exist — correctness by construction
 - Usecase functions are simpler (no validation boilerplate)
 - Domain primitives are reusable across command types
 
 ### Negative
+
 - Parsing errors surface at cmd layer (further from domain logic)
 - More types to maintain (one per validated concept)
 
 ### Neutral
+
 - Error messages move from domain validation to primitive constructors

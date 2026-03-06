@@ -13,8 +13,8 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
-	"github.com/hironow/amadeus/internal/usecase/port"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // --- Fake implementations for gate tests ---
@@ -167,12 +167,18 @@ type testCheckStateProvider struct {
 	agg *domain.CheckAggregate
 }
 
-func (m *testCheckStateProvider) ShouldFullCheck(forceFlag bool) bool       { return m.agg.ShouldFullCheck(forceFlag) }
-func (m *testCheckStateProvider) ForceFullNext() bool                       { return m.agg.ForceFullNext() }
-func (m *testCheckStateProvider) SetForceFullNext(v bool)                   { m.agg.SetForceFullNext(v) }
-func (m *testCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool { return m.agg.ShouldPromoteToFull(prev, curr) }
-func (m *testCheckStateProvider) AdvanceCheckCount(fullCheck bool)          { m.agg.AdvanceCheckCount(fullCheck) }
-func (m *testCheckStateProvider) Restore(result domain.CheckResult)         { m.agg.Restore(result) }
+func (m *testCheckStateProvider) ShouldFullCheck(forceFlag bool) bool {
+	return m.agg.ShouldFullCheck(forceFlag)
+}
+func (m *testCheckStateProvider) ForceFullNext() bool     { return m.agg.ForceFullNext() }
+func (m *testCheckStateProvider) SetForceFullNext(v bool) { m.agg.SetForceFullNext(v) }
+func (m *testCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool {
+	return m.agg.ShouldPromoteToFull(prev, curr)
+}
+func (m *testCheckStateProvider) AdvanceCheckCount(fullCheck bool) {
+	m.agg.AdvanceCheckCount(fullCheck)
+}
+func (m *testCheckStateProvider) Restore(result domain.CheckResult) { m.agg.Restore(result) }
 
 type denyApprover struct{}
 

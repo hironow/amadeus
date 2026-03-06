@@ -19,7 +19,7 @@ var _ domain.EventApplier = (*Projector)(nil)
 type Projector struct {
 	Store       *ProjectionStore
 	OutboxStore port.OutboxStore // transactional outbox for D-Mail delivery
-	rebuilding  bool               // true during Rebuild to skip outbox writes
+	rebuilding  bool             // true during Rebuild to skip outbox writes
 }
 
 // Apply processes a single event and updates the relevant projections.

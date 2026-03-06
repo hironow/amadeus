@@ -21,17 +21,17 @@ type Amadeus struct {
 	Events      port.EventStore     // nil skips event persistence (Projector still required for writes)
 	Projector   domain.EventApplier // nil skips projection updates (Events still required for writes)
 	Git         port.Git
-	RepoDir     string              // repository root directory
+	RepoDir     string            // repository root directory
 	Claude      port.ClaudeRunner // nil falls back to the default Claude runner
 	Logger      domain.Logger
-	DataOut     io.Writer              // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver    port.Approver          // nil = no gate (auto-approve)
-	Notifier    port.Notifier          // nil = no notifications
-	Metrics     port.PolicyMetrics     // nil = no policy metrics
-	ReviewCmd   string                 // code review command (empty = skip)
-	ClaudeCmd   string                 // Claude CLI command (empty = "claude")
-	ClaudeModel string                 // Claude model for review fix (empty = "opus")
-	Emitter     port.CheckEventEmitter // event production + persistence + dispatch (injected by usecase layer)
+	DataOut     io.Writer               // machine-readable output (stdout); Logger is for human progress (stderr)
+	Approver    port.Approver           // nil = no gate (auto-approve)
+	Notifier    port.Notifier           // nil = no notifications
+	Metrics     port.PolicyMetrics      // nil = no policy metrics
+	ReviewCmd   string                  // code review command (empty = skip)
+	ClaudeCmd   string                  // Claude CLI command (empty = "claude")
+	ClaudeModel string                  // Claude model for review fix (empty = "opus")
+	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
 }
 
@@ -330,4 +330,3 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
 	return a.Emitter.EmitDMailCommented(dmailName, issueID, time.Now().UTC())
 }
-

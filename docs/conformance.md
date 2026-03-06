@@ -31,6 +31,7 @@ Event store implementation MUST NOT exist outside `internal/eventsource`.
 `session` uses `eventsource` as a client but does not implement event persistence itself.
 
 Key constraints enforced by semgrep (ERROR severity):
+
 - `usecase --> session` PROHIBITED (must use output port interfaces)
 - `cmd --> eventsource` PROHIBITED (ADR S0008)
 - `domain` has no I/O, no `context.Context`

@@ -1,4 +1,5 @@
 package session
+
 // white-box-reason: OTel instrumentation: tests unexported tracer setup and span attribute verification
 
 import (
@@ -66,12 +67,18 @@ type testInternalCheckStateProvider struct {
 	agg *domain.CheckAggregate
 }
 
-func (m *testInternalCheckStateProvider) ShouldFullCheck(forceFlag bool) bool       { return m.agg.ShouldFullCheck(forceFlag) }
-func (m *testInternalCheckStateProvider) ForceFullNext() bool                       { return m.agg.ForceFullNext() }
-func (m *testInternalCheckStateProvider) SetForceFullNext(v bool)                   { m.agg.SetForceFullNext(v) }
-func (m *testInternalCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool { return m.agg.ShouldPromoteToFull(prev, curr) }
-func (m *testInternalCheckStateProvider) AdvanceCheckCount(fullCheck bool)          { m.agg.AdvanceCheckCount(fullCheck) }
-func (m *testInternalCheckStateProvider) Restore(result domain.CheckResult)         { m.agg.Restore(result) }
+func (m *testInternalCheckStateProvider) ShouldFullCheck(forceFlag bool) bool {
+	return m.agg.ShouldFullCheck(forceFlag)
+}
+func (m *testInternalCheckStateProvider) ForceFullNext() bool     { return m.agg.ForceFullNext() }
+func (m *testInternalCheckStateProvider) SetForceFullNext(v bool) { m.agg.SetForceFullNext(v) }
+func (m *testInternalCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool {
+	return m.agg.ShouldPromoteToFull(prev, curr)
+}
+func (m *testInternalCheckStateProvider) AdvanceCheckCount(fullCheck bool) {
+	m.agg.AdvanceCheckCount(fullCheck)
+}
+func (m *testInternalCheckStateProvider) Restore(result domain.CheckResult) { m.agg.Restore(result) }
 
 // fakeClaudeRunner returns a fixed JSON response for testing.
 type fakeClaudeRunner struct {

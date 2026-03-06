@@ -261,7 +261,9 @@ func goodSessionForwarding(d struct{ hasQueue func() bool }) {
 
 // --- Rule 22: lod-excessive-dot-chain ---
 
-func badLodChain(a struct{ B struct{ C struct{ D func() } } }) {
+func badLodChain(a struct {
+	B struct{ C struct{ D func() } }
+}) {
 	// ruleid: lod-excessive-dot-chain
 	a.B.C.D()
 }

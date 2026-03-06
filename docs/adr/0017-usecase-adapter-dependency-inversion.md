@@ -55,15 +55,18 @@ Enforced by semgrep rule `layer-usecase-no-import-session` (ERROR severity).
 ## Consequences
 
 ### Positive
+
 - usecase layer is fully decoupled from infrastructure — testable with null objects
 - Dependency direction matches hexagonal architecture intent
 - Pure passthrough elimination reduces indirection and code volume
 - semgrep rule prevents regression
 
 ### Negative
+
 - cmd layer has more wiring code (composition root responsibility)
 - Port interface additions require coordination between usecase/port and session
 
 ### Neutral
+
 - Test files (`*_test.go`) are exempt from the session import prohibition
   to allow integration-style tests that verify adapter behavior

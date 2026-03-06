@@ -1,4 +1,5 @@
 package session
+
 // white-box-reason: OTel instrumentation: tests unexported SpanEventStore wrapper and attribute inspection
 
 import (

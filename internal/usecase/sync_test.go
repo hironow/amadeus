@@ -1,4 +1,5 @@
 package usecase
+
 // white-box-reason: usecase internals: tests unexported fakeArchiveOps test double
 
 import (

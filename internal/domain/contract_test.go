@@ -1,6 +1,7 @@
 //go:build contract
 
 package domain
+
 // white-box-reason: contract validation: tests unexported golden file enumeration
 
 import (
