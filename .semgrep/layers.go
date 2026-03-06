@@ -245,6 +245,32 @@ func badAggCall(p struct{ Aggregate interface{ RecordCheck() } }) {
 // ok: session-no-aggregate-method-call
 func goodEmitterCall(e port.CheckEventEmitter) {}
 
+// --- Rule 21: session-no-raw-session-field-access ---
+
+func badSessionFieldAccess(d struct {
+	Session struct{ HasQueue func() bool }
+}) {
+	// ruleid: session-no-raw-session-field-access
+	d.Session.HasQueue()
+}
+
+func goodSessionForwarding(d struct{ hasQueue func() bool }) {
+	// ok: session-no-raw-session-field-access
+	d.hasQueue()
+}
+
+// --- Rule 22: lod-excessive-dot-chain ---
+
+func badLodChain(a struct{ B struct{ C struct{ D func() } } }) {
+	// ruleid: lod-excessive-dot-chain
+	a.B.C.D()
+}
+
+func goodLodChain(a struct{ B func() }) {
+	// ok: lod-excessive-dot-chain
+	a.B()
+}
+
 // suppress unused import warnings for test fixture
 var (
 	_ = fmt.Sprintf
