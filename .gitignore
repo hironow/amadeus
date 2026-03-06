@@ -1,7 +1,7 @@
 # OS
 .DS_Store
-# build files
-/amadeus
+# build artifacts
+/dist/
 # test
 coverage.out
 # amadeus runtime state on target repository
@@ -12,7 +12,9 @@ coverage.out
 .claude/*.local.*
 # git worktrees
 .worktrees/
-# implementation plans (local reference only)
+# plan drafts (ephemeral)
 docs/plans/
 # golang
 .gocache/
+# firebase local debug log
+firebase-debug.log
