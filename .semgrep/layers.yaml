@@ -537,7 +537,7 @@ rules:
         - "/internal/session/"
       exclude:
         - "*_test.go"
-        - "store_factory.go"
+        - "**/store_factory.go"
     message: |
       session 層で .jsonl ファイル操作は禁止です。
       event persistence は internal/eventsource に限定してください (AWS Event Sourcing pattern)。
