@@ -15,7 +15,8 @@ import (
 // eventsource is the event persistence adapter (AWS Event Sourcing pattern).
 // Derives the events path from the state root.
 func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
-	return eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)
+	raw := eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)
+	return NewSpanEventStore(raw)
 }
 
 // EventsDir returns the events directory path for a state root.
