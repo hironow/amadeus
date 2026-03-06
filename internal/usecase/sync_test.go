@@ -20,7 +20,7 @@ func (*fakeArchiveOps) ListExpiredEventFiles(_ context.Context, _ string, _ int)
 func (*fakeArchiveOps) PruneEventFiles(_ context.Context, _ string, _ []string) ([]string, error) {
 	return nil, nil
 }
-func (*fakeArchiveOps) PruneFlushedOutbox(_ string) (int, error) { return 0, nil }
+func (*fakeArchiveOps) PruneFlushedOutbox(_ context.Context, _ string) (int, error) { return 0, nil }
 
 // Validation tests for RunSyncCommand, RebuildCommand, and ArchivePruneCommand
 // have been moved to domain/primitives_test.go (parse-don't-validate).

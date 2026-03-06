@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -120,11 +121,12 @@ func (p *Projector) applyDMailGenerated(event domain.Event) error {
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
+	ctx := context.Background()
 	filename := data.DMail.Name + ".md"
-	if err := p.OutboxStore.Stage(filename, marshaledData); err != nil {
+	if err := p.OutboxStore.Stage(ctx, filename, marshaledData); err != nil {
 		return fmt.Errorf("stage dmail: %w", err)
 	}
-	n, err := p.OutboxStore.Flush()
+	n, err := p.OutboxStore.Flush(ctx)
 	if err != nil {
 		return fmt.Errorf("flush dmail: %w", err)
 	}

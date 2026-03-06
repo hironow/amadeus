@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 
 	_ "modernc.org/sqlite"
@@ -89,11 +92,17 @@ func createOutboxSchema(db *sql.DB) error {
 
 // Stage inserts a D-Mail into the staging table. Idempotent: re-staging the
 // same name is silently ignored (INSERT OR IGNORE).
-func (s *SQLiteOutboxStore) Stage(name string, data []byte) error {
+func (s *SQLiteOutboxStore) Stage(ctx context.Context, name string, data []byte) error {
+	_, span := platform.Tracer.Start(ctx, "outbox.stage")
+	defer span.End()
+
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO staged (name, data) VALUES (?, ?)`, name, data)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.stage"))
 		return fmt.Errorf("outbox store: stage %s: %w", name, err)
 	}
+	span.SetAttributes(attribute.String("db.operation", "stage"))
 	return nil
 }
 
@@ -102,10 +111,15 @@ func (s *SQLiteOutboxStore) Stage(name string, data []byte) error {
 // is wrapped in a BEGIN IMMEDIATE transaction so that concurrent CLI
 // processes wait (up to busy_timeout) instead of deadlocking. A partial
 // failure leaves items eligible for retry on the next Flush call.
-func (s *SQLiteOutboxStore) Flush() (int, error) {
-	ctx := context.Background()
+func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
+	ctx, span := platform.Tracer.Start(ctx, "outbox.flush")
+	defer span.End()
+	span.SetAttributes(attribute.String("db.operation", "flush"))
+
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: get conn: %w", err)
 	}
 	defer conn.Close()
@@ -114,6 +128,8 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	// the SHARED→EXCLUSIVE deadlock that occurs with DEFERRED transactions
 	// when two connections SELECT then UPDATE concurrently.
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: begin immediate: %w", err)
 	}
 	committed := false
@@ -126,6 +142,8 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	rows, err := conn.QueryContext(ctx,
 		`SELECT name, data FROM staged WHERE flushed = 0 AND retry_count < ?`, maxRetryCount)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: query staged: %w", err)
 	}
 
@@ -138,11 +156,15 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 		var it item
 		if err := rows.Scan(&it.name, &it.data); err != nil {
 			rows.Close()
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 			return 0, fmt.Errorf("outbox store: scan row: %w", err)
 		}
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: rows iter: %w", err)
 	}
 
@@ -150,6 +172,7 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 		// Nothing to flush — rollback the empty transaction.
 		conn.ExecContext(ctx, "ROLLBACK") //nolint:errcheck
 		committed = true                  // suppress deferred rollback
+		span.SetAttributes(attribute.Int("flush.success.count", 0))
 		return 0, nil
 	}
 
@@ -169,34 +192,50 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 			continue
 		}
 		if _, err := conn.ExecContext(ctx, `UPDATE staged SET flushed = 1 WHERE name = ?`, it.name); err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 			return 0, fmt.Errorf("outbox store: mark flushed %s: %w", it.name, err)
 		}
 		flushed++
 	}
 
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
+	span.SetAttributes(attribute.Int("flush.success.count", flushed))
 	return flushed, nil
 }
 
 // PruneFlushed deletes all flushed rows from the staging table and runs
 // incremental vacuum to reclaim disk space. Returns the number of deleted rows.
-func (s *SQLiteOutboxStore) PruneFlushed() (int, error) {
+func (s *SQLiteOutboxStore) PruneFlushed(ctx context.Context) (int, error) {
+	_, span := platform.Tracer.Start(ctx, "outbox.prune")
+	defer span.End()
+	span.SetAttributes(attribute.String("db.operation", "prune"))
+
 	result, err := s.db.Exec(`DELETE FROM staged WHERE flushed = 1`)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.prune"))
 		return 0, fmt.Errorf("outbox store: prune flushed: %w", err)
 	}
 	deleted, err := result.RowsAffected()
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "outbox.prune"))
 		return 0, fmt.Errorf("outbox store: rows affected: %w", err)
 	}
 	if deleted > 0 {
 		if vacErr := s.IncrementalVacuum(); vacErr != nil {
+			span.RecordError(vacErr)
+			span.SetAttributes(attribute.String("error.stage", "outbox.prune"))
 			return int(deleted), fmt.Errorf("outbox store: vacuum after prune: %w", vacErr)
 		}
 	}
+	span.SetAttributes(attribute.Int("prune.count", int(deleted)))
 	return int(deleted), nil
 }
 
@@ -225,7 +264,7 @@ func NewOutboxStoreForDir(root string) (*SQLiteOutboxStore, error) {
 
 // PruneFlushedOutbox opens the outbox DB, deletes flushed rows, runs
 // incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
-func PruneFlushedOutbox(root string) (int, error) {
+func PruneFlushedOutbox(ctx context.Context, root string) (int, error) {
 	dbPath := filepath.Join(root, ".run", "outbox.db")
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return 0, nil
@@ -235,7 +274,7 @@ func PruneFlushedOutbox(root string) (int, error) {
 		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
 	}
 	defer store.Close()
-	return store.PruneFlushed()
+	return store.PruneFlushed(ctx)
 }
 
 // atomicWrite writes data to a temporary file in the same directory, then

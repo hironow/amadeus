@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,13 +53,14 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
-	err := store.Stage("test-mail.md", []byte("hello"))
+	err := store.Stage(ctx, "test-mail.md", []byte("hello"))
 	if err != nil {
 		t.Fatalf("Stage: %v", err)
 	}
 
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -89,15 +91,16 @@ func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
-	if err := store.Stage("dup.md", []byte("first")); err != nil {
+	if err := store.Stage(ctx, "dup.md", []byte("first")); err != nil {
 		t.Fatalf("Stage 1: %v", err)
 	}
-	if err := store.Stage("dup.md", []byte("second")); err != nil {
+	if err := store.Stage(ctx, "dup.md", []byte("second")); err != nil {
 		t.Fatalf("Stage 2: %v", err)
 	}
 
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -119,8 +122,9 @@ func TestSQLiteOutboxStore_FlushEmpty(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -133,13 +137,14 @@ func TestSQLiteOutboxStore_FlushOnlyUnflushed(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
-	store.Stage("first.md", []byte("one"))
-	store.Flush()
+	store.Stage(ctx, "first.md", []byte("one"))
+	store.Flush(ctx)
 
-	store.Stage("second.md", []byte("two"))
+	store.Stage(ctx, "second.md", []byte("two"))
 
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -159,12 +164,13 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
-	store.Stage("a.md", []byte("aaa"))
-	store.Stage("b.md", []byte("bbb"))
-	store.Stage("c.md", []byte("ccc"))
+	store.Stage(ctx, "a.md", []byte("aaa"))
+	store.Stage(ctx, "b.md", []byte("bbb"))
+	store.Stage(ctx, "c.md", []byte("ccc"))
 
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -203,6 +209,7 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	defer storeB.Close()
 
 	const itemsPerStore = 10
+	ctx := context.Background()
 
 	var wg sync.WaitGroup
 	errA := make(chan error, 1)
@@ -213,11 +220,11 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		defer wg.Done()
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("a-%03d.md", i)
-			if err := storeA.Stage(name, []byte("from-A-"+name)); err != nil {
+			if err := storeA.Stage(ctx, name, []byte("from-A-"+name)); err != nil {
 				errA <- err
 				return
 			}
-			if _, err := storeA.Flush(); err != nil {
+			if _, err := storeA.Flush(ctx); err != nil {
 				errA <- err
 				return
 			}
@@ -228,11 +235,11 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		defer wg.Done()
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("b-%03d.md", i)
-			if err := storeB.Stage(name, []byte("from-B-"+name)); err != nil {
+			if err := storeB.Stage(ctx, name, []byte("from-B-"+name)); err != nil {
 				errB <- err
 				return
 			}
-			if _, err := storeB.Flush(); err != nil {
+			if _, err := storeB.Flush(ctx); err != nil {
 				errB <- err
 				return
 			}
@@ -306,8 +313,9 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 		t.Fatalf("create store: %v", err)
 	}
 	defer store.Close()
+	ctx := context.Background()
 
-	store.Stage("fail.md", []byte("data"))
+	store.Stage(ctx, "fail.md", []byte("data"))
 
 	// Make archive dir read-only so atomicWrite fails
 	os.Chmod(archiveDir, 0o444)
@@ -315,7 +323,7 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 
 	// when: flush 3 times (each fails, incrementing retry_count to 3)
 	for i := range 3 {
-		n, _ := store.Flush()
+		n, _ := store.Flush(ctx)
 		if n != 0 {
 			t.Errorf("flush %d: expected 0 flushed, got %d", i+1, n)
 		}
@@ -325,7 +333,7 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	os.Chmod(archiveDir, 0o755)
 
 	// when: flush again — item should be dead-letter
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -347,19 +355,20 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 		t.Fatalf("create store: %v", err)
 	}
 	defer store.Close()
+	ctx := context.Background()
 
-	store.Stage("retry.md", []byte("retry-data"))
+	store.Stage(ctx, "retry.md", []byte("retry-data"))
 
 	// First flush fails
 	os.Chmod(archiveDir, 0o444)
-	n, _ := store.Flush()
+	n, _ := store.Flush(ctx)
 	if n != 0 {
 		t.Errorf("first flush: expected 0, got %d", n)
 	}
 
 	// Restore — second flush succeeds
 	os.Chmod(archiveDir, 0o755)
-	n, err = store.Flush()
+	n, err = store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("second Flush: %v", err)
 	}
@@ -388,7 +397,8 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create setup store: %v", err)
 	}
-	if err := storeSetup.Stage("shared.md", []byte("shared-content")); err != nil {
+	ctx := context.Background()
+	if err := storeSetup.Stage(ctx, "shared.md", []byte("shared-content")); err != nil {
 		t.Fatalf("stage: %v", err)
 	}
 	storeSetup.Close()
@@ -412,11 +422,11 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		nA, eA = storeA.Flush()
+		nA, eA = storeA.Flush(ctx)
 	}()
 	go func() {
 		defer wg.Done()
-		nB, eB = storeB.Flush()
+		nB, eB = storeB.Flush(ctx)
 	}()
 	wg.Wait()
 

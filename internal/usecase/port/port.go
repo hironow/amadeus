@@ -77,8 +77,8 @@ type EventStore interface {
 // Stage writes to a write-ahead log (SQLite); Flush materialises staged
 // items to archive/ and outbox/ using atomic file writes.
 type OutboxStore interface {
-	Stage(name string, data []byte) error
-	Flush() (int, error)
+	Stage(ctx context.Context, name string, data []byte) error
+	Flush(ctx context.Context) (int, error)
 	Close() error
 }
 
@@ -128,7 +128,7 @@ type ArchiveOps interface {
 	PruneFiles(candidates []PruneCandidate) (int, error)
 	ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error)
 	PruneEventFiles(ctx context.Context, stateDir string, files []string) ([]string, error)
-	PruneFlushedOutbox(root string) (int, error)
+	PruneFlushedOutbox(ctx context.Context, root string) (int, error)
 }
 
 // CheckEventEmitter wraps aggregate event production + persistence + projection + dispatch.

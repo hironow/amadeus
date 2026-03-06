@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -15,6 +16,7 @@ func TestRace_OutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
 	var wg sync.WaitGroup
 	const workers = 10
@@ -24,11 +26,11 @@ func TestRace_OutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("race-%03d.md", id)
-			store.Stage(name, []byte("data"))
+			store.Stage(ctx, name, []byte("data"))
 		}(i)
 		go func() {
 			defer wg.Done()
-			store.Flush()
+			store.Flush(ctx)
 		}()
 	}
 	wg.Wait()
@@ -52,20 +54,21 @@ func TestRace_OutboxStore_ConcurrentMultiStore(t *testing.T) {
 	}
 	defer storeB.Close()
 
+	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i := range 10 {
 		wg.Add(2)
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("a-%03d.md", id)
-			storeA.Stage(name, []byte("data-a"))
-			storeA.Flush()
+			storeA.Stage(ctx, name, []byte("data-a"))
+			storeA.Flush(ctx)
 		}(i)
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("b-%03d.md", id)
-			storeB.Stage(name, []byte("data-b"))
-			storeB.Flush()
+			storeB.Stage(ctx, name, []byte("data-b"))
+			storeB.Flush(ctx)
 		}(i)
 	}
 	wg.Wait()

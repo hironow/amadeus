@@ -61,7 +61,7 @@ func ExecutePrune(ctx context.Context, result *PruneResult, eventStore port.Even
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
-	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(stateDir); pruneErr == nil && pruned > 0 {
+	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(ctx, stateDir); pruneErr == nil && pruned > 0 {
 		totalCount += pruned
 	}
 
