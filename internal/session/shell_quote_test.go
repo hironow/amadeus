@@ -1,7 +1,9 @@
-package session
+package session_test
 
 import (
 	"testing"
+
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestShellQuoteUnix(t *testing.T) {
@@ -18,7 +20,7 @@ func TestShellQuoteUnix(t *testing.T) {
 		{`"; rm -rf /`, `'"; rm -rf /'`},
 	}
 	for _, tt := range tests {
-		got := ShellQuoteUnix(tt.input)
+		got := session.ShellQuoteUnix(tt.input)
 		if got != tt.want {
 			t.Errorf("ShellQuoteUnix(%q): got %q, want %q", tt.input, got, tt.want)
 		}
@@ -38,7 +40,7 @@ func TestShellQuoteCmd(t *testing.T) {
 		{`"quoted" & piped`, `"""quoted"" & piped"`},
 	}
 	for _, tt := range tests {
-		got := ShellQuoteCmd(tt.input)
+		got := session.ShellQuoteCmd(tt.input)
 		if got != tt.want {
 			t.Errorf("ShellQuoteCmd(%q): got %q, want %q", tt.input, got, tt.want)
 		}
@@ -50,10 +52,10 @@ func TestShellQuote_DelegatesToPlatformFunction(t *testing.T) {
 	input := "test value"
 
 	// when
-	got := ShellQuote(input)
+	got := session.ShellQuote(input)
 
 	// then — on non-windows, should delegate to ShellQuoteUnix
-	want := ShellQuoteUnix(input)
+	want := session.ShellQuoteUnix(input)
 	if got != want {
 		t.Errorf("ShellQuote(%q) = %q, want %q (same as ShellQuoteUnix)", input, got, want)
 	}

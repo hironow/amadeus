@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestInstallHook_NewHook(t *testing.T) {
@@ -15,7 +17,7 @@ func TestInstallHook_NewHook(t *testing.T) {
 	os.MkdirAll(filepath.Join(gitDir, "hooks"), 0o755)
 
 	// when
-	err := InstallHook(gitDir)
+	err := session.InstallHook(gitDir)
 
 	// then
 	if err != nil {
@@ -30,10 +32,10 @@ func TestInstallHook_NewHook(t *testing.T) {
 	if !strings.HasPrefix(content, "#!/bin/sh\n") {
 		t.Errorf("expected shebang, got: %q", content[:20])
 	}
-	if !strings.Contains(content, hookMarkerBegin) {
+	if !strings.Contains(content, session.ExportHookMarkerBegin) {
 		t.Error("missing begin marker")
 	}
-	if !strings.Contains(content, hookMarkerEnd) {
+	if !strings.Contains(content, session.ExportHookMarkerEnd) {
 		t.Error("missing end marker")
 	}
 	if !strings.Contains(content, "amadeus check --quiet") {
@@ -55,7 +57,7 @@ func TestInstallHook_AppendToExisting(t *testing.T) {
 	os.WriteFile(filepath.Join(hooksDir, "post-merge"), []byte(existing), 0o755)
 
 	// when
-	err := InstallHook(gitDir)
+	err := session.InstallHook(gitDir)
 
 	// then
 	if err != nil {
@@ -66,7 +68,7 @@ func TestInstallHook_AppendToExisting(t *testing.T) {
 	if !strings.HasPrefix(content, "#!/bin/sh\necho 'existing hook'\n") {
 		t.Error("existing content was modified")
 	}
-	if !strings.Contains(content, hookMarkerBegin) {
+	if !strings.Contains(content, session.ExportHookMarkerBegin) {
 		t.Error("missing amadeus section")
 	}
 }
@@ -76,10 +78,10 @@ func TestInstallHook_AlreadyInstalled(t *testing.T) {
 	gitDir := t.TempDir()
 	hooksDir := filepath.Join(gitDir, "hooks")
 	os.MkdirAll(hooksDir, 0o755)
-	InstallHook(gitDir)
+	session.InstallHook(gitDir)
 
 	// when
-	err := InstallHook(gitDir)
+	err := session.InstallHook(gitDir)
 
 	// then
 	if err == nil {
@@ -96,7 +98,7 @@ func TestInstallHook_CreatesHooksDir(t *testing.T) {
 	// hooks/ dir does not exist
 
 	// when
-	err := InstallHook(gitDir)
+	err := session.InstallHook(gitDir)
 
 	// then
 	if err != nil {
@@ -114,10 +116,10 @@ func TestUninstallHook_RemovesAmadeusOnly(t *testing.T) {
 	os.MkdirAll(hooksDir, 0o755)
 	existing := "#!/bin/sh\necho 'existing hook'\n"
 	os.WriteFile(filepath.Join(hooksDir, "post-merge"), []byte(existing), 0o755)
-	InstallHook(gitDir)
+	session.InstallHook(gitDir)
 
 	// when
-	err := UninstallHook(gitDir)
+	err := session.UninstallHook(gitDir)
 
 	// then
 	if err != nil {
@@ -125,7 +127,7 @@ func TestUninstallHook_RemovesAmadeusOnly(t *testing.T) {
 	}
 	data, _ := os.ReadFile(filepath.Join(hooksDir, "post-merge"))
 	content := string(data)
-	if strings.Contains(content, hookMarkerBegin) {
+	if strings.Contains(content, session.ExportHookMarkerBegin) {
 		t.Error("amadeus section was not removed")
 	}
 	if !strings.Contains(content, "echo 'existing hook'") {
@@ -137,10 +139,10 @@ func TestUninstallHook_RemovesFileWhenAmadeusOnly(t *testing.T) {
 	// given
 	gitDir := t.TempDir()
 	os.MkdirAll(filepath.Join(gitDir, "hooks"), 0o755)
-	InstallHook(gitDir)
+	session.InstallHook(gitDir)
 
 	// when
-	err := UninstallHook(gitDir)
+	err := session.UninstallHook(gitDir)
 
 	// then
 	if err != nil {
@@ -156,7 +158,7 @@ func TestUninstallHook_NoHookFile(t *testing.T) {
 	gitDir := t.TempDir()
 
 	// when
-	err := UninstallHook(gitDir)
+	err := session.UninstallHook(gitDir)
 
 	// then
 	if err == nil {
@@ -175,7 +177,7 @@ func TestUninstallHook_NoAmadeusSection(t *testing.T) {
 	os.WriteFile(filepath.Join(hooksDir, "post-merge"), []byte("#!/bin/sh\necho hi\n"), 0o755)
 
 	// when
-	err := UninstallHook(gitDir)
+	err := session.UninstallHook(gitDir)
 
 	// then
 	if err == nil {
@@ -191,11 +193,11 @@ func TestUninstallHook_EndMarkerBeforeBegin(t *testing.T) {
 	gitDir := t.TempDir()
 	hooksDir := filepath.Join(gitDir, "hooks")
 	os.MkdirAll(hooksDir, 0o755)
-	malformed := "#!/bin/sh\n" + hookMarkerEnd + "\nsome stuff\n" + hookMarkerBegin + "\namadeus check\n"
+	malformed := "#!/bin/sh\n" + session.ExportHookMarkerEnd + "\nsome stuff\n" + session.ExportHookMarkerBegin + "\namadeus check\n"
 	os.WriteFile(filepath.Join(hooksDir, "post-merge"), []byte(malformed), 0o755)
 
 	// when
-	err := UninstallHook(gitDir)
+	err := session.UninstallHook(gitDir)
 
 	// then: should report malformed, not silently produce garbled output
 	if err == nil {

@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -16,7 +17,7 @@ func TestFindPruneCandidates_DirNotExist(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nonexistent")
 
 	// when
-	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+	candidates, err := session.FindPruneCandidates(dir, 30*24*time.Hour)
 
 	// then
 	if err != nil {
@@ -32,7 +33,7 @@ func TestFindPruneCandidates_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+	candidates, err := session.FindPruneCandidates(dir, 30*24*time.Hour)
 
 	// then
 	if err != nil {
@@ -65,7 +66,7 @@ func TestFindPruneCandidates_FiltersOldFiles(t *testing.T) {
 	}
 
 	// when: prune files older than 30 days
-	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+	candidates, err := session.FindPruneCandidates(dir, 30*24*time.Hour)
 
 	// then
 	if err != nil {
@@ -92,7 +93,7 @@ func TestFindPruneCandidates_IgnoresNonMdFiles(t *testing.T) {
 	}
 
 	// when
-	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+	candidates, err := session.FindPruneCandidates(dir, 30*24*time.Hour)
 
 	// then
 	if err != nil {
@@ -115,7 +116,7 @@ func TestFindPruneCandidates_RecentFilesOnly(t *testing.T) {
 	}
 
 	// when
-	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+	candidates, err := session.FindPruneCandidates(dir, 30*24*time.Hour)
 
 	// then
 	if err != nil {
@@ -138,7 +139,7 @@ func TestFindPruneCandidates_IgnoresDirectories(t *testing.T) {
 	}
 
 	// when
-	candidates, err := FindPruneCandidates(dir, 30*24*time.Hour)
+	candidates, err := session.FindPruneCandidates(dir, 30*24*time.Hour)
 
 	// then
 	if err != nil {
@@ -167,7 +168,7 @@ func TestPruneFiles_DeletesFiles(t *testing.T) {
 	}
 
 	// when
-	count, err := PruneFiles(candidates)
+	count, err := session.PruneFiles(candidates)
 
 	// then
 	if err != nil {
@@ -186,7 +187,7 @@ func TestPruneFiles_DeletesFiles(t *testing.T) {
 
 func TestPruneFiles_EmptyList(t *testing.T) {
 	// when
-	count, err := PruneFiles(nil)
+	count, err := session.PruneFiles(nil)
 
 	// then
 	if err != nil {

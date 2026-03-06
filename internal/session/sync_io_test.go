@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"encoding/json"
@@ -7,13 +7,14 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 )
 
 // MY-346: MarkCommented uses composite key format "dmailName:issueID".
 func TestMarkCommented_CompositeKeyFormat(t *testing.T) {
 	// given
 	root := t.TempDir()
-	store := NewProjectionStore(root)
+	store := session.NewProjectionStore(root)
 
 	// when
 	if err := store.MarkCommented("feedback-001", "MY-42"); err != nil {
@@ -41,7 +42,7 @@ func TestMarkCommented_CompositeKeyFormat(t *testing.T) {
 func TestMarkCommented_MultipleIssuesPerDMail(t *testing.T) {
 	// given
 	root := t.TempDir()
-	store := NewProjectionStore(root)
+	store := session.NewProjectionStore(root)
 
 	// when
 	if err := store.MarkCommented("feedback-001", "MY-42"); err != nil {
@@ -87,7 +88,7 @@ func TestMarkCommented_LegacyKeyNotMatched(t *testing.T) {
 	}
 
 	// when: loading and checking with new composite key
-	store := NewProjectionStore(root)
+	store := session.NewProjectionStore(root)
 	state, err := store.LoadSyncState()
 	if err != nil {
 		t.Fatalf("LoadSyncState: %v", err)
