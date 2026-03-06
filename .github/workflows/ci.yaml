@@ -44,6 +44,29 @@ jobs:
       - name: Run semgrep
         run: semgrep --config .semgrep/ internal/ --error
 
+  package-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test package audit (external test ratio)
+        run: |
+          audit_dir() {
+            local dir="$1" label="$2" threshold="$3"
+            ext=$(grep -rl '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+            same=$(grep -rL '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+            total=$((ext + same))
+            if [ "$total" -gt 0 ]; then pct=$((ext * 100 / total)); else pct=0; fi
+            echo "$label: external $ext (${pct}%) / same $same ($((100 - pct))%)"
+            if [ "$pct" -lt "$threshold" ]; then
+              echo "FAIL: $label external ratio ${pct}% is below threshold ${threshold}%" >&2
+              return 1
+            fi
+          }
+          audit_dir "internal" "internal/" 70
+          audit_dir "internal/session" "internal/session/" 75
+
   docs-check:
     runs-on: ubuntu-latest
     steps:
