@@ -33,7 +33,9 @@ func (s *SpanEventStore) Append(events ...domain.Event) (domain.AppendResult, er
 		span.SetAttributes(attribute.String("error.stage", "eventsource.append"))
 		return result, err
 	}
-	span.SetAttributes(attribute.Int("event.append.bytes", result.BytesWritten))
+	if platform.IsDetailDebug() {
+		span.SetAttributes(attribute.Int("event.append.bytes", result.BytesWritten))
+	}
 	return result, nil
 }
 
@@ -47,11 +49,13 @@ func (s *SpanEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all"))
 		return events, result, err
 	}
-	span.SetAttributes(
-		attribute.Int("event.count.out", len(events)),
-		attribute.Int("event.file.count", result.FileCount),
-		attribute.Int("event.corrupt_line.count", result.CorruptLineCount),
-	)
+	span.SetAttributes(attribute.Int("event.count.out", len(events)))
+	if platform.IsDetailDebug() {
+		span.SetAttributes(
+			attribute.Int("event.file.count", result.FileCount),
+			attribute.Int("event.corrupt_line.count", result.CorruptLineCount),
+		)
+	}
 	return events, result, nil
 }
 
@@ -65,10 +69,12 @@ func (s *SpanEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_since"))
 		return events, result, err
 	}
-	span.SetAttributes(
-		attribute.Int("event.count.out", len(events)),
-		attribute.Int("event.file.count", result.FileCount),
-		attribute.Int("event.corrupt_line.count", result.CorruptLineCount),
-	)
+	span.SetAttributes(attribute.Int("event.count.out", len(events)))
+	if platform.IsDetailDebug() {
+		span.SetAttributes(
+			attribute.Int("event.file.count", result.FileCount),
+			attribute.Int("event.corrupt_line.count", result.CorruptLineCount),
+		)
+	}
 	return events, result, nil
 }
