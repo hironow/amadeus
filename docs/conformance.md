@@ -37,6 +37,18 @@ Key constraints enforced by semgrep (ERROR severity):
 
 Ref: `.semgrep/layers.yaml`, ADR 0017
 
+## Domain Primitives & Parse-Don't-Validate
+
+Domain command types use the Parse-Don't-Validate pattern:
+
+- Domain primitives (`RepoPath`, `Days`) validate in `New*()` constructors — invalid values are rejected at parse time
+- Command types use unexported fields with `New*Command()` constructors that accept only pre-validated primitives
+- Commands are always-valid by construction — no `Validate() []error` methods exist
+- Usecase layer receives always-valid commands with no validation boilerplate
+- Semgrep rule `domain-no-validate-method` prevents reintroduction of `Validate() []error`
+
+Ref: `.semgrep/layers.yaml`, ADR 0018
+
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.

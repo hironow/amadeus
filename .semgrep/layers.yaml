@@ -545,3 +545,20 @@ rules:
       1. event persistence ロジックを internal/eventsource へ移動する
       2. session は store_factory.go 経由で eventsource を利用する
       Ref: docs/conformance.md
+
+  # --- Rule: No Validate() method on domain commands ---
+
+  - id: domain-no-validate-method
+    languages: [go]
+    severity: ERROR
+    pattern-regex: 'func\s+\([^)]+\)\s+Validate\(\)\s+\[\]error'
+    paths:
+      include:
+        - "/internal/domain/**"
+    message: |
+      domain commands に Validate() []error メソッドは禁止です。
+      Parse-Don't-Validate パターンを使用してください。
+      修正手順:
+      1. New*() コンストラクタで validated domain primitives を受け取る
+      2. Validate() メソッドを削除する
+      理由: always-valid domain model (okite skill: parse-dont-validate)
