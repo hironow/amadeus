@@ -235,6 +235,22 @@ docs-check:
     @! grep -rin 'eventsource.*廃止\|eventsource.*吸収\|eventsource.*session.*移' docs/ 2>/dev/null || (echo "ERROR: stale eventsource terminology — eventsource is retained per todo 73" && exit 1)
     @echo "docs-check passed"
 
+# Audit white-box-reason comments on same-package test files
+test-package-rationale-audit:
+    #!/usr/bin/env bash
+    missing=0
+    while IFS= read -r f; do
+      if ! grep -q 'white-box-reason:' "$f" 2>/dev/null; then
+        echo "MISSING white-box-reason: $f" >&2
+        missing=$((missing + 1))
+      fi
+    done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null)
+    if [ "$missing" -gt 0 ]; then
+      echo "FAIL: $missing same-package test file(s) missing white-box-reason comment" >&2
+      exit 1
+    fi
+    echo "OK: all same-package test files have white-box-reason comments"
+
 # Clean build artifacts
 clean:
     rm -f {{TOOL}} coverage.out
