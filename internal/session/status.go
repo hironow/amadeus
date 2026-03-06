@@ -1,17 +1,21 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 // Status collects current operational status from the event store and filesystem.
 // gateDir is the .gate/ directory path (e.g. "<repo>/.gate").
-func Status(gateDir string, logger domain.Logger) domain.StatusReport {
+func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.StatusReport {
 	var report domain.StatusReport
 
 	// Count inbox files
@@ -22,7 +26,17 @@ func Status(gateDir string, logger domain.Logger) domain.StatusReport {
 
 	// Load all events for check stats
 	store := NewEventStore(gateDir, logger)
+
+	_, span := platform.Tracer.Start(ctx, "eventsource.load_all")
+	defer span.End()
+
 	allEvents, err := store.LoadAll()
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all"))
+	}
+	span.SetAttributes(attribute.Int("event.count.out", len(allEvents)))
+
 	if err != nil || len(allEvents) == 0 {
 		return report
 	}

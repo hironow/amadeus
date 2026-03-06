@@ -46,7 +46,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 			}
 
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
-			report := session.Status(divRoot, logger)
+			report := session.Status(cmd.Context(), divRoot, logger)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {

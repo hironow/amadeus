@@ -126,8 +126,8 @@ type PruneCandidate struct {
 type ArchiveOps interface {
 	FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandidate, error)
 	PruneFiles(candidates []PruneCandidate) (int, error)
-	ListExpiredEventFiles(stateDir string, days int) ([]string, error)
-	PruneEventFiles(stateDir string, files []string) ([]string, error)
+	ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error)
+	PruneEventFiles(ctx context.Context, stateDir string, files []string) ([]string, error)
 	PruneFlushedOutbox(root string) (int, error)
 }
 

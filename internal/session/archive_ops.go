@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"time"
 
 	"github.com/hironow/amadeus/internal/usecase/port"
@@ -22,12 +23,12 @@ func (*archiveOps) PruneFiles(candidates []port.PruneCandidate) (int, error) {
 	return PruneFiles(candidates)
 }
 
-func (*archiveOps) ListExpiredEventFiles(stateDir string, days int) ([]string, error) {
-	return ListExpiredEventFiles(stateDir, days)
+func (*archiveOps) ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error) {
+	return ListExpiredEventFiles(ctx, stateDir, days)
 }
 
-func (*archiveOps) PruneEventFiles(stateDir string, files []string) ([]string, error) {
-	return PruneEventFiles(stateDir, files)
+func (*archiveOps) PruneEventFiles(ctx context.Context, stateDir string, files []string) ([]string, error) {
+	return PruneEventFiles(ctx, stateDir, files)
 }
 
 func (*archiveOps) PruneFlushedOutbox(root string) (int, error) {

@@ -68,7 +68,7 @@ Pass --execute to actually remove the files.`,
 			archiveOps := session.NewArchiveOps()
 
 			// COMMAND → usecase (collect candidates)
-			result, err := usecase.CollectPruneCandidates(pruneCmd, archiveOps)
+			result, err := usecase.CollectPruneCandidates(cmd.Context(), pruneCmd, archiveOps)
 			if err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ Pass --execute to actually remove the files.`,
 				}
 				if execute {
 					eventStore := session.NewEventStore(divRoot, logger)
-					totalCount, execErr := usecase.ExecutePrune(result, eventStore, archiveOps, divRoot, logger)
+					totalCount, execErr := usecase.ExecutePrune(cmd.Context(), result, eventStore, archiveOps, divRoot, logger)
 					if execErr != nil {
 						return execErr
 					}
@@ -161,7 +161,7 @@ Pass --execute to actually remove the files.`,
 
 			// usecase → execute prune + emit event
 			eventStore := session.NewEventStore(divRoot, logger)
-			totalCount, err := usecase.ExecutePrune(result, eventStore, archiveOps, divRoot, logger)
+			totalCount, err := usecase.ExecutePrune(cmd.Context(), result, eventStore, archiveOps, divRoot, logger)
 			if err != nil {
 				return err
 			}

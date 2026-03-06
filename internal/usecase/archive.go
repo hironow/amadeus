@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -17,7 +18,7 @@ type PruneResult struct {
 
 // CollectPruneCandidates finds files eligible for pruning.
 // The ArchivePruneCommand is already valid by construction (parse-don't-validate).
-func CollectPruneCandidates(cmd domain.ArchivePruneCommand, archiveOps port.ArchiveOps) (*PruneResult, error) {
+func CollectPruneCandidates(ctx context.Context, cmd domain.ArchivePruneCommand, archiveOps port.ArchiveOps) (*PruneResult, error) {
 	divRoot := filepath.Join(cmd.RepoPath().String(), domain.StateDir)
 	archiveDir := filepath.Join(divRoot, "archive")
 	maxAge := time.Duration(cmd.Days().Int()) * 24 * time.Hour
@@ -27,7 +28,7 @@ func CollectPruneCandidates(cmd domain.ArchivePruneCommand, archiveOps port.Arch
 		return nil, fmt.Errorf("find prune candidates: %w", err)
 	}
 
-	eventCandidates, err := archiveOps.ListExpiredEventFiles(divRoot, cmd.Days().Int())
+	eventCandidates, err := archiveOps.ListExpiredEventFiles(ctx, divRoot, cmd.Days().Int())
 	if err != nil {
 		return nil, fmt.Errorf("find expired event files: %w", err)
 	}
@@ -40,7 +41,7 @@ func CollectPruneCandidates(cmd domain.ArchivePruneCommand, archiveOps port.Arch
 
 // ExecutePrune deletes the collected candidates, prunes flushed outbox rows,
 // and emits an archive.pruned event.
-func ExecutePrune(result *PruneResult, eventStore port.EventStore, archiveOps port.ArchiveOps, stateDir string, logger domain.Logger) (int, error) {
+func ExecutePrune(ctx context.Context, result *PruneResult, eventStore port.EventStore, archiveOps port.ArchiveOps, stateDir string, logger domain.Logger) (int, error) {
 	totalCount := 0
 
 	if len(result.ArchiveCandidates) > 0 {
@@ -52,7 +53,7 @@ func ExecutePrune(result *PruneResult, eventStore port.EventStore, archiveOps po
 	}
 
 	if len(result.EventCandidates) > 0 {
-		deleted, err := archiveOps.PruneEventFiles(stateDir, result.EventCandidates)
+		deleted, err := archiveOps.PruneEventFiles(ctx, stateDir, result.EventCandidates)
 		if err != nil {
 			return totalCount, fmt.Errorf("prune event files: %w", err)
 		}

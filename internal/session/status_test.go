@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := session.Status(baseDir, &domain.NopLogger{})
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.CheckCount != 0 {
@@ -70,7 +71,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := session.Status(baseDir, &domain.NopLogger{})
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.InboxCount != 2 {
@@ -141,7 +142,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 
 	// when
-	report := session.Status(baseDir, &domain.NopLogger{})
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.CheckCount != 2 {
