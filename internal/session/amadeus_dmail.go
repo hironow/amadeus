@@ -16,7 +16,7 @@ import (
 func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 	span := trace.SpanFromContext(ctx)
 
-	consumed, scanErr := a.Store.ScanInbox()
+	consumed, scanErr := a.Store.ScanInbox(ctx)
 	if scanErr != nil {
 		return fmt.Errorf("scan inbox: %w", scanErr)
 	}

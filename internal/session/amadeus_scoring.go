@@ -66,13 +66,13 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 
 // buildCheckPrompt runs Phase 2a: collects ADRs, DoDs, and dependency map,
 // then builds the appropriate Claude prompt (full or diff).
-func (a *Amadeus) buildCheckPrompt(report ShiftReport, fullCheck bool, previous domain.CheckResult, quiet bool) (string, error) {
+func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, fullCheck bool, previous domain.CheckResult, quiet bool) (string, error) {
 	repoRoot := a.RepoDir
-	allADRs, adrErr := CollectADRs(repoRoot)
+	allADRs, adrErr := CollectADRs(ctx, repoRoot)
 	if adrErr != nil && !quiet {
 		a.Logger.Info("Warning: failed to collect ADRs: %v", adrErr)
 	}
-	allDoDs, dodErr := CollectDoDs(repoRoot)
+	allDoDs, dodErr := CollectDoDs(ctx, repoRoot)
 	if dodErr != nil && !quiet {
 		a.Logger.Info("Warning: failed to collect DoDs: %v", dodErr)
 	}

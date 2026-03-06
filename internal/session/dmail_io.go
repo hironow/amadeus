@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,10 @@ import (
 	"sort"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 // NextDMailName returns the next sequential D-Mail name by scanning existing
@@ -122,17 +126,24 @@ func (s *ProjectionStore) SaveConsumed(records []domain.ConsumedRecord) error {
 // invoked by cron or git hooks, so polling at invocation time is sufficient.
 // A watcher would only be warranted if amadeus were daemonised for
 // real-time inbox delivery.
-func (s *ProjectionStore) ScanInbox() ([]domain.DMail, error) {
+func (s *ProjectionStore) ScanInbox(ctx context.Context) ([]domain.DMail, error) {
+	ctx, span := platform.Tracer.Start(ctx, "amadeus.dmail_io")
+	defer span.End()
+
 	inboxDir := filepath.Join(s.Root, "inbox")
 	entries, err := os.ReadDir(inboxDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			span.SetAttributes(attribute.Int("inbox.scan.count", 0))
 			return nil, nil
 		}
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 		return nil, fmt.Errorf("read inbox: %w", err)
 	}
 
 	var dmails []domain.DMail
+	archiveCount := 0
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".md") {
 			continue
@@ -140,10 +151,14 @@ func (s *ProjectionStore) ScanInbox() ([]domain.DMail, error) {
 		inboxPath := filepath.Join(inboxDir, e.Name())
 		data, err := os.ReadFile(inboxPath)
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 			return nil, fmt.Errorf("read inbox file %s: %w", e.Name(), err)
 		}
 		dmail, err := domain.ParseDMail(data)
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 			return nil, fmt.Errorf("parse inbox file %s: %w", e.Name(), err)
 		}
 
@@ -151,12 +166,17 @@ func (s *ProjectionStore) ScanInbox() ([]domain.DMail, error) {
 		archivePath := filepath.Join(s.Root, "archive", e.Name())
 		if _, statErr := os.Stat(archivePath); errors.Is(statErr, fs.ErrNotExist) {
 			if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+				span.RecordError(err)
+				span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 				return nil, fmt.Errorf("archive %s: %w", e.Name(), err)
 			}
+			archiveCount++
 		}
 
 		// Remove from inbox
 		if err := os.Remove(inboxPath); err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 			return nil, fmt.Errorf("remove inbox %s: %w", e.Name(), err)
 		}
 
@@ -166,5 +186,9 @@ func (s *ProjectionStore) ScanInbox() ([]domain.DMail, error) {
 	sort.Slice(dmails, func(i, j int) bool {
 		return dmails[i].Name < dmails[j].Name
 	})
+	span.SetAttributes(
+		attribute.Int("inbox.scan.count", len(dmails)),
+		attribute.Int("archive.write.count", archiveCount),
+	)
 	return dmails, nil
 }

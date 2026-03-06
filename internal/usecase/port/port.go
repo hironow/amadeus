@@ -88,7 +88,7 @@ type StateReader interface {
 	LoadLatest() (domain.CheckResult, error)
 
 	// ScanInbox consumes inbound D-Mails from the inbox directory.
-	ScanInbox() ([]domain.DMail, error)
+	ScanInbox(ctx context.Context) ([]domain.DMail, error)
 
 	// NextDMailName generates a unique D-Mail name for the given kind.
 	NextDMailName(kind domain.DMailKind) (string, error)

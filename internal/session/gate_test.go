@@ -46,7 +46,7 @@ type fakeStateReader struct {
 func (s *fakeStateReader) LoadLatest() (domain.CheckResult, error) {
 	return s.latest, nil
 }
-func (s *fakeStateReader) ScanInbox() ([]domain.DMail, error) {
+func (s *fakeStateReader) ScanInbox(_ context.Context) ([]domain.DMail, error) {
 	return nil, nil
 }
 func (s *fakeStateReader) NextDMailName(_ domain.DMailKind) (string, error) {

@@ -8,7 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 const maxReviewGateCycles = 3
@@ -64,6 +67,9 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
 func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger domain.Logger, budget ...int) (bool, error) {
+	ctx, span := platform.Tracer.Start(ctx, "amadeus.review")
+	defer span.End()
+
 	if strings.TrimSpace(reviewCmd) == "" {
 		return true, nil
 	}
@@ -88,15 +94,20 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 	var lastComments string
 	for cycle := 1; cycle <= maxCycles; cycle++ {
 		if ctx.Err() != nil {
+			span.RecordError(ctx.Err())
+			span.SetAttributes(attribute.String("error.stage", "amadeus.review"))
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
 
+		span.SetAttributes(attribute.Int("review.cycle", cycle))
 		logger.Info("Review gate: cycle %d/%d", cycle, maxCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, reviewCmd, dir)
 		reviewCancel()
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.review"))
 			return false, fmt.Errorf("review gate cycle %d: %w", cycle, err)
 		}
 

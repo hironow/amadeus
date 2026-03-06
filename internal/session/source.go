@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -8,17 +9,27 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 // collectMarkdownFiles reads all .md files from dir, sorted by name,
 // and returns them concatenated with filename headers.
 // Returns ("", nil) if the directory does not exist.
-func collectMarkdownFiles(dir string) (string, error) {
+func collectMarkdownFiles(ctx context.Context, dir string) (string, error) {
+	_, span := platform.Tracer.Start(ctx, "amadeus.source")
+	defer span.End()
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			span.SetAttributes(attribute.Int("source.md.count", 0))
 			return "", nil
 		}
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "amadeus.source"))
 		return "", err
 	}
 
@@ -31,6 +42,8 @@ func collectMarkdownFiles(dir string) (string, error) {
 	}
 	sort.Strings(mdFiles)
 
+	span.SetAttributes(attribute.Int("source.md.count", len(mdFiles)))
+
 	if len(mdFiles) == 0 {
 		return "", nil
 	}
@@ -39,6 +52,8 @@ func collectMarkdownFiles(dir string) (string, error) {
 	for _, name := range mdFiles {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.source"))
 			return "", fmt.Errorf("read %s: %w", name, err)
 		}
 		fmt.Fprintf(&sb, "### %s\n%s\n\n", name, strings.TrimRight(string(data), "\n"))
@@ -49,15 +64,15 @@ func collectMarkdownFiles(dir string) (string, error) {
 // CollectADRs reads all .md files from {repoRoot}/docs/adr/
 // and returns them concatenated with filename headers.
 // Returns ("", nil) if the directory does not exist.
-func CollectADRs(repoRoot string) (string, error) {
-	return collectMarkdownFiles(filepath.Join(repoRoot, "docs", "adr"))
+func CollectADRs(ctx context.Context, repoRoot string) (string, error) {
+	return collectMarkdownFiles(ctx, filepath.Join(repoRoot, "docs", "adr"))
 }
 
 // CollectDoDs reads all .md files from {repoRoot}/docs/dod/
 // and returns them concatenated with filename headers.
 // Returns ("", nil) if the directory does not exist.
-func CollectDoDs(repoRoot string) (string, error) {
-	return collectMarkdownFiles(filepath.Join(repoRoot, "docs", "dod"))
+func CollectDoDs(ctx context.Context, repoRoot string) (string, error) {
+	return collectMarkdownFiles(ctx, filepath.Join(repoRoot, "docs", "dod"))
 }
 
 // CollectDependencyMap reads {repoRoot}/go.mod and returns its content.
