@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -6,19 +6,19 @@ import (
 	"strings"
 	"testing"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 func TestCmdNotifier_Timeout(t *testing.T) {
 	// given -- a command factory that captures the context deadline
 	var capturedCtx context.Context
-	n := &CmdNotifier{
-		cmdTemplate: "echo {message}",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	n := session.NewCmdNotifierForTest("echo {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedCtx = ctx
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -40,7 +40,7 @@ func TestCmdNotifier_Timeout(t *testing.T) {
 
 func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	// given
-	n := NewCmdNotifier("")
+	n := session.NewCmdNotifier("")
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -54,13 +54,12 @@ func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 func TestCmdNotifier_Placeholders(t *testing.T) {
 	// given -- template with placeholders, factory captures the expanded command
 	var capturedArgs []string
-	n := &CmdNotifier{
-		cmdTemplate: "echo {title}: {message}",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	n := session.NewCmdNotifierForTest("echo {title}: {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedArgs = args
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	err := n.Notify(context.Background(), "Hello", "World")
@@ -83,7 +82,7 @@ func TestCmdNotifier_Placeholders(t *testing.T) {
 
 func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// given: unsupported OS
-	n := NewLocalNotifierForTest("freebsd",
+	n := session.NewLocalNotifierForTest("freebsd",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("true")
 		},
@@ -93,7 +92,7 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	err := n.Notify(context.Background(), "Title", "Message")
 
 	// then: should return ErrUnsupportedOS sentinel
-	if err != amadeus.ErrUnsupportedOS {
-		t.Errorf("err = %v, want amadeus.ErrUnsupportedOS", err)
+	if err != port.ErrUnsupportedOS {
+		t.Errorf("err = %v, want port.ErrUnsupportedOS", err)
 	}
 }

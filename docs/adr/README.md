@@ -1,8 +1,21 @@
 # Architecture Decision Records
 
+## Numbering Scheme
+
+| Range | Scope | Description |
+|-------|-------|-------------|
+| 0000-0005 | Shared (canonical: phonewave) | Cross-tool decisions. All 4 tools follow these. |
+| 0006+ (per tool) | Tool-specific | Each tool numbers its own ADRs starting from 0006. |
+| S00XX | Shared additions (canonical: phonewave) | Post-initial shared decisions added during alignment. |
+
+- **Shared ADRs (0000-0005)** live only in phonewave `docs/adr/`. Other tools reference them but do not copy them.
+- **Tool-specific ADRs (0006+)** live in each tool's own `docs/adr/` with numbering starting at 0006.
+- **S-series ADRs** are shared decisions added after the initial 0000-0005 set. They also live only in phonewave.
+- Semgrep rules enforcing shared ADRs are copied to each tool's `.semgrep/shared-adr.yaml`.
+
 ## Shared ADRs (canonical: phonewave)
 
-0001-0005 are reserved. Canonical versions live in `phonewave/docs/adr/`.
+0000-0005 are reserved. Canonical versions live in `phonewave/docs/adr/`.
 
 | # | Decision | Linear |
 |---|----------|--------|
@@ -12,17 +25,12 @@
 | 0004 | D-Mail Schema v1 specification | MY-352, MY-353 |
 | 0005 | fsnotify daemon design | — |
 
-## Extended Shared ADRs (S-series, canonical: phonewave)
+## S-series Shared ADRs (canonical: phonewave)
 
 Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverability.
 
 | # | Decision | Status |
 |---|----------|--------|
-| S0001 | ~~Logger as root package exception~~ | Superseded by S0005 |
-| S0002 | JSONL append-only event sourcing pattern | Accepted |
-| S0003 | Three-way approval contract | Accepted |
-| S0004 | ~~Layer architecture conventions~~ | Superseded by S0005 |
-| S0005 | Root infrastructure pattern and layer conventions | Accepted |
 | S0011 | SQLite WAL cooperative model for concurrent CLI | Accepted |
 | S0012 | Reference data management pattern | Accepted |
 | S0013 | COMMAND naming convention (imperative present tense) | Accepted |
@@ -32,6 +40,15 @@ Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverab
 | S0017 | Aggregate root and use case layer | Accepted |
 | S0018 | Event Storming alignment and per-tool applicability | Accepted |
 | S0019 | Data persistence boundaries (Linear/GitHub/local) | Accepted |
+| S0020 | Accepted cross-tool divergence (default subcommand, storage model) | Accepted |
+| S0021 | D-Mail receive-side validation (Postel's Law) | Accepted |
+| S0022 | OTel Metrics Design | Accepted |
+| S0023 | Cross-Tool Contract Testing | Accepted |
+| S0024 | ~~CLI Argument Design Decisions~~ | Superseded by S0028 |
+| S0025 | Event Delivery Guarantee Levels | Accepted |
+| S0026 | Domain Model Maturity Assessment | Accepted |
+| S0027 | RDRA Gap Resolution — D-Mail Protocol Extension | Accepted |
+| S0028 | CLI Argument Design (Actual Implementation) | Accepted |
 
 ## amadeus-specific ADRs
 

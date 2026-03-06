@@ -1,43 +1,45 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// Compile-time check that Projector implements amadeus.EventApplier.
-var _ amadeus.EventApplier = (*Projector)(nil)
+// Compile-time check that Projector implements domain.EventApplier.
+var _ domain.EventApplier = (*Projector)(nil)
 
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
 	Store       *ProjectionStore
-	OutboxStore amadeus.OutboxStore // transactional outbox for D-Mail delivery
-	rebuilding  bool                // true during Rebuild to skip outbox writes
+	OutboxStore port.OutboxStore // transactional outbox for D-Mail delivery
+	rebuilding  bool             // true during Rebuild to skip outbox writes
 }
 
 // Apply processes a single event and updates the relevant projections.
-func (p *Projector) Apply(event amadeus.Event) error {
+func (p *Projector) Apply(event domain.Event) error {
 	switch event.Type {
-	case amadeus.EventCheckCompleted:
+	case domain.EventCheckCompleted:
 		return p.applyCheckCompleted(event)
-	case amadeus.EventBaselineUpdated:
+	case domain.EventBaselineUpdated:
 		return p.applyBaselineUpdated(event)
-	case amadeus.EventForceFullNextSet:
+	case domain.EventForceFullNextSet:
 		return p.applyForceFullNextSet(event)
-	case amadeus.EventDMailGenerated:
+	case domain.EventDMailGenerated:
 		return p.applyDMailGenerated(event)
-	case amadeus.EventInboxConsumed:
+	case domain.EventInboxConsumed:
 		return p.applyInboxConsumed(event)
-	case amadeus.EventDMailCommented:
+	case domain.EventDMailCommented:
 		return p.applyDMailCommented(event)
-	case amadeus.EventArchivePruned:
+	case domain.EventArchivePruned:
 		return p.applyArchivePruned(event)
-	case amadeus.EventConvergenceDetected:
+	case domain.EventConvergenceDetected:
 		return nil // informational only, no projection needed
 	default:
 		return nil // unknown events are ignored for forward compatibility
@@ -49,7 +51,7 @@ func (p *Projector) Apply(event amadeus.Event) error {
 // so that rebuilt state exactly reflects the event stream.
 // NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed
 // because inbox.consumed events contain only metadata, not the full D-Mail content.
-func (p *Projector) Rebuild(events []amadeus.Event) error {
+func (p *Projector) Rebuild(events []domain.Event) error {
 	// Clear all projection directories
 	for _, sub := range []string{".run", "archive", "outbox"} {
 		dir := filepath.Join(p.Store.Root, sub)
@@ -72,16 +74,16 @@ func (p *Projector) Rebuild(events []amadeus.Event) error {
 	return nil
 }
 
-func (p *Projector) applyCheckCompleted(event amadeus.Event) error {
-	var data amadeus.CheckCompletedData
+func (p *Projector) applyCheckCompleted(event domain.Event) error {
+	var data domain.CheckCompletedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal CheckCompletedData: %w", err)
 	}
 	return p.Store.SaveLatest(data.Result)
 }
 
-func (p *Projector) applyBaselineUpdated(event amadeus.Event) error {
-	var data amadeus.BaselineUpdatedData
+func (p *Projector) applyBaselineUpdated(event domain.Event) error {
+	var data domain.BaselineUpdatedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal BaselineUpdatedData: %w", err)
 	}
@@ -95,7 +97,7 @@ func (p *Projector) applyBaselineUpdated(event amadeus.Event) error {
 	return p.Store.SaveBaseline(latest)
 }
 
-func (p *Projector) applyForceFullNextSet(event amadeus.Event) error {
+func (p *Projector) applyForceFullNextSet(event domain.Event) error {
 	latest, err := p.Store.LoadLatest()
 	if err != nil {
 		return fmt.Errorf("load latest for ForceFullNext: %w", err)
@@ -104,8 +106,8 @@ func (p *Projector) applyForceFullNextSet(event amadeus.Event) error {
 	return p.Store.SaveLatest(latest)
 }
 
-func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
-	var data amadeus.DMailGeneratedData
+func (p *Projector) applyDMailGenerated(event domain.Event) error {
+	var data domain.DMailGeneratedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailGeneratedData: %w", err)
 	}
@@ -115,15 +117,16 @@ func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
 		return p.Store.SaveDMailToArchive(data.DMail)
 	}
 	// Normal mode: transactional outbox (Stage → Flush to archive/ + outbox/).
-	marshaledData, err := amadeus.MarshalDMail(data.DMail)
+	marshaledData, err := domain.MarshalDMail(data.DMail)
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
+	ctx := context.Background()
 	filename := data.DMail.Name + ".md"
-	if err := p.OutboxStore.Stage(filename, marshaledData); err != nil {
+	if err := p.OutboxStore.Stage(ctx, filename, marshaledData); err != nil {
 		return fmt.Errorf("stage dmail: %w", err)
 	}
-	n, err := p.OutboxStore.Flush()
+	n, err := p.OutboxStore.Flush(ctx)
 	if err != nil {
 		return fmt.Errorf("flush dmail: %w", err)
 	}
@@ -137,22 +140,22 @@ func (p *Projector) applyDMailGenerated(event amadeus.Event) error {
 // NOTE: This only updates consumed.json, not archive/. Inbox D-Mails are copied
 // to archive/ at scan time (ScanInbox), not via event replay. This is intentional:
 // the event payload contains only metadata, not the full D-Mail content.
-func (p *Projector) applyInboxConsumed(event amadeus.Event) error {
-	var data amadeus.InboxConsumedData
+func (p *Projector) applyInboxConsumed(event domain.Event) error {
+	var data domain.InboxConsumedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal InboxConsumedData: %w", err)
 	}
-	record := amadeus.ConsumedRecord{
+	record := domain.ConsumedRecord{
 		Name:       data.Name,
 		Kind:       data.Kind,
 		ConsumedAt: event.Timestamp,
 		Source:     data.Source,
 	}
-	return p.Store.SaveConsumed([]amadeus.ConsumedRecord{record})
+	return p.Store.SaveConsumed([]domain.ConsumedRecord{record})
 }
 
-func (p *Projector) applyDMailCommented(event amadeus.Event) error {
-	var data amadeus.DMailCommentedData
+func (p *Projector) applyDMailCommented(event domain.Event) error {
+	var data domain.DMailCommentedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailCommentedData: %w", err)
 	}
@@ -161,7 +164,7 @@ func (p *Projector) applyDMailCommented(event amadeus.Event) error {
 		return fmt.Errorf("load sync state: %w", err)
 	}
 	key := data.DMail + ":" + data.IssueID
-	state.CommentedDMails[key] = amadeus.CommentRecord{
+	state.CommentedDMails[key] = domain.CommentRecord{
 		DMail:       data.DMail,
 		IssueID:     data.IssueID,
 		CommentedAt: event.Timestamp,
@@ -169,8 +172,8 @@ func (p *Projector) applyDMailCommented(event amadeus.Event) error {
 	return p.Store.SaveSyncState(state)
 }
 
-func (p *Projector) applyArchivePruned(event amadeus.Event) error {
-	var data amadeus.ArchivePrunedData
+func (p *Projector) applyArchivePruned(event domain.Event) error {
+	var data domain.ArchivePrunedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal ArchivePrunedData: %w", err)
 	}
@@ -180,10 +183,10 @@ func (p *Projector) applyArchivePruned(event amadeus.Event) error {
 		if strings.Contains(name, "/") || strings.Contains(name, "\\") || name == ".." {
 			continue
 		}
-		// Only delete archive/ files. Event files (.jsonl) are the source of
-		// truth and must never be deleted by a projection handler — the CLI
+		// Only delete archive/ files. Event files are the source of truth
+		// and must never be deleted by a projection handler — the CLI
 		// archive-prune command handles event file deletion directly.
-		if strings.HasSuffix(name, ".jsonl") {
+		if strings.HasSuffix(name, ".jsonl") { // nosemgrep: layer-session-no-event-persistence — guard to protect event files from deletion, not event persistence [permanent]
 			continue
 		}
 		os.Remove(filepath.Join(archiveDir, name))

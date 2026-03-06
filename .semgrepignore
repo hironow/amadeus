@@ -1,0 +1,2 @@
+# Semgrep test fixtures (intentionally contain rule violations)
+.semgrep/*.go

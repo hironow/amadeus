@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.
@@ -85,7 +85,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 	case "windows":
 		script := fmt.Sprintf(
 			`Add-Type -AssemblyName System.Windows.Forms; `+
-				`$n = New-Object System.Windows.Forms.NotifyIcon; `+
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+ // nosemgrep: lod-excessive-dot-chain [permanent]
 				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
 				`$n.BalloonTipTitle = '%s'; `+
 				`$n.BalloonTipText = '%s'; `+
@@ -95,6 +95,6 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		)
 		return factory(ctx, "powershell", "-NoProfile", "-Command", script).Run()
 	default:
-		return amadeus.ErrUnsupportedOS
+		return port.ErrUnsupportedOS
 	}
 }

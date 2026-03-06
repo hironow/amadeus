@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
@@ -24,23 +24,25 @@ func newRebuildCommand() *cobra.Command {
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			logger := loggerFrom(cmd)
 
-			eventStore := session.NewEventStore(divRoot)
+			// Composition root: wire stores directly
+			eventStore := session.NewEventStore(divRoot, logger)
 			store := session.NewProjectionStore(divRoot)
-
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
 			}
-			defer outboxStore.Close()
+			defer outbox.Close()
 
-			projector := &session.Projector{Store: store, OutboxStore: outboxStore}
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
 
-			return usecase.Rebuild(amadeus.RebuildCommand{
-				RepoPath: repoRoot,
-			}, eventStore, projector, logger)
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
+			}
+			return usecase.Rebuild(domain.NewRebuildCommand(rp), eventStore, projector, logger)
 		},
 	}
 

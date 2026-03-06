@@ -113,7 +113,7 @@ amadeus check
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
     |   +-- baseline.json     <- Full calibration baseline
-    +-- history/              <- Historical check results
+    +-- events/               <- Append-only event log (JSONL, daily rotation)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
     +-- archive/              <- All D-Mails (git-tracked)
@@ -179,7 +179,7 @@ amadeus init
 amadeus check
 ```
 
-Amadeus creates `.gate/` with config, state, history, and D-Mail storage automatically.
+Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Subcommands
 
@@ -192,6 +192,9 @@ Amadeus creates `.gate/` with config, state, history, and D-Mail storage automat
 | `amadeus log` | Print check history and D-Mail log |
 | `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
 | `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
+| `amadeus status [path]` | Show amadeus operational status |
+| `amadeus clean [path]` | Remove state directory (`.gate/`) |
+| `amadeus rebuild [path]` | Rebuild projections from event store |
 | `amadeus archive-prune` | Prune old archived D-Mail files |
 | `amadeus install-hook` | Install git post-merge hook |
 | `amadeus uninstall-hook` | Remove git post-merge hook |
@@ -249,6 +252,7 @@ amadeus update -C
 |------|-------|---------|-------------|
 | `--config` | `-c` | `.gate/config.yaml` | Config file path |
 | `--verbose` | `-v` | `false` | Verbose logging |
+| `--output` | `-o` | `text` | Output format: `text` or `json` |
 | `--lang` | `-l` | | Output language (`ja`, `en`) |
 
 ### check
@@ -401,20 +405,10 @@ just release-snapshot   # Test release locally (snapshot, no upload)
 |   +-- sync_io.go            Sync state persistence
 |   +-- hook.go               Git hook file management
 |   +-- archive_prune.go      Archive file discovery/deletion
-+-- internal/eventsource/     Event store infrastructure (JSONL append-only)
++-- internal/eventsource/     Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI docs generation
-+-- Root package (amadeus)    Types, interfaces, pure functions, go:embed
-|   +-- amadeus.go            DriftError, ExitCode, CheckOptions
-|   +-- config.go             Config type, DefaultConfig, ValidateConfig
-|   +-- convergence.go        Pure convergence algorithm
-|   +-- dmail.go              DMail types, ParseDMail, MarshalDMail, ValidateDMail
-|   +-- event.go              Event envelope, EventType constants
-|   +-- scoring.go            Pure scoring calculation
-|   +-- state.go              CheckType, CheckResult, StateReader interface
-|   +-- claude.go             ClaudeRunner interface, go:embed templates
-|   +-- logger.go             Structured logger (noop default)
-|   +-- telemetry.go          OTel tracer (noop default)
++-- doc.go                    Package declaration (root-zero: all code in internal/)
 +-- templates/                AI prompt templates ({en,ja})
 |   +-- skills/               D-Mail SKILL.md templates
 +-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
@@ -444,6 +438,19 @@ Linear Issues -----------> Git Repository -----------> .gate/
                   (report) -----+----> inbox/         outbox/ ----> feedback
                   (specification)                      archive/ (immutable)
 ```
+
+## What / Why / How
+
+See [docs/conformance.md](docs/conformance.md) for the full conformance table (single source).
+
+## Documentation
+
+- [docs/](docs/README.md) — Full documentation index
+- [docs/conformance.md](docs/conformance.md) — What/Why/How conformance table
+- [docs/gate-directory.md](docs/gate-directory.md) — `.gate/` directory structure
+- [docs/policies.md](docs/policies.md) — Event → Policy mapping
+- [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/adr/](docs/adr/README.md) — Architecture Decision Records
 
 ## Prerequisites
 

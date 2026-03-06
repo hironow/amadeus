@@ -1,37 +1,34 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // PruneResult holds the outcome of an archive prune operation.
 type PruneResult struct {
-	ArchiveCandidates []session.PruneCandidate
+	ArchiveCandidates []port.PruneCandidate
 	EventCandidates   []string
 }
 
 // CollectPruneCandidates finds files eligible for pruning.
-// Validates the ArchivePruneCommand before collecting candidates.
-func CollectPruneCandidates(cmd amadeus.ArchivePruneCommand) (*PruneResult, error) {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return nil, fmt.Errorf("command validation: %w", errs[0])
-	}
-
-	divRoot := filepath.Join(cmd.RepoPath, ".gate")
+// The ArchivePruneCommand is already valid by construction (parse-don't-validate).
+func CollectPruneCandidates(ctx context.Context, cmd domain.ArchivePruneCommand, archiveOps port.ArchiveOps) (*PruneResult, error) {
+	divRoot := filepath.Join(cmd.RepoPath().String(), domain.StateDir)
 	archiveDir := filepath.Join(divRoot, "archive")
-	maxAge := time.Duration(cmd.Days) * 24 * time.Hour
+	maxAge := time.Duration(cmd.Days().Int()) * 24 * time.Hour
 
-	archiveCandidates, err := session.FindPruneCandidates(archiveDir, maxAge)
+	archiveCandidates, err := archiveOps.FindPruneCandidates(archiveDir, maxAge)
 	if err != nil {
 		return nil, fmt.Errorf("find prune candidates: %w", err)
 	}
 
-	eventCandidates, err := session.ListExpiredEventFiles(divRoot, cmd.Days)
+	eventCandidates, err := archiveOps.ListExpiredEventFiles(ctx, divRoot, cmd.Days().Int())
 	if err != nil {
 		return nil, fmt.Errorf("find expired event files: %w", err)
 	}
@@ -44,11 +41,11 @@ func CollectPruneCandidates(cmd amadeus.ArchivePruneCommand) (*PruneResult, erro
 
 // ExecutePrune deletes the collected candidates, prunes flushed outbox rows,
 // and emits an archive.pruned event.
-func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
+func ExecutePrune(ctx context.Context, result *PruneResult, eventStore port.EventStore, archiveOps port.ArchiveOps, stateDir string, logger domain.Logger) (int, error) {
 	totalCount := 0
 
 	if len(result.ArchiveCandidates) > 0 {
-		count, err := session.PruneFiles(result.ArchiveCandidates)
+		count, err := archiveOps.PruneFiles(result.ArchiveCandidates)
 		if err != nil {
 			return totalCount, fmt.Errorf("prune archive: %w", err)
 		}
@@ -56,7 +53,7 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	}
 
 	if len(result.EventCandidates) > 0 {
-		deleted, err := session.PruneEventFiles(gateDir, result.EventCandidates)
+		deleted, err := archiveOps.PruneEventFiles(ctx, stateDir, result.EventCandidates)
 		if err != nil {
 			return totalCount, fmt.Errorf("prune event files: %w", err)
 		}
@@ -64,7 +61,7 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
-	if pruned, pruneErr := session.PruneFlushedOutbox(gateDir); pruneErr == nil && pruned > 0 {
+	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(ctx, stateDir); pruneErr == nil && pruned > 0 {
 		totalCount += pruned
 	}
 
@@ -75,15 +72,14 @@ func ExecutePrune(result *PruneResult, gateDir, eventsDir string) (int, error) {
 	}
 	paths = append(paths, result.EventCandidates...)
 
-	eventStore := session.NewEventStoreFromEventsDir(eventsDir)
-	ev, evErr := amadeus.NewEvent(amadeus.EventArchivePruned, amadeus.ArchivePrunedData{
+	ev, evErr := domain.NewEvent(domain.EventArchivePruned, domain.ArchivePrunedData{
 		Paths: paths,
 		Count: totalCount,
 	}, time.Now().UTC())
 	if evErr != nil {
 		return totalCount, fmt.Errorf("pruned %d file(s) but failed to create archive.pruned event: %w", totalCount, evErr)
 	}
-	if appendErr := eventStore.Append(ev); appendErr != nil {
+	if _, appendErr := eventStore.Append(ev); appendErr != nil {
 		return totalCount, fmt.Errorf("pruned %d file(s) but failed to record archive.pruned event: %w", totalCount, appendErr)
 	}
 

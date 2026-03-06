@@ -1,14 +1,16 @@
-package session
+package session_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestPreflightCheck_ExistingBinary(t *testing.T) {
 	// given: "go" should always exist in test environment
 	// when
-	err := PreflightCheck("go")
+	err := session.PreflightCheck("go")
 
 	// then
 	if err != nil {
@@ -19,7 +21,7 @@ func TestPreflightCheck_ExistingBinary(t *testing.T) {
 func TestPreflightCheck_MissingBinary(t *testing.T) {
 	// given: a binary that should not exist
 	// when
-	err := PreflightCheck("nonexistent-binary-xyz-123")
+	err := session.PreflightCheck("nonexistent-binary-xyz-123")
 
 	// then
 	if err == nil {
@@ -33,7 +35,7 @@ func TestPreflightCheck_MissingBinary(t *testing.T) {
 func TestPreflightCheck_MultipleBinaries(t *testing.T) {
 	// given: first binary exists, second does not
 	// when
-	err := PreflightCheck("go", "nonexistent-binary-xyz-123")
+	err := session.PreflightCheck("go", "nonexistent-binary-xyz-123")
 
 	// then: should fail on the missing binary
 	if err == nil {
@@ -47,7 +49,7 @@ func TestPreflightCheck_MultipleBinaries(t *testing.T) {
 func TestPreflightCheck_NoBinaries(t *testing.T) {
 	// given: no binaries to check
 	// when
-	err := PreflightCheck()
+	err := session.PreflightCheck()
 
 	// then
 	if err != nil {

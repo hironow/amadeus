@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
@@ -25,7 +25,7 @@ func newSyncCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
@@ -43,25 +43,32 @@ func newSyncCommand() *cobra.Command {
 			}
 
 			logger := loggerFrom(cmd)
-			store := session.NewProjectionStore(divRoot)
 
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
+			// Composition root: wire session.Amadeus
+			store := session.NewProjectionStore(divRoot)
+			eventStore := session.NewEventStore(divRoot, logger)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
 			}
-			defer outboxStore.Close()
+			defer outbox.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
 
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
-				Events:    session.NewEventStore(divRoot),
-				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
+				Events:    eventStore,
+				Projector: projector,
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 			}
-			return usecase.PrintSync(amadeus.RunSyncCommand{
-				RepoPath: repoRoot,
-			}, a)
+
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
+			}
+			return usecase.PrintSync(domain.NewRunSyncCommand(rp), a)
 		},
 	}
 

@@ -1,4 +1,4 @@
-package usecase
+package usecase_test
 
 import (
 	"context"
@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase"
 )
 
 func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 	// given
-	engine := NewPolicyEngine(nil)
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+	engine := usecase.NewPolicyEngine(nil)
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -30,14 +31,14 @@ func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 
 func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 	// given
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -57,16 +58,16 @@ func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 
 func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	// given
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var count int
 	for range 3 {
-		engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+		engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 			count++
 			return nil
 		})
 	}
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -84,14 +85,19 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	}
 }
 
-func TestPolicyEngine_HandlerError(t *testing.T) {
-	// given
-	engine := NewPolicyEngine(nil)
-	engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+func TestPolicyEngine_HandlerError_BestEffort(t *testing.T) {
+	// given: two handlers — first fails, second succeeds
+	engine := usecase.NewPolicyEngine(nil)
+	var secondFired bool
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		return fmt.Errorf("handler failed")
 	})
-	ev, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
-		Result: amadeus.CheckResult{Commit: "abc123"},
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
+		secondFired = true
+		return nil
+	})
+	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
+		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -100,21 +106,24 @@ func TestPolicyEngine_HandlerError(t *testing.T) {
 	// when
 	dispatchErr := engine.Dispatch(context.Background(), ev)
 
-	// then: first handler error stops dispatch
-	if dispatchErr == nil {
-		t.Fatal("expected error from handler")
+	// then: best-effort — error swallowed, all handlers execute, nil returned
+	if dispatchErr != nil {
+		t.Fatalf("expected nil (best-effort), got: %v", dispatchErr)
+	}
+	if !secondFired {
+		t.Fatal("second handler should fire even after first handler error")
 	}
 }
 
 func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 	// given: register for check.completed only
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(amadeus.EventCheckCompleted, func(ctx context.Context, ev amadeus.Event) error {
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := amadeus.NewEvent(amadeus.EventBaselineUpdated, amadeus.BaselineUpdatedData{
+	ev, err := domain.NewEvent(domain.EventBaselineUpdated, domain.BaselineUpdatedData{
 		Commit: "abc123",
 	}, time.Now().UTC())
 	if err != nil {

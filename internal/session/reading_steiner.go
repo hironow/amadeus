@@ -6,18 +6,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 type ShiftReport struct {
 	Significant       bool
-	MergedPRs         []amadeus.MergedPR
+	MergedPRs         []domain.MergedPR
 	Diff              string
 	CodebaseStructure string
 }
 
 type ReadingSteiner struct {
-	Git amadeus.Git
+	Git port.Git
 }
 
 func (rs *ReadingSteiner) DetectShift(sinceCommit string) (ShiftReport, error) {

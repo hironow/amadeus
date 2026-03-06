@@ -7,42 +7,73 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
 func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "archive-prune",
+		Use:   "archive-prune [path]",
 		Short: "Prune old archived files",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Prune archived d-mail files and expired event files.
+
+By default, runs in dry-run mode showing what would be deleted.
+Pass --execute to actually remove the files.`,
+		Example: `  # Dry-run: list expired files (default 30 days)
+  amadeus archive-prune
+
+  # Delete expired files (with confirmation)
+  amadeus archive-prune --execute
+
+  # Delete without confirmation
+  amadeus archive-prune --execute --yes
+
+  # Custom retention period
+  amadeus archive-prune --days 7 --execute
+
+  # JSON output for scripting
+  amadeus archive-prune -o json`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
-			dryRun, _ := cmd.Flags().GetBool("dry-run")
+			execute, _ := cmd.Flags().GetBool("execute")
+			dryRunExplicit := cmd.Flags().Changed("dry-run")
 			yes, _ := cmd.Flags().GetBool("yes")
 			outputFmt, _ := cmd.Flags().GetString("output")
+			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
+
+			if execute && dryRunExplicit {
+				return fmt.Errorf("--execute and --dry-run are mutually exclusive")
+			}
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
 
-			pruneCmd := amadeus.ArchivePruneCommand{
-				RepoPath: repoRoot,
-				Days:     days,
-				DryRun:   dryRun,
-				Yes:      yes,
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
 			}
+			d, dErr := domain.NewDays(days)
+			if dErr != nil {
+				return dErr
+			}
+			pruneCmd := domain.NewArchivePruneCommand(rp, d, !execute, yes)
+
+			// Composition root: wire ArchiveOps and EventStore
+			archiveOps := session.NewArchiveOps()
 
 			// COMMAND → usecase (collect candidates)
-			result, err := usecase.CollectPruneCandidates(pruneCmd)
+			result, err := usecase.CollectPruneCandidates(cmd.Context(), pruneCmd, archiveOps)
 			if err != nil {
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
-			eventsDir := filepath.Join(divRoot, "events")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			errW := cmd.ErrOrStderr()
 
 			// Extract file names for output.
@@ -65,8 +96,9 @@ func newArchivePruneCommand() *cobra.Command {
 					EventCandidates:   len(result.EventCandidates),
 					EventFiles:        result.EventCandidates,
 				}
-				if !dryRun {
-					totalCount, execErr := usecase.ExecutePrune(result, divRoot, eventsDir)
+				if execute {
+					eventStore := session.NewEventStore(divRoot, logger)
+					totalCount, execErr := usecase.ExecutePrune(cmd.Context(), result, eventStore, archiveOps, divRoot, logger)
 					if execErr != nil {
 						return execErr
 					}
@@ -105,8 +137,8 @@ func newArchivePruneCommand() *cobra.Command {
 				}
 			}
 
-			if dryRun {
-				fmt.Fprintf(errW, "\n(dry-run — no files deleted)\n")
+			if !execute {
+				fmt.Fprintln(errW, "(dry-run — pass --execute to delete)")
 				return nil
 			}
 
@@ -128,7 +160,8 @@ func newArchivePruneCommand() *cobra.Command {
 			}
 
 			// usecase → execute prune + emit event
-			totalCount, err := usecase.ExecutePrune(result, divRoot, eventsDir)
+			eventStore := session.NewEventStore(divRoot, logger)
+			totalCount, err := usecase.ExecutePrune(cmd.Context(), result, eventStore, archiveOps, divRoot, logger)
 			if err != nil {
 				return err
 			}
@@ -138,9 +171,10 @@ func newArchivePruneCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntP("days", "d", 30, "prune files older than N days")
-	cmd.Flags().BoolP("dry-run", "n", false, "show what would be pruned without deleting")
-	cmd.Flags().BoolP("yes", "y", false, "skip confirmation prompt")
+	cmd.Flags().IntP("days", "d", 30, "Retention days")
+	cmd.Flags().BoolP("execute", "x", false, "Execute pruning (default: dry-run)")
+	cmd.Flags().BoolP("dry-run", "n", false, "Dry-run mode (default behavior, explicit for scripting)")
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }

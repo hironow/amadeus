@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+
 import (
 	"context"
 	"encoding/json"
@@ -10,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -24,11 +27,11 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	amadeus.Tracer = tp.Tracer("amadeus-test")
+	platform.Tracer = tp.Tracer("amadeus-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		amadeus.Tracer = prev.Tracer("amadeus")
+		platform.Tracer = prev.Tracer("amadeus")
 	})
 	return exp
 }
@@ -51,7 +54,7 @@ func initGateDirForTest(t *testing.T, root string) {
 		}
 	}
 	// Write default config
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +66,7 @@ func initGateDirForTest(t *testing.T, root string) {
 	// Write SKILL.md files from embedded templates
 	for _, name := range []string{"dmail-sendable", "dmail-readable"} {
 		tmplPath := "templates/skills/" + name + "/SKILL.md"
-		content, readErr := amadeus.SkillTemplateFS.ReadFile(tmplPath)
+		content, readErr := platform.SkillTemplateFS.ReadFile(tmplPath)
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -81,12 +84,12 @@ func initGateDirForTest(t *testing.T, root string) {
 
 func TestCheckStatusLabel(t *testing.T) {
 	tests := []struct {
-		status CheckStatus
+		status domain.CheckStatus
 		want   string
 	}{
-		{CheckOK, "OK"},
-		{CheckFail, "FAIL"},
-		{CheckSkip, "SKIP"},
+		{domain.CheckOK, "OK"},
+		{domain.CheckFail, "FAIL"},
+		{domain.CheckSkip, "SKIP"},
 	}
 	for _, tt := range tests {
 		if got := tt.status.StatusLabel(); got != tt.want {
@@ -98,8 +101,8 @@ func TestCheckStatusLabel(t *testing.T) {
 func TestCheckTool_Exists(t *testing.T) {
 	ctx := context.Background()
 	result := checkTool(ctx, "git")
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK for 'git', got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK for 'git', got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Message, "git") {
 		t.Errorf("expected message to contain path, got: %s", result.Message)
@@ -109,8 +112,8 @@ func TestCheckTool_Exists(t *testing.T) {
 func TestCheckTool_NotFound(t *testing.T) {
 	ctx := context.Background()
 	result := checkTool(ctx, "nonexistent-tool-xyz-12345")
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if result.Message != "command not found" {
 		t.Errorf("expected 'command not found', got: %s", result.Message)
@@ -124,16 +127,16 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 		t.Fatalf("git init: %v", err)
 	}
 	result := checkGitRepo(dir)
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckGitRepo_NotRepo(t *testing.T) {
 	dir := t.TempDir()
 	result := checkGitRepo(dir)
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -142,16 +145,16 @@ func TestCheckGateDir_Exists(t *testing.T) {
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
 	result := checkGateDir(dir)
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
 	result := checkGateDir(dir)
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -168,8 +171,8 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -186,8 +189,8 @@ func TestCheckLinearMCP_NotConnected(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -204,8 +207,8 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -222,27 +225,27 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	result := checkLinearMCP(ctx, "claude")
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail for disconnected, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for disconnected, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckConfig_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(path, data, 0o644)
 	result := checkConfig(path)
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckConfig_NotFound(t *testing.T) {
 	result := checkConfig("/nonexistent/config.yaml")
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -251,8 +254,8 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 	path := filepath.Join(dir, "config.yaml")
 	os.WriteFile(path, []byte(`{{{invalid`), 0o644)
 	result := checkConfig(path)
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -267,7 +270,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// Create .gate/ with config
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 
@@ -278,7 +281,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir)
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
 	// then: should have 10 results
 	if len(results) != 10 {
@@ -305,20 +308,20 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	exec.Command("git", "init", dir).Run()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 
 	ctx := context.Background()
 
 	// when
-	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir)
+	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir, &domain.NopLogger{})
 
-	// then: amadeus.doctor span should exist
+	// then: domain.doctor span should exist
 	spans := exp.GetSpans()
 	found := false
 	for _, s := range spans {
-		if s.Name == "amadeus.doctor" {
+		if s.Name == "domain.doctor" {
 			found = true
 			// Should have 10 doctor.check events (one per check)
 			eventCount := 0
@@ -333,7 +336,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("expected 'amadeus.doctor' span")
+		t.Errorf("expected 'domain.doctor' span")
 	}
 }
 
@@ -347,8 +350,8 @@ func TestCheckSkillMD_BothExist(t *testing.T) {
 	result := checkSkillMD(dir)
 
 	// then
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -363,8 +366,8 @@ func TestCheckSkillMD_MissingSendable(t *testing.T) {
 	result := checkSkillMD(dir)
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Message, "dmail-sendable") {
 		t.Errorf("expected message to mention dmail-sendable, got: %s", result.Message)
@@ -379,8 +382,8 @@ func TestCheckSkillMD_NoGateDir(t *testing.T) {
 	result := checkSkillMD(dir)
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -400,7 +403,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir)
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
 	// then: should have 10 results
 	if len(results) != 10 {
@@ -412,7 +415,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	}
 
 	// then: SKILL.md check should be present and OK
-	var skillResult DoctorCheckResult
+	var skillResult domain.DoctorCheckResult
 	found := false
 	for _, r := range results {
 		if r.Name == "SKILL.md" {
@@ -424,8 +427,8 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	if !found {
 		t.Fatal("expected SKILL.md check in doctor results")
 	}
-	if skillResult.Status != CheckOK {
-		t.Errorf("expected SKILL.md CheckOK, got %v: %s", skillResult.Status, skillResult.Message)
+	if skillResult.Status != domain.CheckOK {
+		t.Errorf("expected SKILL.md domain.CheckOK, got %v: %s", skillResult.Status, skillResult.Message)
 	}
 }
 
@@ -434,7 +437,7 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
 	exec.Command("git", "init", dir).Run()
@@ -443,17 +446,17 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when: pass a nonexistent claude command
-	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz")
+	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{})
 
 	// then
-	var mcpResult DoctorCheckResult
+	var mcpResult domain.DoctorCheckResult
 	for _, r := range results {
 		if r.Name == "Linear MCP" {
 			mcpResult = r
 			break
 		}
 	}
-	if mcpResult.Status != CheckSkip {
+	if mcpResult.Status != domain.CheckSkip {
 		t.Errorf("expected Linear MCP SKIP when claude unavailable, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
 	if !strings.Contains(mcpResult.Message, "claude not available") {
@@ -471,8 +474,8 @@ func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then: skip — no D-Mails to validate
-	if result.Status != CheckSkip {
-		t.Errorf("expected CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckSkip {
+		t.Errorf("expected domain.CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -482,14 +485,14 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 	initGateDirForTest(t, root)
 	// Write a valid D-Mail directly to archive
-	dmail := amadeus.DMail{
-		SchemaVersion: amadeus.DMailSchemaVersion,
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          amadeus.KindFeedback,
+		Kind:          domain.KindFeedback,
 		Description:   "test",
-		Severity:      amadeus.SeverityHigh,
+		Severity:      domain.SeverityHigh,
 	}
-	data, err := amadeus.MarshalDMail(dmail)
+	data, err := domain.MarshalDMail(dmail)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,8 +504,8 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then
-	if result.Status != CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -518,8 +521,8 @@ func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail for invalid D-Mail, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for invalid D-Mail, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -532,8 +535,8 @@ func TestCheckDMailSchema_NoGateDir(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then: skip — archive doesn't exist yet
-	if result.Status != CheckSkip {
-		t.Errorf("expected CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckSkip {
+		t.Errorf("expected domain.CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -550,8 +553,8 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	result := checkDMailSchema(root)
 
 	// then: FAIL — permission error should not be masked
-	if result.Status != CheckFail {
-		t.Errorf("expected CheckFail for permission error, got %v: %s", result.Status, result.Message)
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for permission error, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -573,11 +576,11 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	eventsDir := filepath.Join(gateDir, "events")
 	today := time.Now().UTC().Format("2006-01-02")
 
-	cleanData, _ := json.Marshal(amadeus.CheckCompletedData{
-		Result: amadeus.CheckResult{DMails: nil},
+	cleanData, _ := json.Marshal(domain.CheckCompletedData{
+		Result: domain.CheckResult{DMails: nil},
 	})
-	driftData, _ := json.Marshal(amadeus.CheckCompletedData{
-		Result: amadeus.CheckResult{DMails: []string{"feedback-001"}},
+	driftData, _ := json.Marshal(domain.CheckCompletedData{
+		Result: domain.CheckResult{DMails: []string{"feedback-001"}},
 	})
 	now := time.Now().UTC().Format(time.RFC3339)
 	lines := []string{
@@ -592,15 +595,15 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, repoRoot)
+	results := runDoctor(ctx, configPath, repoRoot, &domain.NopLogger{})
 
 	// then: success-rate check should be present
 	var found bool
 	for _, r := range results {
 		if r.Name == "success-rate" {
 			found = true
-			if r.Status != CheckOK {
-				t.Errorf("expected CheckOK, got %v", r.Status)
+			if r.Status != domain.CheckOK {
+				t.Errorf("expected domain.CheckOK, got %v", r.Status)
 			}
 			if !strings.Contains(r.Message, "66.7%") || !strings.Contains(r.Message, "(2/3)") {
 				t.Errorf("unexpected message: %s", r.Message)

@@ -32,6 +32,56 @@ jobs:
       - name: Test (race)
         run: go test ./... -race -count=1 -short
 
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
+
+      - name: Install semgrep
+        run: pip install semgrep
+
+      - name: Run semgrep
+        run: just semgrep
+
+      - name: Audit nosemgrep annotations
+        run: just nosemgrep-audit
+
+      - name: Test semgrep rules
+        run: just semgrep-test
+
+  package-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
+
+      - name: Test package audit (external test ratio)
+        run: |
+          audit_dir() {
+            local dir="$1" label="$2" threshold="$3"
+            ext=$(grep -rl '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+            same=$(grep -rL '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+            total=$((ext + same))
+            if [ "$total" -gt 0 ]; then pct=$((ext * 100 / total)); else pct=0; fi
+            echo "$label: external $ext (${pct}%) / same $same ($((100 - pct))%)"
+            if [ "$pct" -lt "$threshold" ]; then
+              echo "FAIL: $label external ratio ${pct}% is below threshold ${threshold}%" >&2
+              return 1
+            fi
+          }
+          audit_dir "internal" "internal/" 70
+          audit_dir "internal/session" "internal/session/" 75
+
+      - name: Test package rationale audit (white-box-reason comments)
+        run: just test-package-rationale-audit
+
   docs-check:
     runs-on: ubuntu-latest
     steps:
@@ -48,3 +98,26 @@ jobs:
 
       - name: Check for uncommitted doc changes
         run: git diff --exit-code docs/cli/
+
+      - name: Check dead links in docs
+        run: |
+          ok=true
+          for f in $(find docs/ README.md -name '*.md' 2>/dev/null); do
+            dir=$(dirname "$f")
+            grep -oE '\[([^]]*)\]\(([^)]+)\)' "$f" | grep -oE '\(([^)]+)\)' | tr -d '()' | grep -v '^http' | grep -v '^#' | while read -r link; do
+              target="$dir/$link"
+              target="${target%%#*}"
+              if [ ! -f "$target" ] && [ ! -d "$target" ]; then
+                echo "DEAD LINK: $f -> $link (resolved: $target)"
+                echo "DEAD_LINK_FOUND=true" >> "$GITHUB_ENV"
+              fi
+            done
+          done
+          if [ "${DEAD_LINK_FOUND:-}" = "true" ]; then exit 1; fi
+
+      - name: Check forbidden vocabulary in docs
+        run: |
+          if grep -rn 'LINEAR_API_KEY' docs/ README.md internal/ 2>/dev/null | grep -v '_test\.go' | grep -v '\.semgrep/'; then
+            echo "ERROR: Found LINEAR_API_KEY reference"
+            exit 1
+          fi

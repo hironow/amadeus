@@ -1,11 +1,12 @@
 package session_test
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -15,6 +16,7 @@ func TestRace_OutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 	store := testOutboxStore(t, root)
+	ctx := context.Background()
 
 	var wg sync.WaitGroup
 	const workers = 10
@@ -24,11 +26,11 @@ func TestRace_OutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("race-%03d.md", id)
-			store.Stage(name, []byte("data"))
+			store.Stage(ctx, name, []byte("data"))
 		}(i)
 		go func() {
 			defer wg.Done()
-			store.Flush()
+			store.Flush(ctx)
 		}()
 	}
 	wg.Wait()
@@ -40,32 +42,33 @@ func TestRace_OutboxStore_ConcurrentMultiStore(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 
-	storeA, err := session.NewOutboxStoreForGateDir(root)
+	storeA, err := session.NewOutboxStoreForDir(root)
 	if err != nil {
 		t.Fatalf("create store A: %v", err)
 	}
 	defer storeA.Close()
 
-	storeB, err := session.NewOutboxStoreForGateDir(root)
+	storeB, err := session.NewOutboxStoreForDir(root)
 	if err != nil {
 		t.Fatalf("create store B: %v", err)
 	}
 	defer storeB.Close()
 
+	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i := range 10 {
 		wg.Add(2)
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("a-%03d.md", id)
-			storeA.Stage(name, []byte("data-a"))
-			storeA.Flush()
+			storeA.Stage(ctx, name, []byte("data-a"))
+			storeA.Flush(ctx)
 		}(i)
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("b-%03d.md", id)
-			storeB.Stage(name, []byte("data-b"))
-			storeB.Flush()
+			storeB.Stage(ctx, name, []byte("data-b"))
+			storeB.Flush(ctx)
 		}(i)
 	}
 	wg.Wait()
@@ -74,7 +77,7 @@ func TestRace_OutboxStore_ConcurrentMultiStore(t *testing.T) {
 // TestRace_Logger_ConcurrentWrite verifies that Logger's mutex protects
 // concurrent log writes.
 func TestRace_Logger_ConcurrentWrite(t *testing.T) {
-	logger := amadeus.NewLogger(nil, false)
+	logger := platform.NewLogger(nil, false)
 
 	var wg sync.WaitGroup
 	for i := range 20 {

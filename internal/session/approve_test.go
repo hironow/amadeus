@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"bytes"
@@ -7,13 +7,15 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestStdinApprover_Yes(t *testing.T) {
 	// given
 	in := strings.NewReader("y\n")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "Continue check?")
@@ -34,7 +36,7 @@ func TestStdinApprover_YesFull(t *testing.T) {
 	// given
 	in := strings.NewReader("yes\n")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -52,7 +54,7 @@ func TestStdinApprover_No(t *testing.T) {
 	// given
 	in := strings.NewReader("n\n")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -70,7 +72,7 @@ func TestStdinApprover_EmptyDefault(t *testing.T) {
 	// given: empty enter = default = deny (safe side)
 	in := strings.NewReader("\n")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -86,7 +88,7 @@ func TestStdinApprover_EmptyDefault(t *testing.T) {
 
 func TestStdinApprover_NilInput(t *testing.T) {
 	// given: StdinApprover with nil input (library/non-interactive usage)
-	a := NewStdinApprover(nil, new(bytes.Buffer))
+	a := session.NewStdinApprover(nil, new(bytes.Buffer))
 
 	// when: should not panic
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -104,7 +106,7 @@ func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
 	// given: piped input "y" without trailing newline (echo -n "y" | amadeus check)
 	in := strings.NewReader("y")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -122,7 +124,7 @@ func TestStdinApprover_EOFTerminatedNo(t *testing.T) {
 	// given: piped "n" without trailing newline — should deny (not error)
 	in := strings.NewReader("n")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -142,7 +144,7 @@ func TestStdinApprover_SharedReader(t *testing.T) {
 	// must still be readable from the same reader.
 	in := strings.NewReader("y\nnext-line\n")
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -171,7 +173,7 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 
 	in := new(blockingReader)
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(ctx, "msg")
@@ -192,7 +194,7 @@ func TestStdinApprover_Timeout(t *testing.T) {
 
 	in := new(blockingReader)
 	out := new(bytes.Buffer)
-	a := NewStdinApprover(in, out)
+	a := session.NewStdinApprover(in, out)
 
 	// when
 	approved, err := a.RequestApproval(ctx, "msg")
@@ -208,7 +210,7 @@ func TestStdinApprover_Timeout(t *testing.T) {
 
 func TestCmdApprover_EmptyTemplate(t *testing.T) {
 	// given
-	a := NewCmdApprover("")
+	a := session.NewCmdApprover("")
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "msg")
@@ -225,13 +227,12 @@ func TestCmdApprover_EmptyTemplate(t *testing.T) {
 func TestCmdApprover_FactoryDI(t *testing.T) {
 	// given -- inject a factory that records the expanded command
 	var capturedArgs []string
-	a := &CmdApprover{
-		cmdTemplate: "echo {message}",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	a := session.NewCmdApproverForTest("echo {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedArgs = args
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "hello world")

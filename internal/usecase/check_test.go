@@ -1,4 +1,4 @@
-package usecase
+package usecase_test
 
 import (
 	"context"
@@ -6,32 +6,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-func TestRunCheck_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := amadeus.ExecuteCheckCommand{RepoPath: ""}
-	opts := amadeus.CheckOptions{}
-	a := &session.Amadeus{
-		Config: amadeus.DefaultConfig(),
-		Logger: amadeus.NewLogger(nil, false),
-	}
-
-	// when
-	err := RunCheck(context.Background(), cmd, opts, a)
-
-	// then: command validation should fail
-	if err == nil {
-		t.Fatal("expected error for empty RepoPath")
-	}
-	if got := err.Error(); got != "command validation: RepoPath is required" {
-		t.Fatalf("unexpected error: %s", got)
-	}
-}
-
-func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
+func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	// given: valid command with minimal real deps (temp dir with .gate/)
 	tmpDir := t.TempDir()
 	gateDir := filepath.Join(tmpDir, ".gate")
@@ -43,33 +25,36 @@ func TestRunCheck_AggregateAndDispatcherInjected(t *testing.T) {
 	}
 
 	store := session.NewProjectionStore(gateDir)
-	eventStore := session.NewEventStore(gateDir)
+	eventStore := session.NewEventStore(gateDir, &domain.NopLogger{})
 
-	cmd := amadeus.ExecuteCheckCommand{RepoPath: tmpDir}
-	opts := amadeus.CheckOptions{DryRun: true}
+	rp, _ := domain.NewRepoPath(tmpDir)
+	cmd := domain.NewExecuteCheckCommand(rp)
+	opts := domain.CheckOptions{DryRun: true}
+	cfg := domain.DefaultConfig()
+	logger := platform.NewLogger(nil, false)
 	a := &session.Amadeus{
-		Config: amadeus.DefaultConfig(),
+		Config: cfg,
 		Store:  store,
 		Events: eventStore,
-		Logger: amadeus.NewLogger(nil, false),
+		Logger: logger,
 	}
 
 	// pre-conditions
-	if a.Aggregate != nil {
-		t.Fatal("aggregate should be nil before RunCheck")
+	if a.Emitter != nil {
+		t.Fatal("emitter should be nil before RunCheck")
 	}
-	if a.Dispatcher != nil {
-		t.Fatal("dispatcher should be nil before RunCheck")
+	if a.State != nil {
+		t.Fatal("state should be nil before RunCheck")
 	}
 
 	// when: RunCheck will fail at Git operations (not configured), but wiring happens first
-	_ = RunCheck(context.Background(), cmd, opts, a)
+	_ = usecase.RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
-	// then: aggregate and dispatcher should have been injected
-	if a.Aggregate == nil {
-		t.Fatal("aggregate should be injected after RunCheck")
+	// then: emitter and state should have been injected
+	if a.Emitter == nil {
+		t.Fatal("emitter should be injected after RunCheck")
 	}
-	if a.Dispatcher == nil {
-		t.Fatal("dispatcher should be injected after RunCheck")
+	if a.State == nil {
+		t.Fatal("state should be injected after RunCheck")
 	}
 }

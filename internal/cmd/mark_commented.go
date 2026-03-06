@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +29,7 @@ func newMarkCommentedCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
 			if _, err := os.Stat(divRoot); err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
@@ -36,20 +38,32 @@ func newMarkCommentedCommand() *cobra.Command {
 				return fmt.Errorf("stat .gate directory: %w", err)
 			}
 
-			store := session.NewProjectionStore(divRoot)
+			logger := loggerFrom(cmd)
 
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
+			// Composition root: wire session.Amadeus
+			store := session.NewProjectionStore(divRoot)
+			eventStore := session.NewEventStore(divRoot, logger)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
 			}
-			defer outboxStore.Close()
+			defer outbox.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
+			cfg := domain.DefaultConfig()
+
+			agg := domain.NewCheckAggregate(cfg)
+			emitter := usecase.NewCheckEventEmitter(agg, eventStore, projector, nil, logger)
 
 			a := &session.Amadeus{
+				Config:    cfg,
 				Store:     store,
-				Events:    session.NewEventStore(divRoot),
-				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
-				Logger:    loggerFrom(cmd),
+				Events:    eventStore,
+				Projector: projector,
+				Logger:    logger,
+				Emitter:   emitter,
 			}
+
 			if err := a.MarkCommented(dmailName, issueID); err != nil {
 				return fmt.Errorf("mark commented: %w", err)
 			}

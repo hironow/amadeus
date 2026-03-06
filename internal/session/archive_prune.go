@@ -8,17 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-)
 
-// PruneCandidate represents an archive file eligible for pruning.
-type PruneCandidate struct {
-	Path    string
-	ModTime time.Time
-}
+	"github.com/hironow/amadeus/internal/usecase/port"
+)
 
 // FindPruneCandidates returns .md files in archiveDir older than maxAge.
 // Returns (nil, nil) if the directory does not exist.
-func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandidate, error) {
+func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]port.PruneCandidate, error) {
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -28,7 +24,7 @@ func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandid
 	}
 
 	cutoff := time.Now().Add(-maxAge)
-	candidates := []PruneCandidate{}
+	candidates := []port.PruneCandidate{}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
@@ -38,7 +34,7 @@ func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandid
 			return nil, fmt.Errorf("stat %s: %w", e.Name(), err)
 		}
 		if info.ModTime().Before(cutoff) {
-			candidates = append(candidates, PruneCandidate{
+			candidates = append(candidates, port.PruneCandidate{
 				Path:    filepath.Join(archiveDir, e.Name()),
 				ModTime: info.ModTime(),
 			})
@@ -48,7 +44,7 @@ func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandid
 }
 
 // PruneFiles deletes the given files and returns the count of successfully deleted files.
-func PruneFiles(candidates []PruneCandidate) (int, error) {
+func PruneFiles(candidates []port.PruneCandidate) (int, error) {
 	count := 0
 	for _, c := range candidates {
 		if err := os.Remove(c.Path); err != nil {

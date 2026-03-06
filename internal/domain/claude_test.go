@@ -1,0 +1,148 @@
+package domain_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/hironow/amadeus/internal/domain"
+)
+
+func TestParseClaudeResponse_Valid(t *testing.T) {
+	raw := `{
+		"axes": {
+			"adr_integrity": {"score": 15, "details": "ADR-003 minor tension"},
+			"dod_fulfillment": {"score": 20, "details": "Issue #42 edge case"},
+			"dependency_integrity": {"score": 10, "details": "clean"},
+			"implicit_constraints": {"score": 5, "details": "naming drift"}
+		},
+		"dmails": [
+			{
+				"description": "ADR-003 needs update",
+				"detail": "Auth module violates ADR-003"
+			}
+		],
+		"reasoning": "Minor tensions detected"
+	}`
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseClaudeResponse failed: %v", err)
+	}
+	if resp.Axes[domain.AxisADR].Score != 15 {
+		t.Errorf("expected ADR score 15, got %d", resp.Axes[domain.AxisADR].Score)
+	}
+	if len(resp.DMails) != 1 {
+		t.Fatalf("expected 1 D-Mail, got %d", len(resp.DMails))
+	}
+	if resp.DMails[0].Description != "ADR-003 needs update" {
+		t.Errorf("expected description 'ADR-003 needs update', got %s", resp.DMails[0].Description)
+	}
+}
+
+func TestParseClaudeResponse_InvalidJSON(t *testing.T) {
+	_, err := domain.ParseClaudeResponse([]byte("not json"))
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestParseClaudeResponse_WithImpactRadius(t *testing.T) {
+	// given
+	raw := `{
+		"axes": {
+			"adr_integrity": {"score": 10, "details": "ok"},
+			"dod_fulfillment": {"score": 0, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "minor",
+		"impact_radius": [
+			{"area": "auth/session.go", "impact": "direct", "detail": "Session validation changed"},
+			{"area": "api/middleware.go", "impact": "indirect", "detail": "Uses auth session"}
+		]
+	}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.ImpactRadius) != 2 {
+		t.Fatalf("expected 2 impact entries, got %d", len(resp.ImpactRadius))
+	}
+	if resp.ImpactRadius[0].Area != "auth/session.go" {
+		t.Errorf("expected area 'auth/session.go', got %q", resp.ImpactRadius[0].Area)
+	}
+	if resp.ImpactRadius[0].Impact != "direct" {
+		t.Errorf("expected impact 'direct', got %q", resp.ImpactRadius[0].Impact)
+	}
+	if resp.ImpactRadius[1].Impact != "indirect" {
+		t.Errorf("expected impact 'indirect', got %q", resp.ImpactRadius[1].Impact)
+	}
+}
+
+func TestParseClaudeResponse_WithoutImpactRadius_BackwardCompatible(t *testing.T) {
+	// given: existing JSON format without impact_radius
+	raw := `{
+		"axes": {
+			"adr_integrity": {"score": 5, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "clean"
+	}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.ImpactRadius != nil {
+		t.Errorf("expected nil impact_radius for old format, got %v", resp.ImpactRadius)
+	}
+}
+
+// fakeClaudeRunner returns a canned response for testing.
+type fakeClaudeRunner struct {
+	response string
+}
+
+func (f *fakeClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
+	return []byte(f.response), nil
+}
+
+func TestFakeClaudeRunner(t *testing.T) {
+	// given
+	canned := `{
+		"axes": {
+			"adr_integrity": {"score": 10, "details": "test"},
+			"dod_fulfillment": {"score": 0, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "fake response"
+	}`
+	fake := &fakeClaudeRunner{response: canned}
+
+	// when
+	raw, err := fake.Run(context.Background(), "test prompt")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, err := domain.ParseClaudeResponse(raw)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if resp.Axes[domain.AxisADR].Score != 10 {
+		t.Errorf("expected ADR score 10, got %d", resp.Axes[domain.AxisADR].Score)
+	}
+	if resp.Reasoning != "fake response" {
+		t.Errorf("expected reasoning 'fake response', got %q", resp.Reasoning)
+	}
+}

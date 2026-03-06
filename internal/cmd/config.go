@@ -5,23 +5,23 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"gopkg.in/yaml.v3"
 )
 
 // loadConfig reads a YAML configuration file from path.
 // If the file does not exist, it returns DefaultConfig with no error.
-func loadConfig(path string) (amadeus.Config, error) {
+func loadConfig(path string) (domain.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return amadeus.DefaultConfig(), nil
+			return domain.DefaultConfig(), nil
 		}
-		return amadeus.Config{}, err
+		return domain.Config{}, err
 	}
-	cfg := amadeus.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return amadeus.Config{}, err
+		return domain.Config{}, err
 	}
 	return cfg, nil
 }

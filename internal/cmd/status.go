@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -21,7 +23,7 @@ func newStatusCommand() *cobra.Command {
 		Long: `Display operational status including check history, divergence,
 success rate, and pending d-mail counts.
 
-Output goes to stderr (human-readable) by default.
+Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.`,
 		Example: `  # Show status for current directory
   amadeus status
@@ -38,12 +40,13 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
 
-			report := session.Status(divRoot)
+			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
+			report := session.Status(cmd.Context(), divRoot, logger)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {
@@ -55,8 +58,8 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return nil
 			}
 
-			// Text output to stderr (human-readable metadata per ADR 0002)
-			fmt.Fprint(cmd.ErrOrStderr(), report.FormatText())
+			// Text output to stdout (human-readable, per S0027)
+			fmt.Fprint(cmd.OutOrStdout(), report.FormatText())
 			return nil
 		},
 	}

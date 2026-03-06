@@ -6,6 +6,8 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/spf13/cobra"
 )
 
@@ -22,12 +24,13 @@ func newDoctorCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
 
-			results := runDoctor(cmd.Context(), configPath, repoRoot)
+			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
+			results := runDoctor(cmd.Context(), configPath, repoRoot, logger)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)
@@ -45,14 +48,15 @@ type jsonCheck struct {
 	Name    string `json:"name"`
 	Status  string `json:"status"`
 	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
 }
 
-func printDoctorJSON(w io.Writer, results []DoctorCheckResult) error {
+func printDoctorJSON(w io.Writer, results []domain.DoctorCheckResult) error {
 	checks := make([]jsonCheck, len(results))
 	hasFail := false
 	for i, r := range results {
-		checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message}
-		if r.Status == CheckFail {
+		checks[i] = jsonCheck{Name: r.Name, Status: r.Status.StatusLabel(), Message: r.Message, Hint: r.Hint}
+		if r.Status == domain.CheckFail {
 			hasFail = true
 		}
 	}
@@ -69,11 +73,14 @@ func printDoctorJSON(w io.Writer, results []DoctorCheckResult) error {
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []DoctorCheckResult) error {
+func printDoctorText(w io.Writer, results []domain.DoctorCheckResult) error {
 	hasFail := false
 	for _, r := range results {
 		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
-		if r.Status == CheckFail {
+		if r.Hint != "" {
+			fmt.Fprintf(w, "         %-16s hint: %s\n", "", r.Hint)
+		}
+		if r.Status == domain.CheckFail {
 			hasFail = true
 		}
 	}

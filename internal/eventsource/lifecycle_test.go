@@ -1,5 +1,7 @@
 package eventsource
 
+// white-box-reason: eventsource internals: tests unexported file rotation and lifecycle logic
+
 import (
 	"os"
 	"path/filepath"

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,12 +11,15 @@ import (
 	"sort"
 	"strings"
 
-	amadeus "github.com/hironow/amadeus"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 // NextDMailName returns the next sequential D-Mail name by scanning existing
 // .md files in the archive/ directory.
-func (s *ProjectionStore) NextDMailName(kind amadeus.DMailKind) (string, error) {
+func (s *ProjectionStore) NextDMailName(kind domain.DMailKind) (string, error) {
 	archiveDir := filepath.Join(s.Root, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
@@ -37,8 +41,8 @@ func (s *ProjectionStore) NextDMailName(kind amadeus.DMailKind) (string, error) 
 
 // SaveDMailToArchive writes a D-Mail to archive/ only, skipping outbox/.
 // Used during rebuild to avoid re-queuing historical D-Mails for delivery.
-func (s *ProjectionStore) SaveDMailToArchive(dmail amadeus.DMail) error {
-	data, err := amadeus.MarshalDMail(dmail)
+func (s *ProjectionStore) SaveDMailToArchive(dmail domain.DMail) error {
+	data, err := domain.MarshalDMail(dmail)
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
@@ -51,23 +55,23 @@ func (s *ProjectionStore) SaveDMailToArchive(dmail amadeus.DMail) error {
 }
 
 // LoadDMail reads a single D-Mail by name from the archive/ directory.
-func (s *ProjectionStore) LoadDMail(name string) (amadeus.DMail, error) {
+func (s *ProjectionStore) LoadDMail(name string) (domain.DMail, error) {
 	path := filepath.Join(s.Root, "archive", name+".md")
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return amadeus.DMail{}, fmt.Errorf("load dmail %s: %w", name, err)
+		return domain.DMail{}, fmt.Errorf("load dmail %s: %w", name, err)
 	}
-	return amadeus.ParseDMail(data)
+	return domain.ParseDMail(data)
 }
 
 // LoadAllDMails reads all D-Mails from the archive/ directory, sorted by name ascending.
-func (s *ProjectionStore) LoadAllDMails() ([]amadeus.DMail, error) {
+func (s *ProjectionStore) LoadAllDMails() ([]domain.DMail, error) {
 	archiveDir := filepath.Join(s.Root, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
 		return nil, err
 	}
-	var dmails []amadeus.DMail
+	var dmails []domain.DMail
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".md") {
 			continue
@@ -86,16 +90,16 @@ func (s *ProjectionStore) LoadAllDMails() ([]amadeus.DMail, error) {
 }
 
 // LoadConsumed reads all consumed records from .run/consumed.json.
-func (s *ProjectionStore) LoadConsumed() ([]amadeus.ConsumedRecord, error) {
+func (s *ProjectionStore) LoadConsumed() ([]domain.ConsumedRecord, error) {
 	path := filepath.Join(s.Root, ".run", "consumed.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return []amadeus.ConsumedRecord{}, nil
+			return []domain.ConsumedRecord{}, nil
 		}
 		return nil, err
 	}
-	var records []amadeus.ConsumedRecord
+	var records []domain.ConsumedRecord
 	if err := json.Unmarshal(data, &records); err != nil {
 		return nil, err
 	}
@@ -103,7 +107,7 @@ func (s *ProjectionStore) LoadConsumed() ([]amadeus.ConsumedRecord, error) {
 }
 
 // SaveConsumed appends consumed records to .run/consumed.json.
-func (s *ProjectionStore) SaveConsumed(records []amadeus.ConsumedRecord) error {
+func (s *ProjectionStore) SaveConsumed(records []domain.ConsumedRecord) error {
 	existing, err := s.LoadConsumed()
 	if err != nil {
 		return err
@@ -122,17 +126,24 @@ func (s *ProjectionStore) SaveConsumed(records []amadeus.ConsumedRecord) error {
 // invoked by cron or git hooks, so polling at invocation time is sufficient.
 // A watcher would only be warranted if amadeus were daemonised for
 // real-time inbox delivery.
-func (s *ProjectionStore) ScanInbox() ([]amadeus.DMail, error) {
+func (s *ProjectionStore) ScanInbox(ctx context.Context) ([]domain.DMail, error) {
+	ctx, span := platform.Tracer.Start(ctx, "amadeus.dmail_io")
+	defer span.End()
+
 	inboxDir := filepath.Join(s.Root, "inbox")
 	entries, err := os.ReadDir(inboxDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			span.SetAttributes(attribute.Int("inbox.scan.count", 0))
 			return nil, nil
 		}
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 		return nil, fmt.Errorf("read inbox: %w", err)
 	}
 
-	var dmails []amadeus.DMail
+	var dmails []domain.DMail
+	archiveCount := 0
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".md") {
 			continue
@@ -140,10 +151,14 @@ func (s *ProjectionStore) ScanInbox() ([]amadeus.DMail, error) {
 		inboxPath := filepath.Join(inboxDir, e.Name())
 		data, err := os.ReadFile(inboxPath)
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 			return nil, fmt.Errorf("read inbox file %s: %w", e.Name(), err)
 		}
-		dmail, err := amadeus.ParseDMail(data)
+		dmail, err := domain.ParseDMail(data)
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 			return nil, fmt.Errorf("parse inbox file %s: %w", e.Name(), err)
 		}
 
@@ -151,12 +166,17 @@ func (s *ProjectionStore) ScanInbox() ([]amadeus.DMail, error) {
 		archivePath := filepath.Join(s.Root, "archive", e.Name())
 		if _, statErr := os.Stat(archivePath); errors.Is(statErr, fs.ErrNotExist) {
 			if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+				span.RecordError(err)
+				span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 				return nil, fmt.Errorf("archive %s: %w", e.Name(), err)
 			}
+			archiveCount++
 		}
 
 		// Remove from inbox
 		if err := os.Remove(inboxPath); err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.dmail_io"))
 			return nil, fmt.Errorf("remove inbox %s: %w", e.Name(), err)
 		}
 
@@ -166,5 +186,9 @@ func (s *ProjectionStore) ScanInbox() ([]amadeus.DMail, error) {
 	sort.Slice(dmails, func(i, j int) bool {
 		return dmails[i].Name < dmails[j].Name
 	})
+	span.SetAttributes(
+		attribute.Int("inbox.scan.count", len(dmails)),
+		attribute.Int("archive.write.count", archiveCount),
+	)
 	return dmails, nil
 }

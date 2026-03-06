@@ -3,17 +3,16 @@ package usecase
 import (
 	"fmt"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // Rebuild replays events to regenerate projection files.
-// Validates the RebuildCommand and performs the rebuild.
-func Rebuild(cmd amadeus.RebuildCommand, events amadeus.EventStore, projector amadeus.EventApplier, logger *amadeus.Logger) error {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
+// The RebuildCommand is already valid by construction (parse-don't-validate).
+func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
+	_ = cmd // command validated by construction; no fields accessed here
 
-	allEvents, err := events.LoadAll()
+	allEvents, _, err := events.LoadAll()
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
 	}

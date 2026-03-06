@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/usecase/port"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +31,7 @@ func newCheckCommand() *cobra.Command {
 				return err
 			}
 
-			divRoot := filepath.Join(repoRoot, ".gate")
+			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
 			// Pre-flight check: ensure init has been run
 			if _, statErr := os.Stat(divRoot); statErr != nil {
@@ -58,7 +60,7 @@ func newCheckCommand() *cobra.Command {
 			}
 
 			if lang != "" {
-				if !amadeus.ValidLang(lang) {
+				if !domain.ValidLang(lang) {
 					return fmt.Errorf("unsupported language: %s (supported: ja, en)", lang)
 				}
 				cfg.Lang = lang
@@ -66,63 +68,69 @@ func newCheckCommand() *cobra.Command {
 
 			logger := loggerFrom(cmd)
 
-			store := session.NewProjectionStore(divRoot)
-			eventStore := session.NewEventStore(divRoot)
-
-			outboxStore, err := session.NewOutboxStoreForGateDir(divRoot)
-			if err != nil {
-				return fmt.Errorf("outbox store: %w", err)
-			}
-			defer outboxStore.Close()
-
 			// Wire approver
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
 			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
 
-			var approver amadeus.Approver
+			var approver port.Approver
 			switch {
 			case autoApprove:
-				approver = &amadeus.AutoApprover{}
+				approver = &port.AutoApprover{}
 			case approveCmd != "":
 				approver = session.NewCmdApprover(approveCmd)
 			default:
-				approver = &amadeus.AutoApprover{} // default: no gate
+				approver = &port.AutoApprover{} // default: no gate
 			}
 
 			// Wire notifier
 			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
-			var notifier amadeus.Notifier
+			var notifier port.Notifier
 			if notifyCmd != "" {
 				notifier = session.NewCmdNotifier(notifyCmd)
 			} else {
-				notifier = &amadeus.NopNotifier{}
+				notifier = &port.NopNotifier{}
 			}
 
 			reviewCmd, _ := cmd.Flags().GetString("review-cmd")
+
+			// Composition root: wire session.Amadeus
+			store := session.NewProjectionStore(divRoot)
+			eventStore := session.NewEventStore(divRoot, logger)
+			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			if outboxErr != nil {
+				return fmt.Errorf("outbox store: %w", outboxErr)
+			}
+			defer outbox.Close()
+
+			projector := &session.Projector{Store: store, OutboxStore: outbox}
+			git := session.NewGitClient(repoRoot)
 
 			a := &session.Amadeus{
 				Config:    cfg,
 				Store:     store,
 				Events:    eventStore,
-				Projector: &session.Projector{Store: store, OutboxStore: outboxStore},
-				Git:       session.NewGitClient(repoRoot),
+				Projector: projector,
+				Git:       git,
 				RepoDir:   repoRoot,
 				Logger:    logger,
 				DataOut:   cmd.OutOrStdout(),
 				Approver:  approver,
 				Notifier:  notifier,
+				Metrics:   &platform.OTelPolicyMetrics{},
 				ReviewCmd: reviewCmd,
 			}
 
-			// COMMAND → usecase → Aggregate → EVENT
-			return usecase.RunCheck(cmd.Context(), amadeus.ExecuteCheckCommand{
-				RepoPath: repoRoot,
-			}, amadeus.CheckOptions{
+			// Parse → COMMAND → usecase → EventEmitter → EVENT
+			rp, rpErr := domain.NewRepoPath(repoRoot)
+			if rpErr != nil {
+				return rpErr
+			}
+			return usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), domain.CheckOptions{
 				Full:   full,
 				DryRun: dryRun,
 				Quiet:  quiet,
 				JSON:   jsonOut,
-			}, a)
+			}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
 		},
 	}
 

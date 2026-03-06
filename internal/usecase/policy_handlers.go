@@ -2,30 +2,61 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // registerCheckPolicies registers POLICY handlers for check events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
-func registerCheckPolicies(engine *PolicyEngine, logger *amadeus.Logger) {
-	engine.Register(amadeus.EventCheckCompleted, func(_ context.Context, event amadeus.Event) error {
-		logger.Debug("policy: check completed (type=%s)", event.Type)
+func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
+	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, event domain.Event) error {
+		var data domain.CheckCompletedData
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			logger.Debug("policy: check completed parse error: %v", err)
+			return nil
+		}
+		logger.Info("policy: check completed (divergence=%.2f, commit=%s)", data.Result.Divergence, data.Result.Commit)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Amadeus",
+			fmt.Sprintf("Check completed: divergence=%.2f, commit=%s",
+				data.Result.Divergence, data.Result.Commit)); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
+		metrics.RecordPolicyEvent(ctx, "check.completed", "handled")
 		return nil
 	})
 
-	engine.Register(amadeus.EventConvergenceDetected, func(_ context.Context, event amadeus.Event) error {
-		logger.Debug("policy: convergence detected (type=%s)", event.Type)
+	// POLICY: convergence.detected → notify + metrics.
+	// Convergence detection indicates a recurring pattern — notify user.
+	engine.Register(domain.EventConvergenceDetected, func(ctx context.Context, event domain.Event) error {
+		logger.Info("policy: convergence detected (type=%s)", event.Type)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Amadeus", "Convergence detected"); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
+		metrics.RecordPolicyEvent(ctx, "convergence.detected", "handled")
 		return nil
 	})
 
-	engine.Register(amadeus.EventInboxConsumed, func(_ context.Context, event amadeus.Event) error {
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Inbox consumption is an intermediate processing step.
+	engine.Register(domain.EventInboxConsumed, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: inbox consumed (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "inbox.consumed", "handled")
 		return nil
 	})
 
-	engine.Register(amadeus.EventDMailGenerated, func(_ context.Context, event amadeus.Event) error {
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// D-Mail generation is an intermediate step before delivery.
+	engine.Register(domain.EventDMailGenerated, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail generated (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "dmail.generated", "handled")
 		return nil
 	})
 }

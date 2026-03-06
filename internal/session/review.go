@@ -8,7 +8,10 @@ import (
 	"strings"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 const maxReviewGateCycles = 3
@@ -63,13 +66,16 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 // Returns (true, nil) if review passes or is skipped (empty reviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger *amadeus.Logger, budget ...int) (bool, error) {
+func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger domain.Logger, budget ...int) (bool, error) {
+	ctx, span := platform.Tracer.Start(ctx, "amadeus.review")
+	defer span.End()
+
 	if strings.TrimSpace(reviewCmd) == "" {
 		return true, nil
 	}
 
 	if logger == nil {
-		logger = amadeus.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 
 	maxCycles := maxReviewGateCycles
@@ -88,15 +94,24 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 	var lastComments string
 	for cycle := 1; cycle <= maxCycles; cycle++ {
 		if ctx.Err() != nil {
+			span.RecordError(ctx.Err())
+			span.SetAttributes(attribute.String("error.stage", "amadeus.review"))
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
 
+		span.SetAttributes(attribute.Int("review.cycle", cycle))
 		logger.Info("Review gate: cycle %d/%d", cycle, maxCycles)
 
+		reviewStart := time.Now()
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, reviewCmd, dir)
 		reviewCancel()
+		if platform.IsDetailDebug() {
+			span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
+		}
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "amadeus.review"))
 			return false, fmt.Errorf("review gate cycle %d: %w", cycle, err)
 		}
 
@@ -125,7 +140,7 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, timeoutSec int, logger *amadeus.Logger) error {
+func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, timeoutSec int, logger domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)

@@ -2,17 +2,44 @@
 
 Prune old archived files
 
+### Synopsis
+
+Prune archived d-mail files and expired event files.
+
+By default, runs in dry-run mode showing what would be deleted.
+Pass --execute to actually remove the files.
+
 ```
 amadeus archive-prune [flags]
+```
+
+### Examples
+
+```
+  # Dry-run: list expired files (default 30 days)
+  amadeus archive-prune
+
+  # Delete expired files (with confirmation)
+  amadeus archive-prune --execute
+
+  # Delete without confirmation
+  amadeus archive-prune --execute --yes
+
+  # Custom retention period
+  amadeus archive-prune --days 7 --execute
+
+  # JSON output for scripting
+  amadeus archive-prune -o json
 ```
 
 ### Options
 
 ```
-  -d, --days int   prune files older than N days (default 30)
-  -n, --dry-run    show what would be pruned without deleting
+  -d, --days int   Retention days (default 30)
+  -n, --dry-run    Dry-run mode (default behavior, explicit for scripting)
+  -x, --execute    Execute pruning (default: dry-run)
   -h, --help       help for archive-prune
-  -y, --yes        skip confirmation prompt
+  -y, --yes        Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -20,6 +47,7 @@ amadeus archive-prune [flags]
 ```
   -c, --config string   config file path
   -l, --lang string     output language (ja, en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         verbose output
 ```
 

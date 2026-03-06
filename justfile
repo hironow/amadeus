@@ -73,16 +73,49 @@ fmt:
 vet:
     go vet ./...
 
-# Run semgrep rules
+# Run semgrep rules (ERROR only — blocks CI)
 semgrep:
     semgrep scan --config .semgrep/ --error --severity ERROR .
 
+# Run semgrep WARNING rules (informational — does not block CI)
+semgrep-warnings:
+    semgrep scan --config .semgrep/ --severity WARNING .
+
+# Test semgrep rules against known-bad fixtures
+semgrep-test:
+    semgrep scan --test --config .semgrep/cobra.yaml .semgrep/cobra.go
+    semgrep scan --test --config .semgrep/shared-adr.yaml .semgrep/shared-adr.go
+    semgrep scan --test --config .semgrep/layers.yaml .semgrep/layers.go
+    semgrep scan --test --config .semgrep/stdio.yaml .semgrep/stdio.go
+
+# Audit test package convention (external vs same-package test functions)
+test-package-audit:
+    #!/usr/bin/env bash
+    audit_dir() {
+        local dir="$1" label="$2"
+        ext=$(grep -rl '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+        same=$(grep -rL '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+        total=$((ext + same))
+        if [ $total -gt 0 ]; then pct=$((ext * 100 / total)); else pct=0; fi
+        echo "$label: external $ext (${pct}%) / same $same ($((100 - pct))%)"
+    }
+    audit_dir "internal" "internal/"
+    audit_dir "internal/session" "internal/session/"
+
+# Verify root package contains only doc.go (no code at root)
+root-guard:
+    @if ls *.go 2>/dev/null | grep -qv '^doc\.go$'; then \
+        echo "ERROR: root package may only contain doc.go. Found:" >&2; \
+        ls *.go | grep -v '^doc\.go$' >&2; \
+        exit 1; \
+    fi
+
 # Lint (fmt check + vet + markdown lint)
-lint: vet lint-md
+lint: vet semgrep root-guard nosemgrep-audit lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
-check: fmt vet test
+check: fmt vet semgrep root-guard nosemgrep-audit test docs-check
 
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:
@@ -109,6 +142,10 @@ release-check:
 # Snapshot GoReleaser build (no publish)
 release-snapshot:
     goreleaser release --snapshot --clean
+
+# Run live W&B Weave trace delivery test (requires WANDB_API_KEY)
+test-weave-live:
+    go test ./tests/integration/ -run TestWeave_LiveTraceDelivery -count=1 -v -timeout=60s
 
 # Build and run E2E tests in Docker
 test-e2e:
@@ -163,6 +200,56 @@ test-scenario: check-go
 # Run all scenario tests
 test-scenario-all: check-go
     mise exec -- go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
+
+# Audit nosemgrep annotations: require [permanent] or [expires: YYYY-MM-DD] tag
+nosemgrep-audit:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rc=0
+    today=$(date +%Y-%m-%d)
+    while IFS= read -r line; do
+        file=$(echo "$line" | cut -d: -f1)
+        lineno=$(echo "$line" | cut -d: -f2)
+        if echo "$line" | grep -q '\[permanent\]'; then
+            continue
+        fi
+        if echo "$line" | grep -qoE '\[expires: [0-9]{4}-[0-9]{2}-[0-9]{2}\]'; then
+            expiry=$(echo "$line" | grep -oE '\[expires: [0-9]{4}-[0-9]{2}-[0-9]{2}\]' | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            if [[ "$expiry" < "$today" || "$expiry" == "$today" ]]; then
+                echo "EXPIRED: $file:$lineno (expired $expiry)" >&2
+                rc=1
+            fi
+        else
+            echo "MISSING TAG: $file:$lineno — add [permanent] or [expires: YYYY-MM-DD]" >&2
+            rc=1
+        fi
+    done < <(grep -rn "nosemgrep:" --include="*.go" . || true)
+    if [ $rc -eq 0 ]; then echo "nosemgrep-audit: all annotations tagged"; fi
+    exit $rc
+
+# Check docs for stale references (e.g. deprecated internal/port path)
+docs-check:
+    @echo "Checking for stale references..."
+    @! grep -rn 'internal/port[^/]' docs/ internal/domain/doc.go 2>/dev/null || (echo "ERROR: stale internal/port references found" && exit 1)
+    @! grep -n 'usecase は session' .semgrep/layers.yaml 2>/dev/null || (echo "ERROR: stale usecase->session allowance in semgrep" && exit 1)
+    @! grep -rin 'eventsource.*廃止\|eventsource.*吸収\|eventsource.*session.*移' docs/ 2>/dev/null || (echo "ERROR: stale eventsource terminology — eventsource is retained per todo 73" && exit 1)
+    @echo "docs-check passed"
+
+# Audit white-box-reason comments on same-package test files
+test-package-rationale-audit:
+    #!/usr/bin/env bash
+    missing=0
+    while IFS= read -r f; do
+      if ! grep -q 'white-box-reason:' "$f" 2>/dev/null; then
+        echo "MISSING white-box-reason: $f" >&2
+        missing=$((missing + 1))
+      fi
+    done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null)
+    if [ "$missing" -gt 0 ]; then
+      echo "FAIL: $missing same-package test file(s) missing white-box-reason comment" >&2
+      exit 1
+    fi
+    echo "OK: all same-package test files have white-box-reason comments"
 
 # Clean build artifacts
 clean:

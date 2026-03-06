@@ -2,37 +2,39 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 
-	amadeus "github.com/hironow/amadeus"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // RunCheck orchestrates the amadeus check pipeline.
 // This is the reference implementation of COMMAND → Aggregate → EVENT:
-//  1. Validate the ExecuteCheckCommand
-//  2. Create and restore CheckAggregate from persisted state
-//  3. Inject aggregate into session for domain decisions
-//  4. Delegate I/O pipeline to session
-func RunCheck(ctx context.Context, cmd amadeus.ExecuteCheckCommand, opts amadeus.CheckOptions, a *session.Amadeus) error {
-	// COMMAND validation
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
-
+//  1. Create CheckAggregate, wrap in EventEmitter + StateManager
+//  2. Wire policy engine (WHEN [EVENT] THEN [handler])
+//  3. Delegate I/O pipeline to session via port.Orchestrator
+//
+// The ExecuteCheckCommand is already valid by construction (parse-don't-validate).
+func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions,
+	pipeline port.Orchestrator, cfg domain.Config, logger domain.Logger,
+	notifier port.Notifier, metrics port.PolicyMetrics) error {
 	// Create aggregate with config
-	agg := amadeus.NewCheckAggregate(a.Config)
-
-	// Inject aggregate into session (session uses it for domain decisions)
-	a.Aggregate = agg
+	agg := domain.NewCheckAggregate(cfg)
 
 	// Wire policy engine (WHEN [EVENT] THEN [handler])
-	// Handlers will be registered here as policies are implemented.
-	engine := NewPolicyEngine(a.Logger)
-	registerCheckPolicies(engine, a.Logger)
-	a.Dispatcher = engine
+	engine := NewPolicyEngine(logger)
+	if notifier == nil {
+		notifier = &port.NopNotifier{}
+	}
+	if metrics == nil {
+		metrics = &port.NopPolicyMetrics{}
+	}
+	registerCheckPolicies(engine, logger, notifier, metrics)
 
-	// Delegate to session I/O pipeline
+	// Create EventEmitter + StateManager wrapping the aggregate
+	emitter := NewCheckEventEmitter(agg, pipeline.EventStore(), pipeline.EventApplier(), engine, logger)
+	state := NewCheckStateProvider(agg)
+
+	// Delegate to session I/O pipeline via Orchestrator interface
 	// Session restores aggregate state from persisted projection internally
-	return a.RunCheck(ctx, opts)
+	return pipeline.RunCheck(ctx, opts, emitter, state)
 }

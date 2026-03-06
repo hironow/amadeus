@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	amadeus "github.com/hironow/amadeus"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -17,7 +18,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.CheckCount != 0 {
@@ -70,7 +71,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.InboxCount != 2 {
@@ -89,33 +90,33 @@ func TestStatus_WithEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := session.NewEventStore(baseDir)
+	store := session.NewEventStore(baseDir, &domain.NopLogger{})
 
 	now := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
 	// Create 2 check.completed events: one clean, one with drift
-	cleanResult := amadeus.CheckResult{
+	cleanResult := domain.CheckResult{
 		CheckedAt:  now,
 		Commit:     "abc123",
-		Type:       amadeus.CheckTypeDiff,
+		Type:       domain.CheckTypeDiff,
 		Divergence: 0.05,
 		DMails:     nil,
 	}
-	cleanEv, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	cleanEv, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: cleanResult,
 	}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	driftResult := amadeus.CheckResult{
+	driftResult := domain.CheckResult{
 		CheckedAt:  now.Add(time.Hour),
 		Commit:     "def456",
-		Type:       amadeus.CheckTypeDiff,
+		Type:       domain.CheckTypeDiff,
 		Divergence: 0.35,
 		DMails:     []string{"feedback-001"},
 	}
-	driftEv, err := amadeus.NewEvent(amadeus.EventCheckCompleted, amadeus.CheckCompletedData{
+	driftEv, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: driftResult,
 	}, now.Add(time.Hour))
 	if err != nil {
@@ -123,25 +124,25 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 
 	// Create a convergence event
-	convergenceEv, err := amadeus.NewEvent(amadeus.EventConvergenceDetected, amadeus.ConvergenceDetectedData{
-		Alert: amadeus.ConvergenceAlert{
+	convergenceEv, err := domain.NewEvent(domain.EventConvergenceDetected, domain.ConvergenceDetectedData{
+		Alert: domain.ConvergenceAlert{
 			Target:   "internal/session",
 			Count:    3,
 			Window:   30,
 			DMails:   []string{"feedback-001", "feedback-002", "feedback-003"},
-			Severity: amadeus.SeverityHigh,
+			Severity: domain.SeverityHigh,
 		},
 	}, now.Add(2*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := store.Append(cleanEv, driftEv, convergenceEv); err != nil {
+	if _, err := store.Append(cleanEv, driftEv, convergenceEv); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.CheckCount != 2 {
@@ -163,7 +164,7 @@ func TestStatus_WithEvents(t *testing.T) {
 
 func TestStatus_FormatText(t *testing.T) {
 	// given
-	report := session.StatusReport{
+	report := domain.StatusReport{
 		LastCheck:    time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		Divergence:   0.15,
 		CheckCount:   8,
@@ -202,7 +203,7 @@ func TestStatus_FormatText(t *testing.T) {
 
 func TestStatus_FormatText_NoChecks(t *testing.T) {
 	// given — zero-value report
-	report := session.StatusReport{}
+	report := domain.StatusReport{}
 
 	// when
 	text := report.FormatText()
@@ -218,7 +219,7 @@ func TestStatus_FormatText_NoChecks(t *testing.T) {
 
 func TestStatus_FormatJSON(t *testing.T) {
 	// given
-	report := session.StatusReport{
+	report := domain.StatusReport{
 		LastCheck:    time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		Divergence:   0.15,
 		CheckCount:   8,

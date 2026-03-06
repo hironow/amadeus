@@ -1,17 +1,13 @@
 package usecase
 
 import (
-	"fmt"
-
-	amadeus "github.com/hironow/amadeus"
-	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // PrintSync orchestrates the sync status output.
-// Validates the RunSyncCommand and delegates to session.
-func PrintSync(cmd amadeus.RunSyncCommand, a *session.Amadeus) error {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
-	return a.PrintSync()
+// The RunSyncCommand is already valid by construction (parse-don't-validate).
+func PrintSync(cmd domain.RunSyncCommand, pipeline port.Orchestrator) error {
+	_ = cmd // command validated by construction; no fields accessed here
+	return pipeline.PrintSync()
 }
