@@ -71,6 +71,14 @@ The `package-audit` CI job enforces minimum external test ratios:
 
 Run locally: `just test-package-audit`
 
+### White-Box Test Rationale
+
+Every same-package test file (`package xxx`, not `package xxx_test`) must include a `// white-box-reason:` comment immediately after the package declaration, explaining why public API testing is insufficient.
+
+Format: `// white-box-reason: <concise reason referencing unexported symbols>`
+
+The `package-audit` CI job and `just test-package-rationale-audit` enforce this requirement. New same-package test files without the comment will fail CI.
+
 ## Running Tests
 
 ```bash
