@@ -67,6 +67,21 @@ jobs:
           audit_dir "internal" "internal/" 70
           audit_dir "internal/session" "internal/session/" 75
 
+      - name: Test package rationale audit (white-box-reason comments)
+        run: |
+          missing=0
+          while IFS= read -r f; do
+            if ! grep -q 'white-box-reason:' "$f" 2>/dev/null; then
+              echo "MISSING white-box-reason: $f" >&2
+              missing=$((missing + 1))
+            fi
+          done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null)
+          if [ "$missing" -gt 0 ]; then
+            echo "FAIL: $missing same-package test file(s) missing white-box-reason comment" >&2
+            exit 1
+          fi
+          echo "OK: all same-package test files have white-box-reason comments"
+
   docs-check:
     runs-on: ubuntu-latest
     steps:
