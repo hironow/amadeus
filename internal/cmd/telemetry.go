@@ -24,6 +24,8 @@ import (
 // platform.Tracer. Called from PersistentPreRunE; shutdown is registered
 // via cobra.OnFinalize.
 func initTracer(serviceName, ver string) func(context.Context) error {
+	platform.InitDetailLevel()
+
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
@@ -123,6 +125,7 @@ func startRootSpan(ctx context.Context, command string) context.Context {
 	ctx, rootSpan = platform.Tracer.Start(ctx, "amadeus."+command,
 		trace.WithAttributes(
 			attribute.String("amadeus.command", command),
+			attribute.String("otel.detail_level", string(platform.OTELDetailLevel)),
 		),
 	)
 	return ctx
