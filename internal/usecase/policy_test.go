@@ -1,4 +1,4 @@
-package usecase
+package usecase_test
 
 import (
 	"context"
@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase"
 )
 
 func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 	// given
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{Commit: "abc123"},
 	}, time.Now().UTC())
@@ -30,7 +31,7 @@ func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 
 func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 	// given
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var fired bool
 	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
@@ -57,7 +58,7 @@ func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 
 func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	// given
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var count int
 	for range 3 {
 		engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
@@ -86,7 +87,7 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 
 func TestPolicyEngine_HandlerError_BestEffort(t *testing.T) {
 	// given: two handlers — first fails, second succeeds
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var secondFired bool
 	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		return fmt.Errorf("handler failed")
@@ -116,7 +117,7 @@ func TestPolicyEngine_HandlerError_BestEffort(t *testing.T) {
 
 func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 	// given: register for check.completed only
-	engine := NewPolicyEngine(nil)
+	engine := usecase.NewPolicyEngine(nil)
 	var fired bool
 	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true

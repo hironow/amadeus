@@ -1,4 +1,4 @@
-package usecase
+package usecase_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -43,8 +44,8 @@ func TestPolicyHandler_CheckCompleted_InfoOutput(t *testing.T) {
 	// given
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
-	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -77,8 +78,8 @@ func TestPolicyHandler_CheckCompleted_NotifiesSideEffect(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
-	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -114,8 +115,8 @@ func TestPolicyHandler_ConvergenceDetected_RecordsMetrics(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
-	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",
@@ -144,8 +145,8 @@ func TestPolicyHandler_InboxConsumed_RecordsMetrics(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
-	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
 
 	ev, err := domain.NewEvent(domain.EventInboxConsumed, map[string]string{
 		"kind": "specification",
@@ -174,8 +175,8 @@ func TestPolicyHandler_DMailGenerated_RecordsMetrics(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
-	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
 
 	ev, err := domain.NewEvent(domain.EventDMailGenerated, map[string]string{
 		"kind": "feedback",
@@ -204,8 +205,8 @@ func TestPolicyHandler_ConvergenceDetected_NotifiesSideEffect(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
-	engine := NewPolicyEngine(logger)
-	registerCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",

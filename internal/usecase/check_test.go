@@ -1,4 +1,4 @@
-package usecase
+package usecase_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -47,7 +48,7 @@ func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	}
 
 	// when: RunCheck will fail at Git operations (not configured), but wiring happens first
-	_ = RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	_ = usecase.RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	// then: emitter and state should have been injected
 	if a.Emitter == nil {
