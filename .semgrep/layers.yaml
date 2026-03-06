@@ -593,5 +593,7 @@ rules:
         - "*_test.go"
     message: |
       session 層で .Session.Method() の 2-level アクセスが検出されました。
-      forwarding メソッドを追加して 1-level に縮退してください。
+      禁止: <var>.Session.<Method>() — Session 構造体への直接アクセス
+      許可: <var>.<forwardingMethod>() — forwarding メソッド経由
+      除外: *_test.go
       Ref: Tell-Don't-Ask, Law of Demeter
