@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"time"
 )
 
 // ValidLang reports whether lang is a supported language code.
@@ -51,6 +52,17 @@ func DefaultConfig() Config {
 			EscalationMultiplier: 2,
 		},
 	}
+}
+
+// ConfigLang returns the configured language code.
+func (c Config) ConfigLang() string { return c.Lang }
+
+// WeightFor returns the configured weight for a given axis.
+func (c Config) WeightFor(axis Axis) float64 { return WeightForAxis(axis, c.Weights) }
+
+// DetectConvergence analyzes D-Mails for recurring patterns using the config's convergence settings.
+func (c Config) DetectConvergence(dmails []DMail, now time.Time) []ConvergenceAlert {
+	return AnalyzeConvergence(dmails, c.Convergence, now)
 }
 
 // ValidateConfig checks the config for consistency and returns a list of errors.

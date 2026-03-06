@@ -82,7 +82,7 @@ func (a *Amadeus) buildCheckPrompt(report ShiftReport, fullCheck bool, previous 
 	}
 
 	if fullCheck {
-		return platform.BuildFullCheckPrompt(a.Config.Lang, domain.FullCheckParams{
+		return platform.BuildFullCheckPrompt(a.Config.ConfigLang(), domain.FullCheckParams{
 			CodebaseStructure: report.CodebaseStructure,
 			AllADRs:           allADRs,
 			RecentDoDs:        allDoDs,
@@ -100,7 +100,7 @@ func (a *Amadeus) buildCheckPrompt(report ShiftReport, fullCheck bool, previous 
 	if len(issueIDs) > 0 {
 		linkedDoDs = allDoDs
 	}
-	return platform.BuildDiffCheckPrompt(a.Config.Lang, domain.DiffCheckParams{
+	return platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
 		PreviousScores: string(prevJSON),
 		PRDiffs:        report.Diff,
 		RelevantADRs:   allADRs,

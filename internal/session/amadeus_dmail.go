@@ -96,7 +96,7 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 	if convergenceErr != nil {
 		return nil, nil, nil // tolerate load failure
 	}
-	convergenceAlerts := domain.AnalyzeConvergence(allDMails, a.Config.Convergence, now)
+	convergenceAlerts := a.Config.DetectConvergence(allDMails, now)
 	for _, alert := range convergenceAlerts {
 		if err := a.Emitter.EmitConvergenceDetected(alert, now); err != nil {
 			return nil, nil, fmt.Errorf("phase 4 (emit convergence event): %w", err)

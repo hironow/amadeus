@@ -50,7 +50,7 @@ func (a *Amadeus) PrintCheckOutput(result domain.CheckResult, dmails []domain.DM
 
 	for _, axis := range axisOrder {
 		if score, ok := result.Axes[axis]; ok {
-			weight := domain.WeightForAxis(axis, a.Config.Weights)
+			weight := a.Config.WeightFor(axis)
 			contribution := float64(score.Score) * weight
 			a.dataOut("  %-22s %s — %s",
 				axisNames[axis]+":",
@@ -241,7 +241,7 @@ func (a *Amadeus) PrintLog() error {
 	}
 
 	// Convergence alerts from current archive
-	convergenceAlerts := domain.AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
+	convergenceAlerts := a.Config.DetectConvergence(dmails, time.Now().UTC())
 	if len(convergenceAlerts) > 0 {
 		a.dataOut("")
 		a.dataOut("Convergence Alerts:")
@@ -318,7 +318,7 @@ func (a *Amadeus) PrintLogJSON() error {
 		}
 	}
 
-	convergenceAlerts := domain.AnalyzeConvergence(dmails, a.Config.Convergence, time.Now().UTC())
+	convergenceAlerts := a.Config.DetectConvergence(dmails, time.Now().UTC())
 	if convergenceAlerts == nil {
 		convergenceAlerts = []domain.ConvergenceAlert{}
 	}
