@@ -43,6 +43,9 @@ archives:
       {{- .Os }}_
       {{- .Arch }}
 
+sboms:
+  - artifacts: archive
+
 checksum:
   name_template: checksums.txt
   algorithm: sha256
