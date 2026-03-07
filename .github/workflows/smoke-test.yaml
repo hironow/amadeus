@@ -1,19 +1,29 @@
 name: Smoke Test
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   smoke:
+    if: github.event.workflow_run.conclusion == 'success'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Get latest release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          TAG=$(gh release view --repo "$REPO_FULL" --json tagName -q .tagName)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
       - name: Install via Homebrew (macOS)
         if: runner.os == 'macOS'
         env:
@@ -29,11 +39,10 @@ jobs:
         if: runner.os == 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ github.event.release.tag_name }}
           REPO_FULL: ${{ github.repository }}
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          gh release download "$TAG_NAME" \
+          gh release download "$TAG" \
             -R "$REPO_FULL" \
             -p "*linux_amd64.tar.gz"
           tar xzf *linux_amd64.tar.gz
