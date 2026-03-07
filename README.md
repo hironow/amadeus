@@ -154,19 +154,33 @@ The auth module violates the JWT requirement specified in ADR-003.
 | Kind | Producer | Purpose |
 |------|----------|---------|
 | `feedback` | Amadeus (verifier) | Corrective actions from divergence detection |
-| `specification` | Paintress (designer) | Updated baseline expectations |
-| `report` | Sightjack (implementer) | Implementation status reports |
+| `specification` | Sightjack (designer) | Architecture specifications for implementation |
+| `report` | Paintress (implementer) | Implementation completion reports |
 
 D-Mail `.md` files are immutable once written.
+
+## Scope
+
+**What Amadeus does:**
+- Detect structural shifts in merged PRs or full codebase scans (Reading Steiner)
+- Score divergence across four weighted axes using Claude evaluation (Divergence Meter)
+- Route corrective D-Mails by severity to downstream tools
+- Track check history with append-only event logs
+
+**What Amadeus does NOT do:**
+- Implement fixes automatically (only detects drift and routes D-Mails)
+- Approve or merge PRs (uses external approval gates)
+- Store full PR content (stores references, diffs, and scores only)
+- Modify `.gate/` state externally (all operations are idempotent and local)
 
 ## Install
 
 ```bash
-# Homebrew (macOS / Linux)
+# Homebrew (WIP — tap may not be published yet)
 brew install hironow/tap/amadeus
 
-# Go install
-go install github.com/hironow/amadeus/cmd/amadeus@latest
+# Or build from source
+just install
 ```
 
 ## Setup
@@ -263,6 +277,10 @@ amadeus update -C
 | `--full` | `-f` | `false` | Force full calibration check |
 | `--quiet` | `-q` | `false` | Summary-only output |
 | `--json` | `-j` | `false` | Structured JSON output to stdout |
+| `--auto-approve` | | `false` | Skip approval gate |
+| `--approve-cmd` | | `""` | External approval command (`{message}` placeholder, exit 0 = approve) |
+| `--notify-cmd` | | `""` | External notification command (`{title}`, `{message}` placeholders) |
+| `--review-cmd` | | `""` | Code review command after check (exit 0 = pass) |
 
 ### archive-prune
 
@@ -350,75 +368,32 @@ Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.crea
 ## Development
 
 ```bash
-# Task runner (just)
-just build              # Build binary
-just install            # Build and install to /usr/local/bin
-just test               # Run all tests
-just test-v             # Verbose test output
-just test-race          # Tests with race detector
-just cover              # Coverage report
-just cover-html         # Open coverage in browser
-just fmt                # Format code (gofmt)
-just vet                # Run go vet
-just lint               # fmt check + vet + markdown lint
-just lint-md            # Lint markdown files only
-just semgrep            # Run semgrep with project cobra rules
-just check              # fmt + vet + test (pre-commit check)
-just docgen             # Generate CLI reference docs
-just clean              # Clean build artifacts
-just prek-install       # Install prek hooks (pre-commit + pre-push)
-just prek-run           # Run all prek hooks on all files
-just jaeger             # Start Jaeger trace viewer (docker)
-just jaeger-down        # Stop Jaeger
-just release-check      # Validate goreleaser config
-just release-snapshot   # Test release locally (snapshot, no upload)
+just --list         # Show all available tasks
+just check          # Pre-commit: fmt + vet + test
+just install        # Build and install to /usr/local/bin
+just semgrep        # Run layer enforcement rules
+just jaeger         # Start Jaeger trace viewer
 ```
 
-## File Structure
+See `justfile` for the full task list.
+
+## Project Layout
 
 ```
-+-- cmd/amadeus/
-|   +-- main.go              CLI entry point
-+-- internal/cmd/
-|   +-- root.go              Root command, global flags, build metadata
-|   +-- check.go             check subcommand
-|   +-- archive_prune.go     archive-prune subcommand
-|   +-- version.go           version subcommand (text + JSON)
-|   +-- update.go            Self-update via GitHub releases
-|   +-- doctor.go            doctor subcommand
-|   +-- log.go               log subcommand
-|   +-- init.go              init subcommand
-|   +-- validate.go          validate subcommand
-|   +-- sync.go              sync subcommand (JSON output)
-|   +-- mark_commented.go    mark-commented subcommand (sync state)
-|   +-- hook.go              install-hook / uninstall-hook
-+-- internal/usecase/         Use case layer (PolicyEngine + handlers)
-+-- internal/session/         I/O orchestration layer
-|   +-- amadeus.go            Amadeus orchestrator (RunCheck, PrintLog, PrintSync)
-|   +-- projection.go         Projector (event replay to materialized state)
-|   +-- reading_steiner.go    Shift detection (diff + full scan)
-|   +-- claude.go             DefaultClaudeRunner (subprocess)
-|   +-- dmail_io.go           D-Mail file I/O (archive, inbox, outbox)
-|   +-- git.go                GitClient (subprocess)
-|   +-- source.go             Content collection (ADRs, DoDs, go.mod)
-|   +-- state.go              ProjectionStore, InitGateDir
-|   +-- sync_io.go            Sync state persistence
-|   +-- hook.go               Git hook file management
-|   +-- archive_prune.go      Archive file discovery/deletion
-+-- internal/eventsource/     Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
-+-- internal/domain/          Pure domain functions
-+-- internal/tools/docgen/    CLI docs generation
-+-- doc.go                    Package declaration (root-zero: all code in internal/)
-+-- internal/platform/templates/  AI prompt templates ({en,ja})
-|   +-- skills/               D-Mail SKILL.md templates
-+-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
-+-- tests/e2e/                Docker E2E tests (//go:build e2e)
-+-- .semgrep/                 Semgrep rules (layer enforcement)
-+-- .goreleaser.yaml          Release configuration
-+-- .github/workflows/        CI + Release
-+-- docker/                   Jaeger v2 for trace viewing
-+-- docs/cli/                 Generated CLI reference (Markdown)
+cmd/amadeus/            CLI entry point
+internal/
+  cmd/                  Cobra commands (check, init, doctor, log, sync, etc.)
+  usecase/              Business logic (PolicyEngine + handlers)
+  session/              I/O orchestration (divergence scoring, D-Mail, git)
+  eventsource/          Event persistence (JSONL append-only)
+  domain/               Pure domain types (scoring axes, D-Mail)
+  platform/             Platform adapters (OTel, templates, logger)
+docs/                   Documentation, ADRs, CLI reference
+tests/                  Scenario (L1-L4) and Docker E2E tests
+.semgrep/               Layer enforcement rules
 ```
+
+For detailed structure, see [docs/conformance.md](docs/conformance.md).
 
 ## The Ecosystem
 
