@@ -7,11 +7,17 @@ before:
     - go mod tidy
     - go test ./... -count=1 -short
 
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
 builds:
   - main: ./cmd/amadeus/
     binary: amadeus
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -23,7 +29,7 @@ builds:
       - -s -w
       - -X github.com/hironow/amadeus/internal/cmd.Version={{.Version}}
       - -X github.com/hironow/amadeus/internal/cmd.Commit={{.ShortCommit}}
-      - -X github.com/hironow/amadeus/internal/cmd.Date={{.Date}}
+      - -X github.com/hironow/amadeus/internal/cmd.Date={{.CommitDate}}
 
 archives:
   - formats:
@@ -36,6 +42,9 @@ archives:
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
+
+sboms:
+  - artifacts: archive
 
 checksum:
   name_template: checksums.txt
@@ -64,10 +73,12 @@ brews:
       owner: hironow
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/hironow/amadeus"
     description: "Divergence meter for your codebase"
     license: "Apache-2.0"
     install: |
       bin.install "amadeus"
+      generate_completions_from_executable(bin/"amadeus", "completion")
     test: |
       system "#{bin}/amadeus", "version"

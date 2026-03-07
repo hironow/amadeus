@@ -17,6 +17,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +42,7 @@ const (
 
 func main() {
 	proto, prompt := detectProtocol(os.Args[1:])
+	outputFormat := extractOutputFormat(os.Args[1:])
 
 	// Log prompt for observability.
 	if logDir := os.Getenv("FAKE_CLAUDE_PROMPT_LOG_DIR"); logDir != "" {
@@ -64,11 +66,11 @@ func main() {
 
 	switch proto {
 	case protoAmadeus:
-		handleAmadeus(prompt)
+		handleAmadeus(prompt, outputFormat)
 	case protoSightjack:
-		handleSightjack(prompt)
+		handleSightjack(prompt, outputFormat)
 	case protoPaintress:
-		handlePaintress(prompt)
+		handlePaintress(prompt, outputFormat)
 	}
 }
 
@@ -120,23 +122,50 @@ func extractPrompt(args []string) string {
 	return ""
 }
 
+// extractOutputFormat finds --output-format value in args.
+func extractOutputFormat(args []string) string {
+	for i, arg := range args {
+		if arg == "--output-format" && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return "text"
+}
+
+// wrapStreamJSON wraps a response body in stream-json NDJSON format.
+// Emits: system init -> assistant -> result (3 lines).
+func wrapStreamJSON(body string) string {
+	escaped, _ := json.Marshal(body)
+	escapedStr := string(escaped) // includes surrounding quotes
+
+	initLine := `{"type":"system","subtype":"init","session_id":"fake-session","model":"claude-opus-4-6","tools":["Read","Write","Bash"]}`
+	assistantLine := fmt.Sprintf(`{"type":"assistant","session_id":"fake-session","message":{"id":"msg_fake","role":"assistant","content":[{"type":"text","text":%s}],"model":"claude-opus-4-6","stop_reason":"end_turn","usage":{"input_tokens":100,"output_tokens":50}}}`, escapedStr)
+	resultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake-session","result":%s,"is_error":false,"num_turns":1,"duration_ms":1000,"total_cost_usd":0.01,"usage":{"input_tokens":100,"output_tokens":50},"stop_reason":"end_turn"}`, escapedStr)
+
+	return initLine + "\n" + assistantLine + "\n" + resultLine + "\n"
+}
+
 // ---------------------------------------------------------------------------
 // amadeus mode: keyword match on stdin → JSON to stdout
 // ---------------------------------------------------------------------------
 
-func handleAmadeus(prompt string) {
+func handleAmadeus(prompt, outputFormat string) {
 	content := loadFixture("am", prompt)
 	if content == "" {
 		content = defaultAmadeusResponse
 	}
-	fmt.Fprint(os.Stdout, content)
+	if outputFormat == "stream-json" {
+		fmt.Fprint(os.Stdout, wrapStreamJSON(content))
+	} else {
+		fmt.Fprint(os.Stdout, content)
+	}
 }
 
 // ---------------------------------------------------------------------------
 // sightjack mode: extract JSON path from prompt → write fixture file
 // ---------------------------------------------------------------------------
 
-func handleSightjack(prompt string) {
+func handleSightjack(prompt, outputFormat string) {
 	outputPath := jsonPathRe.FindString(prompt)
 	if outputPath == "" {
 		// Should not reach here since detectProtocol already matched.
@@ -156,18 +185,27 @@ func handleSightjack(prompt string) {
 		fmt.Fprintf(os.Stderr, "fake-claude: write: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Additionally output NDJSON to stdout if stream-json.
+	if outputFormat == "stream-json" {
+		fmt.Fprint(os.Stdout, wrapStreamJSON(content))
+	}
 }
 
 // ---------------------------------------------------------------------------
 // paintress mode: keyword match on -p prompt → text to stdout
 // ---------------------------------------------------------------------------
 
-func handlePaintress(prompt string) {
+func handlePaintress(prompt, outputFormat string) {
 	content := loadFixture("pt", prompt)
 	if content == "" {
 		content = defaultPaintressResponse
 	}
-	fmt.Fprint(os.Stdout, content)
+	if outputFormat == "stream-json" {
+		fmt.Fprint(os.Stdout, wrapStreamJSON(content))
+	} else {
+		fmt.Fprint(os.Stdout, content)
+	}
 }
 
 // ---------------------------------------------------------------------------

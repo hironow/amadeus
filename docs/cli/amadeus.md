@@ -32,5 +32,5 @@ amadeus [flags]
 * [amadeus uninstall-hook](amadeus_uninstall-hook.md)	 - Remove post-merge git hook
 * [amadeus update](amadeus_update.md)	 - Update amadeus to the latest version
 * [amadeus validate](amadeus_validate.md)	 - Validate config file
-* [amadeus version](amadeus_version.md)	 - Print version information
+* [amadeus version](amadeus_version.md)	 - Print version, commit, and build information
 

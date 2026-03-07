@@ -50,6 +50,14 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 		),
 	)
 
+	if entity := os.Getenv("WANDB_ENTITY"); entity != "" {
+		res, _ = resource.Merge(res, resource.NewWithAttributes(
+			semconv.SchemaURL,
+			attribute.String("wandb.entity", entity),
+			attribute.String("wandb.project", os.Getenv("WANDB_PROJECT")),
+		))
+	}
+
 	opts := []sdktrace.TracerProviderOption{
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(res),

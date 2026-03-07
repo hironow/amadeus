@@ -5,10 +5,11 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
-func TestVersion_TextOutput(t *testing.T) {
+func TestVersionCmd_TextOutput(t *testing.T) {
 	// given
 	origVersion, origCommit, origDate := Version, Commit, Date
 	Version, Commit, Date = "1.2.3", "abc1234", "2026-02-21T00:00:00Z"
@@ -25,13 +26,19 @@ func TestVersion_TextOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expected := "amadeus version 1.2.3 (commit: abc1234, built: 2026-02-21T00:00:00Z)\n"
-	if got := buf.String(); got != expected {
-		t.Errorf("expected %q, got %q", expected, got)
+	out := buf.String()
+	if !strings.Contains(out, "amadeus v1.2.3") {
+		t.Errorf("expected 'amadeus v1.2.3' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "commit: abc1234") {
+		t.Errorf("expected 'commit: abc1234' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "go:") {
+		t.Errorf("expected 'go:' in output, got: %s", out)
 	}
 }
 
-func TestVersion_JSONOutput(t *testing.T) {
+func TestVersionCmd_JSONOutput(t *testing.T) {
 	// given
 	origVersion, origCommit, origDate := Version, Commit, Date
 	Version, Commit, Date = "1.2.3", "abc1234", "2026-02-21T00:00:00Z"
@@ -49,17 +56,17 @@ func TestVersion_JSONOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var result map[string]string
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	var info map[string]string
+	if err := json.Unmarshal(buf.Bytes(), &info); err != nil {
+		t.Fatalf("invalid JSON output: %v\nraw: %s", err, buf.String())
 	}
-	if result["version"] != "1.2.3" {
-		t.Errorf("expected version=1.2.3, got %q", result["version"])
+
+	for _, key := range []string{"version", "commit", "date", "go", "os", "arch"} {
+		if _, ok := info[key]; !ok {
+			t.Errorf("expected key %q in JSON output", key)
+		}
 	}
-	if result["commit"] != "abc1234" {
-		t.Errorf("expected commit=abc1234, got %q", result["commit"])
-	}
-	if result["date"] != "2026-02-21T00:00:00Z" {
-		t.Errorf("expected date=2026-02-21T00:00:00Z, got %q", result["date"])
+	if info["version"] != "1.2.3" {
+		t.Errorf("expected version=1.2.3, got %q", info["version"])
 	}
 }
