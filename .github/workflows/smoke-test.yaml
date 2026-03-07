@@ -1,0 +1,40 @@
+name: Smoke Test
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install via Homebrew (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          sleep 30
+          brew tap hironow/tap
+          brew install --cask "hironow/tap/$REPO_NAME"
+          "$REPO_NAME" version
+
+      - name: Verify binary (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          REPO_FULL: ${{ github.repository }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          gh release download "$TAG_NAME" \
+            -R "$REPO_FULL" \
+            -p "*linux_amd64.tar.gz"
+          tar xzf *linux_amd64.tar.gz
+          "./$REPO_NAME" version

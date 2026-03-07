@@ -43,8 +43,14 @@ archives:
       {{- .Os }}_
       {{- .Arch }}
 
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}.src"
+
 sboms:
   - artifacts: archive
+  - id: source
+    artifacts: source
 
 checksum:
   name_template: checksums.txt
@@ -52,12 +58,14 @@ checksum:
 
 signs:
   - cmd: cosign
+    signature: "${artifact}.sigstore.json"
     args:
       - sign-blob
-      - --yes
-      - --output-signature=${signature}
-      - ${artifact}
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
     artifacts: checksum
+    output: true
 
 changelog:
   sort: asc
@@ -68,17 +76,10 @@ changelog:
       - "^ci:"
       - "^chore:"
 
-brews:
+homebrew_casks:
   - repository:
       owner: hironow
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
     homepage: "https://github.com/hironow/amadeus"
     description: "Divergence meter for your codebase"
-    license: "Apache-2.0"
-    install: |
-      bin.install "amadeus"
-      generate_completions_from_executable(bin/"amadeus", "completion")
-    test: |
-      system "#{bin}/amadeus", "version"
