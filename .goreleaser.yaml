@@ -43,8 +43,14 @@ archives:
       {{- .Os }}_
       {{- .Arch }}
 
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}.src"
+
 sboms:
   - artifacts: archive
+  - id: source
+    artifacts: source
 
 checksum:
   name_template: checksums.txt
