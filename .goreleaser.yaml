@@ -52,12 +52,14 @@ checksum:
 
 signs:
   - cmd: cosign
+    signature: "${artifact}.sigstore.json"
     args:
       - sign-blob
-      - --yes
-      - --output-signature=${signature}
-      - ${artifact}
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
     artifacts: checksum
+    output: true
 
 changelog:
   sort: asc
