@@ -23,7 +23,7 @@ builds:
       - -s -w
       - -X github.com/hironow/amadeus/internal/cmd.Version={{.Version}}
       - -X github.com/hironow/amadeus/internal/cmd.Commit={{.ShortCommit}}
-      - -X github.com/hironow/amadeus/internal/cmd.Date={{.Date}}
+      - -X github.com/hironow/amadeus/internal/cmd.Date={{.CommitDate}}
 
 archives:
   - formats:
