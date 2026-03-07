@@ -1,4 +1,4 @@
-# 0017. Usecase-Adapter Dependency Inversion
+# S0028. Usecase-Adapter Dependency Inversion
 
 **Date:** 2026-03-05
 **Status:** Accepted
@@ -6,7 +6,7 @@
 ## Context
 
 The usecase layer directly imported the session layer to call infrastructure functions
-(check runner, store factories, config loading). This created a tight coupling:
+(store factories, daemon construction, file operations). This created a tight coupling:
 usecase depended on concrete session implementations rather than abstractions.
 
 The hexagonal architecture principle (port-adapter pattern) requires that inner layers
@@ -28,7 +28,7 @@ on low-level detail (session infrastructure).
 Invert the usecase→session dependency using output port interfaces:
 
 1. **usecase depends only on `usecase/port` interfaces** — no session import allowed.
-2. **session implements port interfaces** as adapter structs (e.g., `CheckRunnerAdapter`).
+2. **session implements port interfaces** as adapter structs (e.g., `DaemonRunner`).
 3. **cmd acts as composition root** — creates session adapters and injects them into usecase functions.
 4. **Pure passthrough functions eliminated** — usecase functions that only delegated to session are deleted; cmd calls session directly.
 
@@ -44,13 +44,14 @@ session → usecase/port (adapter implementation)
 
 Enforced by semgrep rule `layer-usecase-no-import-session` (ERROR severity).
 
-### amadeus-specific changes
+### phonewave-specific changes
 
-- `CheckRunner` port interface abstracts the check execution workflow
-- `session.NewCheckRunnerAdapter()` factory creates the concrete adapter
-- `usecase.RunCheck()` receives `port.CheckRunner`, retaining only
-  aggregate management, PolicyEngine creation, and delegation
-- Pure passthrough functions (rebuild, init, etc.) deleted; cmd calls session directly
+- `DaemonRunner` port interface encapsulates all daemon infrastructure setup
+  (config loading, route resolution, lock acquisition, store creation).
+- `session.NewDaemonRunner()` factory creates the concrete adapter.
+- `usecase.SetupAndRunDaemon()` receives `port.DaemonRunner`, retaining only
+  validation, PolicyEngine creation, and delegation.
+- 9 ecosystem passthrough functions deleted; cmd calls session directly.
 
 ## Consequences
 

@@ -1,4 +1,4 @@
-# 0006. Integrity Verification Pipeline
+# 0001. Integrity Verification Pipeline
 
 **Date:** 2026-02-23
 **Status:** Accepted

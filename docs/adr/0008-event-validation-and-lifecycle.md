@@ -1,4 +1,4 @@
-# 0013. Event Validation and Lifecycle Management
+# 0008. Event Validation and Lifecycle Management
 
 **Date:** 2026-02-25
 **Status:** Accepted

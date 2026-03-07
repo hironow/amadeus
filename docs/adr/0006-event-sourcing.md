@@ -1,4 +1,4 @@
-# 0011. Event Sourcing for State Management
+# 0006. Event Sourcing for State Management
 
 **Date:** 2026-02-25
 **Status:** Accepted

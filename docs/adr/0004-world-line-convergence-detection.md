@@ -1,4 +1,4 @@
-# 0009. World Line Convergence Detection
+# 0004. World Line Convergence Detection
 
 **Date:** 2026-02-23
 **Status:** Accepted

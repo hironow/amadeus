@@ -40,7 +40,7 @@ repos:
   # pre-push hooks (slower checks, run only on git push)
   # ======================================================================
 
-  # Go: full test suite (300s timeout for testcontainer-based tests)
+  # Go: full test suite (300s timeout for container-based tests)
   - repo: local
     hooks:
       - id: go-test

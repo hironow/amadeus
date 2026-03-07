@@ -44,6 +44,9 @@ jobs:
       - name: Install semgrep
         run: pip install semgrep
 
+      - name: Root layout check
+        run: just root-guard
+
       - name: Run semgrep
         run: just semgrep
 
@@ -52,6 +55,23 @@ jobs:
 
       - name: Test semgrep rules
         run: just semgrep-test
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run E2E tests
+        run: |
+          docker compose -f tests/e2e/compose-e2e.yaml build
+          docker compose -f tests/e2e/compose-e2e.yaml run --rm e2e \
+            go test -tags e2e ./tests/e2e/ -count=1 -v -timeout=600s
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f tests/e2e/compose-e2e.yaml down -v
 
   package-audit:
     runs-on: ubuntu-latest
@@ -121,3 +141,22 @@ jobs:
             echo "ERROR: Found LINEAR_API_KEY reference"
             exit 1
           fi
+
+      - name: README truth check
+        run: |
+          fail=0
+          if grep -qE '^\+-- templates/' README.md 2>/dev/null; then
+            echo "FAIL: README references root templates/ (should be internal/platform/templates/)"
+            fail=1
+          fi
+          for dir in internal/cmd internal/domain internal/usecase internal/usecase/port internal/session internal/eventsource internal/platform; do
+            if [ ! -d "$dir" ]; then
+              echo "FAIL: $dir does not exist"
+              fail=1
+            fi
+          done
+          if [ ! -f doc.go ]; then
+            echo "FAIL: doc.go missing"
+            fail=1
+          fi
+          exit $fail

@@ -91,10 +91,10 @@ func TestE2E_Check_FullCalibration(t *testing.T) {
 	// Verify latest.json saved
 	assertFileExists(t, filepath.Join(dir, ".gate", ".run", "latest.json"))
 
-	// Verify history saved
-	historyFiles := listDir(t, filepath.Join(dir, ".gate", "history"))
-	if len(historyFiles) == 0 {
-		t.Error("expected history entry")
+	// Verify check event recorded in event store
+	checkEvents := countEventsOfType(t, dir, "check.completed")
+	if checkEvents == 0 {
+		t.Error("expected check.completed event in event store")
 	}
 
 	_ = stderr
@@ -218,9 +218,9 @@ func TestE2E_Check_HistoryAccumulates(t *testing.T) {
 
 	runCmd(t, dir, "check", "--full", "--json")
 
-	historyFiles := listDir(t, filepath.Join(dir, ".gate", "history"))
-	if len(historyFiles) < 2 {
-		t.Errorf("expected at least 2 history files, got %d", len(historyFiles))
+	checkEvents := countEventsOfType(t, dir, "check.completed")
+	if checkEvents < 2 {
+		t.Errorf("expected at least 2 check.completed events, got %d", checkEvents)
 	}
 }
 

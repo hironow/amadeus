@@ -3,22 +3,22 @@ rules:
   # Layer dependency direction enforcement (CANONICAL — identical across all tools)
   #
   # 7-layer architecture:
-  #   internal/cmd            — cobra CLI, composition root (top layer)
-  #   internal/usecase        — orchestration (COMMAND, Aggregate, POLICY dispatch)
-  #   internal/usecase/port   — context-aware interface contracts + trivial defaults
-  #   internal/session        — I/O orchestration (filesystem, network, subprocess)
-  #   internal/eventsource    — event store infrastructure
-  #   internal/platform       — cross-cutting infrastructure (logger, telemetry, metrics)
-  #   internal/domain         — pure functions, types, interfaces (no I/O, no context)
+  #   internal/cmd              — cobra CLI (top layer)
+  #   internal/usecase          — orchestration (COMMAND, Aggregate, POLICY dispatch)
+  #   internal/usecase/port     — context-aware interface contracts + trivial defaults
+  #   internal/session          — I/O orchestration (filesystem, network, subprocess)
+  #   internal/eventsource      — event store infrastructure
+  #   internal/platform         — cross-cutting infrastructure (logger, telemetry, metrics)
+  #   internal/domain           — pure functions, types, interfaces (no I/O, no context)
   #
   # Allowed dependency directions (dependency inversion applied):
-  #   cmd            → usecase, session, usecase/port, platform, domain (composition root)
-  #   usecase        → usecase/port, domain (output port interface only)
-  #   usecase/port   → domain (+ stdlib)
-  #   session        → eventsource, usecase/port, platform, domain (adapter implementation)
-  #   eventsource    → domain
-  #   platform       → domain (+ stdlib)
-  #   domain         → (nothing internal, stdlib only)
+  #   cmd              → usecase, session, usecase/port, platform, domain (composition root)
+  #   usecase          → usecase/port, domain (output port interface only)
+  #   session          → eventsource, usecase/port, platform, domain (adapter implementation)
+  #   eventsource      → domain
+  #   usecase/port     → domain (+ stdlib)
+  #   platform         → domain (+ stdlib)
+  #   domain           → (nothing internal, stdlib only)
   #
   # PROHIBITED reverse directions are enforced below.
   #
@@ -27,9 +27,9 @@ rules:
   #       cmd → eventsource is PROHIBITED (ADR S0008).
   #       usecase → session is PROHIBITED (must use output port interfaces).
   #
-  # Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
-  #      phonewave docs/adr/S0008-cmd-eventsource-import-prohibition.md
-  #      phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+  # Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+  #      Shared ADR S0008 — cmd-eventsource-import-prohibition
+  #      Shared ADR S0015 — aggregate-root-and-usecase-layer
   # ==========================================================================
 
   # --- Rule 1: Root package must not import internal/ ---
@@ -39,7 +39,7 @@ rules:
     message: |
       root パッケージから internal/ への import は禁止です。
       root は doc.go のみ（go:embed が必要な場合を除く）。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -65,7 +65,7 @@ rules:
     message: |
       session 層から cmd 層への import は禁止です。
       session は eventsource, port, platform, domain を import できます。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -87,7 +87,7 @@ rules:
     message: |
       domain 層から上位層への import は禁止です。
       domain は pure functions のみ（I/O なし、context.Context なし）。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -97,7 +97,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|eventsource|usecase|platform)"
+          regex: ".*/internal/(session|cmd|eventsource|usecase|platform|port)"
     paths:
       include:
         - "/internal/domain/**"
@@ -109,7 +109,7 @@ rules:
     message: |
       eventsource 層 (event persistence adapter, AWS Event Sourcing pattern) から上位層への import は禁止です。
       eventsource → domain のみ。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -119,7 +119,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|platform)"
+          regex: ".*/internal/(session|cmd|usecase|port|platform)"
     paths:
       include:
         - "/internal/eventsource/**"
@@ -132,7 +132,7 @@ rules:
       cmd 層から eventsource 層への直接 import は禁止です。
       usecase 層のファクトリ関数を経由してください。
       依存方向: cmd → usecase → session → eventsource（cmd → eventsource は禁止）
-      Ref: phonewave docs/adr/S0008-cmd-eventsource-import-prohibition.md
+      Ref: Shared ADR S0008 — cmd-eventsource-import-prohibition
     severity: ERROR
     patterns:
       - pattern-either:
@@ -147,14 +147,14 @@ rules:
       include:
         - "/internal/cmd/**"
 
-  # --- Rule 6: usecase must not import cmd (ADR S0017) ---
+  # --- Rule 6: usecase must not import cmd (ADR S0015) ---
 
   - id: layer-usecase-no-import-cmd
     languages: [go]
     message: |
       usecase 層から cmd 層への import は禁止です。
       usecase は usecase/port, domain のみ import できます（session は禁止: layer-usecase-no-import-session）。
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -169,14 +169,14 @@ rules:
       include:
         - "/internal/usecase/**"
 
-  # --- Rule 7: usecase must not import eventsource directly (ADR S0017) ---
+  # --- Rule 7: usecase must not import eventsource directly (ADR S0015) ---
 
   - id: layer-usecase-no-import-eventsource
     languages: [go]
     message: |
       usecase 層から eventsource 層への直接 import は禁止です。
       session 層のファクトリ関数を経由してください。
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -191,15 +191,15 @@ rules:
       include:
         - "/internal/usecase/**"
 
-  # --- Rule 8: session must not import usecase (ADR S0017) ---
+  # --- Rule 8: session must not import usecase (ADR S0015) ---
 
   - id: layer-session-no-import-usecase
     languages: [go]
     message: |
       session 層から usecase 本体への import は禁止です。
       session は usecase/port (Output Port) のみ import 可能です。
-      session は eventsource, usecase/port, port, platform, domain を import できます。
-      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+      session は eventsource, usecase/port, platform, domain を import できます。
+      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
     patterns:
       - pattern-either:
@@ -269,7 +269,7 @@ rules:
       platform 層から上位層への import は禁止です。
       platform は domain のみ import できます。
       platform は cross-cutting infrastructure（logger, telemetry, metrics）のみ。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -279,7 +279,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(session|cmd|usecase|eventsource)"
+          regex: ".*/internal/(session|cmd|usecase|eventsource|port)"
     paths:
       include:
         - "/internal/platform/**"
@@ -292,7 +292,7 @@ rules:
       domain 層で I/O stdlib パッケージの import は禁止です。
       domain は pure functions のみ。I/O は session 層で行ってください。
       context.Context を使う interface は port 層に配置してください。
-      Ref: phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
     severity: ERROR
     patterns:
       - pattern-either:
@@ -345,20 +345,6 @@ rules:
     paths:
       include:
         - "/internal/usecase/port/**"
-
-  # --- Rule 13b: Prevent re-import of deprecated internal/port ---
-
-  - id: no-import-old-port
-    languages: [go]
-    severity: ERROR
-    pattern-regex: '"[^"]+/internal/port"'
-    paths:
-      include:
-        - "/internal/**"
-      exclude:
-        - "*_test.go"
-    message: |
-      internal/port は廃止済みです。internal/usecase/port を使用してください。
 
   # --- Rule 14: No vendor vocabulary in domain ---
 
@@ -456,7 +442,21 @@ rules:
     message: |
       曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
 
-  # --- Rule 19: Session layer must not reference aggregate types directly ---
+  # --- Rule 19: No import of deprecated internal/port ---
+
+  - id: no-import-old-port
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '"[^"]+/internal/port"'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      internal/port は廃止済みです。internal/usecase/port を使用してください。
+
+  # --- Rule 20: Session layer must not reference aggregate types directly ---
 
   - id: session-no-aggregate-type
     languages: [go]
@@ -471,7 +471,7 @@ rules:
       session 層で *domain.*Aggregate 型の直接使用は禁止です。
       usecase/port の EventEmitter / StateProvider interface を経由してください。
 
-  # --- Rule 20: Session layer must not call aggregate methods ---
+  # --- Rule 21: Session layer must not call aggregate methods ---
 
   - id: session-no-aggregate-method-call
     languages: [go]
@@ -486,7 +486,7 @@ rules:
       session 層から aggregate のメソッド直接呼び出しは禁止です。
       usecase/port の EventEmitter / StateProvider interface を経由してください。
 
-  # --- Rule 21: Domain must not use embed or text/template ---
+  # --- Rule 22: Domain must not use embed or text/template ---
 
   - id: domain-no-embed-template
     languages: [go]
@@ -509,7 +509,7 @@ rules:
       domain 層で embed / text/template の import は禁止です。
       template 責務は platform 層に配置してください。
 
-  # --- Rule 22: No state dir literal in filepath.Join ---
+  # --- Rule 23: No state dir literal in filepath.Join ---
 
   - id: no-state-dir-literal-in-path-join
     languages: [go]
@@ -537,7 +537,7 @@ rules:
         - "/internal/session/"
       exclude:
         - "*_test.go"
-        - "store_factory.go"
+        - "**/store_factory.go"
     message: |
       session 層で .jsonl ファイル操作は禁止です。
       event persistence は internal/eventsource に限定してください (AWS Event Sourcing pattern)。

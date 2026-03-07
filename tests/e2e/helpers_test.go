@@ -221,6 +221,42 @@ func assertFileExists(t *testing.T, path string) {
 	}
 }
 
+// countEventsOfType counts events matching the given type in .gate/events/ JSONL files.
+func countEventsOfType(t *testing.T, dir, eventType string) int {
+	t.Helper()
+	eventsDir := filepath.Join(dir, ".gate", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0
+		}
+		t.Fatalf("read events dir: %v", err)
+	}
+	count := 0
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(eventsDir, e.Name()))
+		if readErr != nil {
+			t.Fatalf("read event file %s: %v", e.Name(), readErr)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var ev struct {
+				Type string `json:"type"`
+			}
+			if jsonErr := json.Unmarshal([]byte(line), &ev); jsonErr == nil && ev.Type == eventType {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 // assertFileNotExists fails if the file exists.
 func assertFileNotExists(t *testing.T, path string) {
 	t.Helper()

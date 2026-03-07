@@ -29,7 +29,7 @@ import "github.com/hironow/amadeus/internal/session"
 // ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, s0008-cmd-no-import-eventsource, layer-usecase-no-import-eventsource, layer-platform-no-import-upper, layer-port-no-import-upper
 import "github.com/hironow/amadeus/internal/eventsource"
 
-// ruleid: layer-root-no-import-internal, no-import-old-port
+// ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, layer-eventsource-no-import-upper, layer-platform-no-import-upper, no-import-old-port
 import "github.com/hironow/amadeus/internal/port"
 
 // ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, layer-eventsource-no-import-upper, layer-platform-no-import-upper, layer-port-no-import-upper

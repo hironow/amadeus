@@ -1,4 +1,4 @@
-# 0012. Root Package File Consolidation
+# 0007. Root Package File Consolidation
 
 **Date:** 2026-02-25
 **Status:** Accepted

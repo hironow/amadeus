@@ -1,4 +1,4 @@
-# 0008. Claude Code as Judgment Engine
+# 0003. Claude Code as Judgment Engine
 
 **Date:** 2026-02-23
 **Status:** Accepted

@@ -22,15 +22,15 @@
 
 | Rule ID | ADR | Description |
 |---------|-----|-------------|
-| layer-root-no-import-internal | phonewave S0005 | root → internal import 禁止 |
-| layer-session-no-import-cmd | phonewave S0005 | session → cmd import 禁止 |
-| layer-domain-no-import-upper | phonewave S0005 | domain → 上位層 import 禁止 |
-| layer-eventsource-no-import-upper | phonewave S0005 | eventsource → 上位層 import 禁止 |
-| layer-cmd-no-import-domain | phonewave S0005 | cmd → domain 直接 import 禁止 |
+| layer-root-no-import-internal | phonewave S0007 | root → internal import 禁止 |
+| layer-session-no-import-cmd | phonewave S0007 | session → cmd import 禁止 |
+| layer-domain-no-import-upper | phonewave S0007 | domain → 上位層 import 禁止 |
+| layer-eventsource-no-import-upper | phonewave S0007 | eventsource → 上位層 import 禁止 |
+| layer-cmd-no-import-domain | phonewave S0007 | cmd → domain 直接 import 禁止 |
 | s0008-cmd-no-import-eventsource | phonewave S0008 | cmd → eventsource 直接 import 禁止 |
-| layer-usecase-no-import-cmd | phonewave S0017 | usecase → cmd import 禁止 |
-| layer-usecase-no-import-eventsource | phonewave S0017 | usecase → eventsource import 禁止 |
-| layer-session-no-import-usecase | phonewave S0017 | session → usecase import 禁止 |
+| layer-usecase-no-import-cmd | phonewave S0015 | usecase → cmd import 禁止 |
+| layer-usecase-no-import-eventsource | phonewave S0015 | usecase → eventsource import 禁止 |
+| layer-session-no-import-usecase | phonewave S0015 | session → usecase import 禁止 |
 
 ## cobra.yaml (7 rules)
 

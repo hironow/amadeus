@@ -1,4 +1,4 @@
-# 0014. Flat Package Architecture Decision
+# 0009. Flat Package Architecture Decision
 
 **Date:** 2026-02-25
 **Status:** Superseded by [0016]

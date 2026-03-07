@@ -1,0 +1,13 @@
+# tool-vars.yaml — amadeus tool-specific values for layers.yaml
+#
+# semgrep does not support external variable includes.
+# This file documents the tool-specific values embedded in layers.yaml
+# so that the shared rule body can be verified via normalized hash.
+#
+# Ref: refs/opsx/semgrep-layer-contract.md
+
+module: github.com/hironow/amadeus
+state_dir: .gate
+session_aggregate_guard:
+  rule_id: session-no-raw-session-field-access
+  pattern: '\b\w+\.Session\.\w+'

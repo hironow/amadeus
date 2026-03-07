@@ -1,4 +1,4 @@
-# 0016. Root Package Layer Separation
+# 0011. Root Package Layer Separation
 
 **Date:** 2026-02-26
 **Status:** Accepted

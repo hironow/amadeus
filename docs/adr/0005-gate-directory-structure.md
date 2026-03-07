@@ -1,4 +1,4 @@
-# 0010. Gate Directory Structure
+# 0005. Gate Directory Structure
 
 **Date:** 2026-02-23
 **Status:** Superseded by [0011]

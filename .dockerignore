@@ -1,0 +1,6 @@
+# Avoid sending unnecessary files to Docker build context
+.git/
+.gate/
+.worktrees/
+.claude/
+docs/

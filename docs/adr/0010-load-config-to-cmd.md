@@ -1,4 +1,4 @@
-# 0015. Move LoadConfig to internal/cmd
+# 0010. Move LoadConfig to internal/cmd
 
 **Date:** 2026-02-25
 **Status:** Accepted

@@ -62,7 +62,7 @@ func TestE2E_Init(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Verify .gate structure
-	for _, sub := range []string{".run", "history", "outbox", "inbox", "archive"} {
+	for _, sub := range []string{".run", "events", "outbox", "inbox", "archive"} {
 		assertFileExists(t, dir+"/.gate/"+sub)
 	}
 	assertFileExists(t, dir+"/.gate/config.yaml")
@@ -71,12 +71,15 @@ func TestE2E_Init(t *testing.T) {
 	assertFileExists(t, dir+"/.gate/skills/dmail-readable/SKILL.md")
 }
 
-func TestE2E_Init_Idempotent(t *testing.T) {
+func TestE2E_Init_AlreadyExists(t *testing.T) {
 	dir := initTestRepo(t)
-	// Running init again should not fail
-	_, _, err := runCmd(t, dir, "init")
-	if err != nil {
-		t.Fatalf("second init: %v", err)
+	// Running init again should fail with "already exists"
+	_, stderr, err := runCmd(t, dir, "init")
+	if err == nil {
+		t.Fatal("expected error on second init")
+	}
+	if !strings.Contains(stderr, "already exists") {
+		t.Errorf("expected 'already exists' error, got: %s", stderr)
 	}
 }
 

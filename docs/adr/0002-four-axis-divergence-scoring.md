@@ -1,4 +1,4 @@
-# 0007. Four-Axis Divergence Scoring
+# 0002. Four-Axis Divergence Scoring
 
 **Date:** 2026-02-23
 **Status:** Accepted

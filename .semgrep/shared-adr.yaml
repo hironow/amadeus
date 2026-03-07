@@ -2,16 +2,16 @@ rules:
   # ==========================================================================
   # Shared ADR enforcement rules (CANONICAL — identical across all tools)
   #
-  # Covers statically-detectable patterns from phonewave docs/adr/:
+  # Covers statically-detectable patterns from shared ADRs (refs/shared-adr/):
   # - Core ADRs 0001, 0003, 0005, 0007-0009 (Go code enforcement)
   # - D4 resource leak detection (per CLAUDE.md SQLite cooperative model)
   #
   # Not covered (no static enforcement):
   # - ADR 0000 (governance), ADR 0002 (stdio — see stdio.yaml)
   # - ADR 0004 (data format), ADR 0006 (build config)
-  # - ADRs S0011-S0029 (see layers.yaml / adr.yaml in each tool)
+  # - ADRs S0009-S0029 (see layers.yaml / adr.yaml in each tool)
   #
-  # Ref: phonewave docs/adr/ (canonical source for shared ADRs)
+  # Ref: refs/shared-adr/ (canonical source for shared ADRs)
   # ==========================================================================
 
   # --- ADR 0001: cobra CLI conventions ---
@@ -24,7 +24,7 @@ rules:
       cobra.Command で Run フィールドを使用しないでください。
       RunE を使用して error を返すようにしてください。
       Run は error を返せないため、main() での exit code 制御ができなくなります。
-      Ref: phonewave docs/adr/0001-cobra-cli-framework.md
+      Ref: Shared ADR 0001 — cobra-cli-framework
     severity: ERROR
     pattern: |
       &cobra.Command{
@@ -42,7 +42,7 @@ rules:
     message: |
       otel.SetTracerProvider() は InitTracer() 内でのみ呼び出してください。
       TracerProvider の設定を分散させると noop デフォルトの保証が崩れます。
-      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
+      Ref: Shared ADR 0003 — opentelemetry-noop-default
     severity: WARNING
     patterns:
       - pattern: otel.SetTracerProvider(...)
@@ -62,7 +62,7 @@ rules:
       otel.SetMeterProvider() は InitTracer() 内でのみ呼び出してください。
       MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
       TracerProvider と同様に集中管理してください。
-      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
+      Ref: Shared ADR 0003 — opentelemetry-noop-default
     severity: WARNING
     patterns:
       - pattern: otel.SetMeterProvider(...)
@@ -82,7 +82,7 @@ rules:
       tracer.Start() で作成した span に defer $SPAN.End() がありません。
       span が End されないとメモリリークし、エクスポーターにも送信されません。
       startRootSpan 等の別関数で End する場合は nosemgrep を付与してください。
-      Ref: phonewave docs/adr/0003-opentelemetry-noop-default.md
+      Ref: Shared ADR 0003 — opentelemetry-noop-default
     severity: ERROR
     patterns:
       - pattern: |
@@ -103,7 +103,7 @@ rules:
       watcher のファイルディスクリプタがリークします。
       同一関数内で defer watcher.Close() を呼び出すか、
       struct に保存して別途 Close する場合は nosemgrep を付与してください。
-      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
+      Ref: Shared ADR 0005 — fsnotify-daemon-design
     severity: ERROR
     patterns:
       - pattern: |
@@ -122,7 +122,7 @@ rules:
       filepath.Join() を使用してください。
       OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
       マップキーや表示用ラベルの場合は nosemgrep を付与してください。
-      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
+      Ref: Shared ADR 0005 — fsnotify-daemon-design
     severity: WARNING
     pattern-regex: '\+\s*"/"\s*\+'
     paths:
@@ -137,7 +137,7 @@ rules:
       $M.Lock() の直後に defer $M.Unlock() がありません。
       Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
       条件付き Unlock が必要な場合は nosemgrep を付与してください。
-      Ref: phonewave docs/adr/0005-fsnotify-daemon-design.md
+      Ref: Shared ADR 0005 — fsnotify-daemon-design
     severity: ERROR
     patterns:
       - pattern: $M.Lock()
@@ -218,6 +218,8 @@ rules:
     severity: ERROR
     pattern: $CMD.Execute()
     paths:
+      include:
+        - "/internal/cmd/**"
       exclude:
         - "*_test.go"
 
