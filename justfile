@@ -259,3 +259,47 @@ test-package-rationale-audit:
 clean:
     rm -rf dist/ coverage.out
     go clean
+
+# Tag a new release (validates semver, clean state, no regression)
+release version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="{{version}}"
+    # 1. Validate semver format (vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease)
+    if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+        echo "ERROR: '$tag' is not valid semver (expected: vMAJOR.MINOR.PATCH)" >&2
+        exit 1
+    fi
+    # 2. Clean working tree
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "ERROR: working tree is dirty — commit or stash changes first" >&2
+        exit 1
+    fi
+    # 3. Tag must not already exist
+    if git rev-parse "$tag" >/dev/null 2>&1; then
+        echo "ERROR: tag '$tag' already exists" >&2
+        exit 1
+    fi
+    # 4. Version must not regress (skip if no prior tags)
+    latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    if [ -n "$latest" ]; then
+        highest=$(printf "%s\n%s" "$latest" "$tag" | sort -V | tail -1)
+        if [ "$highest" = "$latest" ]; then
+            echo "ERROR: '$tag' regresses from latest '$latest'" >&2
+            exit 1
+        fi
+    fi
+    # 5. Must be on default branch (main)
+    current=$(git branch --show-current)
+    if [ "$current" != "main" ]; then
+        echo "ERROR: releases must be tagged on main (currently on '$current')" >&2
+        exit 1
+    fi
+    # 6. All tests must pass
+    echo "Running tests..."
+    go test ./... -count=1 -short -timeout=120s
+    # 7. Create annotated tag
+    git tag -a "$tag" -m "release $tag"
+    echo ""
+    echo "Tagged $tag successfully."
+    echo "Push with:  git push origin $tag"
