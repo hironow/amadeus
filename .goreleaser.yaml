@@ -7,11 +7,17 @@ before:
     - go mod tidy
     - go test ./... -count=1 -short
 
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
 builds:
   - main: ./cmd/amadeus/
     binary: amadeus
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
