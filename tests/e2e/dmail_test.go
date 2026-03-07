@@ -265,9 +265,9 @@ func TestE2E_ArchivePrune_WithYes(t *testing.T) {
 	archivePath := filepath.Join(dir, ".gate", "archive", "feedback-001.md")
 	os.Chtimes(archivePath, oldTime, oldTime)
 
-	_, _, err := runCmd(t, dir, "archive-prune", "--days", "30", "--yes")
+	_, _, err := runCmd(t, dir, "archive-prune", "--execute", "--days", "30", "--yes")
 	if err != nil {
-		t.Fatalf("archive-prune --yes: %v", err)
+		t.Fatalf("archive-prune --execute --yes: %v", err)
 	}
 
 	// File should be deleted
