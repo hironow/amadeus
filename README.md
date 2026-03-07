@@ -1,6 +1,6 @@
 # Amadeus
 
-**A post-merge integrity verification system that measures how far your codebase has diverged from its intended design.**
+**A post-merge divergence meter that scores design drift against ADRs and DoDs, then routes corrective D-Mails when the codebase shifts too far.**
 
 Amadeus uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to evaluate merged changes against ADRs (Architecture Decision Records) and DoDs (Definitions of Done), scoring divergence across four axes and routing corrective D-Mails to downstream tools when the world line drifts too far.
 
