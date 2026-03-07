@@ -287,7 +287,8 @@ amadeus update -C
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--days` | `-d` | `30` | Prune files older than N days |
-| `--dry-run` | `-n` | `false` | Show what would be pruned |
+| `--execute` | `-x` | `false` | Execute pruning (default: dry-run) |
+| `--dry-run` | `-n` | `false` | Explicit dry-run (default behavior) |
 | `--yes` | `-y` | `false` | Skip confirmation prompt |
 
 ### version / doctor / log
