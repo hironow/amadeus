@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -26,7 +27,7 @@ type defaultClaudeRunner struct{}
 func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "claude",
 		"--model", "opus",
-		"--output-format", "json",
+		"--output-format", "stream-json",
 		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
 		"--dangerously-skip-permissions",
 		"--print",
@@ -38,7 +39,18 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("claude: %w\n%s", err, stderr.String())
 	}
-	return stdout.Bytes(), nil
+
+	// Parse stream-json to extract result
+	sr := platform.NewStreamReader(bytes.NewReader(stdout.Bytes()))
+	result, _, err := sr.CollectAll()
+	if err != nil {
+		return nil, fmt.Errorf("stream-json parse: %w", err)
+	}
+	if result == nil {
+		return nil, fmt.Errorf("no result message in stream-json output")
+	}
+
+	return []byte(result.Result), nil
 }
 
 // DefaultClaudeRunner returns the default ClaudeRunner that invokes the real Claude CLI.
