@@ -1,16 +1,18 @@
-package platform
+package platform_test
 
 import (
 	"errors"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 func TestParseStreamMessage_assistant(t *testing.T) {
 	line := `{"type":"assistant","session_id":"sess-1","message":{"id":"msg_1","role":"assistant","content":[{"type":"text","text":"hello"}],"model":"claude-opus-4-6","usage":{"input_tokens":100,"output_tokens":50}}}`
 
-	msg, err := ParseStreamMessage([]byte(line))
+	msg, err := platform.ParseStreamMessage([]byte(line))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -25,7 +27,7 @@ func TestParseStreamMessage_assistant(t *testing.T) {
 func TestParseStreamMessage_result(t *testing.T) {
 	line := `{"type":"result","subtype":"success","session_id":"sess-1","result":"done","total_cost_usd":0.15,"num_turns":5,"duration_ms":45000,"usage":{"input_tokens":5000,"output_tokens":2000}}`
 
-	msg, err := ParseStreamMessage([]byte(line))
+	msg, err := platform.ParseStreamMessage([]byte(line))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,7 +48,7 @@ func TestParseStreamMessage_result(t *testing.T) {
 func TestParseStreamMessage_unknown_type(t *testing.T) {
 	line := `{"type":"future_type","session_id":"sess-1"}`
 
-	msg, err := ParseStreamMessage([]byte(line))
+	msg, err := platform.ParseStreamMessage([]byte(line))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -56,7 +58,7 @@ func TestParseStreamMessage_unknown_type(t *testing.T) {
 }
 
 func TestParseStreamMessage_invalid_json(t *testing.T) {
-	_, err := ParseStreamMessage([]byte("not json"))
+	_, err := platform.ParseStreamMessage([]byte("not json"))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -69,7 +71,7 @@ func TestStreamReader_reads_all_message_types(t *testing.T) {
 		`{"type":"result","subtype":"success","session_id":"s1","result":"done","usage":{"input_tokens":100,"output_tokens":50}}`,
 	}, "\n")
 
-	reader := NewStreamReader(strings.NewReader(input))
+	reader := platform.NewStreamReader(strings.NewReader(input))
 	types := []string{}
 	for {
 		msg, err := reader.Next()
@@ -95,7 +97,7 @@ func TestStreamReader_reads_all_message_types(t *testing.T) {
 
 func TestStreamReader_skips_invalid_json_lines(t *testing.T) {
 	input := "not json\n" + `{"type":"result","result":"ok"}` + "\n"
-	reader := NewStreamReader(strings.NewReader(input))
+	reader := platform.NewStreamReader(strings.NewReader(input))
 
 	msg, err := reader.Next()
 	if err != nil {
@@ -113,7 +115,7 @@ func TestStreamReader_skips_invalid_json_lines(t *testing.T) {
 
 func TestStreamReader_skips_empty_lines(t *testing.T) {
 	input := "\n\n" + `{"type":"result","result":"ok"}` + "\n\n"
-	reader := NewStreamReader(strings.NewReader(input))
+	reader := platform.NewStreamReader(strings.NewReader(input))
 
 	msg, err := reader.Next()
 	if err != nil {
@@ -131,7 +133,7 @@ func TestStreamReader_CollectAll(t *testing.T) {
 		`{"type":"result","subtype":"success","session_id":"s1","result":"hello world","usage":{"input_tokens":100,"output_tokens":50},"total_cost_usd":0.01,"num_turns":1}`,
 	}, "\n")
 
-	sr := NewStreamReader(strings.NewReader(input))
+	sr := platform.NewStreamReader(strings.NewReader(input))
 	result, messages, err := sr.CollectAll()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -150,7 +152,7 @@ func TestStreamReader_CollectAll(t *testing.T) {
 func TestExtractText_concatenates_text_blocks(t *testing.T) {
 	line := `{"type":"assistant","session_id":"s1","message":{"content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"hello "},{"type":"text","text":"world"},{"type":"tool_use","name":"Read","id":"t1","input":{"file_path":"/tmp/x"}}]}}`
 
-	msg, err := ParseStreamMessage([]byte(line))
+	msg, err := platform.ParseStreamMessage([]byte(line))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +168,7 @@ func TestExtractText_concatenates_text_blocks(t *testing.T) {
 func TestExtractToolUse_returns_tool_blocks(t *testing.T) {
 	line := `{"type":"assistant","session_id":"s1","message":{"content":[{"type":"text","text":"reading"},{"type":"tool_use","name":"Read","id":"t1","input":{"file_path":"/tmp/x"}},{"type":"tool_use","name":"Write","id":"t2","input":{"file_path":"/tmp/y"}}]}}`
 
-	msg, err := ParseStreamMessage([]byte(line))
+	msg, err := platform.ParseStreamMessage([]byte(line))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +186,7 @@ func TestExtractToolUse_returns_tool_blocks(t *testing.T) {
 
 func TestStreamReader_propagates_read_errors(t *testing.T) {
 	r := &errReader{data: `{"type":"system"}` + "\n", err: io.ErrUnexpectedEOF}
-	sr := NewStreamReader(r)
+	sr := platform.NewStreamReader(r)
 
 	msg, err := sr.Next()
 	if err != nil {
