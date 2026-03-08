@@ -7,10 +7,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// NeedsDefaultCheck returns true when args contain no explicit subcommand,
-// meaning "check" should be prepended. This preserves the UX where
-// `amadeus [flags]` behaves as `amadeus check [flags]`.
-func NeedsDefaultCheck(rootCmd *cobra.Command, args []string) bool {
+// NeedsDefaultRun returns true when args contain no explicit subcommand,
+// meaning "run" should be prepended. This preserves the UX where
+// `amadeus [flags]` behaves as `amadeus run [flags]`.
+func NeedsDefaultRun(rootCmd *cobra.Command, args []string) bool {
 	if len(args) == 0 {
 		return true
 	}
@@ -24,7 +24,7 @@ func NeedsDefaultCheck(rootCmd *cobra.Command, args []string) bool {
 
 	// Build set of known subcommand names.
 	// Include cobra-injected commands (help, completion) that are only added
-	// at Execute() time — NeedsDefaultCheck runs before Execute().
+	// at Execute() time — NeedsDefaultRun runs before Execute().
 	known := map[string]bool{"help": true, "completion": true}
 	for _, sub := range rootCmd.Commands() {
 		known[sub.Name()] = true

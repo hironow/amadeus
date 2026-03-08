@@ -13,12 +13,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newCheckCommand() *cobra.Command {
+func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:        "check [path]",
-		Short:      "Run divergence check",
-		Deprecated: "use 'amadeus run' instead",
-		Args:       cobra.MaximumNArgs(1),
+		Use:   "run [path]",
+		Short: "Run continuous divergence check and PR convergence",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -26,6 +25,7 @@ func newCheckCommand() *cobra.Command {
 			quiet, _ := cmd.Flags().GetBool("quiet")
 			jsonOut, _ := cmd.Flags().GetBool("json")
 			lang, _ := cmd.Flags().GetString("lang")
+			baseBranch, _ := cmd.Flags().GetString("base")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
@@ -40,8 +40,10 @@ func newCheckCommand() *cobra.Command {
 			}
 
 			// Preflight: verify required binaries exist
-			bins := []string{"git"}
-			if !dryRun {
+			// git and gh are always needed (gh for PR reader)
+			bins := []string{"git", "gh"}
+			// claude is needed only for post-merge pipeline (when --base is set) and not dry-run
+			if baseBranch != "" && !dryRun {
 				bins = append(bins, "claude")
 			}
 			if preErr := session.PreflightCheck(bins...); preErr != nil {
@@ -105,6 +107,7 @@ func newCheckCommand() *cobra.Command {
 
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 			git := session.NewGitClient(repoRoot)
+			prReader := session.NewGhPRReader(repoRoot)
 
 			a := &session.Amadeus{
 				Config:    cfg,
@@ -119,23 +122,29 @@ func newCheckCommand() *cobra.Command {
 				Notifier:  notifier,
 				Metrics:   &platform.OTelPolicyMetrics{},
 				ReviewCmd: reviewCmd,
+				PRReader:  prReader,
 			}
 
-			// Parse → COMMAND → usecase → EventEmitter → EVENT
+			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
 			rp, rpErr := domain.NewRepoPath(repoRoot)
 			if rpErr != nil {
 				return rpErr
 			}
-			return usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), domain.CheckOptions{
-				Full:   full,
-				DryRun: dryRun,
-				Quiet:  quiet,
-				JSON:   jsonOut,
+			return usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
+				CheckOptions: domain.CheckOptions{
+					Full:   full,
+					DryRun: dryRun,
+					Quiet:  quiet,
+					JSON:   jsonOut,
+				},
+				BaseBranch:   baseBranch,
+				PollInterval: domain.DefaultPollInterval,
 			}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
 		},
 	}
 
-	cmd.Flags().BoolP("dry-run", "n", false, "generate prompt only")
+	// Inherit all check flags
+	cmd.Flags().BoolP("dry-run", "n", false, "generate prompt only (post-merge)")
 	cmd.Flags().BoolP("full", "f", false, "force full calibration check")
 	cmd.Flags().BoolP("quiet", "q", false, "summary-only output")
 	cmd.Flags().BoolP("json", "j", false, "output as JSON")
@@ -143,6 +152,8 @@ func newCheckCommand() *cobra.Command {
 	cmd.Flags().String("approve-cmd", "", "external command for approval ({message} placeholder)")
 	cmd.Flags().String("notify-cmd", "", "external command for notifications ({title} and {message} placeholders)")
 	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
+	// New flag for run
+	cmd.Flags().String("base", "", "upstream branch for post-merge divergence check")
 
 	return cmd
 }
