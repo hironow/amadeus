@@ -283,12 +283,12 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 10 results
-	if len(results) != 10 {
-		t.Fatalf("expected 10 results, got %d", len(results))
+	// then: should have 13 results
+	if len(results) != 13 {
+		t.Fatalf("expected 13 results, got %d", len(results))
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "success-rate", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "Git Remote", "gh", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "success-rate", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -323,15 +323,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "domain.doctor" {
 			found = true
-			// Should have 10 doctor.check events (one per check)
+			// Should have 13 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 10 {
-				t.Errorf("expected 10 doctor.check events, got %d", eventCount)
+			if eventCount != 13 {
+				t.Errorf("expected 13 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -405,13 +405,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 10 results
-	if len(results) != 10 {
+	// then: should have 13 results
+	if len(results) != 13 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 10 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 13 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -555,6 +555,83 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	// then: FAIL — permission error should not be masked
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail for permission error, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckTool_GH(t *testing.T) {
+	// given
+	ctx := context.Background()
+
+	// when
+	result := checkTool(ctx, "gh")
+
+	// then: gh should be available in the test environment
+	if result.Status != domain.CheckOK {
+		t.Skipf("gh not installed, skipping: %s", result.Message)
+	}
+	if !strings.Contains(result.Message, "gh") {
+		t.Errorf("expected message to contain path, got: %s", result.Message)
+	}
+}
+
+func TestCheckGitRemote_HasRemote(t *testing.T) {
+	// given: a git repo with a remote
+	dir := t.TempDir()
+	exec.Command("git", "init", dir).Run()
+	exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/example/repo.git").Run()
+
+	// when
+	result := checkGitRemote(dir)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Message, "origin") {
+		t.Errorf("expected message to contain 'origin', got: %s", result.Message)
+	}
+}
+
+func TestCheckGitRemote_NoRemote(t *testing.T) {
+	// given: a git repo without remotes
+	dir := t.TempDir()
+	exec.Command("git", "init", dir).Run()
+
+	// when
+	result := checkGitRemote(dir)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Message, "no remote") {
+		t.Errorf("expected 'no remote' in message, got: %s", result.Message)
+	}
+}
+
+func TestCheckGitRemote_NotGitRepo(t *testing.T) {
+	// given: a directory that is not a git repo
+	dir := t.TempDir()
+
+	// when
+	result := checkGitRemote(dir)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckFsnotify_Available(t *testing.T) {
+	// when
+	result := checkFsnotify()
+
+	// then: should succeed on any normal test environment
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Name != "fsnotify" {
+		t.Errorf("expected name 'fsnotify', got: %s", result.Name)
 	}
 }
 
