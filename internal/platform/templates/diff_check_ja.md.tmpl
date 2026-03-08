@@ -38,8 +38,12 @@ Also produce an **impact_radius** map: identify which areas of the codebase are 
 - "transitive": Files/modules further downstream that may be affected
 
 Output MUST be valid JSON matching this exact schema:
-{"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[]}],"reasoning":""}
+{"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
 
 For D-Mails:
 - Only generate D-Mails for actual issues found. Empty array if none.
 - Include `targets`: file/module paths affected by each D-Mail issue.
+- 各D-Mailを「design」または「implementation」に分類してください:
+  - "design": ADR違反、依存構造の問題、アーキテクチャの乖離
+  - "implementation": DoD未達、コーディング規約違反、テストカバレッジの問題
+- 各D-Mail候補の "category" フィールドに分類を含めてください。
