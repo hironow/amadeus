@@ -31,6 +31,7 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 	))
 	now := time.Now().UTC()
 	for _, d := range consumed {
+		domain.LogBanner(a.Logger, domain.BannerRecv, string(d.Kind), d.Name, d.Description)
 		if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
 			Name:   d.Name,
 			Kind:   d.Kind,
@@ -78,6 +79,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				a.Logger.Warn("skipping invalid %s dmail %s: %v", kind, name, errs)
 				continue
 			}
+			domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
 			if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
 				span3.End()
 				return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
@@ -140,6 +142,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 			return saved, fmt.Errorf("convergence dmail name: %w", nameErr)
 		}
 		cd.Name = cdName
+		domain.LogBanner(a.Logger, domain.BannerSend, string(cd.Kind), cd.Name, cd.Description)
 		if err := a.Emitter.EmitDMailGenerated(cd, time.Now().UTC()); err != nil {
 			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}
