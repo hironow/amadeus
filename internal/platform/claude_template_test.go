@@ -125,6 +125,48 @@ func TestBuildFullCheckPrompt_En(t *testing.T) {
 	}
 }
 
+func TestBuildDiffCheckPrompt_WithPRReviewSummary(t *testing.T) {
+	// given
+	params := domain.DiffCheckParams{
+		PreviousScores:  `{"divergence": 0.1}`,
+		PRDiffs:         "diff --git a/auth.go ...",
+		PRReviewSummary: "### PR #42\n- Review decision: CHANGES_REQUESTED\n",
+	}
+
+	// when
+	prompt, err := platform.BuildDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "PR Review Signals") {
+		t.Error("prompt should contain 'PR Review Signals' section when PRReviewSummary is set")
+	}
+	if !strings.Contains(prompt, "CHANGES_REQUESTED") {
+		t.Error("prompt should contain the review summary content")
+	}
+}
+
+func TestBuildDiffCheckPrompt_WithoutPRReviewSummary(t *testing.T) {
+	// given
+	params := domain.DiffCheckParams{
+		PreviousScores: `{"divergence": 0.1}`,
+		PRDiffs:        "diff --git a/auth.go ...",
+	}
+
+	// when
+	prompt, err := platform.BuildDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(prompt, "PR Review Signals") {
+		t.Error("prompt should NOT contain 'PR Review Signals' when PRReviewSummary is empty")
+	}
+}
+
 func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 	// given
 	params := domain.DiffCheckParams{

@@ -31,11 +31,12 @@ type ClaudeDMailCandidate struct {
 
 // DiffCheckParams holds the template parameters for a diff-based check.
 type DiffCheckParams struct {
-	PreviousScores string
-	PRDiffs        string
-	RelevantADRs   string
-	LinkedDoDs     string
-	LinkedIssueIDs string
+	PreviousScores  string
+	PRDiffs         string
+	RelevantADRs    string
+	LinkedDoDs      string
+	LinkedIssueIDs  string
+	PRReviewSummary string
 }
 
 // FullCheckParams holds the template parameters for a full calibration check.

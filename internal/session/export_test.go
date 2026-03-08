@@ -26,6 +26,9 @@ func NewCmdApproverForTest(cmdTemplate string, factory func(ctx context.Context,
 // ExportParseMergedPRs exposes parseMergedPRs for external tests.
 var ExportParseMergedPRs = parseMergedPRs
 
+// ExportParsePRReviewJSON exposes parsePRReviewJSON for external tests.
+var ExportParsePRReviewJSON = parsePRReviewJSON
+
 // ExportHookMarkerBegin exposes hookMarkerBegin for external tests.
 var ExportHookMarkerBegin = hookMarkerBegin
 

@@ -1,0 +1,114 @@
+package domain_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/hironow/amadeus/internal/domain"
+)
+
+func TestPRReview_HasUnresolvedReviews(t *testing.T) {
+	tests := []struct {
+		name     string
+		decision string
+		want     bool
+	}{
+		{"approved", "APPROVED", false},
+		{"changes requested", "CHANGES_REQUESTED", true},
+		{"empty", "", false},
+		{"review required", "REVIEW_REQUIRED", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := domain.PRReview{ReviewDecision: tt.decision}
+			if got := pr.HasUnresolvedReviews(); got != tt.want {
+				t.Errorf("HasUnresolvedReviews() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatPRReviewSummary_Empty(t *testing.T) {
+	got := domain.FormatPRReviewSummary(nil)
+	if got != "" {
+		t.Errorf("expected empty string for nil reviews, got %q", got)
+	}
+}
+
+func TestFormatPRReviewSummary_WithReviews(t *testing.T) {
+	reviews := []domain.PRReview{
+		{
+			Number:         "#42",
+			ReviewDecision: "CHANGES_REQUESTED",
+			CIStatus:       "FAILURE",
+			Comments: []domain.PRComment{
+				{Author: "senior", Body: "Fix error handling", State: "CHANGES_REQUESTED"},
+			},
+		},
+		{
+			Number:         "#43",
+			ReviewDecision: "APPROVED",
+			CIStatus:       "SUCCESS",
+		},
+	}
+
+	got := domain.FormatPRReviewSummary(reviews)
+
+	if !strings.Contains(got, "### PR #42") {
+		t.Error("should contain PR #42 header")
+	}
+	if !strings.Contains(got, "CHANGES_REQUESTED") {
+		t.Error("should contain CHANGES_REQUESTED")
+	}
+	if !strings.Contains(got, "@senior") {
+		t.Error("should contain reviewer name")
+	}
+	if !strings.Contains(got, "### PR #43") {
+		t.Error("should contain PR #43 header")
+	}
+	if !strings.Contains(got, "APPROVED") {
+		t.Error("should contain APPROVED")
+	}
+}
+
+func TestFormatPRReviewSummary_TruncatesLongComments(t *testing.T) {
+	longBody := strings.Repeat("x", 300)
+	reviews := []domain.PRReview{
+		{
+			Number: "#1",
+			Comments: []domain.PRComment{
+				{Author: "a", Body: longBody, State: "SUBMITTED"},
+			},
+		},
+	}
+
+	got := domain.FormatPRReviewSummary(reviews)
+
+	if strings.Contains(got, longBody) {
+		t.Error("long comment body should be truncated")
+	}
+	if !strings.Contains(got, "...") {
+		t.Error("truncated comment should end with ...")
+	}
+}
+
+func TestPRReview_HasCIFailure(t *testing.T) {
+	tests := []struct {
+		name   string
+		status string
+		want   bool
+	}{
+		{"success", "SUCCESS", false},
+		{"failure", "FAILURE", true},
+		{"pending", "PENDING", false},
+		{"empty", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := domain.PRReview{CIStatus: tt.status}
+			if got := pr.HasCIFailure(); got != tt.want {
+				t.Errorf("HasCIFailure() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

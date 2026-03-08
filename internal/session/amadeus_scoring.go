@@ -59,6 +59,18 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 			attribute.Int("shift.pr_count", len(report.MergedPRs)),
 		))
 	}
+
+	// Enrich with GitHub PR review data (graceful: skip if gh unavailable)
+	if len(report.MergedPRs) > 0 {
+		gh := &GHClient{Dir: a.RepoDir}
+		reviews := gh.FetchPRReviews(report.MergedPRs)
+		if len(reviews) > 0 {
+			report.PRReviews = reviews
+			span1.AddEvent("pr_reviews.fetched", trace.WithAttributes(
+				attribute.Int("pr_reviews.count", len(reviews)),
+			))
+		}
+	}
 	span1.End()
 
 	return report, fullCheck, nil
@@ -101,11 +113,12 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		linkedDoDs = allDoDs
 	}
 	return platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
-		PreviousScores: string(prevJSON),
-		PRDiffs:        report.Diff,
-		RelevantADRs:   allADRs,
-		LinkedDoDs:     linkedDoDs,
-		LinkedIssueIDs: strings.Join(issueIDs, ", "),
+		PreviousScores:  string(prevJSON),
+		PRDiffs:         report.Diff,
+		RelevantADRs:    allADRs,
+		LinkedDoDs:      linkedDoDs,
+		LinkedIssueIDs:  strings.Join(issueIDs, ", "),
+		PRReviewSummary: domain.FormatPRReviewSummary(report.PRReviews),
 	})
 }
 

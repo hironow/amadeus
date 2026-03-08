@@ -21,6 +21,13 @@ The following Linear Issue IDs were found in the merged commits: {{.LinkedIssueI
 
 **Important**: Do NOT trust the issue's status field (e.g., "Done", "In Progress"). Statuses may be inaccurate due to human workflow errors. Focus exclusively on the issue description and acceptance criteria as the source of truth for what the PR should have achieved.
 {{end}}
+{{if .PRReviewSummary}}
+## PR Review Signals
+The following review and CI data was collected from merged PRs.
+Consider unresolved review comments and CI failures as additional integrity signals.
+
+{{.PRReviewSummary}}
+{{end}}
 ## Task
 Evaluate how these changes affect each integrity axis.
 Score each axis 0-100 (0 = full compliance, 100 = full deviation).
