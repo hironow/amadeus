@@ -184,6 +184,35 @@ func WeightForAxis(axis Axis, w Weights) float64 {
 	}
 }
 
+// ClassifyByAxes performs rule-based classification of feedback into "design"
+// or "implementation" category based on axis scores and weights.
+// Design axes: ADR integrity, dependency integrity.
+// Implementation axes: DoD fulfillment, implicit constraints.
+// On tie, defaults to "design".
+func ClassifyByAxes(axes map[Axis]AxisScore, weights Weights) string {
+	designScore := float64(axes[AxisADR].Score)*weights.ADRIntegrity +
+		float64(axes[AxisDependency].Score)*weights.DependencyIntegrity
+	implScore := float64(axes[AxisDoD].Score)*weights.DoDFulfillment +
+		float64(axes[AxisImplicit].Score)*weights.ImplicitConstraints
+	if designScore >= implScore {
+		return "design"
+	}
+	return "implementation"
+}
+
+// ResolveFeedbackKinds determines the D-Mail kind(s) from qualitative (LLM)
+// and quantitative (rule-based) classification signals.
+// When both agree, returns a single kind. On disagreement, returns both.
+func ResolveFeedbackKinds(qualitative, quantitative string) []DMailKind {
+	if qualitative == quantitative {
+		if qualitative == "design" {
+			return []DMailKind{KindDesignFeedback}
+		}
+		return []DMailKind{KindImplFeedback}
+	}
+	return []DMailKind{KindDesignFeedback, KindImplFeedback}
+}
+
 // MeterResult holds the complete output of Phase 2 scoring orchestration.
 type MeterResult struct {
 	Divergence      DivergenceResult

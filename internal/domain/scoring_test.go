@@ -291,6 +291,70 @@ func TestDivergenceMeter_ProcessResponse_NilImpactRadius(t *testing.T) {
 	}
 }
 
+func TestClassifyByAxes_DesignDominant(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 80},
+		domain.AxisDoD:        {Score: 10},
+		domain.AxisDependency: {Score: 60},
+		domain.AxisImplicit:   {Score: 5},
+	}
+	category := domain.ClassifyByAxes(axes, domain.DefaultWeights())
+	if category != "design" {
+		t.Errorf("expected design, got %s", category)
+	}
+}
+
+func TestClassifyByAxes_ImplementationDominant(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 5},
+		domain.AxisDoD:        {Score: 80},
+		domain.AxisDependency: {Score: 10},
+		domain.AxisImplicit:   {Score: 70},
+	}
+	category := domain.ClassifyByAxes(axes, domain.DefaultWeights())
+	if category != "implementation" {
+		t.Errorf("expected implementation, got %s", category)
+	}
+}
+
+func TestClassifyByAxes_TieGoesToDesign(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 50},
+		domain.AxisDoD:        {Score: 50},
+		domain.AxisDependency: {Score: 50},
+		domain.AxisImplicit:   {Score: 50},
+	}
+	weights := domain.Weights{
+		ADRIntegrity: 0.25, DoDFulfillment: 0.25,
+		DependencyIntegrity: 0.25, ImplicitConstraints: 0.25,
+	}
+	category := domain.ClassifyByAxes(axes, weights)
+	if category != "design" {
+		t.Errorf("expected design on tie, got %s", category)
+	}
+}
+
+func TestResolveFeedbackKinds_BothDesign(t *testing.T) {
+	kinds := domain.ResolveFeedbackKinds("design", "design")
+	if len(kinds) != 1 || kinds[0] != domain.KindDesignFeedback {
+		t.Errorf("expected [design-feedback], got %v", kinds)
+	}
+}
+
+func TestResolveFeedbackKinds_BothImpl(t *testing.T) {
+	kinds := domain.ResolveFeedbackKinds("implementation", "implementation")
+	if len(kinds) != 1 || kinds[0] != domain.KindImplFeedback {
+		t.Errorf("expected [implementation-feedback], got %v", kinds)
+	}
+}
+
+func TestResolveFeedbackKinds_Disagreement(t *testing.T) {
+	kinds := domain.ResolveFeedbackKinds("design", "implementation")
+	if len(kinds) != 2 {
+		t.Fatalf("expected 2 kinds on disagreement, got %d", len(kinds))
+	}
+}
+
 func TestDivergenceMeter_ProcessResponse_HighSeverity(t *testing.T) {
 	meter := &domain.DivergenceMeter{
 		Config: domain.DefaultConfig(),

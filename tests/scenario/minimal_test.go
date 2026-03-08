@@ -52,7 +52,7 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	ws.WaitForAbsent(t, ".gate", "outbox", 10*time.Second)
 
 	// Verify feedback kind
-	obs.AssertDMailKind(feedbackPath, "feedback")
+	obs.AssertDMailKind(feedbackPath, "design-feedback")
 
 	// Verify closed loop: all 3 delivery points have D-Mails
 	obs.WaitForClosedLoop(60 * time.Second)

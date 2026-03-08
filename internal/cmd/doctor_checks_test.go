@@ -488,7 +488,7 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	dmail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 		Severity:      domain.SeverityHigh,
 	}

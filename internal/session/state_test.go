@@ -42,8 +42,8 @@ func TestInitGateDir_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	if strings.Contains(string(content), "old-kind") {
 		t.Error("outdated SKILL.md should be overwritten with latest template")
 	}
-	if !strings.Contains(string(content), "kind: feedback") {
-		t.Error("updated SKILL.md should contain 'kind: feedback'")
+	if !strings.Contains(string(content), "kind: design-feedback") {
+		t.Error("updated SKILL.md should contain 'kind: design-feedback'")
 	}
 }
 

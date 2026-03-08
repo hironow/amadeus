@@ -27,6 +27,7 @@ type ClaudeDMailCandidate struct {
 	Issues      []string `json:"issues,omitempty"`
 	Targets     []string `json:"targets,omitempty"`
 	Action      string   `json:"action,omitempty"`
+	Category    string   `json:"category,omitempty"`
 }
 
 // DiffCheckParams holds the template parameters for a diff-based check.

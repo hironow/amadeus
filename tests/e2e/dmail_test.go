@@ -227,7 +227,7 @@ func TestE2E_ArchivePrune_DryRun(t *testing.T) {
 	// Seed an old D-Mail
 	writeDMail(t, dir, "archive", "feedback-001", map[string]any{
 		"name":        "feedback-001",
-		"kind":        "feedback",
+		"kind":        "design-feedback",
 		"description": "Old feedback",
 		"severity":    "low",
 	}, "Old body.\n")
@@ -256,7 +256,7 @@ func TestE2E_ArchivePrune_WithYes(t *testing.T) {
 
 	writeDMail(t, dir, "archive", "feedback-001", map[string]any{
 		"name":        "feedback-001",
-		"kind":        "feedback",
+		"kind":        "design-feedback",
 		"description": "Old feedback",
 		"severity":    "low",
 	}, "Old body.\n")
@@ -280,7 +280,7 @@ func TestE2E_ArchivePrune_PreservesRecent(t *testing.T) {
 
 	writeDMail(t, dir, "archive", "feedback-001", map[string]any{
 		"name":        "feedback-001",
-		"kind":        "feedback",
+		"kind":        "design-feedback",
 		"description": "Recent feedback",
 		"severity":    "low",
 	}, "Recent body.\n")

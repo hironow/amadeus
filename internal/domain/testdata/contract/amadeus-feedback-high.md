@@ -1,7 +1,7 @@
 ---
 dmail-schema-version: "1"
 name: feedback-001
-kind: feedback
+kind: design-feedback
 description: ADR integrity violation in authentication module
 issues:
     - MY-301

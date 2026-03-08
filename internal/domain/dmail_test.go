@@ -10,7 +10,7 @@ import (
 func TestParseDMail_Valid(t *testing.T) {
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "ADR-003 violation detected"
 issues:
   - MY-42
@@ -30,8 +30,8 @@ The auth module violates the JWT requirement.
 	if dmail.Name != "feedback-001" {
 		t.Errorf("expected name feedback-001, got %s", dmail.Name)
 	}
-	if dmail.Kind != domain.KindFeedback {
-		t.Errorf("expected kind feedback, got %s", dmail.Kind)
+	if dmail.Kind != domain.KindDesignFeedback {
+		t.Errorf("expected kind design-feedback, got %s", dmail.Kind)
 	}
 	if dmail.Description != "ADR-003 violation detected" {
 		t.Errorf("expected description, got %s", dmail.Description)
@@ -53,7 +53,7 @@ The auth module violates the JWT requirement.
 func TestParseDMail_Minimal(t *testing.T) {
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "minimal"
 ---
 `
@@ -64,8 +64,8 @@ description: "minimal"
 	if dmail.Name != "feedback-001" {
 		t.Errorf("expected name feedback-001, got %s", dmail.Name)
 	}
-	if dmail.Kind != domain.KindFeedback {
-		t.Errorf("expected kind feedback, got %s", dmail.Kind)
+	if dmail.Kind != domain.KindDesignFeedback {
+		t.Errorf("expected kind design-feedback, got %s", dmail.Kind)
 	}
 	if len(dmail.Issues) != 0 {
 		t.Errorf("expected empty issues, got %v", dmail.Issues)
@@ -97,7 +97,7 @@ func TestParseDMail_MissingDelimiters(t *testing.T) {
 func TestParseDMail_LegacyUppercaseSeverity(t *testing.T) {
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "legacy uppercase severity"
 severity: HIGH
 ---
@@ -114,7 +114,7 @@ severity: HIGH
 func TestParseDMail_LegacyMixedCaseSeverity(t *testing.T) {
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "mixed case"
 severity: Medium
 ---
@@ -131,7 +131,7 @@ severity: Medium
 func TestMarshalDMail_RoundTrip(t *testing.T) {
 	original := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "ADR violation",
 		Issues:      []string{"MY-42"},
 		Severity:    domain.SeverityHigh,
@@ -177,7 +177,7 @@ func TestMarshalDMail_RoundTrip(t *testing.T) {
 func TestParseDMail_WithTargets(t *testing.T) {
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "ADR violation"
 targets:
   - auth/session.go
@@ -201,7 +201,7 @@ Body text.
 func TestMarshalDMail_Targets_RoundTrip(t *testing.T) {
 	original := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "with targets",
 		Targets:     []string{"auth/session.go", "api/handler.go"},
 		Body:        "Details\n",
@@ -226,7 +226,7 @@ func TestMarshalDMail_Targets_RoundTrip(t *testing.T) {
 func TestMarshalDMail_OmitsEmptyTargets(t *testing.T) {
 	original := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "no extras",
 	}
 
@@ -244,7 +244,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 	dmail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "ADR violation detected",
 		Severity:      domain.SeverityHigh,
 	}
@@ -255,7 +255,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 }
 
 func TestValidateDMail_AllKinds(t *testing.T) {
-	for _, kind := range []domain.DMailKind{domain.KindFeedback, domain.KindSpecification, domain.KindReport, domain.KindConvergence, domain.KindCIResult} {
+	for _, kind := range []domain.DMailKind{domain.KindDesignFeedback, domain.KindImplFeedback, domain.KindSpecification, domain.KindReport, domain.KindConvergence, domain.KindCIResult} {
 		dmail := domain.DMail{
 			SchemaVersion: domain.DMailSchemaVersion,
 			Name:          "test-001",
@@ -272,7 +272,7 @@ func TestValidateDMail_AllKinds(t *testing.T) {
 
 func TestValidateDMail_MissingName(t *testing.T) {
 	dmail := domain.DMail{
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "test",
 		Severity:    domain.SeverityHigh,
 	}
@@ -310,7 +310,7 @@ func TestValidateDMail_InvalidKind(t *testing.T) {
 func TestValidateDMail_MissingDescription(t *testing.T) {
 	dmail := domain.DMail{
 		Name:     "feedback-001",
-		Kind:     domain.KindFeedback,
+		Kind:     domain.KindDesignFeedback,
 		Severity: domain.SeverityHigh,
 	}
 	errs := domain.ValidateDMail(dmail)
@@ -324,7 +324,7 @@ func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 	dmail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 	}
 	errs := domain.ValidateDMail(dmail)
@@ -336,7 +336,7 @@ func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 func TestValidateDMail_InvalidSeverity(t *testing.T) {
 	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "test",
 		Severity:    domain.Severity("critical"),
 	}
@@ -357,7 +357,7 @@ func TestValidateDMail_MultipleErrors(t *testing.T) {
 func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
 	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "test",
 	}
 	errs := domain.ValidateDMail(dmail)
@@ -370,7 +370,7 @@ func TestValidateDMail_UnsupportedSchemaVersion(t *testing.T) {
 	dmail := domain.DMail{
 		SchemaVersion: "99",
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 	}
 	errs := domain.ValidateDMail(dmail)
@@ -383,7 +383,7 @@ func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
 	// given: two identical D-Mails
 	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "ADR violation",
 		Body:        "Details here.\n",
 	}
@@ -405,13 +405,13 @@ func TestDMailIdempotencyKey_DifferentContent(t *testing.T) {
 	// given: two D-Mails with different bodies
 	dmail1 := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "ADR violation",
 		Body:        "Details v1.\n",
 	}
 	dmail2 := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "ADR violation",
 		Body:        "Details v2.\n",
 	}
@@ -430,7 +430,7 @@ func TestMarshalDMail_IdempotencyKey(t *testing.T) {
 	// given
 	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "ADR violation",
 		Body:        "Details here.\n",
 	}
@@ -460,7 +460,7 @@ func TestMarshalDMail_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given: D-Mail with existing metadata
 	dmail := domain.DMail{
 		Name:        "feedback-001",
-		Kind:        domain.KindFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "ADR violation",
 		Metadata:    map[string]string{"created_at": "2026-02-28T12:00:00Z"},
 	}
@@ -632,7 +632,7 @@ func TestParseDMail_ActionField_RoundTrip(t *testing.T) {
 	original := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-action-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "Evaluation with retry action",
 		Action:        domain.ActionRetry,
 		Body:          "Implementation needs revision.\n",
@@ -659,7 +659,7 @@ func TestValidateDMail_InvalidAction(t *testing.T) {
 	dmail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 		Action:        domain.DMailAction("invalid-action"),
 	}
@@ -688,7 +688,7 @@ func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
 	dmail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 	}
 
@@ -706,7 +706,7 @@ func TestValidateDMail_AllActions(t *testing.T) {
 		dmail := domain.DMail{
 			SchemaVersion: domain.DMailSchemaVersion,
 			Name:          "test-001",
-			Kind:          domain.KindFeedback,
+			Kind:          domain.KindDesignFeedback,
 			Description:   "test",
 			Action:        action,
 		}
@@ -749,7 +749,7 @@ func TestParseDMail_ZeroPriority_OmittedInMarshal(t *testing.T) {
 	original := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "feedback-001",
-		Kind:          domain.KindFeedback,
+		Kind:          domain.KindDesignFeedback,
 		Description:   "test without prio field",
 	}
 
@@ -772,7 +772,7 @@ func TestParseDMail_LegacyLinearIssueID_SilentDrop(t *testing.T) {
 	// given: a D-Mail with the removed linear_issue_id field
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "legacy format with linear_issue_id"
 linear_issue_id: "MY-42"
 ---
@@ -801,7 +801,7 @@ func TestParseDMail_LegacyLinearIssueID_WithNewIssues(t *testing.T) {
 	// given: a D-Mail with both old and new fields
 	raw := `---
 name: "feedback-001"
-kind: feedback
+kind: design-feedback
 description: "both old and new fields"
 linear_issue_id: "MY-42"
 issues:
@@ -838,5 +838,26 @@ func TestExtractIssueIDs_MixedPrefixes(t *testing.T) {
 	}
 	if ids[0] != "AM-99" || ids[1] != "MY-302" {
 		t.Errorf("expected [AM-99 MY-302], got %v", ids)
+	}
+}
+
+func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test"}
+	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+		t.Errorf("expected valid, got: %v", errs)
+	}
+}
+
+func TestValidateDMail_ImplFeedbackKind(t *testing.T) {
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindImplFeedback, Description: "test"}
+	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+		t.Errorf("expected valid, got: %v", errs)
+	}
+}
+
+func TestValidateDMail_OldFeedbackKind_Invalid(t *testing.T) {
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: "feedback", Description: "test"}
+	if errs := domain.ValidateDMail(dmail); len(errs) == 0 {
+		t.Error("expected validation error for old feedback kind")
 	}
 }

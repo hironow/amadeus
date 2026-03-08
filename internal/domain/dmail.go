@@ -17,8 +17,10 @@ import (
 type DMailKind string
 
 const (
-	// KindFeedback is produced by the verifier role.
-	KindFeedback DMailKind = "feedback"
+	// KindDesignFeedback is produced by the verifier role for design-level issues.
+	KindDesignFeedback DMailKind = "design-feedback"
+	// KindImplFeedback is produced by the verifier role for implementation-level issues.
+	KindImplFeedback DMailKind = "implementation-feedback"
 	// KindSpecification is produced by the designer role.
 	KindSpecification DMailKind = "specification"
 	// KindReport is produced by the implementer role.
@@ -93,11 +95,12 @@ type DMail struct {
 
 // validKinds is the set of valid DMailKind values per schema v1.
 var validKinds = map[DMailKind]bool{
-	KindFeedback:      true,
-	KindSpecification: true,
-	KindReport:        true,
-	KindConvergence:   true,
-	KindCIResult:      true,
+	KindDesignFeedback: true,
+	KindImplFeedback:   true,
+	KindSpecification:  true,
+	KindReport:         true,
+	KindConvergence:    true,
+	KindCIResult:       true,
 }
 
 // validSeverities is the set of valid Severity values per schema v1.

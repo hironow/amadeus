@@ -1,6 +1,6 @@
 ---
 name: feedback-auth-w1
-kind: feedback
+kind: design-feedback
 description: Wave auth:w1 feedback for amadeus
 dmail-schema-version: "1"
 issues:
