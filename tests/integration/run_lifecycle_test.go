@@ -153,7 +153,6 @@ func TestRunLifecycle_StartAndStop(t *testing.T) {
 
 	opts := domain.RunOptions{
 		CheckOptions: domain.CheckOptions{Quiet: true},
-		PollInterval: 50 * time.Millisecond,
 	}
 
 	rp, err := domain.NewRepoPath(tmpDir)
@@ -234,7 +233,6 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 
 	opts := domain.RunOptions{
 		CheckOptions: domain.CheckOptions{Quiet: true},
-		PollInterval: 50 * time.Millisecond,
 	}
 
 	rp, err := domain.NewRepoPath(tmpDir)

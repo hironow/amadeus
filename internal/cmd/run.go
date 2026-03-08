@@ -137,8 +137,7 @@ func newRunCommand() *cobra.Command {
 					Quiet:  quiet,
 					JSON:   jsonOut,
 				},
-				BaseBranch:   baseBranch,
-				PollInterval: domain.DefaultPollInterval,
+				BaseBranch: baseBranch,
 			}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
 		},
 	}
