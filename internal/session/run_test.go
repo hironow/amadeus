@@ -149,18 +149,26 @@ func (s *runState) ShouldPromoteToFull(_, _ float64) bool    { return false }
 func (s *runState) AdvanceCheckCount(_ bool)                 {}
 func (s *runState) Restore(_ domain.CheckResult)             {}
 
+// feedInbox creates a buffered channel pre-loaded with the given D-Mails.
+func feedInbox(dmails ...domain.DMail) <-chan domain.DMail {
+	ch := make(chan domain.DMail, len(dmails))
+	for _, d := range dmails {
+		ch <- d
+	}
+	return ch
+}
+
 // --- Tests ---
 
 func TestRun_gracefulShutdown(t *testing.T) {
-	// given: Amadeus with mock emitter, empty inbox, mock git
+	// given: Amadeus with mock emitter, empty inbox channel, mock git
 	emitter := &runEmitter{}
 	git := &runGit{branch: "main", commit: "abc1234"}
-	store := &runStore{scanPlan: nil} // always empty inbox
 
 	a := &Amadeus{
-		Git:    git,
-		Store:  store,
-		Logger: &domain.NopLogger{},
+		Git:     git,
+		Logger:  &domain.NopLogger{},
+		InboxCh: make(chan domain.DMail), // unbuffered, blocks until ctx cancel
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -171,9 +179,7 @@ func TestRun_gracefulShutdown(t *testing.T) {
 		cancel()
 	}()
 
-	opts := domain.RunOptions{
-		PollInterval: 10 * time.Millisecond,
-	}
+	opts := domain.RunOptions{}
 
 	// when
 	err := a.Run(ctx, opts, emitter, &runState{})
@@ -200,7 +206,7 @@ func TestRun_gracefulShutdown(t *testing.T) {
 }
 
 func TestRun_inboxTriggerPreMerge(t *testing.T) {
-	// given: store returns 1 report D-Mail on first scan, empty on subsequent scans
+	// given: inbox channel delivers 1 report D-Mail
 	reportDMail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "test-report-001",
@@ -210,12 +216,6 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 
 	emitter := &runEmitter{}
 	git := &runGit{branch: "develop", commit: "def5678"}
-	store := &runStore{
-		scanPlan: [][]domain.DMail{
-			{reportDMail}, // first scan returns a report
-			// subsequent scans return empty (nil)
-		},
-	}
 
 	// PRReader with 3 PRs forming a chain
 	pr1 := mustPRState(t, "#1", "Feature A", "develop", "feat-a", true, 2, nil)
@@ -223,24 +223,25 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 	pr3 := mustPRState(t, "#3", "Feature C", "feat-b", "feat-c", true, 0, nil)
 	prReader := &mockPRReader{prs: []domain.PRState{pr1, pr2, pr3}}
 
+	store := &runStore{}
+
 	a := &Amadeus{
 		Git:      git,
 		Store:    store,
 		PRReader: prReader,
 		Logger:   &domain.NopLogger{},
+		InboxCh:  feedInbox(reportDMail),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Cancel after enough time for one scan + processing
+	// Cancel after enough time for processing
 	go func() {
 		time.Sleep(150 * time.Millisecond)
 		cancel()
 	}()
 
-	opts := domain.RunOptions{
-		PollInterval: 20 * time.Millisecond,
-	}
+	opts := domain.RunOptions{}
 
 	// when
 	err := a.Run(ctx, opts, emitter, &runState{})
@@ -273,7 +274,7 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 }
 
 func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
-	// given: PRReader is nil, store returns 1 report D-Mail
+	// given: PRReader is nil, inbox channel delivers 1 report D-Mail
 	reportDMail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          "test-report-002",
@@ -283,17 +284,15 @@ func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
 
 	emitter := &runEmitter{}
 	git := &runGit{branch: "main", commit: "ghi9012"}
-	store := &runStore{
-		scanPlan: [][]domain.DMail{
-			{reportDMail},
-		},
-	}
+
+	store := &runStore{}
 
 	a := &Amadeus{
 		Git:      git,
 		Store:    store,
 		PRReader: nil, // no PR reader
 		Logger:   &domain.NopLogger{},
+		InboxCh:  feedInbox(reportDMail),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -303,9 +302,7 @@ func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
 		cancel()
 	}()
 
-	opts := domain.RunOptions{
-		PollInterval: 20 * time.Millisecond,
-	}
+	opts := domain.RunOptions{}
 
 	// when
 	err := a.Run(ctx, opts, emitter, &runState{})

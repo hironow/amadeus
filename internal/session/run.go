@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -54,80 +55,76 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		}
 	}
 
-	// Main loop
+	// Start inbox monitor
+	var inboxCh <-chan domain.DMail
+	if a.InboxCh != nil {
+		inboxCh = a.InboxCh
+	} else {
+		stateDir := filepath.Join(a.RepoDir, domain.StateDir)
+		var monErr error
+		inboxCh, monErr = MonitorInbox(ctx, stateDir, a.Logger)
+		if monErr != nil {
+			return fmt.Errorf("inbox monitor: %w", monErr)
+		}
+	}
+
+	// Main loop: event-driven via channel
 	for {
 		select {
 		case <-ctx.Done():
-			// Graceful shutdown
 			stopNow := time.Now().UTC()
 			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "signal"}, stopNow)
 			if !opts.Quiet {
 				a.Logger.Info("amadeus run: stopped (signal)")
 			}
 			return nil
-		default:
-		}
 
-		// Scan inbox
-		consumed, scanErr := a.Store.ScanInbox(ctx)
-		if scanErr != nil {
-			a.Logger.Warn("inbox scan error: %v", scanErr)
-			time.Sleep(opts.PollInterval)
-			continue
-		}
+		case dmail, ok := <-inboxCh:
+			if !ok {
+				// Channel closed
+				stopNow := time.Now().UTC()
+				_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "channel_closed"}, stopNow)
+				return nil
+			}
 
-		if len(consumed) == 0 {
-			time.Sleep(opts.PollInterval)
-			continue
-		}
-
-		// Process consumed D-Mails
-		inboxNow := time.Now().UTC()
-		hasReport := false
-		for _, d := range consumed {
-			domain.LogBanner(a.Logger, domain.BannerRecv, string(d.Kind), d.Name, d.Description)
+			inboxNow := time.Now().UTC()
+			domain.LogBanner(a.Logger, domain.BannerRecv, string(dmail.Kind), dmail.Name, dmail.Description)
 			if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
-				Name:   d.Name,
-				Kind:   d.Kind,
-				Source: d.Name + ".md",
+				Name:   dmail.Name,
+				Kind:   dmail.Kind,
+				Source: dmail.Name + ".md",
 			}, inboxNow); err != nil {
 				a.Logger.Warn("emit inbox consumed: %v", err)
 			}
-			if d.Kind == domain.KindReport {
-				hasReport = true
+
+			if !opts.Quiet {
+				a.Logger.Info("consumed D-Mail from inbox: %s", dmail.Name)
 			}
-		}
 
-		if !opts.Quiet {
-			a.Logger.Info("consumed %d D-Mail(s) from inbox", len(consumed))
-		}
-
-		// Trigger pre-merge pipeline on report D-Mails
-		if hasReport {
-			dmails, prErr := a.runPreMergePipeline(ctx, integrationBranch)
-			if prErr != nil {
-				a.Logger.Warn("pre-merge pipeline error: %v", prErr)
-			} else if len(dmails) > 0 && !opts.Quiet {
-				a.Logger.OK("generated %d implementation-feedback D-Mail(s)", len(dmails))
-			}
-		}
-
-		// Trigger post-merge pipeline if BaseBranch is set and we got a report
-		if hasReport && opts.BaseBranch != "" {
-			previous, loadErr := a.Store.LoadLatest()
-			if loadErr != nil {
-				a.Logger.Warn("load previous state: %v", loadErr)
-			} else {
-				a.State.Restore(previous)
-				checkOpts := domain.CheckOptions{
-					Full:  opts.Full,
-					Quiet: opts.Quiet,
-					JSON:  opts.JSON,
+			if dmail.Kind == domain.KindReport {
+				dmails, prErr := a.runPreMergePipeline(ctx, integrationBranch)
+				if prErr != nil {
+					a.Logger.Warn("pre-merge pipeline error: %v", prErr)
+				} else if len(dmails) > 0 && !opts.Quiet {
+					a.Logger.OK("generated %d implementation-feedback D-Mail(s)", len(dmails))
 				}
-				if checkErr := a.runPostMergeCheck(ctx, checkOpts); checkErr != nil {
-					// DriftError is expected, not a failure
-					if _, ok := checkErr.(*domain.DriftError); !ok {
-						a.Logger.Warn("post-merge check error: %v", checkErr)
+
+				if opts.BaseBranch != "" {
+					previous, loadErr := a.Store.LoadLatest()
+					if loadErr != nil {
+						a.Logger.Warn("load previous state: %v", loadErr)
+					} else {
+						a.State.Restore(previous)
+						checkOpts := domain.CheckOptions{
+							Full:  opts.Full,
+							Quiet: opts.Quiet,
+							JSON:  opts.JSON,
+						}
+						if checkErr := a.runPostMergeCheck(ctx, checkOpts); checkErr != nil {
+							if _, ok := checkErr.(*domain.DriftError); !ok {
+								a.Logger.Warn("post-merge check error: %v", checkErr)
+							}
+						}
 					}
 				}
 			}

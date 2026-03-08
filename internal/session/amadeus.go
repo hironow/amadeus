@@ -34,6 +34,10 @@ type Amadeus struct {
 	PRReader    port.GitHubPRReader      // nil = skip PR convergence
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
+
+	// InboxCh overrides MonitorInbox when set (for testing).
+	// When nil, Run starts MonitorInbox automatically.
+	InboxCh <-chan domain.DMail
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
