@@ -30,7 +30,10 @@ const (
 	EventInboxConsumed       EventType = "inbox.consumed"
 	EventDMailCommented      EventType = "dmail.commented"
 	EventConvergenceDetected EventType = "convergence.detected"
-	EventArchivePruned       EventType = "archive.pruned"
+	EventArchivePruned         EventType = "archive.pruned"
+	EventRunStarted            EventType = "run.started"
+	EventRunStopped            EventType = "run.stopped"
+	EventPRConvergenceChecked  EventType = "pr_convergence.checked"
 )
 
 // Event is the envelope for all domain events in the event store.
@@ -118,6 +121,26 @@ type ConvergenceDetectedData struct {
 type ArchivePrunedData struct {
 	Paths []string `json:"paths"`
 	Count int      `json:"count"`
+}
+
+// RunStartedData is the payload for run.started events.
+type RunStartedData struct {
+	IntegrationBranch string `json:"integration_branch"`
+	BaseBranch        string `json:"base_branch,omitempty"`
+}
+
+// RunStoppedData is the payload for run.stopped events.
+type RunStoppedData struct {
+	Reason string `json:"reason"`
+}
+
+// PRConvergenceCheckedData is the payload for pr_convergence.checked events.
+type PRConvergenceCheckedData struct {
+	IntegrationBranch string `json:"integration_branch"`
+	TotalOpenPRs      int    `json:"total_open_prs"`
+	Chains            int    `json:"chains"`
+	ConflictPRs       int    `json:"conflict_prs"`
+	DMails            int    `json:"dmails_generated"`
 }
 
 // NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.

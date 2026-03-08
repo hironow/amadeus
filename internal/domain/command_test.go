@@ -55,3 +55,25 @@ func TestNewArchivePruneCommand(t *testing.T) {
 		t.Error("expected Yes false")
 	}
 }
+
+func TestNewExecuteRunCommand(t *testing.T) {
+	rp, err := domain.NewRepoPath("/tmp/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := domain.NewExecuteRunCommand(rp, "main")
+	if cmd.BaseBranch() != "main" {
+		t.Errorf("got %q", cmd.BaseBranch())
+	}
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("got %q", cmd.RepoPath().String())
+	}
+}
+
+func TestNewExecuteRunCommand_emptyBase(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewExecuteRunCommand(rp, "")
+	if cmd.BaseBranch() != "" {
+		t.Error("expected empty")
+	}
+}

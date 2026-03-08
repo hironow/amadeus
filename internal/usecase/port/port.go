@@ -115,6 +115,13 @@ type Git interface {
 	DiffSince(since string) (string, error)
 }
 
+// GitHubPRReader reads open PR state from GitHub (read-only).
+// Implemented by session-layer adapter using `gh` CLI.
+type GitHubPRReader interface {
+	// ListOpenPRs returns all open PRs targeting the given branch.
+	ListOpenPRs(ctx context.Context, targetBranch string) ([]domain.PRState, error)
+}
+
 // PruneCandidate represents a file eligible for pruning.
 type PruneCandidate struct {
 	Path    string
