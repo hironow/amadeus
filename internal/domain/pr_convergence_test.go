@@ -186,6 +186,41 @@ func TestBuildPRChains_conflictDetection(t *testing.T) {
 	}
 }
 
+func TestBuildPRChains_branchingChain(t *testing.T) {
+	// given: main <- feat-a, feat-a <- feat-b, feat-a <- feat-c (diamond shape)
+	// BFS guarantees feat-a comes before both feat-b and feat-c.
+	pr1 := mustPRState(t, "#1", "A", "main", "feat-a", true, 0, nil)
+	pr2 := mustPRState(t, "#2", "B", "feat-a", "feat-b", true, 0, nil)
+	pr3 := mustPRState(t, "#3", "C", "feat-a", "feat-c", true, 0, nil)
+
+	// when
+	report := domain.BuildPRConvergenceReport("main", []domain.PRState{pr1, pr2, pr3})
+
+	// then: single chain with all 3 PRs
+	if len(report.Chains) != 1 {
+		t.Fatalf("expected 1 chain, got %d", len(report.Chains))
+	}
+	chain := report.Chains[0]
+	if len(chain.PRs) != 3 {
+		t.Fatalf("expected 3 PRs in chain, got %d", len(chain.PRs))
+	}
+	// feat-a (root) must be first; feat-b and feat-c follow in either order.
+	if chain.PRs[0].Number() != "#1" {
+		t.Errorf("expected first PR to be #1 (root), got %q", chain.PRs[0].Number())
+	}
+	// Both dependents must appear after the root.
+	dependents := map[string]bool{
+		chain.PRs[1].Number(): true,
+		chain.PRs[2].Number(): true,
+	}
+	if !dependents["#2"] || !dependents["#3"] {
+		t.Errorf("expected dependents {#2, #3}, got {%q, %q}", chain.PRs[1].Number(), chain.PRs[2].Number())
+	}
+	if len(report.OrphanedPRs) != 0 {
+		t.Errorf("expected 0 orphaned PRs, got %d", len(report.OrphanedPRs))
+	}
+}
+
 func TestBuildPRChains_emptyPRs(t *testing.T) {
 	// when
 	report := domain.BuildPRConvergenceReport("main", nil)

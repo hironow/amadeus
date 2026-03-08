@@ -107,7 +107,7 @@ func BuildPRConvergenceReport(integrationBranch string, prs []PRState) PRConverg
 	roots := adjacency[integrationBranch]
 	chainIdx := 0
 	for _, root := range roots {
-		chain := buildChainDFS(root, adjacency)
+		chain := buildChainBFS(root, adjacency)
 		chain.ID = fmt.Sprintf("chain-%c", 'a'+rune(chainIdx))
 		chainIdx++
 
@@ -134,23 +134,22 @@ func BuildPRConvergenceReport(integrationBranch string, prs []PRState) PRConverg
 	return report
 }
 
-// buildChainDFS walks the adjacency map depth-first from root, collecting
-// all connected PRs into a single chain.
-func buildChainDFS(root PRState, adjacency map[string][]PRState) PRChain {
+// buildChainBFS walks the adjacency map breadth-first from root, collecting
+// all connected PRs into a single chain. BFS guarantees root-to-leaf ordering:
+// a parent PR always appears before any of its dependents.
+func buildChainBFS(root PRState, adjacency map[string][]PRState) PRChain {
 	chain := PRChain{}
-	stack := []PRState{root}
-	for len(stack) > 0 {
-		pr := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
+	queue := []PRState{root}
+	for len(queue) > 0 {
+		pr := queue[0]
+		queue = queue[1:]
 		chain.PRs = append(chain.PRs, pr)
 		if pr.HasConflict() {
 			chain.HasConflict = true
 		}
 		// Follow children: PRs whose baseBranch == this PR's headBranch.
 		children := adjacency[pr.headBranch]
-		for _, child := range children {
-			stack = append(stack, child)
-		}
+		queue = append(queue, children...)
 	}
 	return chain
 }
