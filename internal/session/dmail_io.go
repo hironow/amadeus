@@ -116,6 +116,41 @@ func (s *ProjectionStore) SaveConsumed(records []domain.ConsumedRecord) error {
 	return s.writeJSON(filepath.Join(s.Root, ".run", "consumed.json"), existing)
 }
 
+// ReceiveDMailFromInbox reads a single D-Mail file from inbox/, applies
+// archive-based dedup, archives the file, and removes it from inbox/.
+// Returns (nil, nil) if the file is already archived (dedup).
+// Returns (nil, err) if the file cannot be read or parsed (left in inbox for retry).
+func ReceiveDMailFromInbox(root, filename string) (*domain.DMail, error) {
+	archivePath := filepath.Join(root, "archive", filename)
+	inboxPath := filepath.Join(root, "inbox", filename)
+
+	// Dedup: if already archived, clean up inbox (best-effort) and return nil.
+	if _, err := os.Stat(archivePath); err == nil {
+		_ = os.Remove(inboxPath) // best-effort cleanup
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(inboxPath)
+	if err != nil {
+		return nil, fmt.Errorf("read inbox file %s: %w", filename, err)
+	}
+
+	dmail, err := domain.ParseDMail(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse inbox file %s: %w", filename, err)
+	}
+
+	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+		return nil, fmt.Errorf("archive %s: %w", filename, err)
+	}
+
+	if err := os.Remove(inboxPath); err != nil {
+		return nil, fmt.Errorf("remove inbox %s: %w", filename, err)
+	}
+
+	return &dmail, nil
+}
+
 // ScanInbox reads all .md files from inbox/, parses them with ParseDMail,
 // copies to archive/ (skip if already exists), and removes from inbox/.
 // Returns the parsed D-Mails sorted by name.
