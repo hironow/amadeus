@@ -203,6 +203,26 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 			Hint:    `run "amadeus init" to regenerate skill files`,
 		}
 	}
+	// Check for deprecated "kind: feedback" (split into design-feedback / implementation-feedback)
+	for _, name := range required {
+		path := filepath.Join(skillsDir, name, "SKILL.md")
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "kind: feedback") &&
+			!strings.Contains(content, "kind: design-feedback") &&
+			!strings.Contains(content, "kind: implementation-feedback") {
+			return domain.DoctorCheckResult{
+				Name:    "SKILL.md",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
+				Hint:    `run "amadeus init --force" to regenerate skills with updated kinds (feedback → design-feedback / implementation-feedback)`,
+			}
+		}
+	}
+
 	return domain.DoctorCheckResult{
 		Name:    "SKILL.md",
 		Status:  domain.CheckOK,

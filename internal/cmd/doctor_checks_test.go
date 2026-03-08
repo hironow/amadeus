@@ -387,6 +387,42 @@ func TestCheckSkillMD_NoGateDir(t *testing.T) {
 	}
 }
 
+func TestCheckSkillMD_DeprecatedFeedbackKind(t *testing.T) {
+	// given: SKILL.md with deprecated "kind: feedback" (pre-split)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	initGateDirForTest(t, root)
+	// Overwrite sendable with old kind
+	os.WriteFile(filepath.Join(root, "skills", "dmail-sendable", "SKILL.md"),
+		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: feedback\n---\n"), 0o644)
+
+	// when
+	result := checkSkillMD(dir)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail for deprecated kind, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "init --force") {
+		t.Errorf("hint should suggest init --force, got %q", result.Hint)
+	}
+}
+
+func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
+	// given: SKILL.md with updated kinds (post-split)
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	initGateDirForTest(t, root)
+
+	// when
+	result := checkSkillMD(dir)
+
+	// then: templates already have updated kinds
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK for updated kind, got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// given: mock commands succeed
 	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
