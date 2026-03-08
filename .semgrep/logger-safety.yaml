@@ -1,0 +1,27 @@
+rules:
+  # ==========================================================================
+  # Logger safety: prevent multi-line strings in log output
+  #
+  # Logger methods (Info, Warn, Error, OK) prepend a prefix to each call.
+  # If the formatted string contains newlines, only the first line gets the
+  # prefix — subsequent lines appear as raw text, breaking log parsing and
+  # readability.
+  #
+  # Rule: strings.Join with "\n" separator must not be returned from exported
+  # functions/methods. Use single-line summary formats instead.
+  # ==========================================================================
+
+  - id: logger-safety-no-newline-join-in-exported
+    languages: [go]
+    message: |
+      strings.Join(..., "\n") を exported 関数/メソッドの戻り値に使わないでください。
+      この戻り値が Logger.Info() 等に渡されると、2行目以降のログプレフィックスが
+      欠落し、ログのパースや可読性が壊れます。
+      1行サマリー形式に変換するか、呼び出し側で各行を個別にログ出力してください。
+    severity: WARNING
+    pattern: 'return strings.Join($SLICE, "\n")'
+    paths:
+      include:
+        - "/internal/**/*.go"
+      exclude:
+        - "*_test.go"
