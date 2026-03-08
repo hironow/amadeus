@@ -87,7 +87,8 @@ type StateReader interface {
 	// LoadLatest returns the most recent check result.
 	LoadLatest() (domain.CheckResult, error)
 
-	// ScanInbox consumes inbound D-Mails from the inbox directory.
+	// ScanInbox consumes inbound D-Mails from the inbox directory (one-shot).
+	// Used by RunCheck. The Run daemon uses MonitorInbox (fsnotify) instead.
 	ScanInbox(ctx context.Context) ([]domain.DMail, error)
 
 	// NextDMailName generates a unique D-Mail name for the given kind.

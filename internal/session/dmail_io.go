@@ -155,12 +155,8 @@ func ReceiveDMailFromInbox(root, filename string) (*domain.DMail, error) {
 // copies to archive/ (skip if already exists), and removes from inbox/.
 // Returns the parsed D-Mails sorted by name.
 //
-// NOTE: All D-Mail I/O (inbox, outbox, archive) uses synchronous
-// os.ReadDir/ReadFile/WriteFile/Rename — no file-system watcher such as
-// github.com/fsnotify/fsnotify is involved. amadeus is a one-shot CLI
-// invoked by cron or git hooks, so polling at invocation time is sufficient.
-// A watcher would only be warranted if amadeus were daemonised for
-// real-time inbox delivery.
+// Used by RunCheck (one-shot check command). The Run daemon loop uses
+// MonitorInbox (fsnotify-based, in inbox_watcher.go) for real-time D-Mail reception.
 func (s *ProjectionStore) ScanInbox(ctx context.Context) ([]domain.DMail, error) {
 	ctx, span := platform.Tracer.Start(ctx, "amadeus.dmail_io")
 	defer span.End()
