@@ -162,6 +162,30 @@ func (e *testCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Ti
 	return e.emit(events...)
 }
 
+func (e *testCheckEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
+	ev, err := e.agg.RecordRunStarted(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
+	ev, err := e.agg.RecordRunStopped(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
+	ev, err := e.agg.RecordPRConvergenceChecked(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
 // testCheckStateProvider implements port.CheckStateManager for session tests.
 type testCheckStateProvider struct {
 	agg *domain.CheckAggregate

@@ -41,6 +41,8 @@ func (p *Projector) Apply(event domain.Event) error {
 		return p.applyArchivePruned(event)
 	case domain.EventConvergenceDetected:
 		return nil // informational only, no projection needed
+	case domain.EventRunStarted, domain.EventRunStopped, domain.EventPRConvergenceChecked:
+		return nil // lifecycle/informational events, no projection needed
 	default:
 		return nil // unknown events are ignored for forward compatibility
 	}

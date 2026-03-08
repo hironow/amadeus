@@ -113,6 +113,30 @@ func (e *checkEventEmitter) EmitCheck(result domain.CheckResult, now time.Time) 
 	return e.emit(events...)
 }
 
+func (e *checkEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
+	ev, err := e.agg.RecordRunStarted(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *checkEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
+	ev, err := e.agg.RecordRunStopped(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *checkEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
+	ev, err := e.agg.RecordPRConvergenceChecked(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
 // checkStateProvider implements port.CheckStateProvider.
 // It delegates to the aggregate for state queries and mutations.
 type checkStateProvider struct {

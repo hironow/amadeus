@@ -148,6 +148,9 @@ type CheckEventEmitter interface {
 	EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error
 	EmitDMailCommented(dmailName, issueID string, now time.Time) error
 	EmitCheck(result domain.CheckResult, now time.Time) error
+	EmitRunStarted(data domain.RunStartedData, now time.Time) error
+	EmitRunStopped(data domain.RunStoppedData, now time.Time) error
+	EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error
 }
 
 // CheckStateProvider provides aggregate state read/write without exposing the aggregate type.

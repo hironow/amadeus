@@ -100,6 +100,21 @@ func (a *CheckAggregate) RecordDMailCommented(dmailName, issueID string, now tim
 	}, now)
 }
 
+// RecordRunStarted produces a run.started event.
+func (a *CheckAggregate) RecordRunStarted(data RunStartedData, now time.Time) (Event, error) {
+	return NewEvent(EventRunStarted, data, now)
+}
+
+// RecordRunStopped produces a run.stopped event.
+func (a *CheckAggregate) RecordRunStopped(data RunStoppedData, now time.Time) (Event, error) {
+	return NewEvent(EventRunStopped, data, now)
+}
+
+// RecordPRConvergenceChecked produces a pr_convergence.checked event.
+func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedData, now time.Time) (Event, error) {
+	return NewEvent(EventPRConvergenceChecked, data, now)
+}
+
 // RecordCheck produces events for a completed check result.
 // For full checks, it also produces a baseline.updated event.
 // The caller is responsible for persisting the returned events.
