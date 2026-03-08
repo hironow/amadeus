@@ -12,14 +12,17 @@
 ## CLI Reference
 
 - [amadeus](cli/amadeus.md) — Root command
-- [amadeus init](cli/amadeus_init.md) — Initialize a project
-- [amadeus check](cli/amadeus_check.md) — Run integrity verification
+- [amadeus init](cli/amadeus_init.md) — Initialize a project (`--force` to regenerate)
+- [amadeus run](cli/amadeus_run.md) — Daemon mode: divergence check + PR convergence + fsnotify inbox watcher
+- [amadeus check](cli/amadeus_check.md) — Run integrity verification (deprecated, use `amadeus run`)
+- [amadeus config show](cli/amadeus_config_show.md) — Show current configuration
+- [amadeus config set](cli/amadeus_config_set.md) — Update configuration values
 - [amadeus validate](cli/amadeus_validate.md) — Validate configuration
 - [amadeus log](cli/amadeus_log.md) — Show divergence log
 - [amadeus sync](cli/amadeus_sync.md) — Sync state
 - [amadeus mark-commented](cli/amadeus_mark-commented.md) — Mark D-Mails as commented
 - [amadeus status](cli/amadeus_status.md) — Show verification status
-- [amadeus doctor](cli/amadeus_doctor.md) — Diagnose configuration issues
+- [amadeus doctor](cli/amadeus_doctor.md) — Diagnose configuration issues (13 checks)
 - [amadeus clean](cli/amadeus_clean.md) — Clean state files
 - [amadeus rebuild](cli/amadeus_rebuild.md) — Rebuild state from events
 - [amadeus archive-prune](cli/amadeus_archive-prune.md) — Prune archived data

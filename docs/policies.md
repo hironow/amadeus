@@ -19,6 +19,8 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 | InboxConsumedUpdateProjection | inbox.consumed | UpdateProjection | Log (Debug) + Metrics |
 | DMailGeneratedFlushOutbox | dmail.generated | FlushOutbox | Log (Debug) + Metrics |
 
+Note: `run.started`, `run.stopped`, and `pr_convergence.checked` events are informational (no policy handlers). They are emitted for observability and event store completeness.
+
 ## Event Payload Format
 
 | Event | Payload Type | Fields |

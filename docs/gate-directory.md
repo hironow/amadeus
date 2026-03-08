@@ -69,6 +69,9 @@ All state mutations flow through the `emit()` method, which appends events to th
 | `dmail.commented` | `.run/sync.json` | D-Mail posted as comment |
 | `convergence.detected` | (informational only) | Convergence alert |
 | `archive.pruned` | `archive/` (file removal) | Archive cleanup |
+| `run.started` | (informational only) | Daemon started |
+| `run.stopped` | (informational only) | Daemon stopped |
+| `pr_convergence.checked` | (informational only) | PR convergence pipeline completed |
 
 ### Rebuild
 
@@ -88,7 +91,7 @@ Auto-rebuild is skipped when `inbox.consumed` events are present (to avoid losin
 
 ## Check Pipeline Data Flow
 
-The `amadeus check` command reads state, evaluates divergence, and routes D-Mails.
+The `amadeus run` command (daemon mode) executes the divergence check pipeline, PR convergence pipeline, and monitors inbox via fsnotify. The legacy `amadeus check` command runs a single divergence check (deprecated).
 
 ### Input Sources
 
@@ -111,14 +114,16 @@ The `amadeus check` command reads state, evaluates divergence, and routes D-Mail
 ## D-Mail Lifecycle
 
 ```
-[External tool]          amadeus                      [External tool]
+[External tool]          amadeus (daemon)                 [External tool]
      |                      |                              |
      | writes to inbox/     |                              |
      |--------------------->|                              |
-     |                      | ScanInbox()                  |
+     |                      | MonitorInbox (fsnotify)      |
+     |                      |   ReceiveDMailFromInbox()    |
      |                      |   parse -> archive/ (copy)   |
      |                      |   remove from inbox/         |
      |                      |   emit(inbox.consumed)       |
+     |                      |   dedup via archive hash     |
      |                      |                              |
      |                      | (check runs, D-Mail generated)
      |                      |                              |
@@ -129,14 +134,14 @@ The `amadeus check` command reads state, evaluates divergence, and routes D-Mail
      |                      |----------------------------->|
 ```
 
-All D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
+In daemon mode (`amadeus run`), inbox is monitored via fsnotify for real-time D-Mail reception. `ReceiveDMailFromInbox` uses archive-based deduplication (content hash) to ensure idempotent processing. All D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
 
 ## D-Mail File Format
 
 ```yaml
 ---
-name: feedback-001
-kind: feedback
+name: design-feedback-001
+kind: design-feedback
 description: ADR-003 auth dependency violation
 issues:
   - MY-310
@@ -152,7 +157,7 @@ service, violating the dependency direction defined in ADR-003.
 | Frontmatter Field | Type | Required | Description |
 |-------------------|------|----------|-------------|
 | `name` | string | Yes | Unique identifier (`{kind}-{NNN}`) |
-| `kind` | string | Yes | `feedback`, `specification`, or `report` |
+| `kind` | string | Yes | `design-feedback`, `implementation-feedback`, `specification`, `report`, `convergence`, or `ci-result` |
 | `description` | string | Yes | One-line summary |
 | `issues` | []string | No | Related Linear issue IDs |
 | `severity` | string | No | `high`, `medium`, or `low` |
