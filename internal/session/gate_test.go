@@ -26,6 +26,7 @@ type fakeGit struct {
 }
 
 func (g *fakeGit) CurrentCommit() (string, error)                     { return g.commit, nil }
+func (g *fakeGit) CurrentBranch() (string, error)                     { return "main", nil }
 func (g *fakeGit) MergedPRsSince(_ string) ([]domain.MergedPR, error) { return g.prs, nil }
 func (g *fakeGit) DiffSince(_ string) (string, error)                 { return g.diff, nil }
 

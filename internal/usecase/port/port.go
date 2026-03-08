@@ -108,6 +108,9 @@ type Git interface {
 	// CurrentCommit returns the short SHA of the current HEAD.
 	CurrentCommit() (string, error)
 
+	// CurrentBranch returns the name of the currently checked-out branch.
+	CurrentBranch() (string, error)
+
 	// MergedPRsSince returns merged PRs between the given commit and HEAD.
 	MergedPRsSince(since string) ([]domain.MergedPR, error)
 
@@ -168,6 +171,7 @@ type CheckStateProvider interface {
 // Implemented by session.Amadeus; injected into usecase by cmd (composition root).
 type Orchestrator interface {
 	RunCheck(ctx context.Context, opts domain.CheckOptions, emitter CheckEventEmitter, state CheckStateProvider) error
+	Run(ctx context.Context, opts domain.RunOptions, emitter CheckEventEmitter, state CheckStateProvider) error
 	PrintSync() error
 	PrintLog() error
 	PrintLogJSON() error
