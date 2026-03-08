@@ -31,6 +31,7 @@ type Amadeus struct {
 	ReviewCmd   string                  // code review command (empty = skip)
 	ClaudeCmd   string                  // Claude CLI command (empty = "claude")
 	ClaudeModel string                  // Claude model for review fix (empty = "opus")
+	PRReader    port.GitHubPRReader      // nil = skip PR convergence
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
 }
