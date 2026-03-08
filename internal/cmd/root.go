@@ -104,6 +104,7 @@ func NewRootCommand() *cobra.Command {
 		newStatusCommand(),
 		newVersionCommand(),
 		newUpdateCommand(),
+		newConfigCommand(),
 	)
 
 	return cmd

@@ -3,8 +3,10 @@ package cmd
 // white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -40,6 +42,105 @@ full_check:
 	}
 	if cfg.FullCheck.Interval != 5 {
 		t.Errorf("expected interval 5, got %d", cfg.FullCheck.Interval)
+	}
+}
+
+func TestConfigShow(t *testing.T) {
+	// given: a directory with valid config
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`
+lang: "en"
+full_check:
+  interval: 20
+`), 0644)
+
+	var stdout, stderr bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "show", dir})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&stderr)
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config show failed: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "lang: en") {
+		t.Errorf("expected 'lang: en' in output, got:\n%s", out)
+	}
+}
+
+func TestConfigSet_Lang(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "lang", "en", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config set failed: %v", err)
+	}
+
+	// verify
+	cfg, _ := loadConfig(filepath.Join(gateDir, "config.yaml"))
+	if cfg.Lang != "en" {
+		t.Errorf("expected lang 'en', got %q", cfg.Lang)
+	}
+}
+
+func TestConfigSet_InvalidKey(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "bad.key", "value", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid config key")
+	}
+}
+
+func TestConfigSet_InvalidLang(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "lang", "fr", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid lang value")
 	}
 }
 

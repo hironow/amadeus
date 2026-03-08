@@ -20,6 +20,68 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
+func TestDefaultConfig_AllFields(t *testing.T) {
+	// given/when
+	cfg := domain.DefaultConfig()
+
+	// then: Lang
+	if cfg.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", cfg.Lang)
+	}
+
+	// then: Weights
+	if cfg.Weights.ADRIntegrity != 0.4 {
+		t.Errorf("Weights.ADRIntegrity: expected 0.4, got %f", cfg.Weights.ADRIntegrity)
+	}
+	if cfg.Weights.DoDFulfillment != 0.3 {
+		t.Errorf("Weights.DoDFulfillment: expected 0.3, got %f", cfg.Weights.DoDFulfillment)
+	}
+	if cfg.Weights.DependencyIntegrity != 0.2 {
+		t.Errorf("Weights.DependencyIntegrity: expected 0.2, got %f", cfg.Weights.DependencyIntegrity)
+	}
+	if cfg.Weights.ImplicitConstraints != 0.1 {
+		t.Errorf("Weights.ImplicitConstraints: expected 0.1, got %f", cfg.Weights.ImplicitConstraints)
+	}
+
+	// then: Thresholds
+	if cfg.Thresholds.LowMax != 0.25 {
+		t.Errorf("Thresholds.LowMax: expected 0.25, got %f", cfg.Thresholds.LowMax)
+	}
+	if cfg.Thresholds.MediumMax != 0.50 {
+		t.Errorf("Thresholds.MediumMax: expected 0.50, got %f", cfg.Thresholds.MediumMax)
+	}
+
+	// then: PerAxisOverride
+	if cfg.PerAxisOverride.ADRForceHigh != 60 {
+		t.Errorf("PerAxisOverride.ADRForceHigh: expected 60, got %d", cfg.PerAxisOverride.ADRForceHigh)
+	}
+	if cfg.PerAxisOverride.DoDForceHigh != 70 {
+		t.Errorf("PerAxisOverride.DoDForceHigh: expected 70, got %d", cfg.PerAxisOverride.DoDForceHigh)
+	}
+	if cfg.PerAxisOverride.DepForceMedium != 80 {
+		t.Errorf("PerAxisOverride.DepForceMedium: expected 80, got %d", cfg.PerAxisOverride.DepForceMedium)
+	}
+
+	// then: FullCheck
+	if cfg.FullCheck.Interval != 10 {
+		t.Errorf("FullCheck.Interval: expected 10, got %d", cfg.FullCheck.Interval)
+	}
+	if cfg.FullCheck.OnDivergenceJump != 0.15 {
+		t.Errorf("FullCheck.OnDivergenceJump: expected 0.15, got %f", cfg.FullCheck.OnDivergenceJump)
+	}
+
+	// then: Convergence
+	if cfg.Convergence.WindowDays != 14 {
+		t.Errorf("Convergence.WindowDays: expected 14, got %d", cfg.Convergence.WindowDays)
+	}
+	if cfg.Convergence.Threshold != 3 {
+		t.Errorf("Convergence.Threshold: expected 3, got %d", cfg.Convergence.Threshold)
+	}
+	if cfg.Convergence.EscalationMultiplier != 2 {
+		t.Errorf("Convergence.EscalationMultiplier: expected 2, got %d", cfg.Convergence.EscalationMultiplier)
+	}
+}
+
 func TestValidateConfig_DefaultIsValid(t *testing.T) {
 	// given
 	cfg := domain.DefaultConfig()
