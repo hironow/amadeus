@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 )
 
@@ -223,4 +224,96 @@ func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
 
 	// Clean up
 	logger.SetExtraWriter(nil)
+}
+
+func TestBanner_Send_Format(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.SetNoColor(false)
+
+	log.Banner(domain.BannerSend, "feedback", "fb-001", "test description")
+
+	got := buf.String()
+	if !strings.Contains(got, "\033[7;32m") {
+		t.Errorf("expected green inversion ANSI code, got %q", got)
+	}
+	if !strings.Contains(got, "D-MAIL SEND") {
+		t.Errorf("expected D-MAIL SEND label, got %q", got)
+	}
+	if !strings.Contains(got, "feedback") {
+		t.Errorf("expected kind, got %q", got)
+	}
+	if !strings.Contains(got, "fb-001") {
+		t.Errorf("expected name, got %q", got)
+	}
+}
+
+func TestBanner_Recv_Format(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.SetNoColor(false)
+
+	log.Banner(domain.BannerRecv, "report", "rpt-001", "incoming report")
+
+	got := buf.String()
+	if !strings.Contains(got, "\033[7;36m") {
+		t.Errorf("expected cyan inversion ANSI code, got %q", got)
+	}
+	if !strings.Contains(got, "D-MAIL RECV") {
+		t.Errorf("expected D-MAIL RECV label, got %q", got)
+	}
+}
+
+func TestBanner_NoColor(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.SetNoColor(true)
+
+	log.Banner(domain.BannerSend, "feedback", "fb-001", "test")
+
+	got := buf.String()
+	if strings.Contains(got, "\033[") {
+		t.Errorf("expected no ANSI codes in no-color mode, got %q", got)
+	}
+	if !strings.Contains(got, ">>> D-MAIL SEND") {
+		t.Errorf("expected plain arrow prefix, got %q", got)
+	}
+}
+
+func TestBanner_LongDescription_Truncated(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.SetNoColor(true)
+
+	long := strings.Repeat("x", 60)
+	log.Banner(domain.BannerSend, "feedback", "fb-001", long)
+
+	got := buf.String()
+	if !strings.Contains(got, "...") {
+		t.Errorf("expected truncation ellipsis, got %q", got)
+	}
+	if strings.Contains(got, long) {
+		t.Errorf("expected description to be truncated, got full string in %q", got)
+	}
+}
+
+func TestBanner_ExtraWriter_PlainText(t *testing.T) {
+	var primary bytes.Buffer
+	log := platform.NewLogger(&primary, false)
+	log.SetNoColor(false)
+
+	var extra bytes.Buffer
+	log.SetExtraWriter(&extra)
+
+	log.Banner(domain.BannerSend, "feedback", "fb-001", "test")
+
+	if !strings.Contains(primary.String(), "\033[7;32m") {
+		t.Errorf("primary should have ANSI codes, got %q", primary.String())
+	}
+	if strings.Contains(extra.String(), "\033[") {
+		t.Errorf("extra writer should be plain text, got %q", extra.String())
+	}
+	if !strings.Contains(extra.String(), ">>> D-MAIL SEND") {
+		t.Errorf("extra writer should have plain content, got %q", extra.String())
+	}
 }

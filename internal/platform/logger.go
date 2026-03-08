@@ -10,8 +10,9 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-// compile-time interface check
+// compile-time interface checks
 var _ domain.Logger = (*Logger)(nil)
+var _ domain.BannerLogger = (*Logger)(nil)
 
 // ANSI color codes — CVD (Color Vision Deficiency) friendly palette.
 //
@@ -27,7 +28,9 @@ const (
 	ansiBoldGreen = "\033[1;32m"  // OK   — convention + bold brightness for CVD
 	ansiYellow    = "\033[33m"    // WARN — yellow axis, safe for common CVD
 	ansiBoldRed   = "\033[1;31m"  // ERR  — convention + bold brightness for CVD
-	ansiGray      = "\033[90m"    // DBUG — brightness-only, no hue dependency
+	ansiGray        = "\033[90m"    // DBUG — brightness-only, no hue dependency
+	ansiInvertGreen = "\033[7;32m" // SEND banner — CVD-safe green inversion
+	ansiInvertCyan  = "\033[7;36m" // RECV banner — CVD-safe cyan inversion
 )
 
 // Logger provides structured, timestamped log output.
@@ -134,4 +137,42 @@ func (l *Logger) SetExtraWriter(w io.Writer) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.extraWriter = w
+}
+
+// Banner prints an inverted-color D-Mail intent line to stderr.
+// It satisfies domain.BannerLogger.
+func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) {
+	desc := description
+	if len(desc) > 50 {
+		desc = desc[:47] + "..."
+	}
+
+	var arrow, label, color, plainArrow string
+	switch dir {
+	case domain.BannerSend:
+		arrow = "▶"
+		label = "D-MAIL SEND"
+		color = ansiInvertGreen
+		plainArrow = ">>>"
+	default:
+		arrow = "◀"
+		label = "D-MAIL RECV"
+		color = ansiInvertCyan
+		plainArrow = "<<<"
+	}
+
+	ts := time.Now().Format("15:04:05")
+	content := fmt.Sprintf("%s %s %s (%s) %q", arrow, label, kind, name, desc)
+	plainContent := fmt.Sprintf("%s %s %s (%s) %q", plainArrow, label, kind, name, desc)
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.noColor {
+		fmt.Fprintf(l.out, "[%s] %s\n", ts, plainContent)
+	} else {
+		fmt.Fprintf(l.out, "%s[%s] %s%s\n", color, ts, content, ansiReset)
+	}
+	if l.extraWriter != nil {
+		fmt.Fprintf(l.extraWriter, "[%s] %s\n", ts, plainContent)
+	}
 }
