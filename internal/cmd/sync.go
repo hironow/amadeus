@@ -30,7 +30,9 @@ func newSyncCommand() *cobra.Command {
 			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
-			if err := session.InitGateDir(divRoot); err != nil {
+			logger := loggerFrom(cmd)
+
+			if err := session.InitGateDir(divRoot, logger); err != nil {
 				return fmt.Errorf("init gate dir: %w", err)
 			}
 
@@ -41,8 +43,6 @@ func newSyncCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}
-
-			logger := loggerFrom(cmd)
 
 			// Composition root: wire session.Amadeus
 			store := session.NewProjectionStore(divRoot)

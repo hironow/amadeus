@@ -30,8 +30,9 @@ func newInitCommand() *cobra.Command {
 			if rpErr != nil {
 				return rpErr
 			}
+			logger := loggerFrom(cmd)
 			initCmd := domain.NewInitCommand(rp)
-			if err := usecase.RunInit(initCmd, &session.InitAdapter{}); err != nil {
+			if err := usecase.RunInit(initCmd, &session.InitAdapter{Logger: logger}); err != nil {
 				return fmt.Errorf("init: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)

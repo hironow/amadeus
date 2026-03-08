@@ -47,7 +47,9 @@ func newCheckCommand() *cobra.Command {
 				return preErr
 			}
 
-			if err := session.InitGateDir(divRoot); err != nil {
+			logger := loggerFrom(cmd)
+
+			if err := session.InitGateDir(divRoot, logger); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 
@@ -65,8 +67,6 @@ func newCheckCommand() *cobra.Command {
 				}
 				cfg.Lang = lang
 			}
-
-			logger := loggerFrom(cmd)
 
 			// Wire approver
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")

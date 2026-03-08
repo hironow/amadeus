@@ -2,10 +2,12 @@ package platform_test
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/platform"
@@ -102,6 +104,76 @@ func TestLogger_SetExtraWriter(t *testing.T) {
 	}
 }
 
+func TestLogger_NoColorWhenNotTerminal(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.Info("no terminal")
+	if strings.Contains(buf.String(), "\033[") {
+		t.Errorf("expected no ANSI codes for non-terminal writer, got %q", buf.String())
+	}
+}
+
+func TestLogger_ColorWhenEnabled(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.SetNoColor(false)
+	log.Info("colored")
+	if !strings.Contains(buf.String(), "\033[") {
+		t.Errorf("expected ANSI codes when color enabled, got %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "\033[0m") {
+		t.Errorf("expected reset code, got %q", buf.String())
+	}
+}
+
+func TestLogger_SetNoColor(t *testing.T) {
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.SetNoColor(false)
+	log.Info("on")
+	colored := buf.String()
+
+	buf.Reset()
+	log.SetNoColor(true)
+	log.Info("off")
+	plain := buf.String()
+
+	if !strings.Contains(colored, "\033[") {
+		t.Errorf("expected color codes when on, got %q", colored)
+	}
+	if strings.Contains(plain, "\033[") {
+		t.Errorf("expected no color codes when off, got %q", plain)
+	}
+}
+
+func TestLogger_NoColorEnvVar(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	var buf bytes.Buffer
+	log := platform.NewLogger(&buf, false)
+	log.Info("env test")
+	if strings.Contains(buf.String(), "\033[") {
+		t.Errorf("NO_COLOR=1 should disable color, got %q", buf.String())
+	}
+}
+
+func TestLogger_ExtraWriterPlainText(t *testing.T) {
+	var primary bytes.Buffer
+	log := platform.NewLogger(&primary, false)
+	log.SetNoColor(false) // color on for primary
+
+	var extra bytes.Buffer
+	log.SetExtraWriter(&extra)
+
+	log.Info("dual")
+
+	if !strings.Contains(primary.String(), "\033[") {
+		t.Errorf("primary should have ANSI codes, got %q", primary.String())
+	}
+	if strings.Contains(extra.String(), "\033[") {
+		t.Errorf("extra writer should be plain text, got %q", extra.String())
+	}
+}
+
 func TestLogger_SetExtraWriter_Nil(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
@@ -124,4 +196,31 @@ func TestLogger_SetExtraWriter_Nil(t *testing.T) {
 	if !strings.Contains(buf.String(), "INFO after disconnect") {
 		t.Errorf("expected output after disconnect, got %q", buf.String())
 	}
+}
+
+func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
+	logger := platform.NewLogger(io.Discard, false)
+
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			var buf bytes.Buffer
+			logger.SetExtraWriter(&buf)
+		}()
+		go func(n int) {
+			defer wg.Done()
+			logger.Info("race test info %d", n)
+			logger.Warn("race test warn %d", n)
+		}(i)
+		go func() {
+			defer wg.Done()
+			logger.SetExtraWriter(nil)
+		}()
+	}
+	wg.Wait()
+
+	// Clean up
+	logger.SetExtraWriter(nil)
 }

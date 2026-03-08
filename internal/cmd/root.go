@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -51,6 +52,10 @@ func NewRootCommand() *cobra.Command {
 			} else {
 				applyOtelEnv(domain.StateDir)
 			}
+			noColor, _ := cmd.Flags().GetBool("no-color")
+			if noColor {
+				os.Setenv("NO_COLOR", "1")
+			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
@@ -79,6 +84,7 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().StringP("config", "c", "", "config file path")
 	cmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+	cmd.PersistentFlags().Bool("no-color", false, "Disable colored output (respects NO_COLOR env)")
 	cmd.PersistentFlags().StringP("lang", "l", "", "output language (ja, en)")
 	cmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 
