@@ -46,7 +46,7 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 // generateDMails runs Phase 3: creates D-Mail entities from meter candidates,
 // validates them, and emits dmail-generated events.
 func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterResult, now time.Time) ([]domain.DMail, error) {
-	_, span3 := platform.Tracer.Start(ctx, "dmail") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+	_, span3 := platform.Tracer.Start(ctx, "phase.dmail_generation") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 	var dmails []domain.DMail
 	quantitative := domain.ClassifyByAxes(meterResult.Divergence.Axes, a.Config.Weights)
 

@@ -141,9 +141,13 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state)
 	if !opts.DryRun {
+		// nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+		_, inboxSpan := platform.Tracer.Start(ctx, "phase.inbox_drain")
 		if err := a.consumeInbox(ctx, opts.Quiet); err != nil {
+			inboxSpan.End()
 			return err
 		}
+		inboxSpan.End()
 	}
 
 	report, fullCheck, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
@@ -258,7 +262,10 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		return err
 	}
 
+	// nosemgrep: adr0003-otel-span-without-defer-end -- End() called explicitly before error return [permanent]
+	_, convSpan := platform.Tracer.Start(ctx, "phase.convergence_detection")
 	convergenceAlerts, convergenceDMails, err := a.detectConvergence(now)
+	convSpan.End()
 	if err != nil {
 		return err
 	}
