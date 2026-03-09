@@ -13,9 +13,9 @@ import (
 // ghPRViewResponse is the JSON shape from:
 // gh pr view {number} --json reviewDecision,reviews,statusCheckRollup
 type ghPRViewResponse struct {
-	ReviewDecision     string           `json:"reviewDecision"`
-	Reviews            []ghReview       `json:"reviews"`
-	StatusCheckRollup  []ghStatusCheck  `json:"statusCheckRollup"`
+	ReviewDecision    string          `json:"reviewDecision"`
+	Reviews           []ghReview      `json:"reviews"`
+	StatusCheckRollup []ghStatusCheck `json:"statusCheckRollup"`
 }
 
 type ghReview struct {

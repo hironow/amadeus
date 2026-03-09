@@ -23,17 +23,17 @@ type EventApplier interface {
 type EventType string
 
 const (
-	EventCheckCompleted      EventType = "check.completed"
-	EventBaselineUpdated     EventType = "baseline.updated"
-	EventForceFullNextSet    EventType = "force_full_next.set"
-	EventDMailGenerated      EventType = "dmail.generated"
-	EventInboxConsumed       EventType = "inbox.consumed"
-	EventDMailCommented      EventType = "dmail.commented"
-	EventConvergenceDetected EventType = "convergence.detected"
-	EventArchivePruned         EventType = "archive.pruned"
-	EventRunStarted            EventType = "run.started"
-	EventRunStopped            EventType = "run.stopped"
-	EventPRConvergenceChecked  EventType = "pr_convergence.checked"
+	EventCheckCompleted       EventType = "check.completed"
+	EventBaselineUpdated      EventType = "baseline.updated"
+	EventForceFullNextSet     EventType = "force_full_next.set"
+	EventDMailGenerated       EventType = "dmail.generated"
+	EventInboxConsumed        EventType = "inbox.consumed"
+	EventDMailCommented       EventType = "dmail.commented"
+	EventConvergenceDetected  EventType = "convergence.detected"
+	EventArchivePruned        EventType = "archive.pruned"
+	EventRunStarted           EventType = "run.started"
+	EventRunStopped           EventType = "run.stopped"
+	EventPRConvergenceChecked EventType = "pr_convergence.checked"
 )
 
 // Event is the envelope for all domain events in the event store.

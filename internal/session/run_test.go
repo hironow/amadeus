@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: tests unexported run-loop internals (goroutine lifecycle, channel coordination, fsnotify integration)
+
 import (
 	"context"
 	"sync"
@@ -14,14 +16,14 @@ import (
 
 // runEmitter records Run lifecycle events for assertion.
 type runEmitter struct {
-	mu                sync.Mutex
-	runStartedCalled  bool
-	runStartedData    *domain.RunStartedData
-	runStoppedCalled  bool
-	runStoppedData    *domain.RunStoppedData
-	inboxConsumed     []domain.InboxConsumedData
-	dmailsGenerated   []domain.DMail
-	checksEmitted     []domain.CheckResult
+	mu                 sync.Mutex
+	runStartedCalled   bool
+	runStartedData     *domain.RunStartedData
+	runStoppedCalled   bool
+	runStoppedData     *domain.RunStoppedData
+	inboxConsumed      []domain.InboxConsumedData
+	dmailsGenerated    []domain.DMail
+	checksEmitted      []domain.CheckResult
 	prConvergenceCalls int
 }
 
@@ -142,12 +144,12 @@ func (s *runStore) LoadSyncState() (domain.SyncState, error) {
 // runState implements port.CheckStateProvider as a no-op for Run tests.
 type runState struct{}
 
-func (s *runState) ShouldFullCheck(_ bool) bool              { return false }
-func (s *runState) ForceFullNext() bool                      { return false }
-func (s *runState) SetForceFullNext(_ bool)                  {}
-func (s *runState) ShouldPromoteToFull(_, _ float64) bool    { return false }
-func (s *runState) AdvanceCheckCount(_ bool)                 {}
-func (s *runState) Restore(_ domain.CheckResult)             {}
+func (s *runState) ShouldFullCheck(_ bool) bool           { return false }
+func (s *runState) ForceFullNext() bool                   { return false }
+func (s *runState) SetForceFullNext(_ bool)               {}
+func (s *runState) ShouldPromoteToFull(_, _ float64) bool { return false }
+func (s *runState) AdvanceCheckCount(_ bool)              {}
+func (s *runState) Restore(_ domain.CheckResult)          {}
 
 // feedInbox creates a buffered channel pre-loaded with the given D-Mails.
 func feedInbox(dmails ...domain.DMail) <-chan domain.DMail {

@@ -22,10 +22,10 @@ type lifecycleGit struct {
 	commit string
 }
 
-func (g *lifecycleGit) CurrentBranch() (string, error)                  { return g.branch, nil }
-func (g *lifecycleGit) CurrentCommit() (string, error)                  { return g.commit, nil }
+func (g *lifecycleGit) CurrentBranch() (string, error)                     { return g.branch, nil }
+func (g *lifecycleGit) CurrentCommit() (string, error)                     { return g.commit, nil }
 func (g *lifecycleGit) MergedPRsSince(_ string) ([]domain.MergedPR, error) { return nil, nil }
-func (g *lifecycleGit) DiffSince(_ string) (string, error)              { return "", nil }
+func (g *lifecycleGit) DiffSince(_ string) (string, error)                 { return "", nil }
 
 var _ port.Git = (*lifecycleGit)(nil)
 
