@@ -224,6 +224,32 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
 	}
 }
 
+// checkClaudeInference determines if the Claude CLI can perform inference
+// by interpreting the result of a minimal "1+1=" prompt.
+func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
+	if err != nil {
+		return domain.DoctorCheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckFail,
+			Message: "inference failed: " + err.Error(),
+			Hint:    "check API key, quota, and model access",
+		}
+	}
+	if !strings.Contains(output, "2") {
+		return domain.DoctorCheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckFail,
+			Message: "unexpected response",
+			Hint:    "check API key, quota, and model access",
+		}
+	}
+	return domain.DoctorCheckResult{
+		Name:    "claude-inference",
+		Status:  domain.CheckOK,
+		Message: "inference OK",
+	}
+}
+
 // checkSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
 func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 	skillsDir := filepath.Join(repoRoot, domain.StateDir, "skills")
@@ -287,44 +313,27 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 
 	var results []domain.DoctorCheckResult
 
-	// 1. git binary
+	// --- Binaries ---
 	results = append(results, checkTool(ctx, "git"))
-
-	// 2. git repository
-	results = append(results, checkGitRepo(repoRoot))
-
-	// 3. git remote (required for PR convergence)
-	results = append(results, checkGitRemote(repoRoot))
-
-	// 4. gh CLI (required for PR reading)
-	results = append(results, checkTool(ctx, "gh"))
-
-	// 5. claude CLI
 	claudeResult := checkTool(ctx, claudeCmd)
 	results = append(results, claudeResult)
+	results = append(results, checkTool(ctx, "gh"))
 
-	// 6. .gate/ directory
+	// --- Repository ---
+	results = append(results, checkGitRepo(repoRoot))
+	results = append(results, checkGitRemote(repoRoot))
+
+	// --- State ---
 	results = append(results, checkGateDir(repoRoot))
-
-	// 7. config.yaml
 	results = append(results, checkConfig(configPath))
 
-	// 8. SKILL.md files
+	// --- Data ---
 	results = append(results, checkSkillMD(repoRoot))
-
-	// 9. Event Store integrity
 	results = append(results, checkEventStore(filepath.Join(repoRoot, domain.StateDir)))
-
-	// 10. D-Mail schema v1 validation
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, domain.StateDir)))
-
-	// 11. fsnotify (file watcher availability)
 	results = append(results, checkFsnotify())
 
-	// 12. Success rate (informational)
-	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
-
-	// 13-14. claude-auth + Linear MCP (skip both if claude binary unavailable)
+	// --- Connectivity ---
 	if claudeResult.Status != domain.CheckOK {
 		results = append(results, domain.DoctorCheckResult{
 			Name:    "claude-auth",
@@ -336,8 +345,12 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
+		results = append(results, domain.DoctorCheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		})
 	} else {
-		// Run `claude mcp list` once, share output for both auth and MCP checks
 		mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
 		cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
 		out, mcpErr := cmd.Output()
@@ -346,17 +359,30 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		authResult := checkClaudeAuth(mcpOutput, mcpErr)
 		results = append(results, authResult)
 
-		// Skip Linear MCP check if auth failed
 		if authResult.Status != domain.CheckOK {
 			results = append(results, domain.DoctorCheckResult{
 				Name:    "Linear MCP",
 				Status:  domain.CheckSkip,
 				Message: "skipped (claude not authenticated)",
 			})
+			results = append(results, domain.DoctorCheckResult{
+				Name:    "claude-inference",
+				Status:  domain.CheckSkip,
+				Message: "skipped (auth failed)",
+			})
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+
+			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
+			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferOut, inferErr := inferCmd.Output()
+			inferCancel()
+			results = append(results, checkClaudeInference(string(inferOut), inferErr))
 		}
 	}
+
+	// --- Metrics ---
+	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
 
 	for _, r := range results {
 		span.AddEvent("doctor.check", trace.WithAttributes(

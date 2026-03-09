@@ -53,6 +53,24 @@ func main() {
 		return
 	}
 
+	// Handle --print flag (used by doctor's inference check).
+	if hasFlag(os.Args[1:], "--print") {
+		// Find the last positional argument as the prompt
+		prompt := ""
+		for i := len(os.Args) - 1; i >= 1; i-- {
+			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" {
+				prompt = os.Args[i]
+				break
+			}
+		}
+		if strings.Contains(prompt, "1+1") {
+			fmt.Print("2")
+		} else {
+			fmt.Print("unknown")
+		}
+		return
+	}
+
 	proto, prompt := detectProtocol(os.Args[1:])
 	outputFormat := extractOutputFormat(os.Args[1:])
 

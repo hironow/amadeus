@@ -325,16 +325,16 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 14 results (includes claude-auth)
-	if len(results) != 14 {
+	// then: should have 15 results
+	if len(results) != 15 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 14 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 15 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "Git Remote", "gh", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "success-rate", "claude-auth", "Linear MCP"}
+	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "Linear MCP", "claude-inference", "success-rate"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -373,15 +373,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "domain.doctor" {
 			found = true
-			// Should have 14 doctor.check events (one per check, including claude-auth)
+			// Should have 15 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 14 {
-				t.Errorf("expected 14 doctor.check events, got %d", eventCount)
+			if eventCount != 15 {
+				t.Errorf("expected 15 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -495,13 +495,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 14 results (includes claude-auth)
-	if len(results) != 14 {
+	// then: should have 15 results
+	if len(results) != 15 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 14 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 15 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -538,14 +538,16 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	// when: pass a nonexistent claude command
 	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{})
 
-	// then: both claude-auth and Linear MCP should be skipped
-	var authResult, mcpResult domain.DoctorCheckResult
+	// then: claude-auth, Linear MCP, and claude-inference should be skipped
+	var authResult, mcpResult, inferResult domain.DoctorCheckResult
 	for _, r := range results {
-		if r.Name == "claude-auth" {
+		switch r.Name {
+		case "claude-auth":
 			authResult = r
-		}
-		if r.Name == "Linear MCP" {
+		case "Linear MCP":
 			mcpResult = r
+		case "claude-inference":
+			inferResult = r
 		}
 	}
 	if authResult.Status != domain.CheckSkip {
@@ -559,6 +561,12 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	}
 	if !strings.Contains(mcpResult.Message, "claude not available") {
 		t.Errorf("expected 'claude not available' in MCP message, got: %s", mcpResult.Message)
+	}
+	if inferResult.Status != domain.CheckSkip {
+		t.Errorf("expected claude-inference SKIP when claude unavailable, got %v: %s", inferResult.Status, inferResult.Message)
+	}
+	if !strings.Contains(inferResult.Message, "claude not available") {
+		t.Errorf("expected 'claude not available' in inference message, got: %s", inferResult.Message)
 	}
 }
 
@@ -810,14 +818,16 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	// when
 	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{})
 
-	// then: claude-auth and Linear MCP should be OK (fake-claude supports mcp list)
-	var authResult, mcpResult domain.DoctorCheckResult
+	// then: claude-auth, Linear MCP, and claude-inference should be OK
+	var authResult, mcpResult, inferResult domain.DoctorCheckResult
 	for _, r := range results {
 		switch r.Name {
 		case "claude-auth":
 			authResult = r
 		case "Linear MCP":
 			mcpResult = r
+		case "claude-inference":
+			inferResult = r
 		}
 	}
 	if authResult.Status != domain.CheckOK {
@@ -825,5 +835,53 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	}
 	if mcpResult.Status != domain.CheckOK {
 		t.Errorf("Linear MCP: expected OK, got %v: %s", mcpResult.Status, mcpResult.Message)
+	}
+	if inferResult.Status != domain.CheckOK {
+		t.Errorf("claude-inference: expected OK, got %v: %s", inferResult.Status, inferResult.Message)
+	}
+}
+
+func TestCheckClaudeInference_Success(t *testing.T) {
+	// given
+	output := "2"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "inference OK" {
+		t.Errorf("expected 'inference OK', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeInference_Error(t *testing.T) {
+	// given
+	err := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeInference("", err)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
+	// given
+	output := "I cannot compute that"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "unexpected response" {
+		t.Errorf("expected 'unexpected response', got: %s", result.Message)
 	}
 }
