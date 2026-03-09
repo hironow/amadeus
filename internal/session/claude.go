@@ -20,8 +20,8 @@ var DivergenceMeterAllowedTools = []string{
 
 // defaultClaudeRunner executes the real Claude CLI as a subprocess.
 type defaultClaudeRunner struct {
-	cmd   string // Claude CLI command name (e.g. "claude")
-	model string // Claude model name (e.g. "opus")
+	cmd   string // Claude CLI command name (from config)
+	model string // Claude model name (from config)
 }
 
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
@@ -58,8 +58,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 }
 
 // DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.
-// If claudeCmd is empty, "claude" is used as the default.
-// If model is empty, "opus" is used as the default.
+// Both claudeCmd and model are expected to be set by the caller (from config).
 func DefaultClaudeRunner(claudeCmd string, model string) port.ClaudeRunner {
 	return &defaultClaudeRunner{cmd: claudeCmd, model: model}
 }

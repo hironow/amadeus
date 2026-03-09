@@ -29,8 +29,8 @@ type Amadeus struct {
 	Notifier    port.Notifier           // nil = no notifications
 	Metrics     port.PolicyMetrics      // nil = no policy metrics
 	ReviewCmd   string                  // code review command (empty = skip)
-	ClaudeCmd   string                  // Claude CLI command (empty = "claude")
-	ClaudeModel string                  // Claude model for review fix (empty = "opus")
+	ClaudeCmd   string                  // Claude CLI command (set by cmd layer from config)
+	ClaudeModel string                  // Claude model for review fix (set by cmd layer from config)
 	PRReader    port.GitHubPRReader     // nil = skip PR convergence
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
