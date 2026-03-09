@@ -26,6 +26,24 @@ Pull request creation is restricted to collaborators. This setting will remain u
 
 If you'd like to propose a code change, please start with an issue to discuss the approach.
 
+### Commit and PR Title Convention
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/). Since all PRs are squash-merged, **the PR title becomes the commit message** and must follow this format:
+
+```
+type: description
+```
+
+Common types: `feat`, `fix`, `tidy`, `docs`, `test`, `ci`
+
+**Breaking changes** must include `!` after the type:
+
+```
+feat!: remove OTEL_DETAIL_LEVEL environment variable (BREAKING)
+```
+
+The `(BREAKING)` suffix is optional but recommended for visibility. GoReleaser uses this convention to group release notes automatically.
+
 ### Fork
 
 You are welcome to fork this repository under the terms of the [Apache 2.0 License](LICENSE).
