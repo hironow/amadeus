@@ -285,6 +285,81 @@ func TestConfigSet_ClaudeCmd_Unit(t *testing.T) {
 	}
 }
 
+func TestConfigSet_Model(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "model", "sonnet", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config set model failed: %v", err)
+	}
+
+	// verify
+	cfg, _ := loadConfig(filepath.Join(gateDir, "config.yaml"))
+	if cfg.Model != "sonnet" {
+		t.Errorf("expected Model 'sonnet', got %q", cfg.Model)
+	}
+}
+
+func TestConfigSet_TimeoutSec(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "timeout_sec", "600", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config set timeout_sec failed: %v", err)
+	}
+
+	// verify
+	cfg, _ := loadConfig(filepath.Join(gateDir, "config.yaml"))
+	if cfg.TimeoutSec != 600 {
+		t.Errorf("expected TimeoutSec 600, got %d", cfg.TimeoutSec)
+	}
+}
+
+func TestConfigSet_TimeoutSec_Invalid(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "timeout_sec", "-5", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Error("expected error for negative timeout_sec")
+	}
+}
+
 func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 	// given: DefaultConfig marshalled to YAML file
 	dir := t.TempDir()
@@ -313,6 +388,12 @@ func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 	}
 	if loaded.ClaudeCmd != "claude" {
 		t.Errorf("ClaudeCmd: expected 'claude', got %q", loaded.ClaudeCmd)
+	}
+	if loaded.Model != "opus" {
+		t.Errorf("Model: expected 'opus', got %q", loaded.Model)
+	}
+	if loaded.TimeoutSec != 1980 {
+		t.Errorf("TimeoutSec: expected 1980, got %d", loaded.TimeoutSec)
 	}
 
 	// Weights

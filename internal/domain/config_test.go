@@ -325,6 +325,12 @@ func TestDefaultConfig_ClaudeCmd(t *testing.T) {
 	if cfg.ClaudeCmd != "claude" {
 		t.Errorf("expected ClaudeCmd=\"claude\", got %q", cfg.ClaudeCmd)
 	}
+	if cfg.Model != "opus" {
+		t.Errorf("expected Model=\"opus\", got %q", cfg.Model)
+	}
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected TimeoutSec=1980, got %d", cfg.TimeoutSec)
+	}
 }
 
 func TestConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
@@ -351,6 +357,14 @@ func TestConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
 	// then: ClaudeCmd preserved
 	if restored.ClaudeCmd != "claude" {
 		t.Errorf("expected ClaudeCmd=\"claude\" after round-trip, got %q", restored.ClaudeCmd)
+	}
+	// then: Model preserved
+	if restored.Model != "opus" {
+		t.Errorf("expected Model=\"opus\" after round-trip, got %q", restored.Model)
+	}
+	// then: TimeoutSec preserved
+	if restored.TimeoutSec != 1980 {
+		t.Errorf("expected TimeoutSec=1980 after round-trip, got %d", restored.TimeoutSec)
 	}
 }
 

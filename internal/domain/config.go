@@ -25,6 +25,8 @@ type ComputedConfig struct{}
 type Config struct {
 	Lang            string            `yaml:"lang"`
 	ClaudeCmd       string            `yaml:"claude_cmd,omitempty"`
+	Model           string            `yaml:"model,omitempty"`
+	TimeoutSec      int               `yaml:"timeout_sec,omitempty"`
 	Weights         Weights           `yaml:"weights"`
 	Thresholds      Thresholds        `yaml:"thresholds"`
 	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
@@ -45,6 +47,8 @@ func DefaultConfig() Config {
 	return Config{
 		Lang:            "ja",
 		ClaudeCmd:       "claude",
+		Model:           "opus",
+		TimeoutSec:      1980,
 		Weights:         DefaultWeights(),
 		Thresholds:      sc.Thresholds,
 		PerAxisOverride: sc.PerAxisOverride,
@@ -134,6 +138,11 @@ func ValidateConfig(cfg Config) []string {
 	}
 	if cfg.Convergence.EscalationMultiplier < 0 {
 		errs = append(errs, fmt.Sprintf("convergence.escalation_multiplier must be non-negative (got %d)", cfg.Convergence.EscalationMultiplier))
+	}
+
+	// TimeoutSec check
+	if cfg.TimeoutSec < 0 {
+		errs = append(errs, fmt.Sprintf("timeout_sec must be non-negative (got %d)", cfg.TimeoutSec))
 	}
 
 	// Full check config
