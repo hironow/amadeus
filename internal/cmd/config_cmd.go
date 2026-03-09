@@ -73,7 +73,8 @@ Supported keys:
   convergence.escalation_multiplier                       Escalation multiplier
   per_axis_override.adr_integrity_force_high               ADR force-high threshold (0-100)
   per_axis_override.dod_fulfillment_force_high             DoD force-high threshold (0-100)
-  per_axis_override.dependency_integrity_force_medium       Dep force-medium threshold (0-100)`,
+  per_axis_override.dependency_integrity_force_medium       Dep force-medium threshold (0-100)
+  claude_cmd                            Claude CLI command name (default: claude)`,
 		Example: `  amadeus config set lang en
   amadeus config set full_check.interval 20
   amadeus config set weights.adr_integrity 0.5`,
@@ -238,6 +239,9 @@ func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid value for %s: %w", key, err)
 		}
 		cfg.PerAxisOverride.DepForceMedium = n
+
+	case "claude_cmd":
+		cfg.ClaudeCmd = value
 
 	default:
 		return fmt.Errorf("unknown config key %q", key)

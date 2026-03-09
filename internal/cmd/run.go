@@ -39,17 +39,6 @@ func newRunCommand() *cobra.Command {
 				return fmt.Errorf("not initialized — run 'amadeus init' first")
 			}
 
-			// Preflight: verify required binaries exist
-			// git and gh are always needed (gh for PR reader)
-			bins := []string{"git", "gh"}
-			// claude is needed only for post-merge pipeline (when --base is set) and not dry-run
-			if baseBranch != "" && !dryRun {
-				bins = append(bins, "claude")
-			}
-			if preErr := session.PreflightCheck(bins...); preErr != nil {
-				return preErr
-			}
-
 			logger := loggerFrom(cmd)
 
 			if err := session.InitGateDir(divRoot, logger); err != nil {
@@ -62,6 +51,17 @@ func newRunCommand() *cobra.Command {
 			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
+			}
+
+			// Preflight: verify required binaries exist
+			// git and gh are always needed (gh for PR reader)
+			bins := []string{"git", "gh"}
+			// claude is needed only for post-merge pipeline (when --base is set) and not dry-run
+			if baseBranch != "" && !dryRun {
+				bins = append(bins, cfg.ClaudeCmd)
+			}
+			if preErr := session.PreflightCheck(bins...); preErr != nil {
+				return preErr
 			}
 
 			if lang != "" {
@@ -122,6 +122,7 @@ func newRunCommand() *cobra.Command {
 				Notifier:  notifier,
 				Metrics:   &platform.OTelPolicyMetrics{},
 				ReviewCmd: reviewCmd,
+				ClaudeCmd: cfg.ClaudeCmd,
 				PRReader:  prReader,
 			}
 

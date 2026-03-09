@@ -232,9 +232,9 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 }
 
 // runDoctor executes all health checks and returns the results.
-// Uses "claude" as the default Claude CLI command name.
+// Uses the default Claude CLI command from domain.DefaultConfig().
 func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheckResult {
-	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude", logger)
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, domain.DefaultConfig().ClaudeCmd, logger)
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.

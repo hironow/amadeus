@@ -39,15 +39,6 @@ func newCheckCommand() *cobra.Command {
 				return fmt.Errorf("not initialized — run 'amadeus init' first")
 			}
 
-			// Preflight: verify required binaries exist
-			bins := []string{"git"}
-			if !dryRun {
-				bins = append(bins, "claude")
-			}
-			if preErr := session.PreflightCheck(bins...); preErr != nil {
-				return preErr
-			}
-
 			logger := loggerFrom(cmd)
 
 			if err := session.InitGateDir(divRoot, logger); err != nil {
@@ -60,6 +51,15 @@ func newCheckCommand() *cobra.Command {
 			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
+			}
+
+			// Preflight: verify required binaries exist
+			bins := []string{"git"}
+			if !dryRun {
+				bins = append(bins, cfg.ClaudeCmd)
+			}
+			if preErr := session.PreflightCheck(bins...); preErr != nil {
+				return preErr
 			}
 
 			if lang != "" {
@@ -119,6 +119,7 @@ func newCheckCommand() *cobra.Command {
 				Notifier:  notifier,
 				Metrics:   &platform.OTelPolicyMetrics{},
 				ReviewCmd: reviewCmd,
+				ClaudeCmd: cfg.ClaudeCmd,
 			}
 
 			// Parse → COMMAND → usecase → EventEmitter → EVENT

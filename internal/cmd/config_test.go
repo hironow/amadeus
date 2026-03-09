@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 func TestLoadConfig_FromFile(t *testing.T) {
@@ -235,6 +237,49 @@ func TestConfigSet_PerAxisOverride_InvalidValue(t *testing.T) {
 				t.Errorf("expected error for non-integer value on %s", key)
 			}
 		})
+	}
+}
+
+func TestConfigSet_ClaudeCmd(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	os.MkdirAll(gateDir, 0755)
+	os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "claude_cmd", "custom-claude", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config set claude_cmd failed: %v", err)
+	}
+
+	// verify
+	cfg, _ := loadConfig(filepath.Join(gateDir, "config.yaml"))
+	if cfg.ClaudeCmd != "custom-claude" {
+		t.Errorf("expected ClaudeCmd 'custom-claude', got %q", cfg.ClaudeCmd)
+	}
+}
+
+func TestConfigSet_ClaudeCmd_Unit(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+
+	// when
+	err := setAmadeusConfigField(&cfg, "claude_cmd", "custom-claude")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.ClaudeCmd != "custom-claude" {
+		t.Errorf("ClaudeCmd = %q, want 'custom-claude'", cfg.ClaudeCmd)
 	}
 }
 

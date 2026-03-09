@@ -45,7 +45,7 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
-	return DefaultClaudeRunner()
+	return DefaultClaudeRunner(a.ClaudeCmd)
 }
 
 // EventStore returns the event persistence store.

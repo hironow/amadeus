@@ -145,7 +145,7 @@ func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, t
 	}
 
 	if claudeCmd == "" {
-		claudeCmd = "claude"
+		claudeCmd = domain.DefaultConfig().ClaudeCmd
 	}
 	if model == "" {
 		model = "opus"

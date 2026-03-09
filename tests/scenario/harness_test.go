@@ -166,11 +166,9 @@ func (w *Workspace) overrideSightjackClaudeCommand(t *testing.T) {
 	}
 }
 
-// overrideAmadeusClaudeCommand is a no-op verification that amadeus can find
-// the claude binary. Unlike sightjack, amadeus resolves claude via PATH
-// (hardcoded "claude" in defaultClaudeRunner.Run), not via config.yaml.
-// TestMain prepends the binDir (containing our fake-claude) to PATH, so no
-// config modification is needed. This function verifies that invariant.
+// overrideAmadeusClaudeCommand writes claude_cmd into the amadeus config
+// so that the defaultClaudeRunner uses the fake-claude binary from PATH.
+// TestMain prepends the binDir (containing our fake-claude) to PATH.
 func (w *Workspace) overrideAmadeusClaudeCommand(t *testing.T) {
 	t.Helper()
 	// Verify .gate/config.yaml exists (amadeus init succeeded).
@@ -178,8 +176,8 @@ func (w *Workspace) overrideAmadeusClaudeCommand(t *testing.T) {
 	if _, err := os.Stat(cfgPath); err != nil {
 		t.Fatalf("amadeus config not found at %s: %v", cfgPath, err)
 	}
-	// No modification needed: amadeus discovers claude via PATH,
-	// which TestMain configures to include the fake-claude binary.
+	// claude_cmd defaults to "claude" which is resolved via PATH.
+	// No modification needed: TestMain configures PATH to include fake-claude.
 }
 
 // phonewaveConfigPath returns the path to the phonewave.yaml config file.

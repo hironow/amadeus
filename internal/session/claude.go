@@ -20,12 +20,18 @@ var DivergenceMeterAllowedTools = []string{
 }
 
 // defaultClaudeRunner executes the real Claude CLI as a subprocess.
-type defaultClaudeRunner struct{}
+type defaultClaudeRunner struct {
+	cmd string // Claude CLI command name (e.g. "claude")
+}
 
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
 func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "claude",
+	claudeCmd := d.cmd
+	if claudeCmd == "" {
+		claudeCmd = "claude"
+	}
+	cmd := exec.CommandContext(ctx, claudeCmd,
 		"--model", "opus",
 		"--output-format", "stream-json",
 		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
@@ -53,7 +59,8 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	return []byte(result.Result), nil
 }
 
-// DefaultClaudeRunner returns the default ClaudeRunner that invokes the real Claude CLI.
-func DefaultClaudeRunner() port.ClaudeRunner {
-	return &defaultClaudeRunner{}
+// DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.
+// If claudeCmd is empty, "claude" is used as the default.
+func DefaultClaudeRunner(claudeCmd string) port.ClaudeRunner {
+	return &defaultClaudeRunner{cmd: claudeCmd}
 }
