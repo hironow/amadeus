@@ -271,9 +271,13 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 }
 
 // runDoctor executes all health checks and returns the results.
-// Uses the default Claude CLI command from domain.DefaultConfig().
+// Reads claude_cmd from the config file; falls back to domain.DefaultClaudeCmd on load error.
 func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheckResult {
-	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, domain.DefaultConfig().ClaudeCmd, logger)
+	claudeCmd := domain.DefaultClaudeCmd
+	if cfg, err := loadConfig(configPath); err == nil {
+		claudeCmd = cfg.ClaudeCmd
+	}
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger)
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
