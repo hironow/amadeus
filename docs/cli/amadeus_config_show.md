@@ -1,15 +1,19 @@
-## amadeus validate
+## amadeus config show
 
-Validate config file
+Display effective configuration
+
+### Synopsis
+
+Display the effective configuration after applying defaults.
 
 ```
-amadeus validate [path] [flags]
+amadeus config show [path] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for validate
+  -h, --help   help for show
 ```
 
 ### Options inherited from parent commands
@@ -24,5 +28,5 @@ amadeus validate [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+* [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
 
