@@ -6,17 +6,18 @@ import (
 	"testing"
 )
 
-func TestNeedsDefaultCheck(t *testing.T) {
+func TestNeedsDefaultRun(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
 		want bool
 	}{
-		// No args → default to check
+		// No args → default to run
 		{"empty args", nil, true},
 		{"empty slice", []string{}, true},
 
 		// Explicit subcommands → no default
+		{"explicit run", []string{"run"}, false},
 		{"explicit check", []string{"check"}, false},
 		{"explicit init", []string{"init"}, false},
 		{"explicit validate", []string{"validate"}, false},
@@ -46,7 +47,7 @@ func TestNeedsDefaultCheck(t *testing.T) {
 		{"lang then check", []string{"-l", "ja", "check"}, false},
 		{"output then check", []string{"-o", "json", "check"}, false},
 
-		// Persistent flags only → default to check
+		// Persistent flags only → default to run
 		{"verbose only", []string{"-v"}, true},
 		{"config only", []string{"-c", "cfg.yaml"}, true},
 		{"long verbose only", []string{"--verbose"}, true},
@@ -54,7 +55,7 @@ func TestNeedsDefaultCheck(t *testing.T) {
 		{"lang only", []string{"--lang", "ja"}, true},
 		{"output only", []string{"--output", "json"}, true},
 
-		// Unknown flags → default to check
+		// Unknown flags → default to run
 		{"unknown flag", []string{"--some-flag"}, true},
 
 		// -- terminator
@@ -65,9 +66,9 @@ func TestNeedsDefaultCheck(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rootCmd := NewRootCommand()
-			got := NeedsDefaultCheck(rootCmd, tt.args)
+			got := NeedsDefaultRun(rootCmd, tt.args)
 			if got != tt.want {
-				t.Errorf("NeedsDefaultCheck(%v) = %v, want %v", tt.args, got, tt.want)
+				t.Errorf("NeedsDefaultRun(%v) = %v, want %v", tt.args, got, tt.want)
 			}
 		})
 	}

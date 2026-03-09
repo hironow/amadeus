@@ -179,7 +179,7 @@ func TestPolicyHandler_DMailGenerated_RecordsMetrics(t *testing.T) {
 	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
 
 	ev, err := domain.NewEvent(domain.EventDMailGenerated, map[string]string{
-		"kind": "feedback",
+		"kind": "design-feedback",
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)

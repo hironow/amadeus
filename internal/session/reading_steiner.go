@@ -13,6 +13,7 @@ import (
 type ShiftReport struct {
 	Significant       bool
 	MergedPRs         []domain.MergedPR
+	PRReviews         []domain.PRReview
 	Diff              string
 	CodebaseStructure string
 }

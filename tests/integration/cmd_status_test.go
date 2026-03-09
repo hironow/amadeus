@@ -66,7 +66,7 @@ func TestStatusCmd_TextOutput(t *testing.T) {
 	// given: initialized .gate/ directory
 	dir := t.TempDir()
 	gateDir := filepath.Join(dir, ".gate")
-	if err := session.InitGateDir(gateDir); err != nil {
+	if err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -105,7 +105,7 @@ func TestStatusCmd_JSONOutput(t *testing.T) {
 	// given: initialized .gate/ directory with an event
 	dir := t.TempDir()
 	gateDir := filepath.Join(dir, ".gate")
-	if err := session.InitGateDir(gateDir); err != nil {
+	if err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -167,7 +167,7 @@ func TestStatusCmd_WithPath(t *testing.T) {
 	// given: initialized .gate/ directory at a specific path
 	dir := t.TempDir()
 	gateDir := filepath.Join(dir, ".gate")
-	if err := session.InitGateDir(gateDir); err != nil {
+	if err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
 		t.Fatal(err)
 	}
 

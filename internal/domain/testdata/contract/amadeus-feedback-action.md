@@ -1,7 +1,7 @@
 ---
 dmail-schema-version: "1"
 name: feedback-action-001
-kind: feedback
+kind: design-feedback
 description: Evaluation with retry action
 issues:
     - MY-401

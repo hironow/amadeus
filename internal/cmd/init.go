@@ -22,16 +22,18 @@ func newInitCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			force, _ := cmd.Flags().GetBool("force")
 			divRoot := filepath.Join(repoRoot, domain.StateDir)
-			if _, err := os.Stat(divRoot); err == nil {
-				return fmt.Errorf("%s already exists", divRoot)
+			if _, err := os.Stat(divRoot); err == nil && !force {
+				return fmt.Errorf("%s already exists\nUse --force to overwrite", divRoot)
 			}
 			rp, rpErr := domain.NewRepoPath(repoRoot)
 			if rpErr != nil {
 				return rpErr
 			}
+			logger := loggerFrom(cmd)
 			initCmd := domain.NewInitCommand(rp)
-			if err := usecase.RunInit(initCmd, &session.InitAdapter{}); err != nil {
+			if err := usecase.RunInit(initCmd, &session.InitAdapter{Logger: logger}); err != nil {
 				return fmt.Errorf("init: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)
@@ -54,6 +56,7 @@ func newInitCommand() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().Bool("force", false, "Overwrite existing state directory (re-initialize)")
 	cmd.Flags().String("otel-backend", "", "OTel backend: jaeger, weave")
 	cmd.Flags().String("otel-entity", "", "Weave entity/team (required for weave)")
 	cmd.Flags().String("otel-project", "", "Weave project (required for weave)")

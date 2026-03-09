@@ -61,6 +61,18 @@ func (e *testInternalCheckEventEmitter) EmitCheck(result domain.CheckResult, now
 	_, err := e.agg.RecordCheck(result, now)
 	return err
 }
+func (e *testInternalCheckEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
+	_, err := e.agg.RecordRunStarted(data, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
+	_, err := e.agg.RecordRunStopped(data, now)
+	return err
+}
+func (e *testInternalCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
+	_, err := e.agg.RecordPRConvergenceChecked(data, now)
+	return err
+}
 
 // testInternalCheckStateProvider implements port.CheckStateManager for internal session tests.
 type testInternalCheckStateProvider struct {

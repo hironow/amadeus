@@ -26,6 +26,7 @@ type fakeGit struct {
 }
 
 func (g *fakeGit) CurrentCommit() (string, error)                     { return g.commit, nil }
+func (g *fakeGit) CurrentBranch() (string, error)                     { return "main", nil }
 func (g *fakeGit) MergedPRsSince(_ string) ([]domain.MergedPR, error) { return g.prs, nil }
 func (g *fakeGit) DiffSince(_ string) (string, error)                 { return g.diff, nil }
 
@@ -160,6 +161,30 @@ func (e *testCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Ti
 		return err
 	}
 	return e.emit(events...)
+}
+
+func (e *testCheckEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
+	ev, err := e.agg.RecordRunStarted(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
+	ev, err := e.agg.RecordRunStopped(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *testCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
+	ev, err := e.agg.RecordPRConvergenceChecked(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
 }
 
 // testCheckStateProvider implements port.CheckStateManager for session tests.

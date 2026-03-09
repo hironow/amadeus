@@ -31,6 +31,14 @@ func (g *GitClient) CurrentCommit() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+func (g *GitClient) CurrentBranch() (string, error) {
+	out, err := g.run("rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 var (
 	// Standard merge commit: "Merge pull request #42 from user/branch"
 	prMergePattern = regexp.MustCompile(`Merge pull request #(\d+)`)

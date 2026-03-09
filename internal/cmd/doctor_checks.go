@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
@@ -75,6 +76,36 @@ func checkGitRepo(dir string) domain.DoctorCheckResult {
 	}
 }
 
+// checkGitRemote verifies that at least one git remote is configured.
+// amadeus reads Pull Requests for divergence checks, so a remote is required.
+func checkGitRemote(dir string) domain.DoctorCheckResult {
+	cmd := exec.Command("git", "remote")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return domain.DoctorCheckResult{
+			Name:    "Git Remote",
+			Status:  domain.CheckFail,
+			Message: fmt.Sprintf("failed to check git remote in %s", dir),
+			Hint:    "ensure the directory is a git repository",
+		}
+	}
+	if strings.TrimSpace(string(out)) == "" {
+		return domain.DoctorCheckResult{
+			Name:    "Git Remote",
+			Status:  domain.CheckFail,
+			Message: "no remote configured",
+			Hint:    `amadeus reads Pull Requests for divergence checks — run "git remote add origin <url>" to connect to GitHub`,
+		}
+	}
+	remotes := strings.Fields(strings.TrimSpace(string(out)))
+	return domain.DoctorCheckResult{
+		Name:    "Git Remote",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%d remote(s): %s", len(remotes), strings.Join(remotes, ", ")),
+	}
+}
+
 // checkGateDir verifies .gate/ directory exists and is writable.
 func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 	dir := filepath.Join(repoRoot, domain.StateDir)
@@ -130,7 +161,7 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckRes
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("claude mcp list failed: %v", err),
-			Hint:    `ensure Claude CLI is authenticated with "claude login"`,
+			Hint:    `ensure Claude CLI is authenticated with "claude login" (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
 
@@ -149,7 +180,8 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckRes
 		Name:    "Linear MCP",
 		Status:  domain.CheckFail,
 		Message: "Linear MCP not found or not connected in claude mcp list output",
-		Hint:    `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`,
+		Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
+			"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
 	}
 }
 
@@ -172,6 +204,26 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 			Hint:    `run "amadeus init" to regenerate skill files`,
 		}
 	}
+	// Check for deprecated "kind: feedback" (split into design-feedback / implementation-feedback)
+	for _, name := range required {
+		path := filepath.Join(skillsDir, name, "SKILL.md")
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "kind: feedback") &&
+			!strings.Contains(content, "kind: design-feedback") &&
+			!strings.Contains(content, "kind: implementation-feedback") {
+			return domain.DoctorCheckResult{
+				Name:    "SKILL.md",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
+				Hint:    `run "amadeus init --force" to regenerate skills with updated kinds (feedback → design-feedback / implementation-feedback)`,
+			}
+		}
+	}
+
 	return domain.DoctorCheckResult{
 		Name:    "SKILL.md",
 		Status:  domain.CheckOK,
@@ -198,29 +250,38 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	// 2. git repository
 	results = append(results, checkGitRepo(repoRoot))
 
-	// 3. claude CLI
+	// 3. git remote (required for PR convergence)
+	results = append(results, checkGitRemote(repoRoot))
+
+	// 4. gh CLI (required for PR reading)
+	results = append(results, checkTool(ctx, "gh"))
+
+	// 5. claude CLI
 	claudeResult := checkTool(ctx, claudeCmd)
 	results = append(results, claudeResult)
 
-	// 4. .gate/ directory
+	// 6. .gate/ directory
 	results = append(results, checkGateDir(repoRoot))
 
-	// 5. config.yaml
+	// 7. config.yaml
 	results = append(results, checkConfig(configPath))
 
-	// 6. SKILL.md files
+	// 8. SKILL.md files
 	results = append(results, checkSkillMD(repoRoot))
 
-	// 7. Event Store integrity
+	// 9. Event Store integrity
 	results = append(results, checkEventStore(filepath.Join(repoRoot, domain.StateDir)))
 
-	// 8. D-Mail schema v1 validation
+	// 10. D-Mail schema v1 validation
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, domain.StateDir)))
 
-	// 9. Success rate (informational)
+	// 11. fsnotify (file watcher availability)
+	results = append(results, checkFsnotify())
+
+	// 12. Success rate (informational)
 	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
 
-	// 10. Linear MCP (skip if claude unavailable)
+	// 13. Linear MCP (skip if claude unavailable)
 	if claudeResult.Status != domain.CheckOK {
 		results = append(results, domain.DoctorCheckResult{
 			Name:    "Linear MCP",
@@ -388,6 +449,26 @@ func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheckRe
 		Name:    "success-rate",
 		Status:  domain.CheckOK,
 		Message: domain.FormatSuccessRate(rate, clean, total),
+	}
+}
+
+// checkFsnotify verifies that the OS file watcher is available.
+// On Linux, inotify limits can prevent watcher creation.
+func checkFsnotify() domain.DoctorCheckResult {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return domain.DoctorCheckResult{
+			Name:    "fsnotify",
+			Status:  domain.CheckFail,
+			Message: fmt.Sprintf("cannot create file watcher: %v", err),
+			Hint:    "on Linux, increase inotify limit: sysctl fs.inotify.max_user_watches=524288",
+		}
+	}
+	defer w.Close()
+	return domain.DoctorCheckResult{
+		Name:    "fsnotify",
+		Status:  domain.CheckOK,
+		Message: "file watcher available",
 	}
 }
 

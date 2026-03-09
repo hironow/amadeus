@@ -13,8 +13,8 @@ func TestE2E_Sync_WithPendingComments(t *testing.T) {
 
 	// Seed D-Mails with issues
 	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "ADR issue", Severity: "low", Issues: []string{"MY-100"}},
-		{Name: "feedback-002", Kind: "feedback", Description: "DoD issue", Severity: "low", Issues: []string{"MY-200", "MY-300"}},
+		{Name: "feedback-001", Kind: "design-feedback", Description: "ADR issue", Severity: "low", Issues: []string{"MY-100"}},
+		{Name: "feedback-002", Kind: "design-feedback", Description: "DoD issue", Severity: "low", Issues: []string{"MY-200", "MY-300"}},
 	})
 
 	stdout, _, err := runCmd(t, dir, "sync")
@@ -56,7 +56,7 @@ func TestE2E_Sync_NoIssues_NoPending(t *testing.T) {
 
 	// Seed D-Mail without issues
 	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "No issues", Severity: "low"},
+		{Name: "feedback-001", Kind: "design-feedback", Description: "No issues", Severity: "low"},
 	})
 
 	stdout, _, err := runCmd(t, dir, "sync")
@@ -80,7 +80,7 @@ func TestE2E_MarkCommented_Text(t *testing.T) {
 
 	// Seed a D-Mail so .gate/ is valid
 	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
+		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
 	_, stderr, err := runCmd(t, dir, "mark-commented", "feedback-001", "MY-100")
@@ -100,7 +100,7 @@ func TestE2E_MarkCommented_JSON(t *testing.T) {
 	writeConfig(t, dir, defaultTestConfig())
 
 	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
+		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
 	stdout, _, err := runCmd(t, dir, "mark-commented", "feedback-001", "MY-100", "--json")
@@ -131,7 +131,7 @@ func TestE2E_MarkCommented_RemovesFromSync(t *testing.T) {
 	writeConfig(t, dir, defaultTestConfig())
 
 	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100", "MY-200"}},
+		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100", "MY-200"}},
 	})
 
 	// Before: 2 pending comments
@@ -169,7 +169,7 @@ func TestE2E_MarkCommented_AllMarked_EmptySync(t *testing.T) {
 	writeConfig(t, dir, defaultTestConfig())
 
 	seedDMails(t, dir, []seedDMailSpec{
-		{Name: "feedback-001", Kind: "feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
+		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
 	// Mark the only comment

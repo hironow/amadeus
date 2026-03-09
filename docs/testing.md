@@ -20,6 +20,7 @@
 
 - Located in `tests/integration/`
 - Test component interactions with real SQLite
+- Includes fsnotify inbox watcher tests and daemon lifecycle tests
 - Run: `go test ./tests/integration/... -count=1`
 
 ## Scenario Tests

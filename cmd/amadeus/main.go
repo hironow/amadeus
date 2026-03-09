@@ -18,8 +18,8 @@ func run() int {
 	// NOTE: No NormalizeArgs — single-dash long flags (e.g. -config) are intentionally
 	// unsupported per MY-334 POSIX-compliant flags policy. Use --config or -c instead.
 	args := os.Args[1:]
-	if cmd.NeedsDefaultCheck(root, args) {
-		args = append([]string{"check"}, args...)
+	if cmd.NeedsDefaultRun(root, args) {
+		args = append([]string{"run"}, args...)
 	}
 	root.SetArgs(args)
 

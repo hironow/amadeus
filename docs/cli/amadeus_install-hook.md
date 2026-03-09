@@ -17,6 +17,7 @@ amadeus install-hook [flags]
 ```
   -c, --config string   config file path
   -l, --lang string     output language (ja, en)
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         verbose output
 ```

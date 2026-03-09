@@ -105,7 +105,7 @@ func TestDMailGeneratedDataMarshalRoundTrip(t *testing.T) {
 	data := domain.DMailGeneratedData{
 		DMail: domain.DMail{
 			Name:        "feedback-001",
-			Kind:        domain.KindFeedback,
+			Kind:        domain.KindDesignFeedback,
 			Description: "test",
 			Severity:    domain.SeverityMedium,
 		},

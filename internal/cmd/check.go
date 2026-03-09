@@ -15,9 +15,10 @@ import (
 
 func newCheckCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "check [path]",
-		Short: "Run divergence check",
-		Args:  cobra.MaximumNArgs(1),
+		Use:        "check [path]",
+		Short:      "Run divergence check",
+		Deprecated: "use 'amadeus run' instead",
+		Args:       cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -47,7 +48,9 @@ func newCheckCommand() *cobra.Command {
 				return preErr
 			}
 
-			if err := session.InitGateDir(divRoot); err != nil {
+			logger := loggerFrom(cmd)
+
+			if err := session.InitGateDir(divRoot, logger); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 
@@ -65,8 +68,6 @@ func newCheckCommand() *cobra.Command {
 				}
 				cfg.Lang = lang
 			}
-
-			logger := loggerFrom(cmd)
 
 			// Wire approver
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")

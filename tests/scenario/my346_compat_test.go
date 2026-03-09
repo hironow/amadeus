@@ -79,7 +79,7 @@ func TestMY346_LegacySyncJsonCompositeKey(t *testing.T) {
 	dmailWithIssues := []byte(`---
 dmail-schema-version: "1"
 name: "feedback-legacy-key"
-kind: "feedback"
+kind: "design-feedback"
 description: "Feedback with issues"
 issues:
   - "MY-42"

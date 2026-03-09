@@ -27,15 +27,17 @@ type ClaudeDMailCandidate struct {
 	Issues      []string `json:"issues,omitempty"`
 	Targets     []string `json:"targets,omitempty"`
 	Action      string   `json:"action,omitempty"`
+	Category    string   `json:"category,omitempty"`
 }
 
 // DiffCheckParams holds the template parameters for a diff-based check.
 type DiffCheckParams struct {
-	PreviousScores string
-	PRDiffs        string
-	RelevantADRs   string
-	LinkedDoDs     string
-	LinkedIssueIDs string
+	PreviousScores  string
+	PRDiffs         string
+	RelevantADRs    string
+	LinkedDoDs      string
+	LinkedIssueIDs  string
+	PRReviewSummary string
 }
 
 // FullCheckParams holds the template parameters for a full calibration check.

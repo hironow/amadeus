@@ -87,7 +87,8 @@ type StateReader interface {
 	// LoadLatest returns the most recent check result.
 	LoadLatest() (domain.CheckResult, error)
 
-	// ScanInbox consumes inbound D-Mails from the inbox directory.
+	// ScanInbox consumes inbound D-Mails from the inbox directory (one-shot).
+	// Used by RunCheck. The Run daemon uses MonitorInbox (fsnotify) instead.
 	ScanInbox(ctx context.Context) ([]domain.DMail, error)
 
 	// NextDMailName generates a unique D-Mail name for the given kind.
@@ -108,11 +109,21 @@ type Git interface {
 	// CurrentCommit returns the short SHA of the current HEAD.
 	CurrentCommit() (string, error)
 
+	// CurrentBranch returns the name of the currently checked-out branch.
+	CurrentBranch() (string, error)
+
 	// MergedPRsSince returns merged PRs between the given commit and HEAD.
 	MergedPRsSince(since string) ([]domain.MergedPR, error)
 
 	// DiffSince returns the unified diff between the given commit and HEAD.
 	DiffSince(since string) (string, error)
+}
+
+// GitHubPRReader reads open PR state from GitHub (read-only).
+// Implemented by session-layer adapter using `gh` CLI.
+type GitHubPRReader interface {
+	// ListOpenPRs returns all open PRs targeting the given branch.
+	ListOpenPRs(ctx context.Context, targetBranch string) ([]domain.PRState, error)
 }
 
 // PruneCandidate represents a file eligible for pruning.
@@ -141,6 +152,9 @@ type CheckEventEmitter interface {
 	EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error
 	EmitDMailCommented(dmailName, issueID string, now time.Time) error
 	EmitCheck(result domain.CheckResult, now time.Time) error
+	EmitRunStarted(data domain.RunStartedData, now time.Time) error
+	EmitRunStopped(data domain.RunStoppedData, now time.Time) error
+	EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error
 }
 
 // CheckStateProvider provides aggregate state read/write without exposing the aggregate type.
@@ -158,6 +172,7 @@ type CheckStateProvider interface {
 // Implemented by session.Amadeus; injected into usecase by cmd (composition root).
 type Orchestrator interface {
 	RunCheck(ctx context.Context, opts domain.CheckOptions, emitter CheckEventEmitter, state CheckStateProvider) error
+	Run(ctx context.Context, opts domain.RunOptions, emitter CheckEventEmitter, state CheckStateProvider) error
 	PrintSync() error
 	PrintLog() error
 	PrintLogJSON() error

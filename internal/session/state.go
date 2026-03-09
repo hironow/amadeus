@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,7 +36,10 @@ func (s *ProjectionStore) runDir() string {
 
 // InitGateDir creates the .gate/ directory structure and writes
 // a default config.yaml if one does not already exist.
-func InitGateDir(root string) error {
+func InitGateDir(root string, logger domain.Logger) error {
+	if logger == nil {
+		logger = &domain.NopLogger{}
+	}
 	dirs := []string{
 		filepath.Join(root, ".run"),
 		filepath.Join(root, "events"),
@@ -52,7 +56,9 @@ func InitGateDir(root string) error {
 	if err := migrateLegacyState(root); err != nil {
 		return fmt.Errorf("migrate legacy state: %w", err)
 	}
-	// Create skills directories and default SKILL.md files from embedded templates
+	// Ensure SKILL.md files are always up-to-date with the embedded template.
+	// SKILL.md is not user-editable — it is derived from the binary's embedded
+	// template and must stay in sync across upgrades.
 	skillNames := []string{"dmail-sendable", "dmail-readable"}
 	for _, name := range skillNames {
 		destDir := filepath.Join(root, "skills", name)
@@ -60,11 +66,15 @@ func InitGateDir(root string) error {
 			return err
 		}
 		skillPath := filepath.Join(destDir, "SKILL.md")
-		if _, err := os.Stat(skillPath); errors.Is(err, fs.ErrNotExist) {
-			tmplPath := path.Join("templates", "skills", name, "SKILL.md")
-			content, readErr := platform.SkillTemplateFS.ReadFile(tmplPath)
-			if readErr != nil {
-				return fmt.Errorf("read skill template %s: %w", name, readErr)
+		tmplPath := path.Join("templates", "skills", name, "SKILL.md")
+		content, readErr := platform.SkillTemplateFS.ReadFile(tmplPath)
+		if readErr != nil {
+			return fmt.Errorf("read skill template %s: %w", name, readErr)
+		}
+		existing, existErr := os.ReadFile(skillPath)
+		if existErr != nil || !bytes.Equal(existing, content) {
+			if existErr == nil {
+				logger.Info("updated SKILL.md: %s (template changed)", name)
 			}
 			if err := os.WriteFile(skillPath, content, 0o644); err != nil {
 				return err
@@ -84,7 +94,7 @@ func InitGateDir(root string) error {
 		}
 	}
 	gitignorePath := filepath.Join(root, ".gitignore")
-	requiredEntries := []string{".run/", "outbox/", "inbox/", ".otel.env"}
+	requiredEntries := []string{".run/", "outbox/", "inbox/", ".otel.env", "events/"}
 	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
 		content := strings.Join(requiredEntries, "\n") + "\n"
 		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {

@@ -30,10 +30,10 @@ func TestE2E_Pipeline_Convergence(t *testing.T) {
 	// threshold=3, so 6 >= threshold*2 → HIGH severity → generates convergence D-Mail
 	now := time.Now().UTC()
 	for i := 1; i <= 6; i++ {
-		name := seedName("feedback", i)
+		name := seedName("design-feedback", i)
 		seedDMails(t, dir, []seedDMailSpec{{
 			Name:        name,
-			Kind:        "feedback",
+			Kind:        "design-feedback",
 			Description: "Issue in auth/session.go",
 			Severity:    "low",
 			Targets:     []string{"auth/session.go"},

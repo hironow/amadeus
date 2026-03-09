@@ -82,3 +82,21 @@ func (c ArchivePruneCommand) DryRun() bool { return c.dryRun }
 
 // Yes returns whether to skip confirmation.
 func (c ArchivePruneCommand) Yes() bool { return c.yes }
+
+// ExecuteRunCommand represents the intent to run the amadeus daemon loop.
+// Fields are unexported; use NewExecuteRunCommand to construct a valid instance.
+type ExecuteRunCommand struct {
+	repoPath   RepoPath
+	baseBranch string
+}
+
+// NewExecuteRunCommand creates an ExecuteRunCommand from validated primitives.
+func NewExecuteRunCommand(repoPath RepoPath, baseBranch string) ExecuteRunCommand {
+	return ExecuteRunCommand{repoPath: repoPath, baseBranch: baseBranch}
+}
+
+// RepoPath returns the validated repository path.
+func (c ExecuteRunCommand) RepoPath() RepoPath { return c.repoPath }
+
+// BaseBranch returns the upstream branch for post-merge checks (empty = none).
+func (c ExecuteRunCommand) BaseBranch() string { return c.baseBranch }

@@ -304,9 +304,9 @@ func TestAnalyzeConvergence_ExcludesConvergenceDMails(t *testing.T) {
 	// With filtering, count=2 should NOT trigger (below threshold).
 	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
 	dmails := []domain.DMail{
-		{Name: "feedback-001", Kind: domain.KindFeedback, Targets: []string{"auth/session.go"},
+		{Name: "feedback-001", Kind: domain.KindDesignFeedback, Targets: []string{"auth/session.go"},
 			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
-		{Name: "feedback-002", Kind: domain.KindFeedback, Targets: []string{"auth/session.go"},
+		{Name: "feedback-002", Kind: domain.KindDesignFeedback, Targets: []string{"auth/session.go"},
 			Metadata: map[string]string{"created_at": "2026-02-20T12:00:00Z"}},
 		{Name: "convergence-001", Kind: domain.KindConvergence, Targets: []string{"auth/session.go"},
 			Metadata: map[string]string{"created_at": "2026-02-21T12:00:00Z", "convergence_for": "feedback-001,feedback-002"}},

@@ -66,7 +66,7 @@ func TestScenario_ApproveCmdPath(t *testing.T) {
 
 	// Verify feedback was produced and delivered to .siren/inbox
 	feedbackPath := ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
-	obs.AssertDMailKind(feedbackPath, "feedback")
+	obs.AssertDMailKind(feedbackPath, "design-feedback")
 
 	// Verify outbox was flushed
 	ws.WaitForAbsent(t, ".gate", "outbox", 10*time.Second)

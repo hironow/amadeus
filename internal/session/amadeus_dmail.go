@@ -31,6 +31,7 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 	))
 	now := time.Now().UTC()
 	for _, d := range consumed {
+		domain.LogBanner(a.Logger, domain.BannerRecv, string(d.Kind), d.Name, d.Description)
 		if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
 			Name:   d.Name,
 			Kind:   d.Kind,
@@ -45,44 +46,56 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 // generateDMails runs Phase 3: creates D-Mail entities from meter candidates,
 // validates them, and emits dmail-generated events.
 func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterResult, now time.Time) ([]domain.DMail, error) {
-	_, span3 := platform.Tracer.Start(ctx, "dmail") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+	_, span3 := platform.Tracer.Start(ctx, "phase.dmail_generation", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+		trace.WithAttributes(
+			attribute.Int("phase.number", 3),
+			attribute.String("phase.name", "dmail_generation"),
+		),
+	)
 	var dmails []domain.DMail
+	quantitative := domain.ClassifyByAxes(meterResult.Divergence.Axes, a.Config.Weights)
+
 	for _, candidate := range meterResult.DMailCandidates {
-		name, err := a.Store.NextDMailName(domain.KindFeedback)
-		if err != nil {
-			span3.End()
-			return nil, fmt.Errorf("phase 3 (dmail name): %w", err)
+		kinds := domain.ResolveFeedbackKinds(candidate.Category, quantitative)
+		for _, kind := range kinds {
+			name, err := a.Store.NextDMailName(kind)
+			if err != nil {
+				span3.End()
+				return nil, fmt.Errorf("phase 3 (dmail name): %w", err)
+			}
+			dmail := domain.DMail{
+				SchemaVersion: domain.DMailSchemaVersion,
+				Name:          name,
+				Kind:          kind,
+				Description:   candidate.Description,
+				Issues:        candidate.Issues,
+				Severity:      meterResult.Divergence.Severity,
+				Action:        domain.DMailAction(candidate.Action),
+				Targets:       candidate.Targets,
+				Metadata: map[string]string{
+					"created_at": now.Format(time.RFC3339),
+				},
+				Body: candidate.Detail,
+			}
+			if dmail.Action == "" {
+				dmail.Action = domain.DefaultDMailAction(meterResult.Divergence.Severity)
+			}
+			if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+				a.Logger.Warn("skipping invalid %s dmail %s: %v", kind, name, errs)
+				continue
+			}
+			domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
+			if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
+				span3.End()
+				return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
+			}
+			span3.AddEvent("dmail.created", trace.WithAttributes(
+				attribute.String("dmail.name", dmail.Name),
+				attribute.String("dmail.kind", string(dmail.Kind)),
+				attribute.String("dmail.severity", string(dmail.Severity)),
+			))
+			dmails = append(dmails, dmail)
 		}
-		dmail := domain.DMail{
-			SchemaVersion: domain.DMailSchemaVersion,
-			Name:          name,
-			Kind:          domain.KindFeedback,
-			Description:   candidate.Description,
-			Issues:        candidate.Issues,
-			Severity:      meterResult.Divergence.Severity,
-			Action:        domain.DMailAction(candidate.Action),
-			Targets:       candidate.Targets,
-			Metadata: map[string]string{
-				"created_at": now.Format(time.RFC3339),
-			},
-			Body: candidate.Detail,
-		}
-		if dmail.Action == "" {
-			dmail.Action = domain.DefaultDMailAction(meterResult.Divergence.Severity)
-		}
-		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
-			a.Logger.Warn("skipping invalid feedback dmail %s: %v", name, errs)
-			continue
-		}
-		if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
-			span3.End()
-			return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
-		}
-		span3.AddEvent("dmail.created", trace.WithAttributes(
-			attribute.String("dmail.name", dmail.Name),
-			attribute.String("dmail.severity", string(dmail.Severity)),
-		))
-		dmails = append(dmails, dmail)
 	}
 	span3.End()
 	return dmails, nil
@@ -134,6 +147,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 			return saved, fmt.Errorf("convergence dmail name: %w", nameErr)
 		}
 		cd.Name = cdName
+		domain.LogBanner(a.Logger, domain.BannerSend, string(cd.Kind), cd.Name, cd.Description)
 		if err := a.Emitter.EmitDMailGenerated(cd, time.Now().UTC()); err != nil {
 			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}

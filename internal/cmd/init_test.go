@@ -45,3 +45,70 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 		t.Errorf("expected 'already exists' or 'already initialized' in error, got: %s", got)
 	}
 }
+
+func TestInitCommand_AlreadyExists_SuggestsForce(t *testing.T) {
+	// given: .gate/ directory already exists
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	if err := os.MkdirAll(gateDir, 0755); err != nil {
+		t.Fatalf("create gate dir: %v", err)
+	}
+
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() { os.Chdir(orig) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"init"})
+
+	// when
+	execErr := cmd.Execute()
+
+	// then
+	if execErr == nil {
+		t.Fatal("expected error when .gate already exists")
+	}
+	if !strings.Contains(execErr.Error(), "--force") {
+		t.Errorf("expected '--force' hint in error, got: %v", execErr)
+	}
+}
+
+func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
+	// given: .gate/ directory already exists
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, ".gate")
+	if err := os.MkdirAll(gateDir, 0755); err != nil {
+		t.Fatalf("create gate dir: %v", err)
+	}
+
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() { os.Chdir(orig) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"init", "--force"})
+
+	// when
+	execErr := cmd.Execute()
+
+	// then
+	if execErr != nil {
+		t.Fatalf("init --force failed: %v", execErr)
+	}
+}
