@@ -47,3 +47,64 @@ jobs:
             -p "*linux_amd64.tar.gz"
           tar xzf *linux_amd64.tar.gz
           "./$REPO_NAME" version
+
+  update-smoke:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get release tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          LATEST=$(gh release view --repo "$REPO_FULL" --json tagName -q .tagName)
+          PREVIOUS=$(gh release list --repo "$REPO_FULL" --limit 2 --json tagName -q '.[1].tagName')
+          echo "LATEST=$LATEST" >> "$GITHUB_ENV"
+          echo "PREVIOUS=$PREVIOUS" >> "$GITHUB_ENV"
+          echo "Latest: $LATEST, Previous: $PREVIOUS"
+
+      - name: Skip if no previous release
+        if: env.PREVIOUS == ''
+        run: echo "No previous release found — skipping update smoke test"
+
+      - name: Download previous release
+        if: env.PREVIOUS != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_FULL: ${{ github.repository }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          gh release download "$PREVIOUS" \
+            -R "$REPO_FULL" \
+            -p "*linux_amd64.tar.gz"
+          tar xzf *linux_amd64.tar.gz
+          echo "Installed previous version:"
+          "./$REPO_NAME" version
+
+      - name: Verify update --check detects newer version
+        if: env.PREVIOUS != ''
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          OUTPUT=$("./$REPO_NAME" update --check 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "update available"
+
+      - name: Run self-update
+        if: env.PREVIOUS != ''
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          "./$REPO_NAME" update 2>&1
+          echo "Update completed"
+
+      - name: Verify updated version matches latest
+        if: env.PREVIOUS != ''
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          OUTPUT=$("./$REPO_NAME" version 2>&1)
+          echo "$OUTPUT"
+          LATEST_VER="${LATEST#v}"
+          echo "$OUTPUT" | grep -q "$LATEST_VER"
+          echo "Version verified: $LATEST_VER"
