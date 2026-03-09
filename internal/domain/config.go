@@ -18,14 +18,19 @@ type ConvergenceConfig struct {
 	EscalationMultiplier int `yaml:"escalation_multiplier"`
 }
 
+// ComputedConfig holds system-written fields. Empty for amadeus today.
+type ComputedConfig struct{}
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
 	Lang            string            `yaml:"lang"`
+	ClaudeCmd       string            `yaml:"claude_cmd,omitempty"`
 	Weights         Weights           `yaml:"weights"`
 	Thresholds      Thresholds        `yaml:"thresholds"`
 	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
 	FullCheck       FullCheckConfig   `yaml:"full_check"`
 	Convergence     ConvergenceConfig `yaml:"convergence"`
+	Computed        ComputedConfig    `yaml:"computed,omitempty"`
 }
 
 // FullCheckConfig controls the full scan strategy.
@@ -39,6 +44,7 @@ func DefaultConfig() Config {
 	sc := DefaultThresholds()
 	return Config{
 		Lang:            "ja",
+		ClaudeCmd:       "claude",
 		Weights:         DefaultWeights(),
 		Thresholds:      sc.Thresholds,
 		PerAxisOverride: sc.PerAxisOverride,
