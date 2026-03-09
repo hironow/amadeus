@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,30 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"gopkg.in/yaml.v3"
 )
+
+// buildFakeClaude compiles the fake-claude binary and returns its absolute path.
+func buildFakeClaude(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	binPath := filepath.Join(binDir, "fake-claude")
+
+	// Locate fake-claude source relative to this test file.
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine test file location")
+	}
+	// thisFile = internal/cmd/doctor_checks_test.go → project root = ../../
+	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
+	fakeSrc := filepath.Join(projectRoot, "tests", "scenario", "testdata", "fake-claude")
+
+	cmd := exec.Command("go", "build", "-o", binPath, ".")
+	cmd.Dir = fakeSrc
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build fake-claude: %v\n%s", err, out)
+	}
+	return binPath
+}
 
 // setupTestTracer configures an in-memory tracer for testing doctor spans.
 func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
@@ -274,16 +299,14 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock commands succeed
-	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	lookPathShell = func(cmdLine string) (string, error) {
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
-	}
-	defer func() {
-		newShellCmd = platform.NewShellCmd
-		lookPathShell = platform.LookPathShell
-	}()
+	})
+	defer cleanupPath()
 
 	dir := t.TempDir()
 	// Create .gate/ with config
@@ -322,16 +345,14 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	// given: mock commands succeed
 	exp := setupTestTracer(t)
-	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	lookPathShell = func(cmdLine string) (string, error) {
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
-	}
-	defer func() {
-		newShellCmd = platform.NewShellCmd
-		lookPathShell = platform.LookPathShell
-	}()
+	})
+	defer cleanupPath()
 
 	dir := t.TempDir()
 	exec.Command("git", "init", dir).Run()
@@ -454,16 +475,14 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 
 func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// given: mock commands succeed
-	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	lookPathShell = func(cmdLine string) (string, error) {
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
-	}
-	defer func() {
-		newShellCmd = platform.NewShellCmd
-		lookPathShell = platform.LookPathShell
-	}()
+	})
+	defer cleanupPath()
 
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
@@ -716,16 +735,14 @@ func TestCheckFsnotify_Available(t *testing.T) {
 
 func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	// given: mock commands succeed
-	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	lookPathShell = func(cmdLine string) (string, error) {
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
-	}
-	defer func() {
-		newShellCmd = platform.NewShellCmd
-		lookPathShell = platform.LookPathShell
-	}()
+	})
+	defer cleanupPath()
 
 	repoRoot := t.TempDir()
 	gateDir := filepath.Join(repoRoot, ".gate")
@@ -774,5 +791,39 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected success-rate check in results")
+	}
+}
+
+func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
+	// given: fake-claude binary via runDoctorWithClaudeCmd
+	fakeClaude := buildFakeClaude(t)
+
+	repoRoot := t.TempDir()
+	gateDir := filepath.Join(repoRoot, ".gate")
+	initGateDirForTest(t, gateDir)
+	exec.Command("git", "init", repoRoot).Run()
+	exec.Command("git", "-C", repoRoot, "remote", "add", "origin", "https://github.com/example/repo.git").Run()
+
+	ctx := context.Background()
+	configPath := filepath.Join(gateDir, "config.yaml")
+
+	// when
+	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{})
+
+	// then: claude-auth and Linear MCP should be OK (fake-claude supports mcp list)
+	var authResult, mcpResult domain.DoctorCheckResult
+	for _, r := range results {
+		switch r.Name {
+		case "claude-auth":
+			authResult = r
+		case "Linear MCP":
+			mcpResult = r
+		}
+	}
+	if authResult.Status != domain.CheckOK {
+		t.Errorf("claude-auth: expected OK, got %v: %s", authResult.Status, authResult.Message)
+	}
+	if mcpResult.Status != domain.CheckOK {
+		t.Errorf("Linear MCP: expected OK, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
 }
