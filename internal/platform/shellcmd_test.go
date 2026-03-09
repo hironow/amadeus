@@ -1,3 +1,4 @@
+// white-box-reason: tests unexported isEnvKey function
 package platform
 
 import (
