@@ -144,6 +144,100 @@ func TestConfigSet_InvalidLang(t *testing.T) {
 	}
 }
 
+func TestConfigSet_PerAxisOverride(t *testing.T) {
+	cases := []struct {
+		key   string
+		value string
+		check func(t *testing.T, dir string)
+	}{
+		{
+			key:   "per_axis_override.adr_integrity_force_high",
+			value: "75",
+			check: func(t *testing.T, dir string) {
+				cfg, _ := loadConfig(filepath.Join(dir, ".gate", "config.yaml"))
+				if cfg.PerAxisOverride.ADRForceHigh != 75 {
+					t.Errorf("expected ADRForceHigh 75, got %d", cfg.PerAxisOverride.ADRForceHigh)
+				}
+			},
+		},
+		{
+			key:   "per_axis_override.dod_fulfillment_force_high",
+			value: "80",
+			check: func(t *testing.T, dir string) {
+				cfg, _ := loadConfig(filepath.Join(dir, ".gate", "config.yaml"))
+				if cfg.PerAxisOverride.DoDForceHigh != 80 {
+					t.Errorf("expected DoDForceHigh 80, got %d", cfg.PerAxisOverride.DoDForceHigh)
+				}
+			},
+		},
+		{
+			key:   "per_axis_override.dependency_integrity_force_medium",
+			value: "50",
+			check: func(t *testing.T, dir string) {
+				cfg, _ := loadConfig(filepath.Join(dir, ".gate", "config.yaml"))
+				if cfg.PerAxisOverride.DepForceMedium != 50 {
+					t.Errorf("expected DepForceMedium 50, got %d", cfg.PerAxisOverride.DepForceMedium)
+				}
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.key, func(t *testing.T) {
+			// given
+			dir := t.TempDir()
+			gateDir := filepath.Join(dir, ".gate")
+			os.MkdirAll(gateDir, 0755)
+			os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+			rootCmd := NewRootCommand()
+			rootCmd.SetArgs([]string{"config", "set", tc.key, tc.value, dir})
+			rootCmd.SetOut(&bytes.Buffer{})
+			rootCmd.SetErr(&bytes.Buffer{})
+
+			// when
+			err := rootCmd.Execute()
+
+			// then
+			if err != nil {
+				t.Fatalf("config set %s failed: %v", tc.key, err)
+			}
+			tc.check(t, dir)
+		})
+	}
+}
+
+func TestConfigSet_PerAxisOverride_InvalidValue(t *testing.T) {
+	keys := []string{
+		"per_axis_override.adr_integrity_force_high",
+		"per_axis_override.dod_fulfillment_force_high",
+		"per_axis_override.dependency_integrity_force_medium",
+	}
+
+	for _, key := range keys {
+		t.Run(key, func(t *testing.T) {
+			// given
+			dir := t.TempDir()
+			gateDir := filepath.Join(dir, ".gate")
+			os.MkdirAll(gateDir, 0755)
+			os.WriteFile(filepath.Join(gateDir, "config.yaml"), []byte(`lang: "ja"`), 0644)
+
+			rootCmd := NewRootCommand()
+			rootCmd.SetArgs([]string{"config", "set", key, "notanumber", dir})
+			rootCmd.SetOut(&bytes.Buffer{})
+			rootCmd.SetErr(&bytes.Buffer{})
+
+			// when
+			err := rootCmd.Execute()
+
+			// then
+			if err == nil {
+				t.Errorf("expected error for non-integer value on %s", key)
+			}
+		})
+	}
+}
+
 func TestLoadConfig_FileNotFound_ReturnsDefault(t *testing.T) {
 	cfg, err := loadConfig("/nonexistent/path/config.yaml")
 	if err != nil {
