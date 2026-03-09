@@ -88,6 +88,14 @@ func (c Config) DetectConvergence(dmails []DMail, now time.Time) []ConvergenceAl
 func ValidateConfig(cfg Config) []string {
 	var errs []string
 
+	// Required string fields
+	if cfg.ClaudeCmd == "" {
+		errs = append(errs, "claude_cmd must not be empty")
+	}
+	if cfg.Model == "" {
+		errs = append(errs, "model must not be empty")
+	}
+
 	// Language check
 	if !ValidLang(cfg.Lang) {
 		errs = append(errs, fmt.Sprintf("lang must be \"ja\" or \"en\" (got %q)", cfg.Lang))

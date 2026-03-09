@@ -201,7 +201,10 @@ func writeConfigWithDefaults(configPath string) error {
 	if readErr == nil && len(existing) > 0 {
 		// Merge: defaults as base, existing values override
 		var defaultMap map[string]any
-		defaultData, _ := yaml.Marshal(cfg)
+		defaultData, marshalErr := yaml.Marshal(cfg)
+		if marshalErr != nil {
+			return fmt.Errorf("marshal default config: %w", marshalErr)
+		}
 		if err := yaml.Unmarshal(defaultData, &defaultMap); err != nil {
 			return err
 		}

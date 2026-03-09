@@ -870,6 +870,22 @@ func TestCheckClaudeInference_Error(t *testing.T) {
 	}
 }
 
+func TestCheckClaudeInference_FalsePositive(t *testing.T) {
+	// given: "12" contains "2" but is not the expected answer
+	output := "12"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then: must FAIL — "12" is not "2"
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL for false positive '12', got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "unexpected response" {
+		t.Errorf("expected 'unexpected response', got: %s", result.Message)
+	}
+}
+
 func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	// given
 	output := "I cannot compute that"

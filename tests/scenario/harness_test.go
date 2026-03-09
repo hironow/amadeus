@@ -166,9 +166,9 @@ func (w *Workspace) overrideSightjackClaudeCommand(t *testing.T) {
 	}
 }
 
-// overrideAmadeusClaudeCommand writes claude_cmd into the amadeus config
-// so that the defaultClaudeRunner uses the fake-claude binary from PATH.
-// TestMain prepends the binDir (containing our fake-claude) to PATH.
+// overrideAmadeusClaudeCommand verifies that the amadeus config.yaml exists
+// (confirming amadeus init succeeded). claude_cmd defaults to "claude" which
+// is resolved via PATH; TestMain prepends the binDir containing fake-claude.
 func (w *Workspace) overrideAmadeusClaudeCommand(t *testing.T) {
 	t.Helper()
 	// Verify .gate/config.yaml exists (amadeus init succeeded).
