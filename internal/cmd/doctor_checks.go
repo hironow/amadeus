@@ -21,13 +21,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// execCommand is a package-level variable for creating exec.Cmd.
+// newShellCmd is a package-level variable for creating shell-aware exec.Cmd.
 // Override in tests to mock command execution.
-var execCommand = exec.CommandContext
+var newShellCmd = platform.NewShellCmd
+
+// lookPathShell is a package-level variable for shell-aware LookPath.
+// Override in tests to mock path lookup.
+var lookPathShell = platform.LookPathShell
 
 // checkTool verifies that a CLI tool is installed and executable.
+// Supports shell-like command strings with leading KEY=VALUE env vars and tilde paths.
 func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
-	path, err := exec.LookPath(name)
+	path, err := lookPathShell(name)
 	if err != nil {
 		return domain.DoctorCheckResult{
 			Name:    name,
@@ -37,7 +42,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 		}
 	}
 
-	out, err := execCommand(ctx, path, "--version").Output()
+	out, err := newShellCmd(ctx, name, "--version").Output()
 	if err != nil {
 		return domain.DoctorCheckResult{
 			Name:    name,
@@ -56,7 +61,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 }
 
 // checkGitRepo verifies the given directory is inside a git repository.
-// Uses exec.Command directly (not execCommand) because cmd.Dir must be set,
+// Uses exec.Command directly (not newShellCmd) because cmd.Dir must be set,
 // and tests use real git repos via git init.
 func checkGitRepo(dir string) domain.DoctorCheckResult {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
@@ -150,22 +155,39 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 	}
 }
 
+// checkClaudeAuth determines if the Claude CLI is authenticated by
+// interpreting the result of running `claude mcp list`. A successful
+// command execution (no error) indicates the CLI is authenticated.
+func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
+	if mcpErr != nil {
+		return domain.DoctorCheckResult{
+			Name:    "claude-auth",
+			Status:  domain.CheckFail,
+			Message: "not authenticated: " + mcpErr.Error(),
+			Hint:    `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
+		}
+	}
+	return domain.DoctorCheckResult{
+		Name:    "claude-auth",
+		Status:  domain.CheckOK,
+		Message: "authenticated",
+	}
+}
+
 // checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckResult {
-	cmd := execCommand(ctx, claudeCmd, "mcp", "list")
-	out, err := cmd.Output()
-	if err != nil {
+func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
+	if mcpErr != nil {
 		return domain.DoctorCheckResult{
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("claude mcp list failed: %v", err),
+			Message: fmt.Sprintf("claude mcp list failed: %v", mcpErr),
 			Hint:    `ensure Claude CLI is authenticated with "claude login" (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
 
-	output := strings.ToLower(string(out))
+	output := strings.ToLower(mcpOutput)
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "linear") && strings.Contains(line, "✓") && strings.Contains(line, "connected") {
 			return domain.DoctorCheckResult{
@@ -281,15 +303,36 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	// 12. Success rate (informational)
 	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
 
-	// 13. Linear MCP (skip if claude unavailable)
+	// 13-14. claude-auth + Linear MCP (skip both if claude binary unavailable)
 	if claudeResult.Status != domain.CheckOK {
+		results = append(results, domain.DoctorCheckResult{
+			Name:    "claude-auth",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		})
 		results = append(results, domain.DoctorCheckResult{
 			Name:    "Linear MCP",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
 	} else {
-		results = append(results, checkLinearMCP(ctx, claudeCmd))
+		// Run `claude mcp list` once, share output for both auth and MCP checks
+		cmd := newShellCmd(ctx, claudeCmd, "mcp", "list")
+		out, mcpErr := cmd.Output()
+		mcpOutput := string(out)
+		authResult := checkClaudeAuth(mcpOutput, mcpErr)
+		results = append(results, authResult)
+
+		// Skip Linear MCP check if auth failed
+		if authResult.Status != domain.CheckOK {
+			results = append(results, domain.DoctorCheckResult{
+				Name:    "Linear MCP",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not authenticated)",
+			})
+		} else {
+			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+		}
 	}
 
 	for _, r := range results {

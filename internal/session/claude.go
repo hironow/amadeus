@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/platform"
@@ -36,7 +35,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	if model == "" {
 		model = "opus"
 	}
-	cmd := exec.CommandContext(ctx, claudeCmd,
+	cmd := platform.NewShellCmd(ctx, claudeCmd,
 		"--model", model,
 		"--output-format", "stream-json",
 		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),

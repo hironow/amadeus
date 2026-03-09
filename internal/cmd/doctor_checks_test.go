@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -158,17 +159,44 @@ func TestCheckGateDir_NotExist(t *testing.T) {
 	}
 }
 
-func TestCheckLinearMCP_Connected(t *testing.T) {
-	// given: mock claude mcp list output showing linear connected
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+func TestCheckClaudeAuth_Authenticated(t *testing.T) {
+	// given
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkClaudeAuth(mcpOutput, nil)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "authenticated" {
+		t.Errorf("expected 'authenticated', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeAuth_NotAuthenticated(t *testing.T) {
+	// given
+	mcpErr := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeAuth("", mcpErr)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "claude login") {
+		t.Errorf("expected hint to mention 'claude login', got: %s", result.Hint)
+	}
+}
+
+func TestCheckLinearMCP_Connected(t *testing.T) {
+	// given
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
+
+	// when
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -177,16 +205,11 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 }
 
 func TestCheckLinearMCP_NotConnected(t *testing.T) {
-	// given: mock output without linear
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "some-other-mcp: https://example.com - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+	// given
+	mcpOutput := "some-other-mcp: https://example.com - ✓ Connected"
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -195,16 +218,11 @@ func TestCheckLinearMCP_NotConnected(t *testing.T) {
 }
 
 func TestCheckLinearMCP_CommandFails(t *testing.T) {
-	// given: claude mcp list fails
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("false")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+	// given
+	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkLinearMCP("", mcpErr)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -213,16 +231,11 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 }
 
 func TestCheckLinearMCP_Disconnected(t *testing.T) {
-	// given: mock output showing linear as disconnected
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+	// given
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected"
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -261,10 +274,16 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock commands succeed
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
 	}
-	defer func() { execCommand = exec.CommandContext }()
+	lookPathShell = func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	}
+	defer func() {
+		newShellCmd = platform.NewShellCmd
+		lookPathShell = platform.LookPathShell
+	}()
 
 	dir := t.TempDir()
 	// Create .gate/ with config
@@ -283,12 +302,16 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 13 results
-	if len(results) != 13 {
-		t.Fatalf("expected 13 results, got %d", len(results))
+	// then: should have 14 results (includes claude-auth)
+	if len(results) != 14 {
+		names := make([]string, len(results))
+		for i, r := range results {
+			names[i] = r.Name
+		}
+		t.Fatalf("expected 14 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "Git Remote", "gh", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "success-rate", "Linear MCP"}
+	expectedNames := []string{"git", "Git Repository", "Git Remote", "gh", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "success-rate", "claude-auth", "Linear MCP"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -299,10 +322,16 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	// given: mock commands succeed
 	exp := setupTestTracer(t)
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
 	}
-	defer func() { execCommand = exec.CommandContext }()
+	lookPathShell = func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	}
+	defer func() {
+		newShellCmd = platform.NewShellCmd
+		lookPathShell = platform.LookPathShell
+	}()
 
 	dir := t.TempDir()
 	exec.Command("git", "init", dir).Run()
@@ -323,15 +352,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "domain.doctor" {
 			found = true
-			// Should have 13 doctor.check events (one per check)
+			// Should have 14 doctor.check events (one per check, including claude-auth)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 13 {
-				t.Errorf("expected 13 doctor.check events, got %d", eventCount)
+			if eventCount != 14 {
+				t.Errorf("expected 14 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -425,10 +454,16 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 
 func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// given: mock commands succeed
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
 	}
-	defer func() { execCommand = exec.CommandContext }()
+	lookPathShell = func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	}
+	defer func() {
+		newShellCmd = platform.NewShellCmd
+		lookPathShell = platform.LookPathShell
+	}()
 
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
@@ -441,13 +476,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 13 results
-	if len(results) != 13 {
+	// then: should have 14 results (includes claude-auth)
+	if len(results) != 14 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 13 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 14 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -468,8 +503,8 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	}
 }
 
-func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
-	// given: no need to mock execCommand for this test
+func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
+	// given
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
@@ -484,19 +519,27 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	// when: pass a nonexistent claude command
 	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{})
 
-	// then
-	var mcpResult domain.DoctorCheckResult
+	// then: both claude-auth and Linear MCP should be skipped
+	var authResult, mcpResult domain.DoctorCheckResult
 	for _, r := range results {
+		if r.Name == "claude-auth" {
+			authResult = r
+		}
 		if r.Name == "Linear MCP" {
 			mcpResult = r
-			break
 		}
+	}
+	if authResult.Status != domain.CheckSkip {
+		t.Errorf("expected claude-auth SKIP when claude unavailable, got %v: %s", authResult.Status, authResult.Message)
+	}
+	if !strings.Contains(authResult.Message, "claude not available") {
+		t.Errorf("expected 'claude not available' in auth message, got: %s", authResult.Message)
 	}
 	if mcpResult.Status != domain.CheckSkip {
 		t.Errorf("expected Linear MCP SKIP when claude unavailable, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
 	if !strings.Contains(mcpResult.Message, "claude not available") {
-		t.Errorf("expected 'claude not available' in message, got: %s", mcpResult.Message)
+		t.Errorf("expected 'claude not available' in MCP message, got: %s", mcpResult.Message)
 	}
 }
 
@@ -673,10 +716,16 @@ func TestCheckFsnotify_Available(t *testing.T) {
 
 func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	// given: mock commands succeed
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
 	}
-	defer func() { execCommand = exec.CommandContext }()
+	lookPathShell = func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	}
+	defer func() {
+		newShellCmd = platform.NewShellCmd
+		lookPathShell = platform.LookPathShell
+	}()
 
 	repoRoot := t.TempDir()
 	gateDir := filepath.Join(repoRoot, ".gate")

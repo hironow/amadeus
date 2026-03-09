@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -120,13 +119,10 @@ func TestCheckGateDir_NotExist_HasHint(t *testing.T) {
 
 func TestCheckLinearMCP_NotConnected_HasHint(t *testing.T) {
 	// given
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "no linear here")
-	}
-	defer func() { execCommand = exec.CommandContext }()
+	mcpOutput := "no linear here"
 
 	// when
-	result := checkLinearMCP(context.Background(), "claude")
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Hint == "" {
