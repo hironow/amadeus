@@ -25,13 +25,16 @@ Schema version remains "1" (additive change, all tools deployed simultaneously).
 ## Consequences
 
 ### Positive
+
 - Sightjack receives only design-relevant feedback for wave planning
 - Paintress receives only implementation-relevant feedback for code fixes
 - Reduced noise in each tool's inbox
 
 ### Negative
+
 - Disagreement between AI and rule-based classification emits duplicate D-Mails
 - Old `feedback` kind removed without backward compatibility
 
 ### Neutral
+
 - phonewave routing logic unchanged (SKILL.md-driven auto-derivation handles new kinds)

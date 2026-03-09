@@ -8,6 +8,7 @@
 When large numbers of PRs accumulate in a repository (e.g., 17 open PRs with deeply nested dependency chains), the codebase needs a mechanism to detect and converge these PRs. The question is what role amadeus should play in this convergence process.
 
 Three roles were considered:
+
 - **Observer**: Detect and report PR state only
 - **Conductor**: Detect PR state, plan convergence, and instruct other tools via D-Mail
 - **Executor**: Detect, plan, and directly execute git operations (rebase, merge)
@@ -29,6 +30,7 @@ amadeus operates as a **Conductor** for PR convergence:
 ## Consequences
 
 ### Positive
+
 - Clear separation of concerns: observation (amadeus) vs. execution (paintress)
 - No LLM cost for PR analysis — purely mechanical detection
 - No GitHub API rate limit risk — inbox-driven, not polling
@@ -36,10 +38,12 @@ amadeus operates as a **Conductor** for PR convergence:
 - Consistent with amadeus's existing role as a verifier, not implementer
 
 ### Negative
+
 - Two-tool coordination required for PR convergence (amadeus + paintress + phonewave routing)
 - Conflict file detection is limited (gh CLI doesn't provide detailed conflict info; paintress discovers details during resolution)
 - No real-time PR monitoring — depends on D-Mail arrival timing
 
 ### Neutral
+
 - `amadeus check` is deprecated in favor of `amadeus run` (daemon mode)
 - Post-merge divergence checking remains available via `--base` flag

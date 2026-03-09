@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: tests unexported PR convergence pipeline internals (phase transitions, retry logic)
+
 import (
 	"context"
 	"fmt"

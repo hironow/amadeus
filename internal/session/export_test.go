@@ -35,6 +35,9 @@ var ExportHookMarkerBegin = hookMarkerBegin
 // ExportHookMarkerEnd exposes hookMarkerEnd for external tests.
 var ExportHookMarkerEnd = hookMarkerEnd
 
+// ExportParseGhPRListOutput exposes parseGhPRListOutput for external tests.
+var ExportParseGhPRListOutput = parseGhPRListOutput
+
 // DBForTest returns the underlying database connection for testing.
 // Only available in test builds.
 func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }

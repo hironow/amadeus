@@ -1,7 +1,9 @@
-package session
+package session_test
 
 import (
 	"testing"
+
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestParseGhPRListOutput_valid(t *testing.T) {
@@ -12,7 +14,7 @@ func TestParseGhPRListOutput_valid(t *testing.T) {
 	]`
 
 	// when
-	prs, err := parseGhPRListOutput([]byte(raw))
+	prs, err := session.ExportParseGhPRListOutput([]byte(raw))
 
 	// then
 	if err != nil {
@@ -53,7 +55,7 @@ func TestParseGhPRListOutput_conflict(t *testing.T) {
 	]`
 
 	// when
-	prs, err := parseGhPRListOutput([]byte(raw))
+	prs, err := session.ExportParseGhPRListOutput([]byte(raw))
 
 	// then
 	if err != nil {
@@ -75,7 +77,7 @@ func TestParseGhPRListOutput_empty(t *testing.T) {
 	raw := `[]`
 
 	// when
-	prs, err := parseGhPRListOutput([]byte(raw))
+	prs, err := session.ExportParseGhPRListOutput([]byte(raw))
 
 	// then
 	if err != nil {
@@ -91,7 +93,7 @@ func TestParseGhPRListOutput_malformed(t *testing.T) {
 	raw := `not valid json`
 
 	// when
-	_, err := parseGhPRListOutput([]byte(raw))
+	_, err := session.ExportParseGhPRListOutput([]byte(raw))
 
 	// then
 	if err == nil {
@@ -106,7 +108,7 @@ func TestParseGhPRListOutput_unknownMergeable(t *testing.T) {
 	]`
 
 	// when
-	prs, err := parseGhPRListOutput([]byte(raw))
+	prs, err := session.ExportParseGhPRListOutput([]byte(raw))
 
 	// then
 	if err != nil {
