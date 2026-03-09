@@ -1,15 +1,33 @@
 ## amadeus update
 
-Update amadeus to the latest version
+Self-update amadeus to the latest release
+
+### Synopsis
+
+Self-update amadeus to the latest GitHub release.
+
+Downloads the latest release, verifies the checksum, and replaces
+the current binary. Use --check to only check for updates without
+installing.
 
 ```
 amadeus update [flags]
 ```
 
+### Examples
+
+```
+  # Check for updates
+  amadeus update --check
+
+  # Update to the latest version
+  amadeus update
+```
+
 ### Options
 
 ```
-  -C, --check   check for updates without installing
+  -C, --check   Check for updates without installing
   -h, --help    help for update
 ```
 
@@ -25,4 +43,5 @@ amadeus update [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+

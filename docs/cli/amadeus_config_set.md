@@ -8,9 +8,6 @@ Update a configuration value in .gate/config.yaml.
 
 Supported keys:
   lang                              Language (ja or en)
-  claude_cmd                        Claude CLI command name
-  model                             Claude model name
-  timeout_sec                       Claude timeout in seconds
   weights.adr_integrity             ADR weight (0.0-1.0)
   weights.dod_fulfillment           DoD weight (0.0-1.0)
   weights.dependency_integrity      Dependency weight (0.0-1.0)
@@ -21,7 +18,13 @@ Supported keys:
   full_check.on_divergence_jump     Divergence jump threshold
   convergence.window_days           Convergence detection window (days)
   convergence.threshold             Convergence threshold count
-  convergence.escalation_multiplier Escalation multiplier
+  convergence.escalation_multiplier                       Escalation multiplier
+  per_axis_override.adr_integrity_force_high               ADR force-high threshold (0-100)
+  per_axis_override.dod_fulfillment_force_high             DoD force-high threshold (0-100)
+  per_axis_override.dependency_integrity_force_medium       Dep force-medium threshold (0-100)
+  claude_cmd                            Claude CLI command name (default: claude)
+  model                                 Claude model name (default: opus)
+  timeout_sec                           Claude CLI timeout in seconds (default: 1980)
 
 ```
 amadeus config set <key> <value> [path] [flags]
@@ -53,4 +56,5 @@ amadeus config set <key> <value> [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus config](amadeus_config.md)  - View or update amadeus configuration
+* [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
+
