@@ -41,6 +41,18 @@ const (
 )
 
 func main() {
+	// Handle --version flag (used by doctor's CheckTool).
+	if hasFlag(os.Args[1:], "--version") || hasFlag(os.Args[1:], "-v") {
+		fmt.Println("fake-claude 0.0.0-test")
+		return
+	}
+
+	// Handle `mcp list` subcommand (used by doctor's auth/MCP checks).
+	if len(os.Args) >= 3 && os.Args[1] == "mcp" && os.Args[2] == "list" {
+		fmt.Println("  linear        ✓  connected")
+		return
+	}
+
 	proto, prompt := detectProtocol(os.Args[1:])
 	outputFormat := extractOutputFormat(os.Args[1:])
 
@@ -110,6 +122,16 @@ func detectProtocol(args []string) (protocol, string) {
 
 	// No -p and empty stdin — treat as paintress with empty prompt.
 	return protoPaintress, ""
+}
+
+// hasFlag returns true if the given flag appears anywhere in args.
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
 }
 
 // extractPrompt finds the value of the -p flag in args.

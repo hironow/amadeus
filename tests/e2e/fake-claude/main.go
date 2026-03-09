@@ -23,6 +23,20 @@ import (
 )
 
 func main() {
+	// Handle --version flag (used by doctor's CheckTool).
+	for _, a := range os.Args[1:] {
+		if a == "--version" || a == "-v" {
+			fmt.Println("fake-claude 0.0.0-test")
+			return
+		}
+	}
+
+	// Handle `mcp list` subcommand (used by doctor's auth/MCP checks).
+	if len(os.Args) >= 3 && os.Args[1] == "mcp" && os.Args[2] == "list" {
+		fmt.Println("  linear        ✓  connected")
+		return
+	}
+
 	prompt, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fake-claude: read stdin: %v\n", err)

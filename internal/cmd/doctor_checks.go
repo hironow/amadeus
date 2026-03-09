@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/amadeus/internal/domain"
@@ -317,8 +318,10 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		})
 	} else {
 		// Run `claude mcp list` once, share output for both auth and MCP checks
-		cmd := newShellCmd(ctx, claudeCmd, "mcp", "list")
+		mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
 		out, mcpErr := cmd.Output()
+		mcpCancel()
 		mcpOutput := string(out)
 		authResult := checkClaudeAuth(mcpOutput, mcpErr)
 		results = append(results, authResult)
