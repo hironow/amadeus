@@ -125,7 +125,7 @@ amadeus run (daemon)
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
     |   +-- baseline.json     <- Full calibration baseline
-    +-- events/               <- Append-only event log (JSONL, daily rotation)
+    +-- events/               <- Append-only event log (JSONL, daily rotation, gitignored)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
     +-- archive/              <- All D-Mails (git-tracked)
@@ -309,7 +309,7 @@ amadeus update -C
 | `--full` | `-f` | `false` | Force full calibration check |
 | `--quiet` | `-q` | `false` | Summary-only output |
 | `--json` | `-j` | `false` | Structured JSON output to stdout |
-| `--base` | `-b` | `main` | Base branch for PR convergence |
+| `--base` | | `""` | Upstream branch for post-merge divergence check |
 
 ### check (deprecated)
 

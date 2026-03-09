@@ -41,12 +41,14 @@ This document describes what each directory/file does, who creates it, and how i
 .run/
 outbox/
 inbox/
+.otel.env
+events/
 ```
 
 | Path | Git Status | Reason |
 |------|-----------|--------|
 | `config.yaml` | Tracked | Project-level scoring configuration |
-| `events/` | Tracked | Append-only event log (single source of truth) |
+| `events/` | Ignored | Append-only event log (single source of truth) |
 | `archive/` | Tracked | Permanent immutable record of all D-Mails |
 | `skills/` | Tracked | Agent capability manifests for phonewave discovery |
 | `.run/` | Ignored | Ephemeral projections (rebuildable from events) |
@@ -123,7 +125,7 @@ The `amadeus run` command (daemon mode) executes the divergence check pipeline, 
      |                      |   parse -> archive/ (copy)   |
      |                      |   remove from inbox/         |
      |                      |   emit(inbox.consumed)       |
-     |                      |   dedup via archive hash     |
+     |                      |   dedup via archive filename  |
      |                      |                              |
      |                      | (check runs, D-Mail generated)
      |                      |                              |
@@ -134,7 +136,7 @@ The `amadeus run` command (daemon mode) executes the divergence check pipeline, 
      |                      |----------------------------->|
 ```
 
-In daemon mode (`amadeus run`), inbox is monitored via fsnotify for real-time D-Mail reception. `ReceiveDMailFromInbox` uses archive-based deduplication (content hash) to ensure idempotent processing. All D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
+In daemon mode (`amadeus run`), inbox is monitored via fsnotify for real-time D-Mail reception. `ReceiveDMailFromInbox` uses archive-based deduplication (filename existence check via `os.Stat`) to ensure idempotent processing. All D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
 
 ## D-Mail File Format
 
