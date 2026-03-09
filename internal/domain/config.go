@@ -21,6 +21,14 @@ type ConvergenceConfig struct {
 // ComputedConfig holds system-written fields. Empty for amadeus today.
 type ComputedConfig struct{}
 
+// Default values for Config fields. Used by DefaultConfig and post-load
+// validation to avoid hardcoded strings throughout the codebase.
+const (
+	DefaultClaudeCmd  = "claude"
+	DefaultModel      = "opus"
+	DefaultTimeoutSec = 1980
+)
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
 	Lang            string            `yaml:"lang"`
@@ -46,9 +54,9 @@ func DefaultConfig() Config {
 	sc := DefaultThresholds()
 	return Config{
 		Lang:            "ja",
-		ClaudeCmd:       "claude",
-		Model:           "opus",
-		TimeoutSec:      1980,
+		ClaudeCmd:       DefaultClaudeCmd,
+		Model:           DefaultModel,
+		TimeoutSec:      DefaultTimeoutSec,
 		Weights:         DefaultWeights(),
 		Thresholds:      sc.Thresholds,
 		PerAxisOverride: sc.PerAxisOverride,

@@ -23,12 +23,28 @@ import (
 )
 
 // newShellCmd is a package-level variable for creating shell-aware exec.Cmd.
-// Override in tests to mock command execution.
+// Override in tests via OverrideShellCmd.
 var newShellCmd = platform.NewShellCmd
 
+// OverrideShellCmd replaces the command constructor for testing and returns a
+// cleanup function.
+func OverrideShellCmd(fn func(ctx context.Context, name string, args ...string) *exec.Cmd) func() {
+	old := newShellCmd
+	newShellCmd = fn
+	return func() { newShellCmd = old }
+}
+
 // lookPathShell is a package-level variable for shell-aware LookPath.
-// Override in tests to mock path lookup.
+// Override in tests via OverrideLookPath.
 var lookPathShell = platform.LookPathShell
+
+// OverrideLookPath replaces the path lookup function for testing and returns a
+// cleanup function.
+func OverrideLookPath(fn func(cmd string) (string, error)) func() {
+	old := lookPathShell
+	lookPathShell = fn
+	return func() { lookPathShell = old }
+}
 
 // checkTool verifies that a CLI tool is installed and executable.
 // Supports shell-like command strings with leading KEY=VALUE env vars and tilde paths.
