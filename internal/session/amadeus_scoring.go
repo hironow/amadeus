@@ -28,7 +28,12 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 	var report ShiftReport
 	var err error
 
-	_, span1 := platform.Tracer.Start(ctx, "phase.reading_steiner") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+	_, span1 := platform.Tracer.Start(ctx, "phase.reading_steiner", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+		trace.WithAttributes(
+			attribute.Int("phase.number", 1),
+			attribute.String("phase.name", "reading_steiner"),
+		),
+	)
 	if fullCheck {
 		report, err = rs.DetectShiftFull(a.RepoDir)
 		if err != nil {
@@ -125,7 +130,12 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 // runDivergenceMeter runs Phase 2b: executes Claude, parses the response,
 // scores with DivergenceMeter, and handles divergence jump detection.
 func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullCheck bool, previous domain.CheckResult, quiet bool) (domain.MeterResult, error) {
-	_, span2 := platform.Tracer.Start(ctx, "phase.divergence_meter") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+	_, span2 := platform.Tracer.Start(ctx, "phase.divergence_meter", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+		trace.WithAttributes(
+			attribute.Int("phase.number", 2),
+			attribute.String("phase.name", "divergence_meter"),
+		),
+	)
 
 	// claude.invoke span wraps the Claude CLI execution with GenAI semconv attributes.
 	model := a.ClaudeModel

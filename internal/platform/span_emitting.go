@@ -109,7 +109,7 @@ func (s *SpanEmittingStreamReader) handleAssistant(msg *StreamMessage) {
 		}
 
 		spanName := "execute_tool " + tool.Name
-		_, toolSpan := s.tracer.Start(s.parentCtx, spanName,
+		_, toolSpan := s.tracer.Start(s.parentCtx, spanName, // nosemgrep: adr0003-otel-span-without-defer-end -- map-managed spans, End() in handleToolResult/endAllOpenSpans [permanent]
 			trace.WithAttributes(GenAIToolAttrs(tool.Name, toolID)...),
 		)
 
