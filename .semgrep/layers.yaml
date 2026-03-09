@@ -597,3 +597,20 @@ rules:
       許可: <var>.<forwardingMethod>() — forwarding メソッド経由
       除外: *_test.go
       Ref: Tell-Don't-Ask, Law of Demeter
+
+  # --- Rule: No hardcoded "claude" literal in exec arguments ---
+
+  - id: config-no-hardcoded-claude-literal
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: exec.Command("claude", ...)
+      - pattern: exec.CommandContext($CTX, "claude", ...)
+      - pattern: append($BINS, "claude")
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      Do not hardcode "claude" as exec argument. Use config.ClaudeCmd.
