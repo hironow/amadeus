@@ -38,6 +38,7 @@ func TestUpdate_AlreadyLatest(t *testing.T) {
 		{name: "current newer", current: "2.0.0", latest: "1.0.0", upToDate: true},
 		{name: "current older", current: "1.0.0", latest: "2.0.0", upToDate: false},
 		{name: "dev version", current: "dev", latest: "1.0.0", upToDate: false},
+		{name: "v-prefixed", current: "v1.0.0", latest: "1.0.0", upToDate: true},
 	}
 
 	for _, tc := range cases {
