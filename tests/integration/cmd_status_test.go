@@ -96,7 +96,7 @@ func TestStatusCmd_TextOutput(t *testing.T) {
 
 	// Text output goes to stdout (per S0027)
 	text := stdout.String()
-	if !strings.Contains(text, "amadeus status:") {
+	if !strings.Contains(text, "amadeus status") {
 		t.Errorf("expected stdout to contain 'amadeus status:', got:\n%s", text)
 	}
 }
@@ -186,7 +186,7 @@ func TestStatusCmd_WithPath(t *testing.T) {
 		t.Fatalf("unexpected error: %v", execErr)
 	}
 	text := stdout.String()
-	if !strings.Contains(text, "amadeus status:") {
+	if !strings.Contains(text, "amadeus status") {
 		t.Errorf("expected stdout to contain 'amadeus status:', got:\n%s", text)
 	}
 }

@@ -179,7 +179,7 @@ func TestStatus_FormatText(t *testing.T) {
 
 	// then — verify key lines are present
 	expected := []string{
-		"amadeus status:",
+		"amadeus status",
 		"Last check:",
 		"Divergence:",
 		"Checks:",

@@ -18,39 +18,31 @@ type StatusReport struct {
 	Convergences int       `json:"convergences"`
 }
 
-// FormatText returns a human-readable status report string suitable for stderr.
+// FormatText returns a human-readable status report string suitable for stdout.
 func (r StatusReport) FormatText() string {
 	var b strings.Builder
-	b.WriteString("amadeus status:\n")
+	b.WriteString("amadeus status\n\n")
 
 	// Last check
 	if r.LastCheck.IsZero() {
-		b.WriteString("  Last check:    no checks yet\n")
+		fmt.Fprintf(&b, "  %-16s %s\n", "Last check:", "no checks yet")
 	} else {
-		b.WriteString(fmt.Sprintf("  Last check:    %s\n", r.LastCheck.Format(time.RFC3339)))
+		fmt.Fprintf(&b, "  %-16s %s\n", "Last check:", r.LastCheck.Format(time.RFC3339))
 	}
 
-	// Divergence
-	b.WriteString(fmt.Sprintf("  Divergence:    %.2f\n", r.Divergence))
-
-	// Checks
-	b.WriteString(fmt.Sprintf("  Checks:        %d total\n", r.CheckCount))
+	fmt.Fprintf(&b, "  %-16s %.2f\n", "Divergence:", r.Divergence)
+	fmt.Fprintf(&b, "  %-16s %d total\n", "Checks:", r.CheckCount)
 
 	// Success rate
 	if r.CheckCount == 0 {
-		b.WriteString("  Success rate:  no events\n")
+		fmt.Fprintf(&b, "  %-16s %s\n", "Success rate:", "no events")
 	} else {
-		b.WriteString(fmt.Sprintf("  Success rate:  %.1f%%\n", r.SuccessRate*100))
+		fmt.Fprintf(&b, "  %-16s %.1f%%\n", "Success rate:", r.SuccessRate*100)
 	}
 
-	// Inbox
-	b.WriteString(fmt.Sprintf("  Inbox:         %d pending\n", r.InboxCount))
-
-	// Archive
-	b.WriteString(fmt.Sprintf("  Archive:       %d processed\n", r.ArchiveCount))
-
-	// Convergences
-	b.WriteString(fmt.Sprintf("  Convergences:  %d active\n", r.Convergences))
+	fmt.Fprintf(&b, "  %-16s %d pending\n", "Inbox:", r.InboxCount)
+	fmt.Fprintf(&b, "  %-16s %d processed\n", "Archive:", r.ArchiveCount)
+	fmt.Fprintf(&b, "  %-16s %d active\n", "Convergences:", r.Convergences)
 
 	return b.String()
 }
