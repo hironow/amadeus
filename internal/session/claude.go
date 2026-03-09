@@ -28,13 +28,7 @@ type defaultClaudeRunner struct {
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
 func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, error) {
 	claudeCmd := d.cmd
-	if claudeCmd == "" {
-		claudeCmd = "claude"
-	}
 	model := d.model
-	if model == "" {
-		model = "opus"
-	}
 	cmd := platform.NewShellCmd(ctx, claudeCmd,
 		"--model", model,
 		"--output-format", "stream-json",

@@ -121,9 +121,10 @@ func newRunCommand() *cobra.Command {
 				Approver:  approver,
 				Notifier:  notifier,
 				Metrics:   &platform.OTelPolicyMetrics{},
-				ReviewCmd: reviewCmd,
-				ClaudeCmd: cfg.ClaudeCmd,
-				PRReader:  prReader,
+				ReviewCmd:   reviewCmd,
+				ClaudeCmd:   cfg.ClaudeCmd,
+				ClaudeModel: cfg.Model,
+				PRReader:    prReader,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT

@@ -144,13 +144,6 @@ func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, t
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	if claudeCmd == "" {
-		claudeCmd = domain.DefaultConfig().ClaudeCmd
-	}
-	if model == "" {
-		model = "opus"
-	}
-
 	prompt := BuildReviewFixPrompt(branch, comments)
 
 	fixTimeout := time.Duration(timeoutSec) * time.Second
