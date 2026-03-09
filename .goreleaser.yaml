@@ -69,6 +69,18 @@ signs:
 
 changelog:
   sort: asc
+  groups:
+    - title: "⚠️ Breaking Changes"
+      regexp: '^.*?!:'
+      order: 0
+    - title: "Features"
+      regexp: '^.*?feat'
+      order: 1
+    - title: "Bug Fixes"
+      regexp: '^.*?fix'
+      order: 2
+    - title: "Other"
+      order: 999
   filters:
     exclude:
       - "^docs:"
