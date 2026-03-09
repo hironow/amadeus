@@ -86,12 +86,11 @@ func (l *Logger) colorPrefix(prefix, color string) string {
 func (l *Logger) logLine(prefix, color, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
-	coloredPrefix := l.colorPrefix(prefix, color)
-	line := fmt.Sprintf("[%s] %s %s\n", ts, coloredPrefix, msg)
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	coloredPrefix := l.colorPrefix(prefix, color)
+	line := fmt.Sprintf("[%s] %s %s\n", ts, coloredPrefix, msg)
 	fmt.Fprint(l.out, line)
 	if l.extraWriter != nil {
 		// Extra writer (log file) always gets plain text — no ANSI codes.
