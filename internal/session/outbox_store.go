@@ -134,9 +134,7 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: begin immediate: %w", err)
 	}
-	if platform.IsDetailDebug() {
-		span.SetAttributes(attribute.Int64("db.lock_wait_ms", time.Since(lockStart).Milliseconds()))
-	}
+	span.SetAttributes(attribute.Int64("db.lock_wait_ms", time.Since(lockStart).Milliseconds()))
 	committed := false
 	defer func() {
 		if !committed {
@@ -177,9 +175,7 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		// Nothing to flush — rollback the empty transaction.
 		conn.ExecContext(ctx, "ROLLBACK") //nolint:errcheck
 		committed = true                  // suppress deferred rollback
-		if platform.IsDetailDebug() {
-			span.SetAttributes(attribute.Int("flush.success.count", 0))
-		}
+		span.SetAttributes(attribute.Int("flush.success.count", 0))
 		return 0, nil
 	}
 
@@ -215,10 +211,8 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
-	if platform.IsDetailDebug() {
-		span.SetAttributes(attribute.Int("flush.retry.count", retryCount))
-		span.SetAttributes(attribute.Int("flush.success.count", flushed))
-	}
+	span.SetAttributes(attribute.Int("flush.retry.count", retryCount))
+	span.SetAttributes(attribute.Int("flush.success.count", flushed))
 	return flushed, nil
 }
 
@@ -248,9 +242,7 @@ func (s *SQLiteOutboxStore) PruneFlushed(ctx context.Context) (int, error) {
 			return int(deleted), fmt.Errorf("outbox store: vacuum after prune: %w", vacErr)
 		}
 	}
-	if platform.IsDetailDebug() {
-		span.SetAttributes(attribute.Int("prune.count", int(deleted)))
-	}
+	span.SetAttributes(attribute.Int("prune.count", int(deleted)))
 	return int(deleted), nil
 }
 

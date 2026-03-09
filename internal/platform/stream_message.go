@@ -19,6 +19,7 @@ type StreamMessage struct {
 	Duration   int64           `json:"duration_ms,omitempty"`
 	IsError    bool            `json:"is_error,omitempty"`
 	StopReason string          `json:"stop_reason,omitempty"`
+	ToolUseID  string          `json:"tool_use_id,omitempty"`
 }
 
 // Usage holds token usage from Claude Code.

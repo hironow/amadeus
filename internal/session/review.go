@@ -106,9 +106,7 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, reviewCmd, dir)
 		reviewCancel()
-		if platform.IsDetailDebug() {
-			span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
-		}
+		span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
 		if err != nil {
 			span.RecordError(err)
 			span.SetAttributes(attribute.String("error.stage", "amadeus.review"))
