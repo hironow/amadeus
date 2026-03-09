@@ -368,6 +368,11 @@ esac
 
 ```yaml
 # .gate/config.yaml
+lang: ja
+claude_cmd: claude
+model: opus
+timeout_sec: 1980
+
 weights:
   adr_integrity: 0.4
   dod_fulfillment: 0.3

@@ -8,6 +8,9 @@ Update a configuration value in .gate/config.yaml.
 
 Supported keys:
   lang                              Language (ja or en)
+  claude_cmd                        Claude CLI command name
+  model                             Claude model name
+  timeout_sec                       Claude timeout in seconds
   weights.adr_integrity             ADR weight (0.0-1.0)
   weights.dod_fulfillment           DoD weight (0.0-1.0)
   weights.dependency_integrity      Dependency weight (0.0-1.0)
