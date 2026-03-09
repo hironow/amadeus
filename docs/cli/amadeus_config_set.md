@@ -50,4 +50,5 @@ amadeus config set <key> <value> [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus config](amadeus_config.md)  - View or update amadeus configuration
+* [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
+
