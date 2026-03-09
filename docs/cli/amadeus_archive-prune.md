@@ -54,5 +54,4 @@ amadeus archive-prune [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
-
+* [amadeus](amadeus.md)  - Divergence meter for your codebase
