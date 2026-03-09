@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
@@ -74,18 +75,38 @@ func printDoctorJSON(w io.Writer, results []domain.DoctorCheckResult) error {
 }
 
 func printDoctorText(w io.Writer, results []domain.DoctorCheckResult) error {
-	hasFail := false
+	fmt.Fprintln(w, "amadeus doctor — integrity health check")
+	fmt.Fprintln(w)
+
+	var fails, skips int
 	for _, r := range results {
 		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
 		if r.Hint != "" {
 			fmt.Fprintf(w, "         %-16s hint: %s\n", "", r.Hint)
 		}
-		if r.Status == domain.CheckFail {
-			hasFail = true
+		switch r.Status {
+		case domain.CheckFail:
+			fails++
+		case domain.CheckSkip:
+			skips++
 		}
 	}
-	if hasFail {
-		return fmt.Errorf("some checks failed")
+
+	fmt.Fprintln(w)
+	if fails == 0 && skips == 0 {
+		fmt.Fprintln(w, "All checks passed.")
+		return nil
+	}
+	var parts []string
+	if fails > 0 {
+		parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
+	}
+	if skips > 0 {
+		parts = append(parts, fmt.Sprintf("%d skipped", skips))
+	}
+	fmt.Fprintln(w, strings.Join(parts, ", ")+".")
+	if fails > 0 {
+		return fmt.Errorf("%d check(s) failed", fails)
 	}
 	return nil
 }
