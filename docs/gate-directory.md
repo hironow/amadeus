@@ -93,7 +93,7 @@ Auto-rebuild is skipped when `inbox.consumed` events are present (to avoid losin
 
 ## Check Pipeline Data Flow
 
-The `amadeus run` command (daemon mode) executes the divergence check pipeline, PR convergence pipeline, and monitors inbox via fsnotify. The legacy `amadeus check` command runs a single divergence check (deprecated).
+The `amadeus run` command (daemon mode) executes the divergence check pipeline, PR convergence pipeline, and monitors inbox via fsnotify.
 
 ### Input Sources
 
@@ -195,7 +195,7 @@ service, violating the dependency direction defined in ADR-003.
 ```bash
 #!/bin/sh
 # >>> amadeus hook — do not edit this section
-amadeus check --quiet 2>/dev/null || true
+amadeus run --quiet 2>/dev/null || true
 # <<< amadeus hook
 ```
 

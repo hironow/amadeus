@@ -82,11 +82,6 @@ func TestSubcommand_ShortAliases(t *testing.T) {
 		flag       string
 		shorthand  string
 	}{
-		// check
-		{"check", "json", "j"},
-		{"check", "dry-run", "n"},
-		{"check", "full", "f"},
-		{"check", "quiet", "q"},
 		// archive-prune
 		{"archive-prune", "days", "d"},
 		{"archive-prune", "dry-run", "n"},

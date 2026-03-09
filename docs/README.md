@@ -14,7 +14,6 @@
 - [amadeus](cli/amadeus.md) — Root command
 - [amadeus init](cli/amadeus_init.md) — Initialize a project (`--force` to regenerate)
 - [amadeus run](cli/amadeus_run.md) — Daemon mode: divergence check + PR convergence + fsnotify inbox watcher
-- [amadeus check](cli/amadeus_check.md) — Run integrity verification (deprecated, use `amadeus run`)
 - [amadeus config show](cli/amadeus_config_show.md) — Show current configuration
 - [amadeus config set](cli/amadeus_config_set.md) — Update configuration values
 - [amadeus validate](cli/amadeus_validate.md) — Validate configuration

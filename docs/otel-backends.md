@@ -37,7 +37,7 @@ amadeus init --otel-backend=weave \
 Environment variables always take precedence over `.otel.env`:
 
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://custom:4318 amadeus check /path/to/repo
+OTEL_EXPORTER_OTLP_ENDPOINT=http://custom:4318 amadeus run /path/to/repo
 ```
 
 ## .otel.env File
@@ -51,7 +51,7 @@ Format: `KEY=VALUE` with `${VAR}` expansion and `#` comments.
 
 1. `export WANDB_API_KEY=your-key-here`
 2. `amadeus init --otel-backend=weave --otel-entity=my-team --otel-project=my-project /path/to/repo`
-3. `amadeus check /path/to/repo`
+3. `amadeus run /path/to/repo`
 4. Open `https://wandb.ai/<entity>/<project>/weave` and verify spans appear
 
 ### Automated (Live Test)

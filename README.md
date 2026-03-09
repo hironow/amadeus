@@ -58,7 +58,7 @@ Diff checks: ██████████ 10/10 -> Full calibration triggered
 ```
 
 - **Interval**: configurable in `config.yaml` (default: every 10 checks)
-- **Force**: `amadeus check --full` triggers immediately
+- **Force**: `amadeus run --full` triggers immediately
 - **Auto-trigger**: a divergence jump also forces a full scan on the next run
 
 ### Divergence Jump (World Line Shift)
@@ -224,7 +224,6 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 | Command | Description |
 |---------|-------------|
 | `amadeus run` | Daemon mode: divergence check + PR convergence + fsnotify inbox watcher |
-| `amadeus check` | Execute single divergence check (deprecated, use `amadeus run`) |
 | `amadeus init` | Initialize `.gate/` directory with default config (`--force` to regenerate) |
 | `amadeus config show` | Show current configuration values |
 | `amadeus config set` | Update configuration values (e.g., `amadeus config set lang en`) |
@@ -255,15 +254,6 @@ amadeus run -f
 
 # Daemon with dry run (build prompt only, skip Claude call)
 amadeus run -n
-
-# Single check (legacy, deprecated)
-amadeus check
-
-# Full calibration (evaluate entire codebase from zero)
-amadeus check -f
-
-# JSON output (machine-readable, stdout)
-amadeus check -j
 
 # Show/set configuration
 amadeus config show
@@ -313,19 +303,6 @@ amadeus update -C
 | `--json` | `-j` | `false` | Structured JSON output to stdout |
 | `--base` | | `""` | Upstream branch for post-merge divergence check |
 
-### check (deprecated)
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--dry-run` | `-n` | `false` | Build prompt only, skip Claude |
-| `--full` | `-f` | `false` | Force full calibration check |
-| `--quiet` | `-q` | `false` | Summary-only output |
-| `--json` | `-j` | `false` | Structured JSON output to stdout |
-| `--auto-approve` | | `false` | Skip approval gate |
-| `--approve-cmd` | | `""` | External approval command (`{message}` placeholder, exit 0 = approve) |
-| `--notify-cmd` | | `""` | External notification command (`{title}`, `{message}` placeholders) |
-| `--review-cmd` | | `""` | Code review command after check (exit 0 = pass) |
-
 ### archive-prune
 
 | Flag | Short | Default | Description |
@@ -356,7 +333,7 @@ amadeus update -C
 | `2` | Drift detected (divergence threshold exceeded) |
 
 ```bash
-amadeus check --quiet
+amadeus run --quiet
 case $? in
   0) echo "clean" ;;
   2) echo "drift detected" >&2 ;;
@@ -402,7 +379,7 @@ Amadeus instruments key operations with OpenTelemetry spans and events. Tracing 
 just jaeger
 
 # Run amadeus with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus run
 
 # View traces at http://localhost:16686
 # MCP endpoint at http://localhost:16687
@@ -411,7 +388,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
 just jaeger-down
 ```
 
-Spans cover: `amadeus.run` (daemon root), `amadeus.check`, `reading_steiner`, `divergence_meter`, `dmail`, `pr_convergence`, and `amadeus.doctor`.
+Spans cover: `amadeus.run` (daemon root), `reading_steiner`, `divergence_meter`, `dmail`, `pr_convergence`, and `amadeus.doctor`.
 
 Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.created`, `doctor.check`, `run.started`, `run.stopped`, `pr_convergence.checked`.
 
