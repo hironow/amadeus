@@ -244,6 +244,8 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Usage
 
+All commands accept an optional `[path]` argument. When omitted, the current working directory is used.
+
 ```bash
 # Daemon mode (divergence check + PR convergence + inbox watcher)
 amadeus run
