@@ -25,7 +25,8 @@ func main() {
 	case strings.HasPrefix(sub, "pr create"):
 		fmt.Println("https://github.com/test/repo/pull/42")
 	case strings.HasPrefix(sub, "pr list"):
-		fmt.Println(`[]`)
+		// Return a PR chain (feat/a -> feat/b) to trigger PR convergence D-Mail generation.
+		fmt.Println(`[{"number":1,"title":"feat: base change","baseRefName":"main","headRefName":"feat/a","mergeable":"MERGEABLE"},{"number":2,"title":"feat: dependent change","baseRefName":"feat/a","headRefName":"feat/b","mergeable":"CONFLICTING"}]`)
 	case strings.HasPrefix(sub, "pr view"):
 		fmt.Println(`{"number":42,"state":"open","url":"https://github.com/test/repo/pull/42"}`)
 	}
