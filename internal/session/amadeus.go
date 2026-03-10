@@ -34,6 +34,7 @@ type Amadeus struct {
 	PRReader    port.GitHubPRReader     // nil = skip PR convergence
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
+	Insights    *InsightWriter          // nil = skip insight generation
 
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.
@@ -225,6 +226,10 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	}
 	now := time.Now().UTC()
 
+	// Write divergence insight (best-effort, does not fail the check)
+	commitRange := previous.Commit + ".." + currentCommit
+	a.writeDivergenceInsight(meterResult.Divergence, currentCommit, commitRange)
+
 	// Gate: request approval before D-Mail generation
 	gateApproved := true
 	if len(meterResult.DMailCandidates) > 0 && a.Approver != nil {
@@ -280,6 +285,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		return err
 	}
 	dmails = append(dmails, convergenceDMails...)
+
+	// Write convergence insights for HIGH severity alerts (best-effort)
+	for _, alert := range convergenceAlerts {
+		a.writeConvergenceInsight(alert, currentCommit)
+	}
 
 	var prNumbers []string
 	for _, pr := range report.MergedPRs {

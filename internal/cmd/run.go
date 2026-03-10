@@ -109,6 +109,11 @@ func newRunCommand() *cobra.Command {
 			git := session.NewGitClient(repoRoot)
 			prReader := session.NewGhPRReader(repoRoot)
 
+			insightWriter := session.NewInsightWriter(
+				filepath.Join(divRoot, "insights"),
+				filepath.Join(divRoot, ".run"),
+			)
+
 			a := &session.Amadeus{
 				Config:      cfg,
 				Store:       store,
@@ -125,6 +130,7 @@ func newRunCommand() *cobra.Command {
 				ClaudeCmd:   cfg.ClaudeCmd,
 				ClaudeModel: cfg.Model,
 				PRReader:    prReader,
+				Insights:    insightWriter,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
