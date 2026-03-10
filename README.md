@@ -88,6 +88,19 @@ All D-Mails go directly to `outbox/` + `archive/`. Receiver-side tools (sightjac
 
 - Per-axis overrides can force high severity for critical axes (e.g., ADR integrity > 60 always high)
 
+## D-Mail Protocol
+
+Amadeus is the verifier in the D-Mail protocol ecosystem:
+
+| Tool | Role | Endpoint |
+|------|------|----------|
+| **sightjack** | Designer / Protocol spec owner | `.siren/` |
+| **paintress** | Implementer | `.expedition/` |
+| **amadeus** | Verifier | `.gate/` |
+| **phonewave** | Courier / Coordinator | (no endpoint — routes between others) |
+
+Amadeus produces corrective D-Mails (`design-feedback`, `implementation-feedback`, `convergence`) and consumes `report` and `ci-result` D-Mails. SKILL.md files in `.gate/skills/` declare produces/consumes routing for phonewave discovery.
+
 ## Architecture
 
 ```
@@ -200,7 +213,7 @@ D-Mail `.md` files are immutable once written.
 - Store full PR content (stores references, diffs, and scores only)
 - Modify `.gate/` state externally (all operations are idempotent and local)
 
-## Install
+## Setup
 
 ```bash
 # Homebrew (WIP — tap may not be published yet)
@@ -208,11 +221,7 @@ brew install hironow/tap/amadeus
 
 # Or build from source
 just install
-```
 
-## Setup
-
-```bash
 # Initialize .gate/ with default config
 amadeus init
 
@@ -299,36 +308,7 @@ amadeus update -C
 | `--output` | `-o` | `text` | Output format: `text` or `json` |
 | `--lang` | `-l` | | Output language (`ja`, `en`) |
 
-### run
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--dry-run` | `-n` | `false` | Build prompt only, skip Claude |
-| `--full` | `-f` | `false` | Force full calibration check |
-| `--quiet` | `-q` | `false` | Summary-only output |
-| `--json` | `-j` | `false` | Structured JSON output to stdout |
-| `--base` | | `""` | Upstream branch for post-merge divergence check |
-
-### archive-prune
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--days` | `-d` | `30` | Prune files older than N days |
-| `--execute` | `-x` | `false` | Execute pruning (default: dry-run) |
-| `--dry-run` | `-n` | `false` | Explicit dry-run (default behavior) |
-| `--yes` | `-y` | `false` | Skip confirmation prompt |
-
-### version / doctor / log
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--json` | `-j` | `false` | JSON output |
-
-### update
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--check` | `-C` | `false` | Check for updates without installing |
+For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
 ## Exit Codes
 
