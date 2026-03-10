@@ -36,7 +36,7 @@ Key constraints enforced by semgrep (ERROR severity):
 - `cmd --> eventsource` PROHIBITED (ADR S0008)
 - `domain` has no I/O, no `context.Context`
 
-Ref: `.semgrep/layers.yaml`, ADR 0017
+Ref: `.semgrep/layers.yaml`, ADR S0007
 
 ## Domain Primitives & Parse-Don't-Validate
 
@@ -48,7 +48,7 @@ Domain command types use the Parse-Don't-Validate pattern:
 - Usecase layer receives always-valid commands with no validation boilerplate
 - Semgrep rule `domain-no-validate-method` prevents reintroduction of `Validate() []error`
 
-Ref: `.semgrep/layers.yaml`, ADR 0018
+Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ## Cross-Tool Conformance
 
