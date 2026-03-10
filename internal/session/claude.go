@@ -32,6 +32,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	cmd := platform.NewShellCmd(ctx, claudeCmd,
 		"--model", model,
 		"--output-format", "stream-json",
+		"--verbose",
 		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
 		"--dangerously-skip-permissions",
 		"--print",
