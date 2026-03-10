@@ -35,7 +35,7 @@ func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, session
 		Why:         why,
 		How:         how,
 		When:        fmt.Sprintf("Check on commits %s", commitRange),
-		Who:         fmt.Sprintf("amadeus check (session-%s)", sessionID),
+		Who:         fmt.Sprintf("amadeus run (session-%s)", sessionID),
 		Constraints: "Scores relative to configured weights",
 		Extra:       divergenceExtra(result),
 	}

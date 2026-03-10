@@ -169,8 +169,9 @@ func (w *Workspace) overrideSightjackClaudeCommand(t *testing.T) {
 	}
 }
 
-// overrideAmadeusClaudeCommand verifies that the amadeus config.yaml exists
-// (confirming amadeus init succeeded). claude_cmd defaults to "claude" which
+// overrideAmadeusClaudeCommand is a no-op verification that amadeus config.yaml
+// exists (confirming amadeus init succeeded). Unlike overrideSightjackClaudeCommand,
+// this does NOT write to the config file. claude_cmd defaults to "claude" which
 // is resolved via PATH; TestMain prepends the binDir containing fake-claude.
 func (w *Workspace) overrideAmadeusClaudeCommand(t *testing.T) {
 	t.Helper()
