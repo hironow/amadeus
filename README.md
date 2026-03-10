@@ -413,7 +413,9 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - [docs/gate-directory.md](docs/gate-directory.md) — `.gate/` directory structure
 - [docs/policies.md](docs/policies.md) — Event → Policy mapping
 - [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/testing.md](docs/testing.md) — Test strategy and conventions
 - [docs/adr/](docs/adr/README.md) — Architecture Decision Records
+- [docs/shared-adr/](docs/shared-adr/README.md) — Cross-tool shared ADRs
 
 ## Prerequisites
 
