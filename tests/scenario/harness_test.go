@@ -49,6 +49,7 @@ func NewWorkspace(t *testing.T, level string) *Workspace {
 	runCmd(t, repoPath, "git", "config", "user.email", "test@scenario.test")
 	runCmd(t, repoPath, "git", "config", "user.name", "Scenario Test")
 	runCmd(t, repoPath, "git", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "init")
+	runCmd(t, repoPath, "git", "remote", "add", "origin", "https://github.com/test/scenario-repo.git")
 
 	// Resolve testdata/fixtures directory
 	here, err := os.Getwd()
@@ -369,7 +370,7 @@ func (w *Workspace) RunAmadeus(t *testing.T, ctx context.Context, args ...string
 // RunAmadeusCheck runs amadeus check with --auto-approve and waits for completion.
 func (w *Workspace) RunAmadeusCheck(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
-	args := []string{"check", "--auto-approve"}
+	args := []string{"run", "--auto-approve"}
 	args = append(args, extraArgs...)
 	args = append(args, w.RepoPath)
 	return w.RunAmadeus(t, ctx, args...)

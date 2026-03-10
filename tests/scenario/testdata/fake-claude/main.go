@@ -59,8 +59,9 @@ func main() {
 		return
 	}
 
-	// Handle --print flag (used by doctor's inference check).
-	if hasFlag(os.Args[1:], "--print") {
+	// Handle --print flag WITHOUT -p (used by doctor's inference check).
+	// When -p is also present, fall through to protocol detection (sightjack/paintress).
+	if hasFlag(os.Args[1:], "--print") && extractPrompt(os.Args[1:]) == "" {
 		// Find the last positional argument as the prompt
 		prompt := ""
 		for i := len(os.Args) - 1; i >= 1; i-- {
