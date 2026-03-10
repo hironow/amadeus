@@ -4,8 +4,16 @@
 /dist/
 # test
 coverage.out
-# amadeus runtime state on target repository
-.gate/
+# amadeus runtime state — ignore contents individually (insights/ is git-tracked per S0030)
+.gate/.run/
+.gate/events/
+.gate/inbox/
+.gate/outbox/
+.gate/archive/
+.gate/skills/
+.gate/config.yaml
+.gate/.otel.env
+.gate/.gitignore
 # environment-specific local files (must not contain full paths)
 *.local.*
 # claude local settings
