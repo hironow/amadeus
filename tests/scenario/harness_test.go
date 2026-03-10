@@ -185,8 +185,8 @@ func (w *Workspace) phonewaveConfigPath() string {
 	return filepath.Join(w.Root, "phonewave.yaml")
 }
 
-// verifyPhonewaveRoutes reads phonewave.yaml and verifies that routes exist
-// for specification, report, and feedback kinds.
+// verifyPhonewaveRoutes reads phonewave.yaml and verifies that endpoints
+// produce/consume the required D-Mail kinds.
 func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 	t.Helper()
 	cfgPath := w.phonewaveConfigPath()
@@ -195,13 +195,15 @@ func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 		t.Fatalf("read phonewave.yaml: %v", err)
 	}
 
-	// Parse the routes section
 	var cfg struct {
-		Routes []struct {
-			Kind string   `yaml:"kind"`
-			From string   `yaml:"from"`
-			To   []string `yaml:"to"`
-		} `yaml:"routes"`
+		Repositories []struct {
+			Path      string `yaml:"path"`
+			Endpoints []struct {
+				Dir      string   `yaml:"dir"`
+				Produces []string `yaml:"produces"`
+				Consumes []string `yaml:"consumes"`
+			} `yaml:"endpoints"`
+		} `yaml:"repositories"`
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		t.Fatalf("parse phonewave.yaml: %v", err)
@@ -213,15 +215,25 @@ func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 		"design-feedback":         false,
 		"implementation-feedback": false,
 	}
-	for _, route := range cfg.Routes {
-		if _, ok := requiredKinds[route.Kind]; ok {
-			requiredKinds[route.Kind] = true
+
+	for _, repo := range cfg.Repositories {
+		for _, ep := range repo.Endpoints {
+			for _, kind := range ep.Produces {
+				if _, ok := requiredKinds[kind]; ok {
+					requiredKinds[kind] = true
+				}
+			}
+			for _, kind := range ep.Consumes {
+				if _, ok := requiredKinds[kind]; ok {
+					requiredKinds[kind] = true
+				}
+			}
 		}
 	}
 
 	for kind, found := range requiredKinds {
 		if !found {
-			t.Fatalf("phonewave.yaml missing required route kind: %s\nconfig content:\n%s", kind, string(data))
+			t.Fatalf("phonewave.yaml missing required kind: %s\nconfig content:\n%s", kind, string(data))
 		}
 	}
 }
