@@ -266,8 +266,8 @@ func (w *Workspace) StartPhonewave(t *testing.T, ctx context.Context) *ToolProce
 	}
 
 	// Wait for the PID file to appear, confirming the daemon started
-	stateDir := filepath.Join(w.Root, ".phonewave")
-	pidFile := filepath.Join(stateDir, "watch.pid")
+	// phonewave writes PID to configBase (= filepath.Dir(configPath) = w.Root/)
+	pidFile := filepath.Join(w.Root, "watch.pid")
 	deadline := time.After(15 * time.Second)
 	for {
 		select {
@@ -290,7 +290,7 @@ func (w *Workspace) StopPhonewave(t *testing.T, tp *ToolProcess) {
 	_ = tp.Cmd.Wait()
 
 	// Wait for PID file removal (graceful shutdown)
-	pidFile := filepath.Join(w.Root, ".phonewave", "watch.pid")
+	pidFile := filepath.Join(w.Root, "watch.pid")
 	deadline := time.After(10 * time.Second)
 	for {
 		select {
