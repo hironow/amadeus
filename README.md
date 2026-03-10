@@ -99,7 +99,7 @@ Amadeus is the verifier in the D-Mail protocol ecosystem:
 | **amadeus** | Verifier | `.gate/` |
 | **phonewave** | Courier / Coordinator | (no endpoint — routes between others) |
 
-Amadeus produces corrective D-Mails (`design-feedback`, `implementation-feedback`, `convergence`) and consumes `report` and `ci-result` D-Mails. SKILL.md files in `.gate/skills/` declare produces/consumes routing for phonewave discovery.
+Amadeus produces corrective D-Mails (`design-feedback`, `implementation-feedback`, `convergence`) and consumes `report` D-Mails. SKILL.md files in `.gate/skills/` declare produces/consumes routing for phonewave discovery.
 
 ## Architecture
 
@@ -243,7 +243,7 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 | `amadeus config show` | Show current configuration values |
 | `amadeus config set` | Update configuration values (e.g., `amadeus config set lang en`) |
 | `amadeus validate` | Validate `.gate/config.yaml` |
-| `amadeus doctor` | Check environment health (13 checks: git, git-remote, gh, claude, config, fsnotify, etc.) |
+| `amadeus doctor` | Check environment health (multiple checks: git, git-remote, gh, claude, config, fsnotify, etc.) |
 | `amadeus log` | Print check history and D-Mail log |
 | `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
 | `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
@@ -422,7 +422,7 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - [GitHub CLI (`gh`)](https://cli.github.com/) (required for PR convergence pipeline)
 - [Docker](https://www.docker.com/) (optional, for Jaeger tracing)
 
-Run `amadeus doctor` to verify all prerequisites (13 checks including git-remote, gh CLI, and fsnotify availability).
+Run `amadeus doctor` to verify all prerequisites (multiple checks including git-remote, gh CLI, and fsnotify availability).
 
 ## License
 
