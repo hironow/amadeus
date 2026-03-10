@@ -125,10 +125,14 @@ amadeus run (daemon)
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
     |   +-- baseline.json     <- Full calibration baseline
+    |   +-- insights.lock     <- Flock for concurrent insight writes
     +-- events/               <- Append-only event log (JSONL, daily rotation, gitignored)
+    +-- insights/             <- Semantic insight ledger (git-tracked, per ADR S0030)
+    |   +-- divergence.md     <- Divergence insights from check results
+    |   +-- convergence.md    <- Convergence insights from PR pipeline
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
-    +-- archive/              <- All D-Mails (git-tracked)
+    +-- archive/              <- All D-Mails (gitignored)
 ```
 
 ### Scoring Axes
@@ -173,6 +177,8 @@ The auth module violates the JWT requirement specified in ADR-003.
 | `ci-result` | CI/CD pipeline | CI/CD pipeline integration results |
 
 > **BREAKING**: The former `kind: feedback` has been split into `kind: design-feedback` and `kind: implementation-feedback`. Run `amadeus init --force` to regenerate SKILL.md files. `amadeus doctor` detects the deprecated kind and guides remediation.
+
+D-Mails may include an optional `context` field (per ADR S0031) containing insight summaries from the Insight Ledger, providing receivers with semantic context about the divergence or convergence state.
 
 D-Mail `.md` files are immutable once written.
 
