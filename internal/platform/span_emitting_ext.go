@@ -1,6 +1,8 @@
 package platform
 
 import (
+	"fmt"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -32,6 +34,20 @@ func (s *SpanEmittingStreamReader) handleExtMessage(msg *StreamMessage) bool {
 	}
 }
 
+// hookSpanKey returns the openSpans map key for a hook. Prefers hook_id
+// (unique per hook invocation) over hook_name (which can collide when
+// multiple hooks share the same name).
+func hookSpanKey(msg *StreamMessage) string {
+	if msg.HookID != "" {
+		return "hook:" + msg.HookID
+	}
+	name := msg.HookName
+	if name == "" {
+		name = "unknown"
+	}
+	return "hook:" + name
+}
+
 // handleHookStarted creates a child span for a hook execution.
 func (s *SpanEmittingStreamReader) handleHookStarted(msg *StreamMessage) {
 	hookName := msg.HookName
@@ -41,6 +57,12 @@ func (s *SpanEmittingStreamReader) handleHookStarted(msg *StreamMessage) {
 	spanName := "hook " + hookName
 	attrs := []attribute.KeyValue{
 		attribute.String("hook.name", hookName),
+	}
+	if msg.HookID != "" {
+		attrs = append(attrs, attribute.String("hook.id", msg.HookID))
+	}
+	if msg.HookEvent != "" {
+		attrs = append(attrs, attribute.String("hook.event", msg.HookEvent))
 	}
 	if msg.Command != "" {
 		attrs = append(attrs, attribute.String("hook.command", msg.Command))
@@ -52,16 +74,12 @@ func (s *SpanEmittingStreamReader) handleHookStarted(msg *StreamMessage) {
 	_, hookSpan := s.tracer.Start(s.parentCtx, spanName, // nosemgrep: adr0003-otel-span-without-defer-end -- map-managed spans, End() in handleHookResponse/endAllOpenSpans [permanent]
 		trace.WithAttributes(attrs...),
 	)
-	s.openSpans["hook:"+hookName] = hookSpan
+	s.openSpans[hookSpanKey(msg)] = hookSpan
 }
 
 // handleHookResponse ends the child span for a hook execution.
 func (s *SpanEmittingStreamReader) handleHookResponse(msg *StreamMessage) {
-	hookName := msg.HookName
-	if hookName == "" {
-		hookName = "unknown"
-	}
-	key := "hook:" + hookName
+	key := hookSpanKey(msg)
 	span, ok := s.openSpans[key]
 	if !ok {
 		return // orphan hook_response — no matching hook_started
@@ -97,7 +115,24 @@ func (s *SpanEmittingStreamReader) handleThinkingBlocks(msg *StreamMessage) bool
 }
 
 // handleRateLimit adds a rate_limit event to the parent span.
+// If rate_limit_info is present, its fields are attached as event attributes.
 func (s *SpanEmittingStreamReader) handleRateLimit(msg *StreamMessage) {
 	parentSpan := trace.SpanFromContext(s.parentCtx)
-	parentSpan.AddEvent("rate_limit")
+	var eventOpts []trace.EventOption
+	if info := msg.RateLimitInfo; info != nil {
+		attrs := []attribute.KeyValue{}
+		if info.Status != "" {
+			attrs = append(attrs, attribute.String("rate_limit.status", info.Status))
+		}
+		if info.RateLimitType != "" {
+			attrs = append(attrs, attribute.String("rate_limit.type", info.RateLimitType))
+		}
+		if info.Utilization > 0 {
+			attrs = append(attrs, attribute.String("rate_limit.utilization", fmt.Sprintf("%.2f", info.Utilization)))
+		}
+		if len(attrs) > 0 {
+			eventOpts = append(eventOpts, trace.WithAttributes(attrs...))
+		}
+	}
+	parentSpan.AddEvent("rate_limit", eventOpts...)
 }

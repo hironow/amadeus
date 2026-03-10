@@ -22,10 +22,25 @@ type StreamMessage struct {
 	ToolUseID  string          `json:"tool_use_id,omitempty"`
 
 	// Hook fields (system subtype: hook_started / hook_response)
-	HookName string `json:"hook_name,omitempty"`
-	Command  string `json:"command,omitempty"`
-	ExitCode *int   `json:"exit_code,omitempty"`
-	Stdout   string `json:"stdout,omitempty"`
+	HookID    string `json:"hook_id,omitempty"`
+	HookName  string `json:"hook_name,omitempty"`
+	HookEvent string `json:"hook_event,omitempty"`
+	Command   string `json:"command,omitempty"`
+	ExitCode  *int   `json:"exit_code,omitempty"`
+	Stdout    string `json:"stdout,omitempty"`
+
+	// Rate limit fields (type: rate_limit_event)
+	RateLimitInfo *RateLimitInfo `json:"rate_limit_info,omitempty"`
+}
+
+// RateLimitInfo holds rate limit details from Claude Code rate_limit_event.
+type RateLimitInfo struct {
+	Status             string  `json:"status,omitempty"`
+	ResetsAt           int64   `json:"resetsAt,omitempty"`
+	RateLimitType      string  `json:"rateLimitType,omitempty"`
+	Utilization        float64 `json:"utilization,omitempty"`
+	IsUsingOverage     bool    `json:"isUsingOverage,omitempty"`
+	SurpassedThreshold float64 `json:"surpassedThreshold,omitempty"`
 }
 
 // Usage holds token usage from Claude Code.
