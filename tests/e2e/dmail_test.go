@@ -22,7 +22,7 @@ func TestE2E_DMail_HighSeverity_GoesToOutbox(t *testing.T) {
 	}
 	writeConfig(t, dir, cfg)
 
-	_, _, err := runCmd(t, dir, "check", "--full", "--json")
+	_, _, err := runCmd(t, dir, "run", "--full", "--json")
 	assertExitCode(t, err, 2)
 
 	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
@@ -45,7 +45,7 @@ func TestE2E_DMail_LowSeverity_GoesToOutbox(t *testing.T) {
 	}
 	writeConfig(t, dir, cfg)
 
-	_, _, err := runCmd(t, dir, "check", "--full", "--json")
+	_, _, err := runCmd(t, dir, "run", "--full", "--json")
 	assertExitCode(t, err, 2)
 
 	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
@@ -64,7 +64,7 @@ func TestE2E_DMail_MediumSeverity_GoesToOutbox(t *testing.T) {
 	}
 	writeConfig(t, dir, cfg)
 
-	_, _, err := runCmd(t, dir, "check", "--full", "--json")
+	_, _, err := runCmd(t, dir, "run", "--full", "--json")
 	assertExitCode(t, err, 2)
 
 	outboxFiles := listDir(t, filepath.Join(dir, ".gate", "outbox"))
@@ -79,7 +79,7 @@ func TestE2E_DMail_ArchiveFormat(t *testing.T) {
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
-	_, _, err := runCmd(t, dir, "check", "--full", "--json")
+	_, _, err := runCmd(t, dir, "run", "--full", "--json")
 	assertExitCode(t, err, 2)
 
 	archiveDir := filepath.Join(dir, ".gate", "archive")
@@ -118,8 +118,8 @@ func TestE2E_DMail_NamingSequence(t *testing.T) {
 	}
 	writeConfig(t, dir, cfg)
 
-	// First check
-	runCmd(t, dir, "check", "--full", "--json")
+	// First run
+	runCmd(t, dir, "run", "--full", "--json")
 
 	// Add commit and run again
 	f := filepath.Join(dir, "a.go")
@@ -131,7 +131,7 @@ func TestE2E_DMail_NamingSequence(t *testing.T) {
 	gitCommit.Dir = dir
 	gitCommit.Run()
 
-	runCmd(t, dir, "check", "--full", "--json")
+	runCmd(t, dir, "run", "--full", "--json")
 
 	archiveFiles := listDir(t, filepath.Join(dir, ".gate", "archive"))
 	// Should have sequential names like feedback-001.md, feedback-002.md
@@ -162,8 +162,8 @@ func TestE2E_DMail_InboxConsumption(t *testing.T) {
 
 	assertFileExists(t, filepath.Join(dir, ".gate", "inbox", "report-001.md"))
 
-	// Run check — should consume inbox
-	runCmd(t, dir, "check", "--full", "--json")
+	// Run — should consume inbox
+	runCmd(t, dir, "run", "--full", "--json")
 
 	// Inbox should be empty
 	assertFileNotExists(t, filepath.Join(dir, ".gate", "inbox", "report-001.md"))
@@ -188,7 +188,7 @@ func TestE2E_DMail_InboxDedupSkipsExisting(t *testing.T) {
 	writeDMail(t, dir, "inbox", "report-001", fm, body)
 	writeDMail(t, dir, "archive", "report-001", fm, "Archive body should be preserved.\n")
 
-	runCmd(t, dir, "check", "--full", "--json")
+	runCmd(t, dir, "run", "--full", "--json")
 
 	// Inbox consumed
 	assertFileNotExists(t, filepath.Join(dir, ".gate", "inbox", "report-001.md"))
@@ -212,7 +212,7 @@ func TestE2E_DMail_InboxNotConsumedInDryRun(t *testing.T) {
 	}, "Report body.\n")
 
 	// Dry-run should NOT consume inbox
-	runCmd(t, dir, "check", "--full", "--dry-run")
+	runCmd(t, dir, "run", "--full", "--dry-run")
 
 	// Inbox should still have the file
 	assertFileExists(t, filepath.Join(dir, ".gate", "inbox", "report-001.md"))
