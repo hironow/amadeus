@@ -12,7 +12,8 @@ import (
 func PreflightCheck(binaries ...string) error {
 	for _, bin := range binaries {
 		if _, err := platform.LookPathShell(bin); err != nil {
-			return fmt.Errorf("preflight: %s not found in PATH", bin)
+			_, resolved, _ := platform.ParseShellCommand(bin)
+			return fmt.Errorf("preflight: %s not found in PATH (from %q)", resolved, bin)
 		}
 	}
 	return nil
