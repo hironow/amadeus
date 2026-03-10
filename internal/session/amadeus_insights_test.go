@@ -111,6 +111,7 @@ func TestWriteConvergenceInsight_HighSeverity(t *testing.T) {
 	dir := t.TempDir()
 	insightsDir := filepath.Join(dir, "insights")
 	runDir := filepath.Join(dir, ".run")
+	archiveDir := t.TempDir() // empty archive dir
 	os.MkdirAll(insightsDir, 0o755)
 	os.MkdirAll(runDir, 0o755)
 
@@ -130,7 +131,7 @@ func TestWriteConvergenceInsight_HighSeverity(t *testing.T) {
 	}
 
 	// when
-	session.ExportWriteConvergenceInsight(a, alert, "def456")
+	session.ExportWriteConvergenceInsight(a, alert, "def456", archiveDir)
 
 	// then
 	data, err := os.ReadFile(filepath.Join(insightsDir, "convergence.md"))
@@ -154,6 +155,7 @@ func TestWriteConvergenceInsight_HighSeverity(t *testing.T) {
 	if !strings.Contains(entry.What, "5 D-Mails in 7 days") {
 		t.Errorf("what: got %q", entry.What)
 	}
+	// With empty archive dir, falls back to default why
 	if !strings.Contains(entry.Why, "structural issue") {
 		t.Errorf("why: got %q", entry.Why)
 	}
@@ -189,12 +191,138 @@ func TestWriteConvergenceInsight_MediumSeveritySkipped(t *testing.T) {
 	}
 
 	// when
-	session.ExportWriteConvergenceInsight(a, alert, "abc123")
+	session.ExportWriteConvergenceInsight(a, alert, "abc123", t.TempDir())
 
 	// then: no file should be created
 	_, err := os.Stat(filepath.Join(insightsDir, "convergence.md"))
 	if err == nil {
 		t.Error("convergence.md should not exist for medium severity")
+	}
+}
+
+func TestWriteConvergenceInsight_IncludesDMailDescriptions(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	insightsDir := filepath.Join(dir, "insights")
+	runDir := filepath.Join(dir, ".run")
+	archiveDir := filepath.Join(dir, "archive")
+	os.MkdirAll(insightsDir, 0o755)
+	os.MkdirAll(runDir, 0o755)
+	os.MkdirAll(archiveDir, 0o755)
+
+	// Create D-Mail archive files with description frontmatter
+	dmail1 := `---
+name: "dmail-001"
+kind: design-feedback
+description: "ADR-003 violation in auth module"
+severity: high
+---
+
+Details about the violation.
+`
+	dmail2 := `---
+name: "dmail-002"
+kind: design-feedback
+description: "Dependency drift in logging subsystem"
+severity: medium
+---
+
+Logging deps need update.
+`
+	os.WriteFile(filepath.Join(archiveDir, "dmail-001.md"), []byte(dmail1), 0o644)
+	os.WriteFile(filepath.Join(archiveDir, "dmail-002.md"), []byte(dmail2), 0o644)
+
+	writer := session.NewInsightWriter(insightsDir, runDir)
+
+	a := &session.Amadeus{
+		Logger:   &domain.NopLogger{},
+		Insights: writer,
+	}
+
+	alert := domain.ConvergenceAlert{
+		Target:   "internal/domain/scoring.go",
+		Count:    3,
+		Window:   7,
+		DMails:   []string{"dmail-001", "dmail-002"},
+		Severity: domain.SeverityHigh,
+	}
+
+	// when
+	session.ExportWriteConvergenceInsight(a, alert, "xyz789", archiveDir)
+
+	// then
+	data, err := os.ReadFile(filepath.Join(insightsDir, "convergence.md"))
+	if err != nil {
+		t.Fatalf("expected convergence.md to exist: %v", err)
+	}
+
+	file, err := domain.UnmarshalInsightFile(data)
+	if err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if len(file.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(file.Entries))
+	}
+
+	entry := file.Entries[0]
+	if !strings.Contains(entry.Why, "ADR-003 violation in auth module") {
+		t.Errorf("why should contain first dmail description: got %q", entry.Why)
+	}
+	if !strings.Contains(entry.Why, "Dependency drift in logging subsystem") {
+		t.Errorf("why should contain second dmail description: got %q", entry.Why)
+	}
+	if !strings.Contains(entry.Why, "Converging feedback") {
+		t.Errorf("why should start with 'Converging feedback': got %q", entry.Why)
+	}
+}
+
+func TestWriteConvergenceInsight_EmptyArchiveFallsBackToDefault(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	insightsDir := filepath.Join(dir, "insights")
+	runDir := filepath.Join(dir, ".run")
+	archiveDir := filepath.Join(dir, "archive")
+	os.MkdirAll(insightsDir, 0o755)
+	os.MkdirAll(runDir, 0o755)
+	os.MkdirAll(archiveDir, 0o755)
+
+	writer := session.NewInsightWriter(insightsDir, runDir)
+
+	a := &session.Amadeus{
+		Logger:   &domain.NopLogger{},
+		Insights: writer,
+	}
+
+	alert := domain.ConvergenceAlert{
+		Target:   "internal/domain/scoring.go",
+		Count:    3,
+		Window:   7,
+		DMails:   []string{"nonexistent-dmail"},
+		Severity: domain.SeverityHigh,
+	}
+
+	// when
+	session.ExportWriteConvergenceInsight(a, alert, "abc123", archiveDir)
+
+	// then
+	data, err := os.ReadFile(filepath.Join(insightsDir, "convergence.md"))
+	if err != nil {
+		t.Fatalf("expected convergence.md to exist: %v", err)
+	}
+
+	file, err := domain.UnmarshalInsightFile(data)
+	if err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if len(file.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(file.Entries))
+	}
+
+	entry := file.Entries[0]
+	if !strings.Contains(entry.Why, "structural issue") {
+		t.Errorf("why should fall back to default message: got %q", entry.Why)
 	}
 }
 

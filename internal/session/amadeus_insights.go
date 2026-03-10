@@ -2,6 +2,8 @@ package session
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -45,7 +47,7 @@ func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, session
 
 // writeConvergenceInsight writes a convergence insight entry for a HIGH severity alert.
 // Fails silently (log warning) to avoid breaking the check pipeline.
-func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, sessionID string) {
+func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, sessionID string, archiveDir string) {
 	if a.Insights == nil {
 		return
 	}
@@ -54,10 +56,15 @@ func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, session
 		return
 	}
 
+	why := "Multiple feedback signals targeting same area indicates structural issue"
+	if descs := collectDMailDescriptions(archiveDir, alert.DMails); len(descs) > 0 {
+		why = fmt.Sprintf("Converging feedback: %s", strings.Join(descs, "; "))
+	}
+
 	entry := domain.InsightEntry{
 		Title:       fmt.Sprintf("convergence-%s", alert.Target),
 		What:        fmt.Sprintf("World line convergence on %s: %d D-Mails in %d days", alert.Target, alert.Count, alert.Window),
-		Why:         "Multiple feedback signals targeting same area indicates structural issue",
+		Why:         why,
 		How:         "Investigate for shared root cause",
 		When:        fmt.Sprintf("When %d D-Mails target same area within window", alert.Count),
 		Who:         fmt.Sprintf("amadeus convergence detector (session-%s)", sessionID),
@@ -70,6 +77,27 @@ func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, session
 	if err := a.Insights.Append("convergence.md", "convergence", "amadeus", entry); err != nil {
 		a.Logger.Warn("insight write (convergence): %v", err)
 	}
+}
+
+// collectDMailDescriptions reads D-Mail files from the archive directory
+// and extracts their description frontmatter fields.
+func collectDMailDescriptions(archiveDir string, names []string) []string {
+	var descs []string
+	for _, name := range names {
+		path := filepath.Join(archiveDir, name+".md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		dmail, err := domain.ParseDMail(data)
+		if err != nil {
+			continue
+		}
+		if dmail.Description != "" {
+			descs = append(descs, dmail.Description)
+		}
+	}
+	return descs
 }
 
 // highScoringAxisDetails returns detail strings for axes with score >= 50.
