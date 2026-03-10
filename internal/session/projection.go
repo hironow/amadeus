@@ -3,7 +3,9 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,7 +59,7 @@ func (p *Projector) Rebuild(events []domain.Event) error {
 	// Clear all projection directories
 	for _, sub := range []string{".run", "archive", "outbox"} {
 		dir := filepath.Join(p.Store.Root, sub)
-		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("clear %s: %w", sub, err)
 		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {

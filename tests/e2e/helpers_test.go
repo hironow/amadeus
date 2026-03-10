@@ -5,7 +5,9 @@ package e2e
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -180,7 +182,7 @@ func listDir(t *testing.T, dir string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		t.Fatal(err)
@@ -216,7 +218,7 @@ func parseJSONOutput(t *testing.T, stdout string, v any) {
 // assertFileExists fails if the file does not exist.
 func assertFileExists(t *testing.T, path string) {
 	t.Helper()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("expected file to exist: %s", path)
 	}
 }
@@ -227,7 +229,7 @@ func countEventsOfType(t *testing.T, dir, eventType string) int {
 	eventsDir := filepath.Join(dir, ".gate", "events")
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return 0
 		}
 		t.Fatalf("read events dir: %v", err)

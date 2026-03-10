@@ -2,6 +2,8 @@ package session_test
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,10 +67,10 @@ func TestMonitorInbox_InitialDrain(t *testing.T) {
 	}
 
 	// Verify file was archived and removed from inbox
-	if _, err := os.Stat(filepath.Join(root, "archive", "report-001.md")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "archive", "report-001.md")); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected file to be archived")
 	}
-	if _, err := os.Stat(filepath.Join(root, "inbox", "report-001.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "inbox", "report-001.md")); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected file to be removed from inbox")
 	}
 }
@@ -107,7 +109,7 @@ func TestMonitorInbox_WatchesNewFiles(t *testing.T) {
 	}
 
 	// Verify archived
-	if _, err := os.Stat(filepath.Join(root, "archive", "report-001.md")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "archive", "report-001.md")); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected file to be archived")
 	}
 }

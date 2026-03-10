@@ -43,7 +43,7 @@ rules:
       otel.SetTracerProvider() は InitTracer() 内でのみ呼び出してください。
       TracerProvider の設定を分散させると noop デフォルトの保証が崩れます。
       Ref: Shared ADR 0003 — opentelemetry-noop-default
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: otel.SetTracerProvider(...)
       - pattern-not-inside: |
@@ -199,7 +199,7 @@ rules:
       signal.NotifyContext は context のキャンセルチェーンに統合され、
       goroutine リークのリスクも低減されます。
       Ref: phonewave docs/adr/0008-signal-context-propagation.md
-    severity: WARNING
+    severity: ERROR
     pattern: signal.Notify(...)
     paths:
       exclude:

@@ -26,7 +26,7 @@ import (
 func initTracer(serviceName, ver string) func(context.Context) error {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
-		otel.SetTracerProvider(np)
+		otel.SetTracerProvider(np) // nosemgrep: adr0003-otel-set-tracer-provider-outside-init -- initTracer is the composition-root equivalent of InitTracer
 		platform.Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
@@ -34,7 +34,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 	exp, err := otlptracehttp.New(context.Background())
 	if err != nil {
 		np := noop.NewTracerProvider()
-		otel.SetTracerProvider(np)
+		otel.SetTracerProvider(np) // nosemgrep: adr0003-otel-set-tracer-provider-outside-init -- initTracer is the composition-root equivalent of InitTracer
 		platform.Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
@@ -72,7 +72,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 	}
 
 	tp := sdktrace.NewTracerProvider(opts...)
-	otel.SetTracerProvider(tp)
+	otel.SetTracerProvider(tp) // nosemgrep: adr0003-otel-set-tracer-provider-outside-init -- initTracer is the composition-root equivalent of InitTracer
 	platform.Tracer = tp.Tracer(serviceName)
 
 	return func(ctx context.Context) error {

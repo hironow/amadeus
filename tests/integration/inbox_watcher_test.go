@@ -2,7 +2,9 @@ package integration_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -166,12 +168,12 @@ func TestMonitorInbox_Integration_DedupOnRestart(t *testing.T) {
 	}
 
 	// then: verify inbox file was cleaned up
-	if _, err := os.Stat(filepath.Join(root, "inbox", "report-dup.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "inbox", "report-dup.md")); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected report-dup.md to be removed from inbox/ after dedup cleanup")
 	}
 
 	// then: archive still has the file
-	if _, err := os.Stat(filepath.Join(root, "archive", "report-dup.md")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "archive", "report-dup.md")); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected report-dup.md to remain in archive/")
 	}
 }

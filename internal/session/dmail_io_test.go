@@ -1,6 +1,8 @@
 package session_test
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,7 +61,7 @@ func TestReceiveDMail_ArchivesAndRemoves(t *testing.T) {
 	}
 
 	// file should be removed from inbox
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("inbox file should have been removed")
 	}
 }
@@ -89,7 +91,7 @@ func TestReceiveDMail_SkipsIfAlreadyArchived(t *testing.T) {
 	}
 
 	// inbox file should be cleaned up
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("inbox file should have been removed for dedup")
 	}
 }
@@ -121,7 +123,7 @@ func TestReceiveDMail_ParseError(t *testing.T) {
 
 	// file should NOT be in archive
 	archivePath := filepath.Join(root, "archive", filename)
-	if _, err := os.Stat(archivePath); !os.IsNotExist(err) {
+	if _, err := os.Stat(archivePath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("archive file should not exist on parse error")
 	}
 }

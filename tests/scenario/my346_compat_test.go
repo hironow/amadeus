@@ -5,6 +5,8 @@ package scenario_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,11 +56,11 @@ It should be silently dropped during parsing.
 
 	// Verify the D-Mail was consumed from inbox (moved to archive)
 	inboxPath := filepath.Join(ws.RepoPath, ".gate", "inbox", "legacy-linear-001.md")
-	if _, statErr := os.Stat(inboxPath); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(inboxPath); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("legacy D-Mail should have been consumed from inbox")
 	}
 	archivePath := filepath.Join(ws.RepoPath, ".gate", "archive", "legacy-linear-001.md")
-	if _, statErr := os.Stat(archivePath); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(archivePath); errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("legacy D-Mail should have been archived")
 	}
 }
