@@ -284,7 +284,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 				Name:    "SKILL.md",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
-				Hint:    `run "amadeus init --force" to regenerate skills with updated kinds (feedback → design-feedback / implementation-feedback)`,
+				Hint:    "deprecated kind 'feedback'; migrate to 'design-feedback' or 'implementation-feedback' (run 'amadeus init --force' to regenerate SKILL.md)",
 			}
 		}
 	}
@@ -374,7 +374,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
-			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd := newShellCmd(inferCtx, claudeCmd, "--verbose", "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			results = append(results, checkClaudeInference(string(inferOut), inferErr))
