@@ -6,6 +6,7 @@
 - [gate-directory.md](gate-directory.md) — `.gate/` directory structure specification
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
+- [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
 - [stdio-convention.md](stdio-convention.md) — stdin/stdout/stderr convention
 - [testing.md](testing.md) — Test strategy and conventions
 
