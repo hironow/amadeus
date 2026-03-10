@@ -88,7 +88,7 @@ jobs:
         run: |
           OUTPUT=$("./$REPO_NAME" update --check 2>&1)
           echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qi "update available"
+          echo "$OUTPUT" | grep -qiE "update available|new version available"
 
       - name: Run self-update
         if: env.PREVIOUS != ''
