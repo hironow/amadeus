@@ -592,6 +592,160 @@ func TestGoldenSkills_result_text(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Init metadata tests: system:init attributes on parent span
+// ---------------------------------------------------------------------------
+
+func TestGolden_init_model_on_parent_span(t *testing.T) {
+	input := loadGolden(t, "golden_simple.jsonl")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+
+	initAttrs := emitter.InitAttrs()
+	foundModel := false
+	for _, attr := range initAttrs {
+		if string(attr.Key) == "claude.init.model" && attr.Value.AsString() == "claude-opus-4-6" {
+			foundModel = true
+		}
+	}
+	if !foundModel {
+		t.Error("expected claude.init.model = claude-opus-4-6")
+	}
+}
+
+func TestGoldenMCP_init_mcp_servers(t *testing.T) {
+	input := loadGolden(t, "golden_mcp.jsonl")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+
+	initAttrs := emitter.InitAttrs()
+
+	// Should have mcp_server names
+	foundMCP := false
+	for _, attr := range initAttrs {
+		if string(attr.Key) == "claude.init.mcp_servers" {
+			foundMCP = true
+			servers := attr.Value.AsStringSlice()
+			if len(servers) != 3 {
+				t.Errorf("mcp_servers count = %d, want 3", len(servers))
+			}
+		}
+	}
+	if !foundMCP {
+		t.Error("expected claude.init.mcp_servers attribute")
+	}
+}
+
+func TestGoldenSkills_init_counts(t *testing.T) {
+	input := loadGolden(t, "golden_skills.jsonl")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+
+	initAttrs := emitter.InitAttrs()
+
+	checks := map[string]int64{
+		"claude.init.tools_count":   8,
+		"claude.init.skills_count":  10,
+		"claude.init.plugins_count": 4,
+	}
+	for key, want := range checks {
+		found := false
+		for _, attr := range initAttrs {
+			if string(attr.Key) == key {
+				found = true
+				if attr.Value.AsInt64() != want {
+					t.Errorf("%s = %d, want %d", key, attr.Value.AsInt64(), want)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("expected %s attribute", key)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// hook_response outcome/stderr tests
+// ---------------------------------------------------------------------------
+
+func TestGolden_hook_outcome_attribute(t *testing.T) {
+	input := loadGolden(t, "golden_simple.jsonl")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+
+	spans := exporter.GetSpans()
+	foundFailureOutcome := false
+	for _, s := range spans {
+		if !strings.HasPrefix(s.Name, "hook ") {
+			continue
+		}
+		for _, attr := range s.Attributes {
+			if string(attr.Key) == "hook.outcome" && attr.Value.AsString() == "failure" {
+				foundFailureOutcome = true
+			}
+		}
+	}
+	if !foundFailureOutcome {
+		t.Error("expected at least one hook span with hook.outcome=failure")
+	}
+}
+
 func TestGolden_result_captures_output(t *testing.T) {
 	input := loadGolden(t, "golden_simple.jsonl")
 

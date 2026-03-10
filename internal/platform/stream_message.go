@@ -18,8 +18,10 @@ type StreamMessage struct {
 	NumTurns   int             `json:"num_turns,omitempty"`
 	Duration   int64           `json:"duration_ms,omitempty"`
 	IsError    bool            `json:"is_error,omitempty"`
-	StopReason string          `json:"stop_reason,omitempty"`
-	ToolUseID  string          `json:"tool_use_id,omitempty"`
+	StopReason      string          `json:"stop_reason,omitempty"`
+	ToolUseID       string          `json:"tool_use_id,omitempty"`
+	ParentToolUseID string          `json:"parent_tool_use_id,omitempty"`
+	DurationAPIMs   int64           `json:"duration_api_ms,omitempty"`
 
 	// Hook fields (system subtype: hook_started / hook_response)
 	HookID    string `json:"hook_id,omitempty"`
@@ -29,8 +31,23 @@ type StreamMessage struct {
 	ExitCode  *int   `json:"exit_code,omitempty"`
 	Stdout    string `json:"stdout,omitempty"`
 
+	Outcome string `json:"outcome,omitempty"`
+
 	// Rate limit fields (type: rate_limit_event)
 	RateLimitInfo *RateLimitInfo `json:"rate_limit_info,omitempty"`
+
+	// Init fields (system subtype: init)
+	Model      string          `json:"model,omitempty"`
+	MCPServers []MCPServerInfo `json:"mcp_servers,omitempty"`
+	Tools      []string        `json:"tools,omitempty"`
+	Skills     []string        `json:"skills,omitempty"`
+	Plugins    []string        `json:"plugins,omitempty"`
+}
+
+// MCPServerInfo represents a connected MCP server from system:init.
+type MCPServerInfo struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 // RateLimitInfo holds rate limit details from Claude Code rate_limit_event.

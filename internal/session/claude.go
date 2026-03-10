@@ -90,6 +90,9 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
 		span.SetAttributes(ioAttrs...)
 	}
+	if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
+		span.SetAttributes(initAttrs...)
+	}
 
 	return []byte(result.Result), nil
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Extended span emission: hooks, thinking, rate_limit
+// Extended span emission: hooks, thinking, rate_limit, init
 // This file extends SpanEmittingStreamReader with additional OTel mappings
 // beyond core tool_use handling.
 // ---------------------------------------------------------------------------
@@ -23,6 +23,9 @@ func (s *SpanEmittingStreamReader) handleExtMessage(msg *StreamMessage) bool {
 		return true
 	case msg.Type == "system" && msg.Subtype == "hook_response":
 		s.handleHookResponse(msg)
+		return true
+	case msg.Type == "system" && msg.Subtype == "init":
+		s.handleInit(msg)
 		return true
 	case msg.Type == "assistant":
 		return s.handleThinkingBlocks(msg)
@@ -87,8 +90,48 @@ func (s *SpanEmittingStreamReader) handleHookResponse(msg *StreamMessage) {
 	if msg.ExitCode != nil {
 		span.SetAttributes(attribute.Int("hook.exit_code", *msg.ExitCode))
 	}
+	if msg.Outcome != "" {
+		span.SetAttributes(attribute.String("hook.outcome", msg.Outcome))
+	}
 	span.End()
 	delete(s.openSpans, key)
+}
+
+// handleInit captures init metadata for later retrieval via InitAttrs().
+func (s *SpanEmittingStreamReader) handleInit(msg *StreamMessage) {
+	s.initMsg = msg
+}
+
+// InitAttrs returns OTel attributes extracted from the system:init message.
+// Returns nil if no init message was seen.
+func (s *SpanEmittingStreamReader) InitAttrs() []attribute.KeyValue {
+	if s.initMsg == nil {
+		return nil
+	}
+	msg := s.initMsg
+	var attrs []attribute.KeyValue
+
+	if msg.Model != "" {
+		attrs = append(attrs, attribute.String("claude.init.model", msg.Model))
+	}
+	if len(msg.MCPServers) > 0 {
+		names := make([]string, len(msg.MCPServers))
+		for i, srv := range msg.MCPServers {
+			names[i] = srv.Name
+		}
+		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", names))
+	}
+	if len(msg.Tools) > 0 {
+		attrs = append(attrs, attribute.Int("claude.init.tools_count", len(msg.Tools)))
+	}
+	if len(msg.Skills) > 0 {
+		attrs = append(attrs, attribute.Int("claude.init.skills_count", len(msg.Skills)))
+	}
+	if len(msg.Plugins) > 0 {
+		attrs = append(attrs, attribute.Int("claude.init.plugins_count", len(msg.Plugins)))
+	}
+
+	return attrs
 }
 
 // handleThinkingBlocks adds gen_ai.thinking events to the parent span

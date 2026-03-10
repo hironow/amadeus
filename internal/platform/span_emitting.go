@@ -43,9 +43,10 @@ type SpanEmittingStreamReader struct {
 	rawEvents    []string
 	maxValueLen  int
 	syntheticSeq int
-	sessionID    string // captured from stream session_id for Weave thread_id
-	resultText   string // captured from result message for Weave output.value
-	inputText    string // caller-provided prompt for Weave input.value
+	sessionID    string         // captured from stream session_id for Weave thread_id
+	resultText   string         // captured from result message for Weave output.value
+	inputText    string         // caller-provided prompt for Weave input.value
+	initMsg      *StreamMessage // captured from system:init for InitAttrs()
 }
 
 // NewSpanEmittingStreamReader creates a SpanEmittingStreamReader.
