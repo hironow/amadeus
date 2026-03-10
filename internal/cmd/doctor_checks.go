@@ -374,7 +374,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
-			inferCmd := newShellCmd(inferCtx, claudeCmd, "--verbose", "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			results = append(results, checkClaudeInference(string(inferOut), inferErr))
