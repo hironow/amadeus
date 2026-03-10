@@ -367,7 +367,47 @@ func (w *Workspace) RunAmadeus(t *testing.T, ctx context.Context, args ...string
 	return err
 }
 
+// StartAmadeusRun starts amadeus run as a background daemon process.
+// Returns a ToolProcess that can be stopped later. amadeus run is a daemon
+// that continuously watches inbox — it only stops when cancelled.
+func (w *Workspace) StartAmadeusRun(t *testing.T, ctx context.Context, extraArgs ...string) *ToolProcess {
+	t.Helper()
+	args := []string{"run", "--auto-approve"}
+	args = append(args, extraArgs...)
+	args = append(args, w.RepoPath)
+
+	daemonCtx, cancel := context.WithCancel(ctx)
+	cmd := w.runToolCmd(daemonCtx, "amadeus", args...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Start(); err != nil {
+		cancel()
+		t.Fatalf("start amadeus run: %v", err)
+	}
+
+	return &ToolProcess{
+		Cmd:    cmd,
+		Cancel: cancel,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+}
+
+// StopAmadeusRun stops the amadeus daemon and returns combined output.
+func (w *Workspace) StopAmadeusRun(t *testing.T, tp *ToolProcess) string {
+	t.Helper()
+	tp.Cancel()
+	_ = tp.Cmd.Wait()
+	return tp.Stderr.String()
+}
+
 // RunAmadeusCheck runs amadeus check with --auto-approve and waits for completion.
+// NOTE: amadeus "run" is a daemon — this waits for ctx cancellation or timeout.
+// For scenario tests that need to run amadeus as a background daemon, use
+// StartAmadeusRun/StopAmadeusRun instead.
 func (w *Workspace) RunAmadeusCheck(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
 	args := []string{"run", "--auto-approve"}

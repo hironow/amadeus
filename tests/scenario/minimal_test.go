@@ -4,7 +4,6 @@ package scenario_test
 
 import (
 	"context"
-	"os/exec"
 	"testing"
 	"time"
 )
@@ -33,18 +32,13 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	}, "# Test Report\n\n## Results\n\n- TEST-001: implemented")
 	ws.InjectDMail(t, ".gate", "inbox", "report-test-001.md", report)
 
-	// Run amadeus check — exit code 2 = drift detected (D-Mails generated, normal)
-	err := ws.RunAmadeusCheck(t, ctx)
-	if err != nil {
-		// exit code 2 is expected: amadeus returns 2 when drift is detected
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
-			t.Logf("amadeus check returned exit code 2 (drift detected) — expected")
-		} else {
-			t.Fatalf("amadeus check failed unexpectedly: %v", err)
-		}
-	}
+	// Start amadeus run as daemon (it watches inbox continuously)
+	am := ws.StartAmadeusRun(t, ctx)
+	defer ws.StopAmadeusRun(t, am)
 
-	// Wait for feedback D-Mail in .gate/outbox -> phonewave -> .siren/inbox + .expedition/inbox
+	// Wait for amadeus to consume report and produce feedback
+	// amadeus run processes inbox D-Mails and writes feedback to outbox
+	// phonewave routes: .gate/outbox -> .siren/inbox + .expedition/inbox
 	feedbackPath := ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
 	ws.WaitForDMailCount(t, ".expedition", "inbox", 1, 30*time.Second)
 
