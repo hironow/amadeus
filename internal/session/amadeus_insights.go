@@ -10,7 +10,7 @@ import (
 
 // writeDivergenceInsight writes a divergence insight entry after scoring.
 // Fails silently (log warning) to avoid breaking the check pipeline.
-func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, sessionID string, commitRange string) {
+func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, sessionID string, commitRange string, reasoning string) {
 	if a.Insights == nil {
 		return
 	}
@@ -22,11 +22,16 @@ func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, session
 		why = strings.Join(whyParts, "; ")
 	}
 
+	how := "Focus remediation on highest-scoring axis"
+	if reasoning != "" {
+		how = reasoning
+	}
+
 	entry := domain.InsightEntry{
 		Title:       fmt.Sprintf("divergence-%s", sessionID),
 		What:        fmt.Sprintf("Divergence score: %f, severity: %s", result.Value, result.Severity),
 		Why:         why,
-		How:         "Focus remediation on highest-scoring axis",
+		How:         how,
 		When:        fmt.Sprintf("Check on commits %s", commitRange),
 		Who:         fmt.Sprintf("amadeus check (session-%s)", sessionID),
 		Constraints: "Scores relative to configured weights",

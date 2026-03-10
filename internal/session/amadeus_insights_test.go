@@ -37,8 +37,10 @@ func TestWriteDivergenceInsight_CreatesFile(t *testing.T) {
 		Severity: domain.SeverityMedium,
 	}
 
+	reasoning := "ADR coverage gap detected in new pattern introduction"
+
 	// when
-	session.ExportWriteDivergenceInsight(a, result, "abc123", "def456..abc123")
+	session.ExportWriteDivergenceInsight(a, result, "abc123", "def456..abc123", reasoning)
 
 	// then
 	data, err := os.ReadFile(filepath.Join(insightsDir, "divergence.md"))
@@ -67,6 +69,9 @@ func TestWriteDivergenceInsight_CreatesFile(t *testing.T) {
 	}
 	if !strings.Contains(entry.Why, "adr_integrity=70") {
 		t.Errorf("why should contain high-scoring axis: got %q", entry.Why)
+	}
+	if entry.How != reasoning {
+		t.Errorf("how should contain reasoning: got %q, want %q", entry.How, reasoning)
 	}
 	if !strings.Contains(entry.When, "def456..abc123") {
 		t.Errorf("when should contain commit range: got %q", entry.When)
@@ -98,7 +103,7 @@ func TestWriteDivergenceInsight_NilInsightsSkips(t *testing.T) {
 	}
 
 	// when/then: should not panic
-	session.ExportWriteDivergenceInsight(a, result, "abc", "x..y")
+	session.ExportWriteDivergenceInsight(a, result, "abc", "x..y", "some reasoning")
 }
 
 func TestWriteConvergenceInsight_HighSeverity(t *testing.T) {
@@ -217,8 +222,8 @@ func TestWriteDivergenceInsight_Idempotent(t *testing.T) {
 	}
 
 	// when: write twice with same session ID (same title)
-	session.ExportWriteDivergenceInsight(a, result, "abc123", "x..y")
-	session.ExportWriteDivergenceInsight(a, result, "abc123", "x..y")
+	session.ExportWriteDivergenceInsight(a, result, "abc123", "x..y", "")
+	session.ExportWriteDivergenceInsight(a, result, "abc123", "x..y", "")
 
 	// then: should have exactly 1 entry (idempotent)
 	data, _ := os.ReadFile(filepath.Join(insightsDir, "divergence.md"))
@@ -226,6 +231,53 @@ func TestWriteDivergenceInsight_Idempotent(t *testing.T) {
 
 	if len(file.Entries) != 1 {
 		t.Errorf("expected 1 entry (idempotent), got %d", len(file.Entries))
+	}
+}
+
+func TestWriteDivergenceInsight_EmptyReasoningFallback(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	insightsDir := filepath.Join(dir, "insights")
+	runDir := filepath.Join(dir, ".run")
+	os.MkdirAll(insightsDir, 0o755)
+	os.MkdirAll(runDir, 0o755)
+
+	writer := session.NewInsightWriter(insightsDir, runDir)
+
+	a := &session.Amadeus{
+		Logger:   &domain.NopLogger{},
+		Insights: writer,
+	}
+
+	result := domain.DivergenceResult{
+		Value:    0.3,
+		Severity: domain.SeverityLow,
+		Axes: map[domain.Axis]domain.AxisScore{
+			domain.AxisADR: {Score: 30, Details: "ok"},
+		},
+	}
+
+	// when: empty reasoning should fall back to default
+	session.ExportWriteDivergenceInsight(a, result, "abc123", "x..y", "")
+
+	// then
+	data, err := os.ReadFile(filepath.Join(insightsDir, "divergence.md"))
+	if err != nil {
+		t.Fatalf("expected divergence.md to exist: %v", err)
+	}
+
+	file, err := domain.UnmarshalInsightFile(data)
+	if err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if len(file.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(file.Entries))
+	}
+
+	entry := file.Entries[0]
+	if entry.How != "Focus remediation on highest-scoring axis" {
+		t.Errorf("how should fall back to default: got %q", entry.How)
 	}
 }
 

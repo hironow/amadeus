@@ -228,7 +228,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 	// Write divergence insight (best-effort, does not fail the check)
 	commitRange := previous.Commit + ".." + currentCommit
-	a.writeDivergenceInsight(meterResult.Divergence, currentCommit, commitRange)
+	a.writeDivergenceInsight(meterResult.Divergence, currentCommit, commitRange, meterResult.Reasoning)
 
 	// Gate: request approval before D-Mail generation
 	gateApproved := true

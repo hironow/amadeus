@@ -45,8 +45,8 @@ var ExportParseGhPRListOutput = parseGhPRListOutput
 func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }
 
 // ExportWriteDivergenceInsight exposes writeDivergenceInsight for external tests.
-func ExportWriteDivergenceInsight(a *Amadeus, result domain.DivergenceResult, sessionID, commitRange string) {
-	a.writeDivergenceInsight(result, sessionID, commitRange)
+func ExportWriteDivergenceInsight(a *Amadeus, result domain.DivergenceResult, sessionID, commitRange, reasoning string) {
+	a.writeDivergenceInsight(result, sessionID, commitRange, reasoning)
 }
 
 // ExportWriteConvergenceInsight exposes writeConvergenceInsight for external tests.
