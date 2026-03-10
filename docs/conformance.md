@@ -9,7 +9,7 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 | **Why** | Detect architectural drift early and route corrective actions before design debt compounds |
 | **How** | Scan merged PRs → Claude evaluates against ADRs/DoDs → score 4 divergence axes → route D-Mails by severity; PR convergence pipeline scores open PRs; fsnotify watches inbox for real-time D-Mail reception |
 | **Input** | Git log (merged PRs), ADRs, DoDs, codebase source, open PR state (via `gh` CLI), inbox D-Mails |
-| **Output** | Divergence scores, PR convergence reports, corrective D-Mails (design-feedback / implementation-feedback) to downstream tools, insight ledger files (`insights/divergence.md`, `insights/convergence.md`) |
+| **Output** | Divergence scores, PR convergence reports, corrective D-Mails (design-feedback / implementation-feedback) to downstream tools, insight ledger files (`insights/divergence.md` with LLM-enriched How, `insights/convergence.md` with archive-enriched Why) |
 | **Telemetry** | OTel spans: `amadeus.run`, `reading_steiner`, `divergence_meter`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
 | **External Systems** | Claude Code subprocess, Git, `gh` CLI (PR reading), OTel exporter (Jaeger/Weave), fsnotify (inbox watcher) |
 

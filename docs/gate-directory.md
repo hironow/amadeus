@@ -93,6 +93,17 @@ entries: 2
 
 Each entry has 6 required axes (`what`, `why`, `how`, `when`, `who`, `constraints`) plus optional tool-specific extra fields.
 
+### LLM-Enriched Fields
+
+Divergence and convergence insights enrich specific fields with contextual data when available, falling back to static defaults:
+
+| File | Field | Enrichment Source | Fallback |
+|------|-------|-------------------|----------|
+| `divergence.md` | `how` | Claude's reasoning text from the divergence evaluation | `"Focus remediation on highest-scoring axis"` |
+| `convergence.md` | `why` | D-Mail `description` fields read from `.gate/archive/` | `"Multiple feedback signals targeting same area indicates structural issue"` |
+
+For divergence insights, the `how` field contains Claude's reasoning about remediation when the LLM provides it during scoring. For convergence insights, the `why` field aggregates actual D-Mail descriptions (e.g., `"Converging feedback: ADR-003 violation; dependency cycle in auth"`) to explain why convergence was detected.
+
 ### Files
 
 | File | Source | Content |

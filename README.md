@@ -128,8 +128,8 @@ amadeus run (daemon)
     |   +-- insights.lock     <- Flock for concurrent insight writes
     +-- events/               <- Append-only event log (JSONL, daily rotation, gitignored)
     +-- insights/             <- Semantic insight ledger (git-tracked, per ADR S0030)
-    |   +-- divergence.md     <- Divergence insights from check results
-    |   +-- convergence.md    <- Convergence insights from PR pipeline
+    |   +-- divergence.md     <- Divergence insights (How enriched with Claude reasoning)
+    |   +-- convergence.md    <- Convergence insights (Why enriched from archive D-Mails)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
     +-- archive/              <- All D-Mails (gitignored)
