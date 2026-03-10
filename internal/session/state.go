@@ -46,6 +46,7 @@ func InitGateDir(root string, logger domain.Logger) error {
 		filepath.Join(root, "outbox"),
 		filepath.Join(root, "inbox"),
 		filepath.Join(root, "archive"),
+		filepath.Join(root, "insights"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {
