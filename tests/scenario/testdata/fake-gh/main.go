@@ -24,6 +24,8 @@ func main() {
 	switch {
 	case strings.HasPrefix(sub, "pr create"):
 		fmt.Println("https://github.com/test/repo/pull/42")
+	case strings.HasPrefix(sub, "pr list"):
+		fmt.Println(`[]`)
 	case strings.HasPrefix(sub, "pr view"):
 		fmt.Println(`{"number":42,"state":"open","url":"https://github.com/test/repo/pull/42"}`)
 	}
