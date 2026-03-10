@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/amadeus/internal/domain"
@@ -21,13 +22,34 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// execCommand is a package-level variable for creating exec.Cmd.
-// Override in tests to mock command execution.
-var execCommand = exec.CommandContext
+// newShellCmd is a package-level variable for creating shell-aware exec.Cmd.
+// Override in tests via OverrideShellCmd.
+var newShellCmd = platform.NewShellCmd
+
+// OverrideShellCmd replaces the command constructor for testing and returns a
+// cleanup function.
+func OverrideShellCmd(fn func(ctx context.Context, name string, args ...string) *exec.Cmd) func() {
+	old := newShellCmd
+	newShellCmd = fn
+	return func() { newShellCmd = old }
+}
+
+// lookPathShell is a package-level variable for shell-aware LookPath.
+// Override in tests via OverrideLookPath.
+var lookPathShell = platform.LookPathShell
+
+// OverrideLookPath replaces the path lookup function for testing and returns a
+// cleanup function.
+func OverrideLookPath(fn func(cmd string) (string, error)) func() {
+	old := lookPathShell
+	lookPathShell = fn
+	return func() { lookPathShell = old }
+}
 
 // checkTool verifies that a CLI tool is installed and executable.
+// Supports shell-like command strings with leading KEY=VALUE env vars and tilde paths.
 func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
-	path, err := exec.LookPath(name)
+	path, err := lookPathShell(name)
 	if err != nil {
 		return domain.DoctorCheckResult{
 			Name:    name,
@@ -37,7 +59,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 		}
 	}
 
-	out, err := execCommand(ctx, path, "--version").Output()
+	out, err := newShellCmd(ctx, name, "--version").Output()
 	if err != nil {
 		return domain.DoctorCheckResult{
 			Name:    name,
@@ -56,7 +78,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 }
 
 // checkGitRepo verifies the given directory is inside a git repository.
-// Uses exec.Command directly (not execCommand) because cmd.Dir must be set,
+// Uses exec.Command directly (not newShellCmd) because cmd.Dir must be set,
 // and tests use real git repos via git init.
 func checkGitRepo(dir string) domain.DoctorCheckResult {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
@@ -150,22 +172,39 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 	}
 }
 
+// checkClaudeAuth determines if the Claude CLI is authenticated by
+// interpreting the result of running `claude mcp list`. A successful
+// command execution (no error) indicates the CLI is authenticated.
+func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
+	if mcpErr != nil {
+		return domain.DoctorCheckResult{
+			Name:    "claude-auth",
+			Status:  domain.CheckFail,
+			Message: "not authenticated: " + mcpErr.Error(),
+			Hint:    `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
+		}
+	}
+	return domain.DoctorCheckResult{
+		Name:    "claude-auth",
+		Status:  domain.CheckOK,
+		Message: "authenticated",
+	}
+}
+
 // checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckResult {
-	cmd := execCommand(ctx, claudeCmd, "mcp", "list")
-	out, err := cmd.Output()
-	if err != nil {
+func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
+	if mcpErr != nil {
 		return domain.DoctorCheckResult{
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("claude mcp list failed: %v", err),
+			Message: fmt.Sprintf("claude mcp list failed: %v", mcpErr),
 			Hint:    `ensure Claude CLI is authenticated with "claude login" (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
 
-	output := strings.ToLower(string(out))
+	output := strings.ToLower(mcpOutput)
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "linear") && strings.Contains(line, "✓") && strings.Contains(line, "connected") {
 			return domain.DoctorCheckResult{
@@ -182,6 +221,32 @@ func checkLinearMCP(ctx context.Context, claudeCmd string) domain.DoctorCheckRes
 		Message: "Linear MCP not found or not connected in claude mcp list output",
 		Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
 			"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
+	}
+}
+
+// checkClaudeInference determines if the Claude CLI can perform inference
+// by interpreting the result of a minimal "1+1=" prompt.
+func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
+	if err != nil {
+		return domain.DoctorCheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckFail,
+			Message: "inference failed: " + err.Error(),
+			Hint:    "check API key, quota, and model access",
+		}
+	}
+	if strings.TrimSpace(output) != "2" {
+		return domain.DoctorCheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckFail,
+			Message: "unexpected response",
+			Hint:    "check API key, quota, and model access",
+		}
+	}
+	return domain.DoctorCheckResult{
+		Name:    "claude-inference",
+		Status:  domain.CheckOK,
+		Message: "inference OK",
 	}
 }
 
@@ -232,9 +297,13 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 }
 
 // runDoctor executes all health checks and returns the results.
-// Uses "claude" as the default Claude CLI command name.
+// Reads claude_cmd from the config file; falls back to domain.DefaultClaudeCmd on load error.
 func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheckResult {
-	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, "claude", logger)
+	claudeCmd := domain.DefaultClaudeCmd
+	if cfg, err := loadConfig(configPath); err == nil {
+		claudeCmd = cfg.ClaudeCmd
+	}
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger)
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
@@ -244,53 +313,76 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 
 	var results []domain.DoctorCheckResult
 
-	// 1. git binary
+	// --- Binaries ---
 	results = append(results, checkTool(ctx, "git"))
-
-	// 2. git repository
-	results = append(results, checkGitRepo(repoRoot))
-
-	// 3. git remote (required for PR convergence)
-	results = append(results, checkGitRemote(repoRoot))
-
-	// 4. gh CLI (required for PR reading)
-	results = append(results, checkTool(ctx, "gh"))
-
-	// 5. claude CLI
 	claudeResult := checkTool(ctx, claudeCmd)
 	results = append(results, claudeResult)
+	results = append(results, checkTool(ctx, "gh"))
 
-	// 6. .gate/ directory
+	// --- Repository ---
+	results = append(results, checkGitRepo(repoRoot))
+	results = append(results, checkGitRemote(repoRoot))
+
+	// --- State ---
 	results = append(results, checkGateDir(repoRoot))
-
-	// 7. config.yaml
 	results = append(results, checkConfig(configPath))
 
-	// 8. SKILL.md files
+	// --- Data ---
 	results = append(results, checkSkillMD(repoRoot))
-
-	// 9. Event Store integrity
 	results = append(results, checkEventStore(filepath.Join(repoRoot, domain.StateDir)))
-
-	// 10. D-Mail schema v1 validation
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, domain.StateDir)))
-
-	// 11. fsnotify (file watcher availability)
 	results = append(results, checkFsnotify())
 
-	// 12. Success rate (informational)
-	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
-
-	// 13. Linear MCP (skip if claude unavailable)
+	// --- Connectivity ---
 	if claudeResult.Status != domain.CheckOK {
+		results = append(results, domain.DoctorCheckResult{
+			Name:    "claude-auth",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		})
 		results = append(results, domain.DoctorCheckResult{
 			Name:    "Linear MCP",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
+		results = append(results, domain.DoctorCheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		})
 	} else {
-		results = append(results, checkLinearMCP(ctx, claudeCmd))
+		mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
+		out, mcpErr := cmd.Output()
+		mcpCancel()
+		mcpOutput := string(out)
+		authResult := checkClaudeAuth(mcpOutput, mcpErr)
+		results = append(results, authResult)
+
+		if authResult.Status != domain.CheckOK {
+			results = append(results, domain.DoctorCheckResult{
+				Name:    "Linear MCP",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not authenticated)",
+			})
+			results = append(results, domain.DoctorCheckResult{
+				Name:    "claude-inference",
+				Status:  domain.CheckSkip,
+				Message: "skipped (auth failed)",
+			})
+		} else {
+			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+
+			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
+			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferOut, inferErr := inferCmd.Output()
+			inferCancel()
+			results = append(results, checkClaudeInference(string(inferOut), inferErr))
+		}
 	}
+
+	// --- Metrics ---
+	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
 
 	for _, r := range results {
 		span.AddEvent("doctor.check", trace.WithAttributes(

@@ -1,7 +1,7 @@
 # S0017. Data Persistence Boundaries
 
 **Date:** 2026-03-01
-**Status:** Accepted
+**Status:** Superseded by S0030
 
 ## Context
 
@@ -68,4 +68,4 @@ When tools need to reference external data (Linear issues, GitHub PRs):
 ### Neutral
 
 - amadeus is the reference implementation for this pattern (`.gate/` fully gitignored, `*.local.*` adopted)
-- phonewave.yaml uses relative paths since S1 resolution
+- phonewave config.yaml uses relative paths since S1 resolution

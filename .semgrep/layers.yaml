@@ -567,8 +567,10 @@ rules:
 
   - id: lod-excessive-dot-chain
     languages: [go]
-    severity: WARNING
-    pattern-regex: '\b\w+\.\w+\.\w+\.\w+'
+    severity: ERROR
+    patterns:
+      - pattern-regex: '\b\w+\.\w+\.\w+\.\w+'
+      - pattern-not-regex: 'attribute\.\w+\("[\w.]+'
     paths:
       include:
         - "/internal/session/**"
@@ -597,3 +599,48 @@ rules:
       許可: <var>.<forwardingMethod>() — forwarding メソッド経由
       除外: *_test.go
       Ref: Tell-Don't-Ask, Law of Demeter
+
+  # --- Rule: No hardcoded "claude" literal in exec arguments ---
+
+  - id: config-no-hardcoded-claude-literal
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: exec.Command("claude", ...)
+      - pattern: exec.CommandContext($CTX, "claude", ...)
+      - pattern: append($BINS, "claude")
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      Do not hardcode "claude" as exec argument. Use config.ClaudeCmd.
+
+  # --- Rule: No empty-string fallback in session layer ---
+
+  - id: session-no-empty-string-fallback
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern: |
+          if $VAR == "" {
+              $VAR = $LITERAL
+          }
+      - metavariable-regex:
+          metavariable: $LITERAL
+          regex: '"[^"]+"'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層での空文字 fallback 代入は禁止です。
+      config のデフォルト値は domain 定数 → config loading で設定してください。
+      session 層で「念のため」fallback すると:
+      - config 設定ミスが検出不能になる
+      - デフォルト値が複数箇所に散らばり一貫性が壊れる
+      - テスト時に config を差し替えても上書きされる
+      修正: config loading (session/config.go) で空文字チェックを行い、
+      domain.Default* 定数を使用してください。

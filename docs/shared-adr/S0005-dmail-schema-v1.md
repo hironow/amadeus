@@ -1,7 +1,7 @@
 # S0005. D-Mail Schema v1 Specification
 
 **Date:** 2026-02-23
-**Status:** Accepted
+**Status:** Amended by S0031
 
 ## Context
 

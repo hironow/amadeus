@@ -15,7 +15,7 @@ func NeedsDefaultRun(rootCmd *cobra.Command, args []string) bool {
 		return true
 	}
 
-	// Root-level flags that should not be redirected to check.
+	// Root-level flags that should not be redirected to run.
 	for _, arg := range args {
 		if arg == "--version" || arg == "--help" || arg == "-h" {
 			return false

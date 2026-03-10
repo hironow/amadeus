@@ -18,7 +18,8 @@ func TestNeedsDefaultRun(t *testing.T) {
 
 		// Explicit subcommands → no default
 		{"explicit run", []string{"run"}, false},
-		{"explicit check", []string{"check"}, false},
+		// "check" is no longer a registered subcommand; it falls through to default
+		{"unknown check", []string{"check"}, true},
 		{"explicit init", []string{"init"}, false},
 		{"explicit validate", []string{"validate"}, false},
 		{"explicit install-hook", []string{"install-hook"}, false},
@@ -41,11 +42,11 @@ func TestNeedsDefaultRun(t *testing.T) {
 		{"-h", []string{"-h"}, false},
 
 		// Persistent flags before subcommand → still finds subcommand
-		{"verbose then check", []string{"-v", "check"}, false},
-		{"config then check", []string{"-c", "cfg.yaml", "check"}, false},
-		{"config=val then check", []string{"-c=cfg.yaml", "check"}, false},
-		{"lang then check", []string{"-l", "ja", "check"}, false},
-		{"output then check", []string{"-o", "json", "check"}, false},
+		{"verbose then run", []string{"-v", "run"}, false},
+		{"config then run", []string{"-c", "cfg.yaml", "run"}, false},
+		{"config=val then run", []string{"-c=cfg.yaml", "run"}, false},
+		{"lang then run", []string{"-l", "ja", "run"}, false},
+		{"output then run", []string{"-o", "json", "run"}, false},
 
 		// Persistent flags only → default to run
 		{"verbose only", []string{"-v"}, true},
@@ -60,7 +61,7 @@ func TestNeedsDefaultRun(t *testing.T) {
 
 		// -- terminator
 		{"double dash only", []string{"--"}, true},
-		{"double dash then subcommand", []string{"--", "check"}, true},
+		{"double dash then subcommand", []string{"--", "run"}, true},
 	}
 
 	for _, tt := range tests {

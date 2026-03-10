@@ -58,7 +58,7 @@ Diff checks: ██████████ 10/10 -> Full calibration triggered
 ```
 
 - **Interval**: configurable in `config.yaml` (default: every 10 checks)
-- **Force**: `amadeus check --full` triggers immediately
+- **Force**: `amadeus run --full` triggers immediately
 - **Auto-trigger**: a divergence jump also forces a full scan on the next run
 
 ### Divergence Jump (World Line Shift)
@@ -87,6 +87,19 @@ high   (score >  0.50) -> Auto-sent (receiver handles approval)
 All D-Mails go directly to `outbox/` + `archive/`. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
 
 - Per-axis overrides can force high severity for critical axes (e.g., ADR integrity > 60 always high)
+
+## D-Mail Protocol
+
+Amadeus is the verifier in the D-Mail protocol ecosystem:
+
+| Tool | Role | Endpoint |
+|------|------|----------|
+| **sightjack** | Designer / Protocol spec owner | `.siren/` |
+| **paintress** | Implementer | `.expedition/` |
+| **amadeus** | Verifier | `.gate/` |
+| **phonewave** | Courier / Coordinator | (no endpoint — routes between others) |
+
+Amadeus produces corrective D-Mails (`design-feedback`, `implementation-feedback`, `convergence`) and consumes `report` D-Mails. SKILL.md files in `.gate/skills/` declare produces/consumes routing for phonewave discovery.
 
 ## Architecture
 
@@ -125,10 +138,14 @@ amadeus run (daemon)
     +-- .run/                 <- Ephemeral state (gitignored)
     |   +-- latest.json       <- Current check state
     |   +-- baseline.json     <- Full calibration baseline
+    |   +-- insights.lock     <- Flock for concurrent insight writes
     +-- events/               <- Append-only event log (JSONL, daily rotation, gitignored)
+    +-- insights/             <- Semantic insight ledger (git-tracked, per ADR S0030)
+    |   +-- divergence.md     <- Divergence insights (How enriched with Claude reasoning)
+    |   +-- convergence.md    <- Convergence insights (Why enriched from archive D-Mails)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
-    +-- archive/              <- All D-Mails (git-tracked)
+    +-- archive/              <- All D-Mails (gitignored)
 ```
 
 ### Scoring Axes
@@ -174,6 +191,8 @@ The auth module violates the JWT requirement specified in ADR-003.
 
 > **BREAKING**: The former `kind: feedback` has been split into `kind: design-feedback` and `kind: implementation-feedback`. Run `amadeus init --force` to regenerate SKILL.md files. `amadeus doctor` detects the deprecated kind and guides remediation.
 
+D-Mails may include an optional `context` field (per ADR S0031) containing insight summaries from the Insight Ledger, providing receivers with semantic context about the divergence or convergence state.
+
 D-Mail `.md` files are immutable once written.
 
 ## Scope
@@ -194,7 +213,7 @@ D-Mail `.md` files are immutable once written.
 - Store full PR content (stores references, diffs, and scores only)
 - Modify `.gate/` state externally (all operations are idempotent and local)
 
-## Install
+## Setup
 
 ```bash
 # Homebrew (WIP — tap may not be published yet)
@@ -202,11 +221,7 @@ brew install hironow/tap/amadeus
 
 # Or build from source
 just install
-```
 
-## Setup
-
-```bash
 # Initialize .gate/ with default config
 amadeus init
 
@@ -224,12 +239,11 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 | Command | Description |
 |---------|-------------|
 | `amadeus run` | Daemon mode: divergence check + PR convergence + fsnotify inbox watcher |
-| `amadeus check` | Execute single divergence check (deprecated, use `amadeus run`) |
 | `amadeus init` | Initialize `.gate/` directory with default config (`--force` to regenerate) |
 | `amadeus config show` | Show current configuration values |
 | `amadeus config set` | Update configuration values (e.g., `amadeus config set lang en`) |
 | `amadeus validate` | Validate `.gate/config.yaml` |
-| `amadeus doctor` | Check environment health (13 checks: git, git-remote, gh, claude, config, fsnotify, etc.) |
+| `amadeus doctor` | Check environment health (multiple checks: git, git-remote, gh, claude, config, fsnotify, etc.) |
 | `amadeus log` | Print check history and D-Mail log |
 | `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
 | `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
@@ -244,6 +258,8 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Usage
 
+All commands accept an optional `[path]` argument. When omitted, the current working directory is used.
+
 ```bash
 # Daemon mode (divergence check + PR convergence + inbox watcher)
 amadeus run
@@ -253,15 +269,6 @@ amadeus run -f
 
 # Daemon with dry run (build prompt only, skip Claude call)
 amadeus run -n
-
-# Single check (legacy, deprecated)
-amadeus check
-
-# Full calibration (evaluate entire codebase from zero)
-amadeus check -f
-
-# JSON output (machine-readable, stdout)
-amadeus check -j
 
 # Show/set configuration
 amadeus config show
@@ -301,49 +308,7 @@ amadeus update -C
 | `--output` | `-o` | `text` | Output format: `text` or `json` |
 | `--lang` | `-l` | | Output language (`ja`, `en`) |
 
-### run
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--dry-run` | `-n` | `false` | Build prompt only, skip Claude |
-| `--full` | `-f` | `false` | Force full calibration check |
-| `--quiet` | `-q` | `false` | Summary-only output |
-| `--json` | `-j` | `false` | Structured JSON output to stdout |
-| `--base` | | `""` | Upstream branch for post-merge divergence check |
-
-### check (deprecated)
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--dry-run` | `-n` | `false` | Build prompt only, skip Claude |
-| `--full` | `-f` | `false` | Force full calibration check |
-| `--quiet` | `-q` | `false` | Summary-only output |
-| `--json` | `-j` | `false` | Structured JSON output to stdout |
-| `--auto-approve` | | `false` | Skip approval gate |
-| `--approve-cmd` | | `""` | External approval command (`{message}` placeholder, exit 0 = approve) |
-| `--notify-cmd` | | `""` | External notification command (`{title}`, `{message}` placeholders) |
-| `--review-cmd` | | `""` | Code review command after check (exit 0 = pass) |
-
-### archive-prune
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--days` | `-d` | `30` | Prune files older than N days |
-| `--execute` | `-x` | `false` | Execute pruning (default: dry-run) |
-| `--dry-run` | `-n` | `false` | Explicit dry-run (default behavior) |
-| `--yes` | `-y` | `false` | Skip confirmation prompt |
-
-### version / doctor / log
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--json` | `-j` | `false` | JSON output |
-
-### update
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--check` | `-C` | `false` | Check for updates without installing |
+For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
 ## Exit Codes
 
@@ -354,7 +319,7 @@ amadeus update -C
 | `2` | Drift detected (divergence threshold exceeded) |
 
 ```bash
-amadeus check --quiet
+amadeus run --quiet
 case $? in
   0) echo "clean" ;;
   2) echo "drift detected" >&2 ;;
@@ -366,6 +331,11 @@ esac
 
 ```yaml
 # .gate/config.yaml
+lang: ja
+claude_cmd: claude
+model: opus
+timeout_sec: 1980
+
 weights:
   adr_integrity: 0.4
   dod_fulfillment: 0.3
@@ -395,7 +365,7 @@ Amadeus instruments key operations with OpenTelemetry spans and events. Tracing 
 just jaeger
 
 # Run amadeus with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus run
 
 # View traces at http://localhost:16686
 # MCP endpoint at http://localhost:16687
@@ -404,7 +374,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus check
 just jaeger-down
 ```
 
-Spans cover: `amadeus.run` (daemon root), `amadeus.check`, `reading_steiner`, `divergence_meter`, `dmail`, `pr_convergence`, and `amadeus.doctor`.
+Spans cover: `amadeus.run` (daemon root), `reading_steiner`, `divergence_meter`, `dmail`, `pr_convergence`, and `amadeus.doctor`.
 
 Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.created`, `doctor.check`, `run.started`, `run.stopped`, `pr_convergence.checked`.
 
@@ -443,7 +413,9 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - [docs/gate-directory.md](docs/gate-directory.md) — `.gate/` directory structure
 - [docs/policies.md](docs/policies.md) — Event → Policy mapping
 - [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/testing.md](docs/testing.md) — Test strategy and conventions
 - [docs/adr/](docs/adr/README.md) — Architecture Decision Records
+- [docs/shared-adr/](docs/shared-adr/README.md) — Cross-tool shared ADRs
 
 ## Prerequisites
 
@@ -452,7 +424,7 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - [GitHub CLI (`gh`)](https://cli.github.com/) (required for PR convergence pipeline)
 - [Docker](https://www.docker.com/) (optional, for Jaeger tracing)
 
-Run `amadeus doctor` to verify all prerequisites (13 checks including git-remote, gh CLI, and fsnotify availability).
+Run `amadeus doctor` to verify all prerequisites (multiple checks including git-remote, gh CLI, and fsnotify availability).
 
 ## License
 

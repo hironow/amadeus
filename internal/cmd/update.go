@@ -2,71 +2,74 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
 )
 
-const repoSlug = "hironow/amadeus"
-
 func newUpdateCommand() *cobra.Command {
+	var checkOnly bool
+
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update amadeus to the latest version",
-		Args:  cobra.NoArgs,
+		Short: "Self-update amadeus to the latest release",
+		Long: `Self-update amadeus to the latest GitHub release.
+
+Downloads the latest release, verifies the checksum, and replaces
+the current binary. Use --check to only check for updates without
+installing.`,
+		Example: `  # Check for updates
+  amadeus update --check
+
+  # Update to the latest version
+  amadeus update`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			checkOnly, _ := cmd.Flags().GetBool("check")
-			ctx := cmd.Context()
-
-			source, err := selfupdate.NewGitHubSource(selfupdate.GitHubConfig{})
-			if err != nil {
-				return fmt.Errorf("create github source: %w", err)
-			}
-
 			updater, err := selfupdate.NewUpdater(selfupdate.Config{
-				Source:    source,
 				Validator: &selfupdate.ChecksumValidator{UniqueFilename: "checksums.txt"},
 			})
 			if err != nil {
-				return fmt.Errorf("create updater: %w", err)
+				return fmt.Errorf("failed to create updater: %w", err)
 			}
 
-			latest, found, err := updater.DetectLatest(ctx, selfupdate.ParseSlug(repoSlug))
+			latest, found, err := updater.DetectLatest(cmd.Context(), selfupdate.ParseSlug("hironow/amadeus"))
 			if err != nil {
-				return fmt.Errorf("detect latest version: %w", err)
+				return fmt.Errorf("failed to detect latest version: %w", err)
 			}
 			if !found {
-				fmt.Fprintln(cmd.ErrOrStderr(), "no release found")
+				fmt.Fprintln(cmd.ErrOrStderr(), "No release found.")
 				return nil
 			}
 
+			cleanVersion := strings.TrimPrefix(Version, "v")
+
 			if isUpToDate(Version, latest.Version()) {
-				fmt.Fprintf(cmd.ErrOrStderr(), "already up to date (%s)\n", Version)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", cleanVersion)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.ErrOrStderr(), "new version available: %s (current: %s)\n",
-					latest.Version(), Version)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", cleanVersion, latest.Version())
 				return nil
 			}
 
 			exe, err := selfupdate.ExecutablePath()
 			if err != nil {
-				return fmt.Errorf("get executable path: %w", err)
+				return fmt.Errorf("failed to locate executable: %w", err)
 			}
 
-			if err := updater.UpdateTo(ctx, latest, exe); err != nil {
-				return fmt.Errorf("update binary: %w", err)
+			if err := updater.UpdateTo(cmd.Context(), latest, exe); err != nil {
+				return fmt.Errorf("update failed: %w", err)
 			}
 
-			fmt.Fprintf(cmd.ErrOrStderr(), "updated to %s\n", latest.Version())
+			fmt.Fprintf(cmd.ErrOrStderr(), "Updated to v%s\n", latest.Version())
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolP("check", "C", false, "check for updates without installing")
+	cmd.Flags().BoolVarP(&checkOnly, "check", "C", false, "Check for updates without installing")
 
 	return cmd
 }

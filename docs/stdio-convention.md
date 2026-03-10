@@ -57,7 +57,7 @@ a := &Amadeus{
 The stream separation ensures correct behavior in Unix pipelines:
 
 ```bash
-amadeus check --json | jq '.axes'    # stdout = JSON only
-amadeus check --json 2>/dev/null     # suppress stderr logs
-amadeus check --json 2>check.log     # split logs to file
+amadeus run --json | jq '.axes'    # stdout = JSON only
+amadeus run --json 2>/dev/null     # suppress stderr logs
+amadeus run --json 2>check.log     # split logs to file
 ```

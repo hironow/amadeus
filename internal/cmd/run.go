@@ -39,17 +39,6 @@ func newRunCommand() *cobra.Command {
 				return fmt.Errorf("not initialized — run 'amadeus init' first")
 			}
 
-			// Preflight: verify required binaries exist
-			// git and gh are always needed (gh for PR reader)
-			bins := []string{"git", "gh"}
-			// claude is needed only for post-merge pipeline (when --base is set) and not dry-run
-			if baseBranch != "" && !dryRun {
-				bins = append(bins, "claude")
-			}
-			if preErr := session.PreflightCheck(bins...); preErr != nil {
-				return preErr
-			}
-
 			logger := loggerFrom(cmd)
 
 			if err := session.InitGateDir(divRoot, logger); err != nil {
@@ -62,6 +51,20 @@ func newRunCommand() *cobra.Command {
 			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
+			}
+
+			// Preflight: verify required binaries exist
+			bins := []string{"git"}
+			// gh is needed for PR reader (pre-merge pipeline)
+			// claude is needed for post-merge pipeline (when --base is set) and not dry-run
+			if baseBranch != "" {
+				bins = append(bins, "gh")
+				if !dryRun {
+					bins = append(bins, cfg.ClaudeCmd)
+				}
+			}
+			if preErr := session.PreflightCheck(bins...); preErr != nil {
+				return preErr
 			}
 
 			if lang != "" {
@@ -107,22 +110,35 @@ func newRunCommand() *cobra.Command {
 
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 			git := session.NewGitClient(repoRoot)
-			prReader := session.NewGhPRReader(repoRoot)
+
+			// PRReader requires gh CLI — only create when --base is set
+			var prReader *session.GhPRReader
+			if baseBranch != "" {
+				prReader = session.NewGhPRReader(repoRoot)
+			}
+
+			insightWriter := session.NewInsightWriter(
+				filepath.Join(divRoot, "insights"),
+				filepath.Join(divRoot, ".run"),
+			)
 
 			a := &session.Amadeus{
-				Config:    cfg,
-				Store:     store,
-				Events:    eventStore,
-				Projector: projector,
-				Git:       git,
-				RepoDir:   repoRoot,
-				Logger:    logger,
-				DataOut:   cmd.OutOrStdout(),
-				Approver:  approver,
-				Notifier:  notifier,
-				Metrics:   &platform.OTelPolicyMetrics{},
-				ReviewCmd: reviewCmd,
-				PRReader:  prReader,
+				Config:      cfg,
+				Store:       store,
+				Events:      eventStore,
+				Projector:   projector,
+				Git:         git,
+				RepoDir:     repoRoot,
+				Logger:      logger,
+				DataOut:     cmd.OutOrStdout(),
+				Approver:    approver,
+				Notifier:    notifier,
+				Metrics:     &platform.OTelPolicyMetrics{},
+				ReviewCmd:   reviewCmd,
+				ClaudeCmd:   cfg.ClaudeCmd,
+				ClaudeModel: cfg.Model,
+				PRReader:    prReader,
+				Insights:    insightWriter,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
@@ -130,14 +146,23 @@ func newRunCommand() *cobra.Command {
 			if rpErr != nil {
 				return rpErr
 			}
+
+			checkOpts := domain.CheckOptions{
+				Full:   full,
+				DryRun: dryRun,
+				Quiet:  quiet,
+				JSON:   jsonOut,
+			}
+
+			// Without --base: one-shot check (replaces old 'check' command)
+			// With --base: daemon loop with inbox monitoring + post-merge checks
+			if baseBranch == "" {
+				return usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), checkOpts,
+					a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
+			}
 			return usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
-				CheckOptions: domain.CheckOptions{
-					Full:   full,
-					DryRun: dryRun,
-					Quiet:  quiet,
-					JSON:   jsonOut,
-				},
-				BaseBranch: baseBranch,
+				CheckOptions: checkOpts,
+				BaseBranch:   baseBranch,
 			}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
 		},
 	}

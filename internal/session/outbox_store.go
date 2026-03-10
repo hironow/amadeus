@@ -3,7 +3,9 @@ package session
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -273,7 +275,7 @@ func NewOutboxStoreForDir(root string) (*SQLiteOutboxStore, error) {
 // incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
 func PruneFlushedOutbox(ctx context.Context, root string) (int, error) {
 	dbPath := filepath.Join(root, ".run", "outbox.db")
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+	if _, err := os.Stat(dbPath); errors.Is(err, fs.ErrNotExist) {
 		return 0, nil
 	}
 	store, err := NewOutboxStoreForDir(root)

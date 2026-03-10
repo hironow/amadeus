@@ -43,8 +43,8 @@ func TestE2E_Pipeline_Convergence(t *testing.T) {
 		}})
 	}
 
-	// Run check — convergence detection runs on all archive D-Mails
-	stdout, _, err := runCmd(t, dir, "check", "--full", "--json")
+	// Run — convergence detection runs on all archive D-Mails
+	stdout, _, err := runCmd(t, dir, "run", "--full", "--json")
 	assertExitCode(t, err, 2)
 
 	var result struct {
@@ -114,13 +114,13 @@ func TestE2E_Pipeline_HookInstallUninstall(t *testing.T) {
 	assertFileNotExists(t, filepath.Join(dir, ".git", "hooks", "post-merge"))
 }
 
-// TestE2E_Pipeline_MultiCheckWithDivergenceHistory runs multiple checks and verifies history.
+// TestE2E_Pipeline_MultiCheckWithDivergenceHistory runs multiple runs and verifies history.
 func TestE2E_Pipeline_MultiCheckWithDivergenceHistory(t *testing.T) {
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
-	// First check (full)
-	runCmd(t, dir, "check", "--full", "--json")
+	// First run (full)
+	runCmd(t, dir, "run", "--full", "--json")
 
 	// Add commit
 	os.WriteFile(filepath.Join(dir, "x.go"), []byte("package x\n"), 0o644)
@@ -131,8 +131,8 @@ func TestE2E_Pipeline_MultiCheckWithDivergenceHistory(t *testing.T) {
 	gitCommit.Dir = dir
 	gitCommit.Run()
 
-	// Second check (full again)
-	runCmd(t, dir, "check", "--full", "--json")
+	// Second run (full again)
+	runCmd(t, dir, "run", "--full", "--json")
 
 	// Verify log shows both entries
 	stdout, _, _ := runCmd(t, dir, "log", "--json")

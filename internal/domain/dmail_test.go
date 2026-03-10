@@ -841,6 +841,71 @@ func TestExtractIssueIDs_MixedPrefixes(t *testing.T) {
 	}
 }
 
+func TestMarshalDMail_ContextRoundTrip(t *testing.T) {
+	// given
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-context-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "ADR violation with insight context",
+		Context: &domain.InsightContext{
+			Insights: []domain.InsightSummary{
+				{Source: "amadeus", Summary: "Divergence score exceeds threshold"},
+				{Source: "sightjack", Summary: "Shibito count reduced to 3"},
+			},
+		},
+		Body: "# Details\n\nSome markdown content.\n",
+	}
+
+	// when
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+	parsed, err := domain.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail round-trip failed: %v", err)
+	}
+
+	// then
+	if parsed.Context == nil {
+		t.Fatal("expected non-nil Context after round-trip")
+	}
+	if len(parsed.Context.Insights) != 2 {
+		t.Fatalf("expected 2 insights, got %d", len(parsed.Context.Insights))
+	}
+	if parsed.Context.Insights[0].Source != "amadeus" {
+		t.Errorf("insight[0].Source = %q, want %q", parsed.Context.Insights[0].Source, "amadeus")
+	}
+	if parsed.Context.Insights[0].Summary != "Divergence score exceeds threshold" {
+		t.Errorf("insight[0].Summary = %q, want %q", parsed.Context.Insights[0].Summary, "Divergence score exceeds threshold")
+	}
+	if parsed.Context.Insights[1].Source != "sightjack" {
+		t.Errorf("insight[1].Source = %q, want %q", parsed.Context.Insights[1].Source, "sightjack")
+	}
+}
+
+func TestMarshalDMail_NilContextOmitted(t *testing.T) {
+	// given — DMail with nil Context
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-no-context",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "no context",
+	}
+
+	// when
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+
+	// then — context should not appear in output
+	if strings.Contains(string(data), "context:") {
+		t.Error("nil Context should be omitted from marshalled output")
+	}
+}
+
 func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {

@@ -70,7 +70,13 @@ Supported keys:
   full_check.on_divergence_jump     Divergence jump threshold
   convergence.window_days           Convergence detection window (days)
   convergence.threshold             Convergence threshold count
-  convergence.escalation_multiplier Escalation multiplier`,
+  convergence.escalation_multiplier                       Escalation multiplier
+  per_axis_override.adr_integrity_force_high               ADR force-high threshold (0-100)
+  per_axis_override.dod_fulfillment_force_high             DoD force-high threshold (0-100)
+  per_axis_override.dependency_integrity_force_medium       Dep force-medium threshold (0-100)
+  claude_cmd                            Claude CLI command name (default: claude)
+  model                                 Claude model name (default: opus)
+  timeout_sec                           Claude CLI timeout in seconds (default: 1980)`,
 		Example: `  amadeus config set lang en
   amadeus config set full_check.interval 20
   amadeus config set weights.adr_integrity 0.5`,
@@ -215,6 +221,39 @@ func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid value for %s: %w", key, err)
 		}
 		cfg.Convergence.EscalationMultiplier = n
+
+	// Per-axis overrides
+	case "per_axis_override.adr_integrity_force_high":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for %s: %w", key, err)
+		}
+		cfg.PerAxisOverride.ADRForceHigh = n
+	case "per_axis_override.dod_fulfillment_force_high":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for %s: %w", key, err)
+		}
+		cfg.PerAxisOverride.DoDForceHigh = n
+	case "per_axis_override.dependency_integrity_force_medium":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for %s: %w", key, err)
+		}
+		cfg.PerAxisOverride.DepForceMedium = n
+
+	case "claude_cmd":
+		cfg.ClaudeCmd = value
+
+	case "model":
+		cfg.Model = value
+
+	case "timeout_sec":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid timeout_sec %q: must be non-negative integer", value)
+		}
+		cfg.TimeoutSec = n
 
 	default:
 		return fmt.Errorf("unknown config key %q", key)

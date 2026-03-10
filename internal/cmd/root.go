@@ -95,7 +95,6 @@ func NewRootCommand() *cobra.Command {
 		newUninstallHookCommand(),
 		newLogCommand(),
 		newDoctorCommand(),
-		newCheckCommand(),
 		newRunCommand(),
 		newSyncCommand(),
 		newMarkCommentedCommand(),

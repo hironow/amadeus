@@ -18,14 +18,29 @@ type ConvergenceConfig struct {
 	EscalationMultiplier int `yaml:"escalation_multiplier"`
 }
 
+// ComputedConfig holds system-written fields. Empty for amadeus today.
+type ComputedConfig struct{}
+
+// Default values for Config fields. Used by DefaultConfig and post-load
+// validation to avoid hardcoded strings throughout the codebase.
+const (
+	DefaultClaudeCmd  = "claude"
+	DefaultModel      = "opus"
+	DefaultTimeoutSec = 1980
+)
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
 	Lang            string            `yaml:"lang"`
+	ClaudeCmd       string            `yaml:"claude_cmd,omitempty"`
+	Model           string            `yaml:"model,omitempty"`
+	TimeoutSec      int               `yaml:"timeout_sec,omitempty"`
 	Weights         Weights           `yaml:"weights"`
 	Thresholds      Thresholds        `yaml:"thresholds"`
 	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
 	FullCheck       FullCheckConfig   `yaml:"full_check"`
 	Convergence     ConvergenceConfig `yaml:"convergence"`
+	Computed        ComputedConfig    `yaml:"computed,omitempty"`
 }
 
 // FullCheckConfig controls the full scan strategy.
@@ -39,6 +54,9 @@ func DefaultConfig() Config {
 	sc := DefaultThresholds()
 	return Config{
 		Lang:            "ja",
+		ClaudeCmd:       DefaultClaudeCmd,
+		Model:           DefaultModel,
+		TimeoutSec:      DefaultTimeoutSec,
 		Weights:         DefaultWeights(),
 		Thresholds:      sc.Thresholds,
 		PerAxisOverride: sc.PerAxisOverride,
@@ -69,6 +87,14 @@ func (c Config) DetectConvergence(dmails []DMail, now time.Time) []ConvergenceAl
 // An empty slice means the config is valid.
 func ValidateConfig(cfg Config) []string {
 	var errs []string
+
+	// Required string fields
+	if cfg.ClaudeCmd == "" {
+		errs = append(errs, "claude_cmd must not be empty")
+	}
+	if cfg.Model == "" {
+		errs = append(errs, "model must not be empty")
+	}
 
 	// Language check
 	if !ValidLang(cfg.Lang) {
@@ -128,6 +154,11 @@ func ValidateConfig(cfg Config) []string {
 	}
 	if cfg.Convergence.EscalationMultiplier < 0 {
 		errs = append(errs, fmt.Sprintf("convergence.escalation_multiplier must be non-negative (got %d)", cfg.Convergence.EscalationMultiplier))
+	}
+
+	// TimeoutSec check
+	if cfg.TimeoutSec < 0 {
+		errs = append(errs, fmt.Sprintf("timeout_sec must be non-negative (got %d)", cfg.TimeoutSec))
 	}
 
 	// Full check config

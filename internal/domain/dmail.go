@@ -76,6 +76,7 @@ type dmailFrontmatter struct {
 	Priority      int               `yaml:"priority,omitempty"`
 	Targets       []string          `yaml:"targets,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 }
 
 // DMail is the correction routing message using YAML frontmatter + Markdown body.
@@ -90,6 +91,7 @@ type DMail struct {
 	Priority      int               `yaml:"priority,omitempty"`
 	Targets       []string          `yaml:"targets,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 	Body          string            `yaml:"-"`
 }
 
@@ -182,6 +184,7 @@ func ParseDMail(data []byte) (DMail, error) {
 		Priority:      fm.Priority,
 		Targets:       fm.Targets,
 		Metadata:      fm.Metadata,
+		Context:       fm.Context,
 		Body:          strings.TrimLeft(bodyPart, "\n"),
 	}, nil
 }
@@ -220,6 +223,7 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 		Priority:      dmail.Priority,
 		Targets:       dmail.Targets,
 		Metadata:      meta,
+		Context:       dmail.Context,
 	}
 	yamlData, err := yaml.Marshal(fm)
 	if err != nil {

@@ -139,9 +139,6 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 
 	// claude.invoke span wraps the Claude CLI execution with GenAI semconv attributes.
 	model := a.ClaudeModel
-	if model == "" {
-		model = "opus"
-	}
 	timeoutSec := 0
 	if deadline, ok := ctx.Deadline(); ok {
 		timeoutSec = int(time.Until(deadline).Seconds())

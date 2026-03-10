@@ -6,6 +6,8 @@ import (
 	"context"
 	"database/sql"
 	"os/exec"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // NewLocalNotifierForTest creates a LocalNotifier with test overrides.
@@ -41,3 +43,18 @@ var ExportParseGhPRListOutput = parseGhPRListOutput
 // DBForTest returns the underlying database connection for testing.
 // Only available in test builds.
 func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }
+
+// ExportWriteDivergenceInsight exposes writeDivergenceInsight for external tests.
+func ExportWriteDivergenceInsight(a *Amadeus, result domain.DivergenceResult, sessionID, commitRange, reasoning string) {
+	a.writeDivergenceInsight(result, sessionID, commitRange, reasoning)
+}
+
+// ExportWriteConvergenceInsight exposes writeConvergenceInsight for external tests.
+func ExportWriteConvergenceInsight(a *Amadeus, alert domain.ConvergenceAlert, sessionID string, archiveDir string) {
+	a.writeConvergenceInsight(alert, sessionID, archiveDir)
+}
+
+// ExportHighScoringAxisDetails exposes highScoringAxisDetails for external tests.
+func ExportHighScoringAxisDetails(axes map[domain.Axis]domain.AxisScore) []string {
+	return highScoringAxisDetails(axes)
+}

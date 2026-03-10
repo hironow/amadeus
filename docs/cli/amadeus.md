@@ -32,7 +32,7 @@ amadeus [flags]
 * [amadeus status](amadeus_status.md)	 - Show amadeus operational status
 * [amadeus sync](amadeus_sync.md)	 - Show D-Mail sync status (JSON)
 * [amadeus uninstall-hook](amadeus_uninstall-hook.md)	 - Remove post-merge git hook
-* [amadeus update](amadeus_update.md)	 - Update amadeus to the latest version
+* [amadeus update](amadeus_update.md)	 - Self-update amadeus to the latest release
 * [amadeus validate](amadeus_validate.md)	 - Validate config file
 * [amadeus version](amadeus_version.md)	 - Print version, commit, and build information
 

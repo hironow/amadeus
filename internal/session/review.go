@@ -144,13 +144,6 @@ func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, t
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	if claudeCmd == "" {
-		claudeCmd = "claude"
-	}
-	if model == "" {
-		model = "opus"
-	}
-
 	prompt := BuildReviewFixPrompt(branch, comments)
 
 	fixTimeout := time.Duration(timeoutSec) * time.Second
@@ -160,7 +153,7 @@ func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, t
 	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
 	defer fixCancel()
 
-	cmd := exec.CommandContext(fixCtx, claudeCmd,
+	cmd := platform.NewShellCmd(fixCtx, claudeCmd,
 		"--model", model,
 		"--continue",
 		"--dangerously-skip-permissions",

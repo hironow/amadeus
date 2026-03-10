@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -303,6 +304,67 @@ func TestValidateConfig_ConvergenceThresholdZero(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected validation error mentioning 'convergence.threshold', got: %v", errs)
+	}
+}
+
+func TestConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
+	// when
+	cfg := domain.DefaultConfig()
+
+	// then
+	if cfg.Computed != (domain.ComputedConfig{}) {
+		t.Errorf("expected Computed to be zero-value, got %+v", cfg.Computed)
+	}
+}
+
+func TestDefaultConfig_ClaudeCmd(t *testing.T) {
+	// when
+	cfg := domain.DefaultConfig()
+
+	// then
+	if cfg.ClaudeCmd != "claude" {
+		t.Errorf("expected ClaudeCmd=\"claude\", got %q", cfg.ClaudeCmd)
+	}
+	if cfg.Model != "opus" {
+		t.Errorf("expected Model=\"opus\", got %q", cfg.Model)
+	}
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected TimeoutSec=1980, got %d", cfg.TimeoutSec)
+	}
+}
+
+func TestConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+
+	// when: marshal
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	// then: no "computed" key in YAML output (empty struct with omitempty)
+	if strings.Contains(string(data), "computed") {
+		t.Errorf("expected no 'computed' key in YAML, got:\n%s", string(data))
+	}
+
+	// when: unmarshal back
+	var restored domain.Config
+	if err := yaml.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("failed to unmarshal config: %v", err)
+	}
+
+	// then: ClaudeCmd preserved
+	if restored.ClaudeCmd != "claude" {
+		t.Errorf("expected ClaudeCmd=\"claude\" after round-trip, got %q", restored.ClaudeCmd)
+	}
+	// then: Model preserved
+	if restored.Model != "opus" {
+		t.Errorf("expected Model=\"opus\" after round-trip, got %q", restored.Model)
+	}
+	// then: TimeoutSec preserved
+	if restored.TimeoutSec != 1980 {
+		t.Errorf("expected TimeoutSec=1980 after round-trip, got %d", restored.TimeoutSec)
 	}
 }
 

@@ -46,6 +46,7 @@ func InitGateDir(root string, logger domain.Logger) error {
 		filepath.Join(root, "outbox"),
 		filepath.Join(root, "inbox"),
 		filepath.Join(root, "archive"),
+		filepath.Join(root, "insights"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -83,15 +84,8 @@ func InitGateDir(root string, logger domain.Logger) error {
 	}
 
 	configPath := filepath.Join(root, "config.yaml")
-	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
-		cfg := domain.DefaultConfig()
-		data, err := yaml.Marshal(cfg)
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(configPath, data, 0o644); err != nil {
-			return err
-		}
+	if err := writeConfigWithDefaults(configPath); err != nil {
+		return err
 	}
 	gitignorePath := filepath.Join(root, ".gitignore")
 	requiredEntries := []string{".run/", "outbox/", "inbox/", ".otel.env", "events/"}
@@ -197,4 +191,71 @@ func (s *ProjectionStore) writeJSON(path string, v any) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+// writeConfigWithDefaults writes config.yaml with all defaults populated.
+// If an existing config.yaml exists, user values are preserved (merged over defaults).
+func writeConfigWithDefaults(configPath string) error {
+	cfg := domain.DefaultConfig()
+
+	existing, readErr := os.ReadFile(configPath)
+	if readErr == nil && len(existing) > 0 {
+		// Merge: defaults as base, existing values override
+		var defaultMap map[string]any
+		defaultData, marshalErr := yaml.Marshal(cfg)
+		if marshalErr != nil {
+			return fmt.Errorf("marshal default config: %w", marshalErr)
+		}
+		if err := yaml.Unmarshal(defaultData, &defaultMap); err != nil {
+			return err
+		}
+
+		var existingMap map[string]any
+		if err := yaml.Unmarshal(existing, &existingMap); err != nil {
+			return err
+		}
+
+		deepMerge(defaultMap, existingMap)
+
+		merged, err := yaml.Marshal(defaultMap)
+		if err != nil {
+			return err
+		}
+		// Validate the merged config by round-tripping through the struct
+		var mergedCfg domain.Config
+		if err := yaml.Unmarshal(merged, &mergedCfg); err != nil {
+			return err
+		}
+		data, err := yaml.Marshal(mergedCfg)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(configPath, data, 0o644)
+	}
+
+	// No existing config: write defaults
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0o644)
+}
+
+// deepMerge merges src into dst recursively. src values override dst values.
+// Nested maps are merged recursively; all other types are replaced.
+func deepMerge(dst, src map[string]any) {
+	for k, sv := range src {
+		dv, exists := dst[k]
+		if !exists {
+			dst[k] = sv
+			continue
+		}
+		srcMap, srcOK := sv.(map[string]any)
+		dstMap, dstOK := dv.(map[string]any)
+		if srcOK && dstOK {
+			deepMerge(dstMap, srcMap)
+		} else {
+			dst[k] = sv
+		}
+	}
 }

@@ -5,9 +5,11 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +21,30 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"gopkg.in/yaml.v3"
 )
+
+// buildFakeClaude compiles the fake-claude binary and returns its absolute path.
+func buildFakeClaude(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	binPath := filepath.Join(binDir, "fake-claude")
+
+	// Locate fake-claude source relative to this test file.
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine test file location")
+	}
+	// thisFile = internal/cmd/doctor_checks_test.go → project root = ../../
+	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
+	fakeSrc := filepath.Join(projectRoot, "tests", "scenario", "testdata", "fake-claude")
+
+	cmd := exec.Command("go", "build", "-o", binPath, ".")
+	cmd.Dir = fakeSrc
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build fake-claude: %v\n%s", err, out)
+	}
+	return binPath
+}
 
 // setupTestTracer configures an in-memory tracer for testing doctor spans.
 func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
@@ -158,17 +184,44 @@ func TestCheckGateDir_NotExist(t *testing.T) {
 	}
 }
 
-func TestCheckLinearMCP_Connected(t *testing.T) {
-	// given: mock claude mcp list output showing linear connected
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+func TestCheckClaudeAuth_Authenticated(t *testing.T) {
+	// given
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkClaudeAuth(mcpOutput, nil)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "authenticated" {
+		t.Errorf("expected 'authenticated', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeAuth_NotAuthenticated(t *testing.T) {
+	// given
+	mcpErr := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeAuth("", mcpErr)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "claude login") {
+		t.Errorf("expected hint to mention 'claude login', got: %s", result.Hint)
+	}
+}
+
+func TestCheckLinearMCP_Connected(t *testing.T) {
+	// given
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
+
+	// when
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -177,16 +230,11 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 }
 
 func TestCheckLinearMCP_NotConnected(t *testing.T) {
-	// given: mock output without linear
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "some-other-mcp: https://example.com - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+	// given
+	mcpOutput := "some-other-mcp: https://example.com - ✓ Connected"
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -195,16 +243,11 @@ func TestCheckLinearMCP_NotConnected(t *testing.T) {
 }
 
 func TestCheckLinearMCP_CommandFails(t *testing.T) {
-	// given: claude mcp list fails
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("false")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+	// given
+	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkLinearMCP("", mcpErr)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -213,16 +256,11 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 }
 
 func TestCheckLinearMCP_Disconnected(t *testing.T) {
-	// given: mock output showing linear as disconnected
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	ctx := context.Background()
+	// given
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected"
 
 	// when
-	result := checkLinearMCP(ctx, "claude")
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -261,10 +299,14 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock commands succeed
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	})
+	defer cleanupPath()
 
 	dir := t.TempDir()
 	// Create .gate/ with config
@@ -283,12 +325,16 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 13 results
-	if len(results) != 13 {
-		t.Fatalf("expected 13 results, got %d", len(results))
+	// then: should have 15 results
+	if len(results) != 15 {
+		names := make([]string, len(results))
+		for i, r := range results {
+			names[i] = r.Name
+		}
+		t.Fatalf("expected 15 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "Git Repository", "Git Remote", "gh", "claude", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "success-rate", "Linear MCP"}
+	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "Linear MCP", "claude-inference", "success-rate"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -299,10 +345,14 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	// given: mock commands succeed
 	exp := setupTestTracer(t)
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	})
+	defer cleanupPath()
 
 	dir := t.TempDir()
 	exec.Command("git", "init", dir).Run()
@@ -323,15 +373,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "domain.doctor" {
 			found = true
-			// Should have 13 doctor.check events (one per check)
+			// Should have 15 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 13 {
-				t.Errorf("expected 13 doctor.check events, got %d", eventCount)
+			if eventCount != 15 {
+				t.Errorf("expected 15 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -425,10 +475,14 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 
 func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// given: mock commands succeed
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	})
+	defer cleanupPath()
 
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
@@ -441,13 +495,13 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 13 results
-	if len(results) != 13 {
+	// then: should have 15 results
+	if len(results) != 15 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 13 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 15 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -468,8 +522,8 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	}
 }
 
-func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
-	// given: no need to mock execCommand for this test
+func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
+	// given
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
@@ -484,19 +538,35 @@ func TestRunDoctor_ClaudeUnavailable_MCPSkipped(t *testing.T) {
 	// when: pass a nonexistent claude command
 	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{})
 
-	// then
-	var mcpResult domain.DoctorCheckResult
+	// then: claude-auth, Linear MCP, and claude-inference should be skipped
+	var authResult, mcpResult, inferResult domain.DoctorCheckResult
 	for _, r := range results {
-		if r.Name == "Linear MCP" {
+		switch r.Name {
+		case "claude-auth":
+			authResult = r
+		case "Linear MCP":
 			mcpResult = r
-			break
+		case "claude-inference":
+			inferResult = r
 		}
+	}
+	if authResult.Status != domain.CheckSkip {
+		t.Errorf("expected claude-auth SKIP when claude unavailable, got %v: %s", authResult.Status, authResult.Message)
+	}
+	if !strings.Contains(authResult.Message, "claude not available") {
+		t.Errorf("expected 'claude not available' in auth message, got: %s", authResult.Message)
 	}
 	if mcpResult.Status != domain.CheckSkip {
 		t.Errorf("expected Linear MCP SKIP when claude unavailable, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
 	if !strings.Contains(mcpResult.Message, "claude not available") {
-		t.Errorf("expected 'claude not available' in message, got: %s", mcpResult.Message)
+		t.Errorf("expected 'claude not available' in MCP message, got: %s", mcpResult.Message)
+	}
+	if inferResult.Status != domain.CheckSkip {
+		t.Errorf("expected claude-inference SKIP when claude unavailable, got %v: %s", inferResult.Status, inferResult.Message)
+	}
+	if !strings.Contains(inferResult.Message, "claude not available") {
+		t.Errorf("expected 'claude not available' in inference message, got: %s", inferResult.Message)
 	}
 }
 
@@ -673,10 +743,14 @@ func TestCheckFsnotify_Available(t *testing.T) {
 
 func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	// given: mock commands succeed
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
-	}
-	defer func() { execCommand = exec.CommandContext }()
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	})
+	defer cleanupPath()
 
 	repoRoot := t.TempDir()
 	gateDir := filepath.Join(repoRoot, ".gate")
@@ -725,5 +799,105 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected success-rate check in results")
+	}
+}
+
+func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
+	// given: fake-claude binary via runDoctorWithClaudeCmd
+	fakeClaude := buildFakeClaude(t)
+
+	repoRoot := t.TempDir()
+	gateDir := filepath.Join(repoRoot, ".gate")
+	initGateDirForTest(t, gateDir)
+	exec.Command("git", "init", repoRoot).Run()
+	exec.Command("git", "-C", repoRoot, "remote", "add", "origin", "https://github.com/example/repo.git").Run()
+
+	ctx := context.Background()
+	configPath := filepath.Join(gateDir, "config.yaml")
+
+	// when
+	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{})
+
+	// then: claude-auth, Linear MCP, and claude-inference should be OK
+	var authResult, mcpResult, inferResult domain.DoctorCheckResult
+	for _, r := range results {
+		switch r.Name {
+		case "claude-auth":
+			authResult = r
+		case "Linear MCP":
+			mcpResult = r
+		case "claude-inference":
+			inferResult = r
+		}
+	}
+	if authResult.Status != domain.CheckOK {
+		t.Errorf("claude-auth: expected OK, got %v: %s", authResult.Status, authResult.Message)
+	}
+	if mcpResult.Status != domain.CheckOK {
+		t.Errorf("Linear MCP: expected OK, got %v: %s", mcpResult.Status, mcpResult.Message)
+	}
+	if inferResult.Status != domain.CheckOK {
+		t.Errorf("claude-inference: expected OK, got %v: %s", inferResult.Status, inferResult.Message)
+	}
+}
+
+func TestCheckClaudeInference_Success(t *testing.T) {
+	// given
+	output := "2"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "inference OK" {
+		t.Errorf("expected 'inference OK', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeInference_Error(t *testing.T) {
+	// given
+	err := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeInference("", err)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckClaudeInference_FalsePositive(t *testing.T) {
+	// given: "12" contains "2" but is not the expected answer
+	output := "12"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then: must FAIL — "12" is not "2"
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL for false positive '12', got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "unexpected response" {
+		t.Errorf("expected 'unexpected response', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
+	// given
+	output := "I cannot compute that"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "unexpected response" {
+		t.Errorf("expected 'unexpected response', got: %s", result.Message)
 	}
 }

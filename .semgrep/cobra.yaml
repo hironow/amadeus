@@ -61,7 +61,7 @@ rules:
       cobra コマンド内で os.Stderr を直接参照しないでください。
       cmd.ErrOrStderr() を使用してください。
       テスト時に cmd.SetErr(buf) で stderr 出力をキャプチャできなくなります。
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: os.Stderr
       - pattern-inside: |
@@ -196,7 +196,7 @@ rules:
       errors.Is(err, fs.ErrNotExist) を使用してください（Go 1.13+）。
       注: os.Stat の直戻り値には os.IsNotExist でも問題ありませんが、
       fmt.Errorf("%w", err) 等で wrap された場合に検出できなくなります。
-    severity: WARNING
+    severity: ERROR
     pattern: os.IsNotExist(...)
 
   # Rule 12: /dev/tty hard fail — needs fallback for Windows/CI
@@ -224,8 +224,11 @@ rules:
       生のナノ秒リテラルは可読性が低いです。
       time.Second, time.Minute 等の定数を使用してください。
       例: 5_000_000_000 → 5 * time.Second
-    severity: WARNING
+    severity: ERROR
     pattern-regex: '(?<!["\x60])\b\d{9,}\b(?!["\x60])'
+    paths:
+      exclude:
+        - "*_test.go"
 
   # Rule 14: SilenceErrors without error output
   # Source: phonewave #3
@@ -236,5 +239,5 @@ rules:
       main() で err を os.Stderr に出力してください。
       fmt.Fprintf(os.Stderr, "Error: %v\n", err) を追加するか、
       SilenceErrors を使わず SilenceUsage のみ設定してください。
-    severity: WARNING
+    severity: ERROR
     pattern-regex: 'SilenceErrors:\s*true'

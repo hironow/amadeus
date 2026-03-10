@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -29,11 +30,12 @@ type Amadeus struct {
 	Notifier    port.Notifier           // nil = no notifications
 	Metrics     port.PolicyMetrics      // nil = no policy metrics
 	ReviewCmd   string                  // code review command (empty = skip)
-	ClaudeCmd   string                  // Claude CLI command (empty = "claude")
-	ClaudeModel string                  // Claude model for review fix (empty = "opus")
+	ClaudeCmd   string                  // Claude CLI command (set by cmd layer from config)
+	ClaudeModel string                  // Claude model for review fix (set by cmd layer from config)
 	PRReader    port.GitHubPRReader     // nil = skip PR convergence
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
+	Insights    *InsightWriter          // nil = skip insight generation
 
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.
@@ -45,7 +47,7 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
-	return DefaultClaudeRunner()
+	return DefaultClaudeRunner(a.ClaudeCmd, a.ClaudeModel)
 }
 
 // EventStore returns the event persistence store.
@@ -225,6 +227,10 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	}
 	now := time.Now().UTC()
 
+	// Write divergence insight (best-effort, does not fail the check)
+	commitRange := previous.Commit + ".." + currentCommit
+	a.writeDivergenceInsight(meterResult.Divergence, currentCommit, commitRange, meterResult.Reasoning)
+
 	// Gate: request approval before D-Mail generation
 	gateApproved := true
 	if len(meterResult.DMailCandidates) > 0 && a.Approver != nil {
@@ -280,6 +286,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		return err
 	}
 	dmails = append(dmails, convergenceDMails...)
+
+	// Write convergence insights for HIGH severity alerts (best-effort)
+	archiveDir := filepath.Join(a.RepoDir, domain.StateDir, "archive")
+	for _, alert := range convergenceAlerts {
+		a.writeConvergenceInsight(alert, currentCommit, archiveDir)
+	}
 
 	var prNumbers []string
 	for _, pr := range report.MergedPRs {

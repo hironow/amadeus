@@ -3,7 +3,9 @@ package eventsource
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -89,7 +91,7 @@ func (s *FileEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, domain.LoadResult, error) {
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, domain.LoadResult{}, nil
 		}
 		return nil, domain.LoadResult{}, fmt.Errorf("read event store dir: %w", err)

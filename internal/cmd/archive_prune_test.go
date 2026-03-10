@@ -5,6 +5,8 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,7 +77,7 @@ func TestArchivePrune_PrunesEventFiles(t *testing.T) {
 	}
 
 	// Old event file should be deleted
-	if _, statErr := os.Stat(oldEventFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldEventFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected old event file to be deleted")
 	}
 
@@ -142,7 +144,7 @@ func TestArchivePrune_FailsWhenEventRecordFails(t *testing.T) {
 	}
 
 	// Old file should still have been deleted (deletion happens before event recording)
-	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected old archive file to be deleted despite event recording failure")
 	}
 }
@@ -176,7 +178,7 @@ func TestArchivePrune_JSONOutput_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, statErr := os.Stat(oldEventFile); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldEventFile); errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("dry-run should NOT delete the file")
 	}
 
@@ -225,7 +227,7 @@ func TestArchivePrune_JSONOutput_Execute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, statErr := os.Stat(oldEventFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldEventFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("--yes should delete the expired file")
 	}
 

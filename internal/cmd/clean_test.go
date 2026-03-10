@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +76,7 @@ func TestCleanCmd_DeletesGateDir(t *testing.T) {
 	if execErr != nil {
 		t.Fatalf("unexpected error: %v", execErr)
 	}
-	if _, err := os.Stat(gateDir); !os.IsNotExist(err) {
+	if _, err := os.Stat(gateDir); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected .gate/ dir to be deleted")
 	}
 }

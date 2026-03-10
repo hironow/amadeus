@@ -37,7 +37,7 @@ func TestE2E_Help(t *testing.T) {
 	if err != nil {
 		t.Fatalf("--help: %v", err)
 	}
-	for _, sub := range []string{"init", "check", "sync", "doctor", "log", "validate", "mark-commented", "archive-prune", "version"} {
+	for _, sub := range []string{"init", "run", "sync", "doctor", "log", "validate", "mark-commented", "archive-prune", "version"} {
 		if !strings.Contains(stdout, sub) {
 			t.Errorf("expected %q in help output", sub)
 		}
