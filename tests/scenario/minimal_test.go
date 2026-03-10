@@ -36,20 +36,15 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	am := ws.StartAmadeusRun(t, ctx)
 	defer ws.StopAmadeusRun(t, am)
 
-	// Wait for amadeus to consume report and produce feedback
-	// amadeus run processes inbox D-Mails and writes feedback to outbox
-	// phonewave routes: .gate/outbox -> .siren/inbox + .expedition/inbox
-	feedbackPath := ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
-	ws.WaitForDMailCount(t, ".expedition", "inbox", 1, 30*time.Second)
+	// Wait for amadeus to consume report and produce implementation-feedback
+	// phonewave routes: .gate/outbox -> .expedition/inbox (implementation-feedback)
+	feedbackPath := ws.WaitForDMail(t, ".expedition", "inbox", 30*time.Second)
 
 	// Verify outbox is cleaned up
 	ws.WaitForAbsent(t, ".gate", "outbox", 10*time.Second)
 
 	// Verify feedback kind
 	obs.AssertDMailKind(feedbackPath, "implementation-feedback")
-
-	// Verify closed loop: all 3 delivery points have D-Mails
-	obs.WaitForClosedLoop(60 * time.Second)
 
 	obs.AssertAllOutboxEmpty()
 }
