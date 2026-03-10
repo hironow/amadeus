@@ -12,6 +12,7 @@
 //	FAKE_CLAUDE_FIXTURE_SET  — fixture level (minimal, small, middle, hard)
 //	FAKE_CLAUDE_FIXTURE_DIR  — absolute path to fixtures directory
 //	FAKE_CLAUDE_PROMPT_LOG_DIR — directory to log all prompts
+//	FAKE_CLAUDE_ENV_LOG_DIR  — directory to log env vars and args as JSON
 //	FAKE_CLAUDE_FAIL_PATTERN — glob pattern; if prompt matches → exit 1
 //	FAKE_CLAUDE_FAIL_COUNT   — fail N times then succeed (file-based counter)
 package main
@@ -41,6 +42,11 @@ const (
 )
 
 func main() {
+	// Log env vars when FAKE_CLAUDE_ENV_LOG_DIR is set.
+	if envLogDir := os.Getenv("FAKE_CLAUDE_ENV_LOG_DIR"); envLogDir != "" {
+		logEnv(envLogDir)
+	}
+
 	// Handle --version flag (used by doctor's CheckTool).
 	if hasFlag(os.Args[1:], "--version") || hasFlag(os.Args[1:], "-v") {
 		fmt.Println("fake-claude 0.0.0-test")
@@ -350,6 +356,32 @@ func logPrompt(dir, prompt string) {
 	seq := len(entries) + 1
 	filename := fmt.Sprintf("prompt_%03d.txt", seq)
 	_ = os.WriteFile(filepath.Join(dir, filename), []byte(prompt), 0o644)
+}
+
+// logEnv writes selected environment variables and args to a JSON file.
+func logEnv(dir string) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	entries, _ := os.ReadDir(dir)
+	seq := len(entries) + 1
+	filename := fmt.Sprintf("env_%03d.json", seq)
+
+	data := map[string]any{
+		"args": os.Args[1:],
+	}
+	// Capture env vars that tools set via ParseShellCommand.
+	for _, key := range []string{"CLAUDE_CONFIG_DIR", "CLAUDE_MODEL", "ANTHROPIC_API_KEY"} {
+		if v := os.Getenv(key); v != "" {
+			data[key] = v
+		}
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, filename), jsonBytes, 0o644)
 }
 
 // ---------------------------------------------------------------------------
