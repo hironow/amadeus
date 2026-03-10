@@ -224,8 +224,11 @@ rules:
       生のナノ秒リテラルは可読性が低いです。
       time.Second, time.Minute 等の定数を使用してください。
       例: 5_000_000_000 → 5 * time.Second
-    severity: WARNING
+    severity: ERROR
     pattern-regex: '(?<!["\x60])\b\d{9,}\b(?!["\x60])'
+    paths:
+      exclude:
+        - "*_test.go"
 
   # Rule 14: SilenceErrors without error output
   # Source: phonewave #3

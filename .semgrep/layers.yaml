@@ -567,7 +567,7 @@ rules:
 
   - id: lod-excessive-dot-chain
     languages: [go]
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern-regex: '\b\w+\.\w+\.\w+\.\w+'
       - pattern-not-regex: 'attribute\.\w+\("[\w.]+'
