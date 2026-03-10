@@ -20,6 +20,12 @@ type StreamMessage struct {
 	IsError    bool            `json:"is_error,omitempty"`
 	StopReason string          `json:"stop_reason,omitempty"`
 	ToolUseID  string          `json:"tool_use_id,omitempty"`
+
+	// Hook fields (system subtype: hook_started / hook_response)
+	HookName string `json:"hook_name,omitempty"`
+	Command  string `json:"command,omitempty"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Stdout   string `json:"stdout,omitempty"`
 }
 
 // Usage holds token usage from Claude Code.
@@ -42,12 +48,13 @@ type AssistantMessage struct {
 
 // ContentBlock represents a content block (text, tool_use, thinking).
 type ContentBlock struct {
-	Type     string          `json:"type"`
-	Text     string          `json:"text,omitempty"`
-	Thinking string          `json:"thinking,omitempty"`
-	ID       string          `json:"id,omitempty"`
-	Name     string          `json:"name,omitempty"`
-	Input    json.RawMessage `json:"input,omitempty"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text,omitempty"`
+	Thinking  string          `json:"thinking,omitempty"`
+	Signature string          `json:"signature,omitempty"`
+	ID        string          `json:"id,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Input     json.RawMessage `json:"input,omitempty"`
 }
 
 // ParseStreamMessage parses a single NDJSON line.

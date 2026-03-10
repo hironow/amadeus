@@ -128,6 +128,9 @@ func (s *SpanEmittingStreamReader) processMessage(msg *StreamMessage) {
 		s.resultText = msg.Result
 	}
 
+	// Extended handlers (hooks, thinking, rate_limit) — see span_emitting_ext.go
+	s.handleExtMessage(msg)
+
 	switch msg.Type {
 	case "assistant":
 		s.handleAssistant(msg)
