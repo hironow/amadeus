@@ -27,7 +27,7 @@ Each tool maintains its own copy in `docs/shared-adr/`. ADR IDs are referenced i
 | [S0014](S0014-root-package-organization.md) | Root package file organization | Accepted |
 | [S0015](S0015-aggregate-root-and-usecase-layer.md) | Aggregate root and use case layer | Accepted |
 | [S0016](S0016-event-storming-alignment.md) | Event Storming alignment and per-tool applicability | Accepted |
-| [S0017](S0017-data-persistence-boundaries.md) | Data persistence boundaries (Linear/GitHub/local) | Accepted |
+| [S0017](S0017-data-persistence-boundaries.md) | ~~Data persistence boundaries (Linear/GitHub/local)~~ | Superseded by S0030 |
 | [S0018](S0018-accepted-cross-tool-divergence.md) | Accepted cross-tool divergence (default subcommand, storage model) | Accepted |
 | [S0019](S0019-dmail-receive-side-postel-law.md) | D-Mail receive-side validation (Postel's Law) | Accepted |
 | [S0020](S0020-otel-metrics-design.md) | OTel Metrics Design | Accepted |
@@ -40,3 +40,5 @@ Each tool maintains its own copy in `docs/shared-adr/`. ADR IDs are referenced i
 | [S0027](S0027-otel-env-file-backend-config.md) | OTel env-file backend configuration | Accepted |
 | [S0028](S0028-usecase-adapter-dependency-inversion.md) | Usecase-adapter dependency inversion | Accepted |
 | [S0029](S0029-parse-dont-validate-commands.md) | Parse-don't-validate commands | Accepted |
+| [S0030](S0030-insight-data-persistence.md) | Insight Data Persistence — supersedes S0017 | Accepted |
+| [S0031](S0031-dmail-context-extension.md) | D-Mail Context Extension — amends S0005 | Accepted |
