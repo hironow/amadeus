@@ -568,7 +568,9 @@ rules:
   - id: lod-excessive-dot-chain
     languages: [go]
     severity: WARNING
-    pattern-regex: '\b\w+\.\w+\.\w+\.\w+'
+    patterns:
+      - pattern-regex: '\b\w+\.\w+\.\w+\.\w+'
+      - pattern-not-regex: 'attribute\.\w+\("[\w.]+'
     paths:
       include:
         - "/internal/session/**"
