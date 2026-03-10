@@ -53,7 +53,7 @@ func InitGateDir(root string, logger domain.Logger) error {
 			return err
 		}
 	}
-	// Migrate legacy state/ -> .run/ (v0.0.11 -> v0.0.12)
+	// Migrate legacy state/ -> .run/
 	if err := migrateLegacyState(root); err != nil {
 		return fmt.Errorf("migrate legacy state: %w", err)
 	}

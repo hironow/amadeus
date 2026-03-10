@@ -66,8 +66,8 @@ Uses YAML format with sections for `lang`, `weights`, `thresholds`,
 
 ### State Migration
 
-Legacy `state/` directory (v0.0.11) is automatically migrated to `.run/`
-(v0.0.12) by `migrateLegacyState()`. Files are moved only if the destination
+Legacy `state/` directory is automatically migrated to `.run/`
+by `migrateLegacyState()`. Files are moved only if the destination
 does not exist, preventing accidental overwrites.
 
 ## Consequences
