@@ -8,6 +8,8 @@ import (
 
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // DivergenceMeterAllowedTools is the minimal tool set for divergence evaluation.
@@ -31,6 +33,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	model := d.model
 	cmd := platform.NewShellCmd(ctx, claudeCmd,
 		"--model", model,
+		"--verbose",
 		"--output-format", "stream-json",
 		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
 		"--dangerously-skip-permissions",
@@ -44,14 +47,48 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 		return nil, fmt.Errorf("claude: %w\n%s", err, stderr.String())
 	}
 
-	// Parse stream-json to extract result
+	// Parse stream-json with span-emitting reader for OTel + Weave integration
 	sr := platform.NewStreamReader(bytes.NewReader(stdout.Bytes()))
-	result, _, err := sr.CollectAll()
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
+	emitter.SetInput(prompt)
+
+	result, messages, err := emitter.CollectAll()
 	if err != nil {
 		return nil, fmt.Errorf("stream-json parse: %w", err)
 	}
 	if result == nil {
 		return nil, fmt.Errorf("no result message in stream-json output")
+	}
+
+	// Set GenAI and Weave attributes on the parent invoke span
+	span := trace.SpanFromContext(ctx)
+	var responseModel, responseID string
+	for _, msg := range messages {
+		if msg.Type == "assistant" {
+			if am, _ := msg.ParseAssistantMessage(); am != nil {
+				if am.Model != "" {
+					responseModel = am.Model
+				}
+				if am.ID != "" {
+					responseID = am.ID
+				}
+			}
+		}
+		if msg.Type == "result" {
+			span.SetAttributes(platform.GenAIResultAttrs(msg, responseModel, responseID)...)
+		}
+	}
+	if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
+		span.SetAttributes(attribute.StringSlice("stream.raw_events", rawEvents))
+	}
+	if result.SessionID != "" {
+		span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
+	}
+	if weaveAttrs := emitter.WeaveThreadAttrs(); len(weaveAttrs) > 0 {
+		span.SetAttributes(weaveAttrs...)
+	}
+	if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
+		span.SetAttributes(ioAttrs...)
 	}
 
 	return []byte(result.Result), nil
