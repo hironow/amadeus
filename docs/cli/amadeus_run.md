@@ -9,16 +9,17 @@ amadeus run [path] [flags]
 ### Options
 
 ```
-      --approve-cmd string   external command for approval ({message} placeholder)
-      --auto-approve         skip approval gate
-      --base string          upstream branch for post-merge divergence check
-  -n, --dry-run              generate prompt only (post-merge)
-  -f, --full                 force full calibration check
-  -h, --help                 help for run
-  -j, --json                 output as JSON
-      --notify-cmd string    external command for notifications ({title} and {message} placeholders)
-  -q, --quiet                summary-only output
-      --review-cmd string    code review command after check (exit 0=pass, non-zero=comments)
+      --approve-cmd string      external command for approval ({message} placeholder)
+      --auto-approve            skip approval gate
+      --base string             upstream branch for post-merge divergence check
+  -n, --dry-run                 generate prompt only (post-merge)
+  -f, --full                    force full calibration check
+  -h, --help                    help for run
+  -j, --json                    output as JSON
+      --notify-cmd string       external command for notifications ({title} and {message} placeholders)
+  -q, --quiet                   summary-only output
+      --review-cmd string       code review command after check (exit 0=pass, non-zero=comments)
+      --wait-timeout duration   D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting) (default 30m0s)
 ```
 
 ### Options inherited from parent commands
