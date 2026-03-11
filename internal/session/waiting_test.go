@@ -1,5 +1,4 @@
-// white-box-reason: tests unexported WaitForDMail function
-package session
+package session_test
 
 import (
 	"context"
@@ -7,15 +6,8 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 )
-
-type nopLogger struct{}
-
-func (nopLogger) Info(_ string, _ ...any)  {}
-func (nopLogger) Warn(_ string, _ ...any)  {}
-func (nopLogger) OK(_ string, _ ...any)    {}
-func (nopLogger) Error(_ string, _ ...any) {}
-func (nopLogger) Debug(_ string, _ ...any) {}
 
 func TestWaitForDMail_ArrivalReturnsTrue(t *testing.T) {
 	// given
@@ -23,7 +15,7 @@ func TestWaitForDMail_ArrivalReturnsTrue(t *testing.T) {
 	ch <- domain.DMail{Name: "test-dmail"}
 
 	// when
-	arrived, err := WaitForDMail(context.Background(), ch, time.Minute, nopLogger{})
+	arrived, err := session.WaitForDMail(context.Background(), ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -39,7 +31,7 @@ func TestWaitForDMail_TimeoutReturnsFalse(t *testing.T) {
 	ch := make(chan domain.DMail)
 
 	// when
-	arrived, err := WaitForDMail(context.Background(), ch, 10*time.Millisecond, nopLogger{})
+	arrived, err := session.WaitForDMail(context.Background(), ch, 10*time.Millisecond, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -57,7 +49,7 @@ func TestWaitForDMail_CancelReturnsFalse(t *testing.T) {
 	cancel() // cancel immediately
 
 	// when
-	arrived, err := WaitForDMail(ctx, ch, time.Minute, nopLogger{})
+	arrived, err := session.WaitForDMail(ctx, ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -74,7 +66,7 @@ func TestWaitForDMail_ClosedChannelReturnsFalse(t *testing.T) {
 	close(ch)
 
 	// when
-	arrived, err := WaitForDMail(context.Background(), ch, time.Minute, nopLogger{})
+	arrived, err := session.WaitForDMail(context.Background(), ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -91,7 +83,7 @@ func TestWaitForDMail_ZeroTimeoutNoDeadline(t *testing.T) {
 	ch <- domain.DMail{Name: "test"}
 
 	// when
-	arrived, err := WaitForDMail(context.Background(), ch, 0, nopLogger{})
+	arrived, err := session.WaitForDMail(context.Background(), ch, 0, &domain.NopLogger{})
 
 	// then
 	if err != nil {

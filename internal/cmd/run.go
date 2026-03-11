@@ -181,8 +181,8 @@ func newRunCommand() *cobra.Command {
 				}
 			}
 
-			// Skip waiting in dry-run mode or when explicitly disabled
-			if dryRun || cfg.WaitTimeout < 0 {
+			// Skip waiting in dry-run, one-shot (--full/--json), or when explicitly disabled
+			if dryRun || full || jsonOut || cfg.WaitTimeout < 0 {
 				return checkErr
 			}
 
