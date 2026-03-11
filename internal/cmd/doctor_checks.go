@@ -375,6 +375,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
 			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			results = append(results, checkClaudeInference(string(inferOut), inferErr))
@@ -605,4 +606,18 @@ func checkConfig(path string) domain.DoctorCheckResult {
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s loaded and validated", path),
 	}
+}
+
+// filterEnv returns a copy of env with the named variable removed.
+// Used to unset CLAUDECODE so that doctor's inference check does not
+// trigger the nested-session guard in Claude Code.
+func filterEnv(env []string, name string) []string {
+	prefix := name + "="
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
