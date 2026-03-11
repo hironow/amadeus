@@ -326,15 +326,15 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
 	// then: should have 15 results
-	if len(results) != 15 {
+	if len(results) != 16 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 15 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 16 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "Linear MCP", "claude-inference", "success-rate"}
+	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-login", "claude-auth", "Linear MCP", "claude-inference", "success-rate"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -380,8 +380,8 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 					eventCount++
 				}
 			}
-			if eventCount != 15 {
-				t.Errorf("expected 15 doctor.check events, got %d", eventCount)
+			if eventCount != 16 {
+				t.Errorf("expected 16 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -496,12 +496,12 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
 	// then: should have 15 results
-	if len(results) != 15 {
+	if len(results) != 16 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 15 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 16 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -818,10 +818,12 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	// when
 	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{})
 
-	// then: claude-auth, Linear MCP, and claude-inference should be OK
-	var authResult, mcpResult, inferResult domain.DoctorCheckResult
+	// then: claude-login, claude-auth, Linear MCP, and claude-inference should be OK
+	var loginResult, authResult, mcpResult, inferResult domain.DoctorCheckResult
 	for _, r := range results {
 		switch r.Name {
+		case "claude-login":
+			loginResult = r
 		case "claude-auth":
 			authResult = r
 		case "Linear MCP":
@@ -829,6 +831,9 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 		case "claude-inference":
 			inferResult = r
 		}
+	}
+	if loginResult.Status != domain.CheckOK {
+		t.Errorf("claude-login: expected OK, got %v: %s", loginResult.Status, loginResult.Message)
 	}
 	if authResult.Status != domain.CheckOK {
 		t.Errorf("claude-auth: expected OK, got %v: %s", authResult.Status, authResult.Message)
@@ -899,5 +904,72 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	}
 	if !strings.HasPrefix(result.Message, "unexpected response: ") {
 		t.Errorf("expected message starting with 'unexpected response: ', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeLogin_NotLoggedIn(t *testing.T) {
+	// given — stream-json output from unauthenticated Claude CLI
+	stdout := `{"type":"assistant","message":{"id":"test","role":"assistant","model":"<synthetic>","content":[{"type":"text","text":"Not logged in · Please run /login"}],"stop_reason":"stop_sequence"},"error":"authentication_failed","session_id":"test-session"}
+{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login","session_id":"test-session"}`
+	runErr := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeLogin(stdout, runErr, "claude")
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Message, "not logged in") {
+		t.Errorf("expected message to contain 'not logged in', got: %s", result.Message)
+	}
+	if !strings.Contains(result.Hint, "claude /login") {
+		t.Errorf("expected hint to contain 'claude /login', got: %s", result.Hint)
+	}
+}
+
+func TestCheckClaudeLogin_NotLoggedIn_CustomConfigDir(t *testing.T) {
+	// given — claude_cmd with CLAUDE_CONFIG_DIR prefix
+	stdout := `{"type":"result","is_error":true,"result":"Not logged in · Please run /login"}`
+	runErr := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeLogin(stdout, runErr, "CLAUDE_CONFIG_DIR=~/.claude-work-b claude")
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "CLAUDE_CONFIG_DIR=") || !strings.Contains(result.Hint, "claude /login") {
+		t.Errorf("expected hint with CLAUDE_CONFIG_DIR prefix and 'claude /login', got: %s", result.Hint)
+	}
+}
+
+func TestCheckClaudeLogin_LoggedIn(t *testing.T) {
+	// given — successful stream-json output
+	stdout := `{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"test"}`
+
+	// when
+	result := checkClaudeLogin(stdout, nil, "claude")
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckClaudeLogin_OtherError(t *testing.T) {
+	// given — non-auth error (e.g. binary crash)
+	runErr := fmt.Errorf("signal: killed")
+
+	// when
+	result := checkClaudeLogin("", runErr, "claude")
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+	if strings.Contains(result.Message, "not logged in") {
+		t.Errorf("non-auth error should not say 'not logged in', got: %s", result.Message)
 	}
 }

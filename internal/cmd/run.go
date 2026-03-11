@@ -67,6 +67,10 @@ func newRunCommand() *cobra.Command {
 				return preErr
 			}
 
+			if cmd.Flags().Changed("wait-timeout") {
+				cfg.WaitTimeout, _ = cmd.Flags().GetDuration("wait-timeout")
+			}
+
 			if lang != "" {
 				if !domain.ValidLang(lang) {
 					return fmt.Errorf("unsupported language: %s (supported: ja, en)", lang)
@@ -154,16 +158,59 @@ func newRunCommand() *cobra.Command {
 				JSON:   jsonOut,
 			}
 
-			// Without --base: one-shot check (replaces old 'check' command)
-			// With --base: daemon loop with inbox monitoring + post-merge checks
-			if baseBranch == "" {
-				return usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), checkOpts,
-					a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
+			// With --base: daemon loop with inbox monitoring + post-merge checks.
+			// Adds PR convergence analysis (via PRReader/gh) on top of divergence scoring.
+			if baseBranch != "" {
+				return usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
+					CheckOptions: checkOpts,
+					BaseBranch:   baseBranch,
+				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
 			}
-			return usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
-				CheckOptions: checkOpts,
-				BaseBranch:   baseBranch,
-			}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
+
+			// Without --base: one-shot check + D-Mail waiting loop.
+			// RunCheck runs Phase 0-4 including generateDMails (Phase 3), which
+			// produces KindImplFeedback / KindDesignFeedback from divergence scoring.
+			// PR convergence analysis is skipped (PRReader=nil), but divergence-based
+			// impl feedback is still generated and flushed to outbox.
+			metrics := &platform.OTelPolicyMetrics{}
+			checkErr := usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), checkOpts,
+				a, cfg, logger, notifier, metrics)
+			if checkErr != nil {
+				if _, ok := checkErr.(*domain.DriftError); !ok {
+					return checkErr
+				}
+			}
+
+			// Skip waiting in dry-run, one-shot (--full/--json), or when explicitly disabled
+			if dryRun || full || jsonOut || cfg.WaitTimeout < 0 {
+				return checkErr
+			}
+
+			// Start inbox monitor for waiting phase
+			inboxCh, monErr := session.MonitorInbox(cmd.Context(), divRoot, logger)
+			if monErr != nil {
+				return fmt.Errorf("inbox monitor: %w", monErr)
+			}
+
+			// Waiting loop: wait for D-Mail → re-check → repeat
+			for {
+				arrived, waitErr := session.WaitForDMail(cmd.Context(), inboxCh, cfg.WaitTimeout, logger)
+				if waitErr != nil {
+					return waitErr
+				}
+				if !arrived {
+					return nil // timeout or cancel → clean exit
+				}
+
+				// Re-run check on D-Mail arrival
+				checkErr = usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), checkOpts,
+					a, cfg, logger, notifier, metrics)
+				if checkErr != nil {
+					if _, ok := checkErr.(*domain.DriftError); !ok {
+						return checkErr
+					}
+				}
+			}
 		},
 	}
 
@@ -178,6 +225,7 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
 	// New flag for run
 	cmd.Flags().String("base", "", "upstream branch for post-merge divergence check")
+	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting)")
 
 	return cmd
 }

@@ -31,12 +31,18 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		return fmt.Errorf("auto-rebuild: %w", err)
 	}
 
-	// Determine integration branch
-	integrationBranch, err := a.Git.CurrentBranch()
-	if err != nil {
-		// Fallback: use "main" when branch detection fails
-		integrationBranch = "main"
-		a.Logger.Warn("could not detect current branch, using %q", integrationBranch)
+	// Determine integration branch: --base flag takes precedence, then
+	// current branch, then "main" as last resort. PR convergence builds
+	// chains from PRs whose baseBranch matches this value, so it must be
+	// the branch that PRs target (typically "main").
+	integrationBranch := opts.BaseBranch
+	if integrationBranch == "" {
+		var err error
+		integrationBranch, err = a.Git.CurrentBranch()
+		if err != nil {
+			integrationBranch = "main"
+			a.Logger.Warn("could not detect current branch, using %q", integrationBranch)
+		}
 	}
 
 	// Emit run.started
@@ -66,6 +72,23 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		if monErr != nil {
 			return fmt.Errorf("inbox monitor: %w", monErr)
 		}
+	}
+
+	// Initial pre-merge check on startup (don't wait for first D-Mail)
+	if a.PRReader != nil {
+		if !opts.Quiet {
+			a.Logger.Info("amadeus run: running initial PR convergence check...")
+		}
+		dmails, prErr := a.runPreMergePipeline(ctx, integrationBranch)
+		if prErr != nil {
+			a.Logger.Warn("initial pre-merge pipeline error: %v", prErr)
+		} else if len(dmails) > 0 && !opts.Quiet {
+			a.Logger.OK("initial check: generated %d implementation-feedback D-Mail(s)", len(dmails))
+		}
+	}
+
+	if !opts.Quiet {
+		a.Logger.Info("amadeus run: waiting for inbox D-Mails...")
 	}
 
 	// Main loop: event-driven via channel
@@ -157,6 +180,9 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		return fmt.Errorf("post-merge (build prompt): %w", err)
 	}
 
+	if !opts.Quiet {
+		a.Logger.Info("Divergence Meter: evaluating with %s...", a.ClaudeModel)
+	}
 	meterResult, err := a.runDivergenceMeter(ctx, prompt, fullCheck, previous, opts.Quiet)
 	if err != nil {
 		return err

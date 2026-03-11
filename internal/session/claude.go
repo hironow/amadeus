@@ -44,7 +44,14 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("claude: %w\n%s", err, stderr.String())
+		// Include both stderr and stdout in the error: Claude CLI in
+		// stream-json mode may report errors via stdout NDJSON while
+		// stderr remains empty.
+		diagnostic := stderr.String()
+		if diagnostic == "" {
+			diagnostic = stdout.String()
+		}
+		return nil, fmt.Errorf("claude: %w\n%s", err, diagnostic)
 	}
 
 	// Parse stream-json with span-emitting reader for OTel + Weave integration
@@ -79,7 +86,11 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 		}
 	}
 	if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-		span.SetAttributes(attribute.StringSlice("stream.raw_events", rawEvents))
+		sanitized := make([]string, len(rawEvents))
+		for i, ev := range rawEvents {
+			sanitized[i] = platform.SanitizeUTF8(ev)
+		}
+		span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(sanitized)))
 	}
 	if result.SessionID != "" {
 		span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)

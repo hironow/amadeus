@@ -9,7 +9,17 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
+
+// Stubs for semgrep test (not real code)
+var platform struct {
+	SanitizeUTF8      func(string) string
+	SanitizeUTF8Slice func([]string) []string
+}
+
+func SanitizeUTF8(s string) string      { return s }
+func SanitizeUTF8Slice(ss []string) []string { return ss }
 
 // === ADR 0001: cobra.Command must use RunE, not Run ===
 
@@ -110,6 +120,43 @@ var cmdBadGetwd = &cobra.Command{
 		_, _ = os.Getwd()
 		return nil
 	},
+}
+
+// === OTel UTF-8 safety ===
+
+func badAttributeStringUnsanitized(externalVal string) {
+	// ruleid: otel-attribute-string-unsanitized
+	attribute.String("key", externalVal)
+}
+
+func goodAttributeStringLiteral() {
+	// ok: otel-attribute-string-unsanitized
+	attribute.String("key", "literal-value")
+}
+
+func goodAttributeStringSanitized(externalVal string) {
+	// ok: otel-attribute-string-unsanitized
+	attribute.String("key", platform.SanitizeUTF8(externalVal))
+}
+
+func goodAttributeStringSanitizedLocal(externalVal string) {
+	// ok: otel-attribute-string-unsanitized
+	attribute.String("key", SanitizeUTF8(externalVal))
+}
+
+func badAttributeStringSlice(vals []string) {
+	// ruleid: otel-attribute-stringslice-unsanitized
+	attribute.StringSlice("key", vals)
+}
+
+func goodAttributeStringSliceSanitized(vals []string) {
+	// ok: otel-attribute-stringslice-unsanitized
+	attribute.StringSlice("key", platform.SanitizeUTF8Slice(vals))
+}
+
+func goodAttributeStringSliceSanitizedLocal(vals []string) {
+	// ok: otel-attribute-stringslice-unsanitized
+	attribute.StringSlice("key", SanitizeUTF8Slice(vals))
 }
 
 // === D4: sql.Open without defer Close ===

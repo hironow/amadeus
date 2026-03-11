@@ -216,6 +216,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		return nil
 	}
 
+	if !opts.Quiet {
+		a.Logger.Info("Divergence Meter: evaluating with %s...", a.ClaudeModel)
+	}
 	meterResult, err := a.runDivergenceMeter(ctx, prompt, fullCheck, previous, opts.Quiet)
 	if err != nil {
 		return err

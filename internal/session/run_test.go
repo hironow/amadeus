@@ -4,6 +4,7 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -264,12 +265,82 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 		t.Errorf("expected consumed kind %q, got %q", domain.KindReport, emitter.inboxConsumed[0].Kind)
 	}
 
-	// Verify PR convergence was checked (pre-merge pipeline ran)
-	if emitter.prConvergenceCalls != 1 {
-		t.Errorf("expected 1 pr_convergence.checked event, got %d", emitter.prConvergenceCalls)
+	// Verify PR convergence was checked: once on startup + once on D-Mail arrival
+	if emitter.prConvergenceCalls != 2 {
+		t.Errorf("expected 2 pr_convergence.checked events (initial + inbox), got %d", emitter.prConvergenceCalls)
 	}
 
 	// Verify at least 1 implementation-feedback D-Mail generated
+	if len(emitter.dmailsGenerated) < 1 {
+		t.Errorf("expected at least 1 dmail generated, got %d", len(emitter.dmailsGenerated))
+	}
+}
+
+func TestRun_baseBranchOverridesCurrentBranch(t *testing.T) {
+	// Regression: when opts.BaseBranch is set, integrationBranch must use it
+	// instead of git.CurrentBranch(). Otherwise PR convergence finds 0 chains
+	// because adjacency[currentBranch] is empty when PRs target BaseBranch.
+
+	// given: BaseBranch="main", CurrentBranch="feat/something", PRs target "main"
+	reportDMail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "test-report-base",
+		Kind:          domain.KindReport,
+		Description:   "Report triggering pre-merge",
+	}
+
+	emitter := &runEmitter{}
+	git := &runGit{branch: "feat/something", commit: "aaa1111"}
+
+	pr1 := mustPRState(t, "#10", "Feature X", "main", "feat-x", true, 1, nil)
+	pr2 := mustPRState(t, "#11", "Feature Y", "feat-x", "feat-y", true, 0, nil)
+	prReader := &mockPRReader{prs: []domain.PRState{pr1, pr2}}
+
+	store := &runStore{}
+
+	a := &Amadeus{
+		Git:      git,
+		Store:    store,
+		PRReader: prReader,
+		Logger:   &domain.NopLogger{},
+		InboxCh:  feedInbox(reportDMail),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		cancel()
+	}()
+
+	opts := domain.RunOptions{
+		BaseBranch: "main", // explicitly set, should override CurrentBranch
+	}
+
+	// when
+	err := a.Run(ctx, opts, emitter, &runState{})
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	// IntegrationBranch must be "main" (from BaseBranch), not "feat/something"
+	if emitter.runStartedData == nil {
+		t.Fatal("expected run.started event")
+	}
+	if emitter.runStartedData.IntegrationBranch != "main" {
+		t.Errorf("expected integration branch %q, got %q", "main", emitter.runStartedData.IntegrationBranch)
+	}
+
+	// PR convergence must find chains (proves integrationBranch="main" was used)
+	if emitter.prConvergenceCalls < 1 {
+		t.Errorf("expected at least 1 pr_convergence.checked event, got %d", emitter.prConvergenceCalls)
+	}
+
+	// Implementation-feedback D-Mails must be generated from the chain
 	if len(emitter.dmailsGenerated) < 1 {
 		t.Errorf("expected at least 1 dmail generated, got %d", len(emitter.dmailsGenerated))
 	}
@@ -330,5 +401,77 @@ func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
 	// And no D-Mails generated (no pre-merge, no post-merge)
 	if len(emitter.dmailsGenerated) != 0 {
 		t.Errorf("expected 0 dmails generated, got %d", len(emitter.dmailsGenerated))
+	}
+}
+
+func TestRun_channelClosedEmitsRunStopped(t *testing.T) {
+	// given: inbox channel that closes immediately
+	emitter := &runEmitter{}
+	git := &runGit{branch: "main", commit: "ccc3333"}
+	ch := make(chan domain.DMail)
+	close(ch)
+
+	a := &Amadeus{
+		Git:     git,
+		Logger:  &domain.NopLogger{},
+		InboxCh: ch,
+	}
+
+	opts := domain.RunOptions{}
+
+	// when
+	err := a.Run(context.Background(), opts, emitter, &runState{})
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	if !emitter.runStoppedCalled {
+		t.Fatal("expected run.stopped event")
+	}
+	if emitter.runStoppedData.Reason != "channel_closed" {
+		t.Errorf("expected reason %q, got %q", "channel_closed", emitter.runStoppedData.Reason)
+	}
+}
+
+func TestRun_currentBranchErrorFallsBackToMain(t *testing.T) {
+	// given: no BaseBranch set, CurrentBranch returns error → fallback to "main"
+	emitter := &runEmitter{}
+	git := &runGit{err: fmt.Errorf("not a git repo"), commit: "ddd4444"}
+
+	a := &Amadeus{
+		Git:     git,
+		Logger:  &domain.NopLogger{},
+		InboxCh: make(chan domain.DMail),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	opts := domain.RunOptions{} // no BaseBranch
+
+	// when
+	err := a.Run(ctx, opts, emitter, &runState{})
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	if emitter.runStartedData == nil {
+		t.Fatal("expected run.started event")
+	}
+	if emitter.runStartedData.IntegrationBranch != "main" {
+		t.Errorf("expected fallback integration branch %q, got %q", "main", emitter.runStartedData.IntegrationBranch)
 	}
 }

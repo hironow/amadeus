@@ -163,6 +163,82 @@ func TestParseClaudeResponse_MarkdownCodeBlockWithWhitespace(t *testing.T) {
 	}
 }
 
+func TestParseClaudeResponse_TextPrefixBeforeJSON(t *testing.T) {
+	// given: Claude sometimes returns natural language text before the JSON response.
+	// e.g., "Certainly, here's the analysis:\n\n{...}"
+	// This causes: "invalid character 'C' looking for beginning of value"
+	raw := `Certainly, here's the analysis of the codebase divergence:
+
+{
+	"axes": {
+		"adr_integrity": {"score": 10, "details": "minor"},
+		"dod_fulfillment": {"score": 0, "details": "ok"},
+		"dependency_integrity": {"score": 0, "details": "ok"},
+		"implicit_constraints": {"score": 5, "details": "naming"}
+	},
+	"dmails": [],
+	"reasoning": "Low divergence"
+}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("expected text-prefixed JSON to parse, got: %v", err)
+	}
+	if resp.Axes[domain.AxisADR].Score != 10 {
+		t.Errorf("expected ADR score 10, got %d", resp.Axes[domain.AxisADR].Score)
+	}
+	if resp.Reasoning != "Low divergence" {
+		t.Errorf("expected reasoning 'Low divergence', got %q", resp.Reasoning)
+	}
+}
+
+func TestParseClaudeResponse_TextSuffixAfterJSON(t *testing.T) {
+	// given: Claude sometimes adds text after the JSON too
+	raw := `{
+	"axes": {
+		"adr_integrity": {"score": 0, "details": "ok"}
+	},
+	"dmails": [],
+	"reasoning": "clean"
+}
+
+Let me know if you need more details about the analysis.`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("expected JSON-with-suffix to parse, got: %v", err)
+	}
+	if resp.Reasoning != "clean" {
+		t.Errorf("expected reasoning 'clean', got %q", resp.Reasoning)
+	}
+}
+
+func TestParseClaudeResponse_TextPrefixWithMarkdownBlock(t *testing.T) {
+	// given: Text prefix + markdown code block wrapper
+	raw := "Here's the divergence analysis:\n\n```json\n" + `{
+	"axes": {},
+	"dmails": [],
+	"reasoning": "mixed"
+}` + "\n```\n\nLet me know if you have questions."
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("expected text+markdown to parse, got: %v", err)
+	}
+	if resp.Reasoning != "mixed" {
+		t.Errorf("expected reasoning 'mixed', got %q", resp.Reasoning)
+	}
+}
+
 // fakeClaudeRunner returns a canned response for testing.
 type fakeClaudeRunner struct {
 	response string

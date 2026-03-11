@@ -45,6 +45,8 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 
 // generateDMails runs Phase 3: creates D-Mail entities from meter candidates,
 // validates them, and emits dmail-generated events.
+// This produces KindImplFeedback and/or KindDesignFeedback based on divergence
+// scoring (ClassifyByAxes + ResolveFeedbackKinds). Works with or without --base.
 func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterResult, now time.Time) ([]domain.DMail, error) {
 	_, span3 := platform.Tracer.Start(ctx, "phase.dmail_generation", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 		trace.WithAttributes(
@@ -90,9 +92,9 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
 			}
 			span3.AddEvent("dmail.created", trace.WithAttributes(
-				attribute.String("dmail.name", dmail.Name),
-				attribute.String("dmail.kind", string(dmail.Kind)),
-				attribute.String("dmail.severity", string(dmail.Severity)),
+				attribute.String("dmail.name", platform.SanitizeUTF8(dmail.Name)),
+				attribute.String("dmail.kind", platform.SanitizeUTF8(string(dmail.Kind))),
+				attribute.String("dmail.severity", platform.SanitizeUTF8(string(dmail.Severity))),
 			))
 			dmails = append(dmails, dmail)
 		}

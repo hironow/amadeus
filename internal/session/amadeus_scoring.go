@@ -149,7 +149,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "claude.invoke", // nosemgrep: adr0003-otel-span-without-defer-end — End() called explicitly after Run() [permanent]
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", model),
+				attribute.String("claude.model", platform.SanitizeUTF8(model)),
 				attribute.Int("claude.timeout_sec", timeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
@@ -172,7 +172,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 
 	span2.AddEvent("divergence.evaluated", trace.WithAttributes(
 		attribute.Float64("divergence.value", meterResult.Divergence.Value),
-		attribute.String("divergence.severity", string(meterResult.Divergence.Severity)),
+		attribute.String("divergence.severity", platform.SanitizeUTF8(string(meterResult.Divergence.Severity))),
 	))
 
 	// Defer full scan to next run on large divergence jump

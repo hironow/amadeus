@@ -6,10 +6,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// SanitizeUTF8 replaces invalid UTF-8 bytes with the Unicode replacement character.
+// Use this before passing strings from external sources (Claude output, file system,
+// error messages) to OTel span attributes, which require valid UTF-8.
+func SanitizeUTF8(s string) string {
+	return strings.ToValidUTF8(s, "\uFFFD")
+}
+
+// SanitizeUTF8Slice sanitizes each element of a string slice for OTel safety.
+func SanitizeUTF8Slice(ss []string) []string {
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		out[i] = SanitizeUTF8(s)
+	}
+	return out
+}
 
 // DefaultMaxValueLen is the default truncation limit for raw event values.
 const DefaultMaxValueLen = 512
@@ -83,10 +100,10 @@ func (s *SpanEmittingStreamReader) SetInput(prompt string) {
 func (s *SpanEmittingStreamReader) WeaveIOAttrs() []attribute.KeyValue {
 	var attrs []attribute.KeyValue
 	if s.inputText != "" {
-		attrs = append(attrs, WeaveInputVal.String(s.inputText))
+		attrs = append(attrs, WeaveInputVal.String(SanitizeUTF8(s.inputText)))
 	}
 	if s.resultText != "" {
-		attrs = append(attrs, WeaveOutputVal.String(s.resultText))
+		attrs = append(attrs, WeaveOutputVal.String(SanitizeUTF8(s.resultText)))
 	}
 	return attrs
 }
@@ -162,7 +179,7 @@ func (s *SpanEmittingStreamReader) handleAssistant(msg *StreamMessage) {
 		)
 
 		if len(tool.Input) > 0 {
-			toolSpan.SetAttributes(GenAIToolInput.String(TruncateValue(string(tool.Input), s.maxValueLen)))
+			toolSpan.SetAttributes(GenAIToolInput.String(SanitizeUTF8(TruncateValue(string(tool.Input), s.maxValueLen))))
 		}
 
 		s.openSpans[toolID] = toolSpan

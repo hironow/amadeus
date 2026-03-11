@@ -14,7 +14,7 @@ func RecordCheck(ctx context.Context, status string) {
 	)
 	c.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String("status", status),
+			attribute.String("status", SanitizeUTF8(status)),
 		),
 	)
 }

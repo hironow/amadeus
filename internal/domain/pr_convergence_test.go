@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -237,6 +238,50 @@ func TestBuildPRChains_emptyPRs(t *testing.T) {
 	}
 	if report.IntegrationBranch != "main" {
 		t.Errorf("expected integration branch main, got %q", report.IntegrationBranch)
+	}
+}
+
+func TestBuildPRChains_manyPRsMixedChainsAndOrphans(t *testing.T) {
+	// given: 30 PRs — some forming chains off "main", rest orphaned (targeting "develop")
+	mustPR := func(num int, base, head string) domain.PRState {
+		ps, err := domain.NewPRState(fmt.Sprintf("#%d", num), fmt.Sprintf("PR %d", num), base, head, true, 0, nil)
+		if err != nil {
+			t.Fatalf("NewPRState #%d: %v", num, err)
+		}
+		return ps
+	}
+
+	var prs []domain.PRState
+	// Chain: main <- a <- b <- c <- d <- e (5 deep)
+	prs = append(prs,
+		mustPR(1, "main", "feat-a"),
+		mustPR(2, "feat-a", "feat-b"),
+		mustPR(3, "feat-b", "feat-c"),
+		mustPR(4, "feat-c", "feat-d"),
+		mustPR(5, "feat-d", "feat-e"),
+	)
+	// 25 orphaned PRs targeting "develop"
+	for i := 6; i <= 30; i++ {
+		prs = append(prs, mustPR(i, "develop", fmt.Sprintf("orphan-%d", i)))
+	}
+
+	// when
+	report := domain.BuildPRConvergenceReport("main", prs)
+
+	// then
+	if report.TotalOpenPRs != 30 {
+		t.Errorf("TotalOpenPRs = %d, want 30", report.TotalOpenPRs)
+	}
+	// 1 chain (5 PRs deep)
+	if len(report.Chains) != 1 {
+		t.Fatalf("expected 1 chain, got %d", len(report.Chains))
+	}
+	if len(report.Chains[0].PRs) != 5 {
+		t.Errorf("chain depth = %d, want 5", len(report.Chains[0].PRs))
+	}
+	// 25 orphaned
+	if len(report.OrphanedPRs) != 25 {
+		t.Errorf("orphaned = %d, want 25", len(report.OrphanedPRs))
 	}
 }
 

@@ -3,6 +3,7 @@ package domain_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"gopkg.in/yaml.v3"
@@ -365,6 +366,37 @@ func TestConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
 	// then: TimeoutSec preserved
 	if restored.TimeoutSec != 1980 {
 		t.Errorf("expected TimeoutSec=1980 after round-trip, got %d", restored.TimeoutSec)
+	}
+}
+
+func TestDefaultConfig_WaitTimeout(t *testing.T) {
+	// when
+	cfg := domain.DefaultConfig()
+
+	// then
+	if cfg.WaitTimeout != domain.DefaultWaitTimeout {
+		t.Errorf("expected WaitTimeout=%v, got %v", domain.DefaultWaitTimeout, cfg.WaitTimeout)
+	}
+}
+
+func TestDefaultWaitTimeout_Is30Minutes(t *testing.T) {
+	// then
+	if domain.DefaultWaitTimeout != 30*time.Minute {
+		t.Errorf("expected 30m, got %v", domain.DefaultWaitTimeout)
+	}
+}
+
+func TestConfig_NegativeWaitTimeout_DisablesWaiting(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+	cfg.WaitTimeout = -1
+
+	// then: negative WaitTimeout disables waiting mode (no validation error)
+	errs := domain.ValidateConfig(cfg)
+	for _, e := range errs {
+		if strings.Contains(e, "wait_timeout") {
+			t.Errorf("negative WaitTimeout should be valid (disables waiting), got error: %s", e)
+		}
 	}
 }
 
