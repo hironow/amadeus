@@ -326,15 +326,15 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
 	// then: should have 15 results
-	if len(results) != 16 {
+	if len(results) != 17 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 16 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 17 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-login", "claude-auth", "Linear MCP", "claude-inference", "success-rate"}
+	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-login", "claude-auth", "Linear MCP", "claude-inference", "context-budget", "success-rate"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -380,8 +380,8 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 					eventCount++
 				}
 			}
-			if eventCount != 16 {
-				t.Errorf("expected 16 doctor.check events, got %d", eventCount)
+			if eventCount != 17 {
+				t.Errorf("expected 17 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -496,12 +496,12 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
 	// then: should have 15 results
-	if len(results) != 16 {
+	if len(results) != 17 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 16 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 17 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -971,5 +971,75 @@ func TestCheckClaudeLogin_OtherError(t *testing.T) {
 	}
 	if strings.Contains(result.Message, "not logged in") {
 		t.Errorf("non-auth error should not say 'not logged in', got: %s", result.Message)
+	}
+}
+
+func TestCheckContextBudget_LowUsage(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with small init (2 tools, 1 skill)
+	streamJSON := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write"],"skills":["commit"],"plugins":[],"mcp_servers":[]}
+{"type":"result","result":"2"}`
+
+	// when
+	result := checkContextBudget(streamJSON)
+
+	// then: should be OK (well under threshold)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckContextBudget_HighUsage(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with many tools/skills/plugins + large hook output
+	var lines []string
+	lines = append(lines, `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Bash","Glob","Grep","Agent","mcp__a__t1","mcp__b__t2","mcp__c__t3","mcp__d__t4","mcp__e__t5","mcp__f__t6","mcp__g__t7","mcp__h__t8"],"skills":["s1","s2","s3","s4","s5","s6","s7","s8","s9","s10","s11","s12","s13","s14","s15","s16","s17","s18","s19","s20","s21","s22","s23","s24","s25","s26","s27","s28","s29","s30","s31","s32","s33","s34","s35","s36","s37","s38","s39","s40"],"plugins":["p1","p2","p3","p4","p5","p6","p7","p8"],"mcp_servers":[{"name":"a","status":"connected"},{"name":"b","status":"connected"},{"name":"c","status":"connected"},{"name":"d","status":"connected"},{"name":"e","status":"connected"},{"name":"f","status":"connected"}]}`)
+	// Add large hook response (simulate ~80K chars of hook context)
+	largeStdout := strings.Repeat("x", 80000)
+	lines = append(lines, fmt.Sprintf(`{"type":"system","subtype":"hook_response","hook_id":"h1","stdout":"%s","exit_code":0}`, largeStdout))
+	lines = append(lines, `{"type":"result","result":"2"}`)
+	streamJSON := strings.Join(lines, "\n")
+
+	// when
+	result := checkContextBudget(streamJSON)
+
+	// then: should be OK but with hint (over threshold)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Hint == "" {
+		t.Error("expected non-empty hint for high usage")
+	}
+}
+
+func TestCheckContextBudget_EmptyStream(t *testing.T) {
+	t.Parallel()
+
+	// given: empty stream
+	streamJSON := ""
+
+	// when
+	result := checkContextBudget(streamJSON)
+
+	// then: should be OK (nothing to measure)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK for empty stream, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckContextBudget_NoInitMessage(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with no init message
+	streamJSON := `{"type":"result","result":"2"}`
+
+	// when
+	result := checkContextBudget(streamJSON)
+
+	// then: should be OK (no init = no overhead)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK for no-init stream, got %v: %s", result.Status, result.Message)
 	}
 }
