@@ -54,8 +54,8 @@ func TestWeave_LiveTraceDelivery(t *testing.T) {
 			semconv.SchemaURL,
 			semconv.ServiceName("amadeus"),
 			semconv.ServiceVersion("0.0.0-live-test"),
-			attribute.String("wandb.entity", entity),
-			attribute.String("wandb.project", project),
+			attribute.String("wandb.entity", entity),   // nosemgrep: otel-attribute-string-unsanitized -- env config value, always ASCII [permanent]
+			attribute.String("wandb.project", project), // nosemgrep: otel-attribute-string-unsanitized -- env config value, always ASCII [permanent]
 		),
 	)
 
