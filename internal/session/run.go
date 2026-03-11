@@ -31,12 +31,18 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		return fmt.Errorf("auto-rebuild: %w", err)
 	}
 
-	// Determine integration branch
-	integrationBranch, err := a.Git.CurrentBranch()
-	if err != nil {
-		// Fallback: use "main" when branch detection fails
-		integrationBranch = "main"
-		a.Logger.Warn("could not detect current branch, using %q", integrationBranch)
+	// Determine integration branch: --base flag takes precedence, then
+	// current branch, then "main" as last resort. PR convergence builds
+	// chains from PRs whose baseBranch matches this value, so it must be
+	// the branch that PRs target (typically "main").
+	integrationBranch := opts.BaseBranch
+	if integrationBranch == "" {
+		var err error
+		integrationBranch, err = a.Git.CurrentBranch()
+		if err != nil {
+			integrationBranch = "main"
+			a.Logger.Warn("could not detect current branch, using %q", integrationBranch)
+		}
 	}
 
 	// Emit run.started

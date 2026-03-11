@@ -275,6 +275,76 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 	}
 }
 
+func TestRun_baseBranchOverridesCurrentBranch(t *testing.T) {
+	// Regression: when opts.BaseBranch is set, integrationBranch must use it
+	// instead of git.CurrentBranch(). Otherwise PR convergence finds 0 chains
+	// because adjacency[currentBranch] is empty when PRs target BaseBranch.
+
+	// given: BaseBranch="main", CurrentBranch="feat/something", PRs target "main"
+	reportDMail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "test-report-base",
+		Kind:          domain.KindReport,
+		Description:   "Report triggering pre-merge",
+	}
+
+	emitter := &runEmitter{}
+	git := &runGit{branch: "feat/something", commit: "aaa1111"}
+
+	pr1 := mustPRState(t, "#10", "Feature X", "main", "feat-x", true, 1, nil)
+	pr2 := mustPRState(t, "#11", "Feature Y", "feat-x", "feat-y", true, 0, nil)
+	prReader := &mockPRReader{prs: []domain.PRState{pr1, pr2}}
+
+	store := &runStore{}
+
+	a := &Amadeus{
+		Git:      git,
+		Store:    store,
+		PRReader: prReader,
+		Logger:   &domain.NopLogger{},
+		InboxCh:  feedInbox(reportDMail),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		cancel()
+	}()
+
+	opts := domain.RunOptions{
+		BaseBranch: "main", // explicitly set, should override CurrentBranch
+	}
+
+	// when
+	err := a.Run(ctx, opts, emitter, &runState{})
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	// IntegrationBranch must be "main" (from BaseBranch), not "feat/something"
+	if emitter.runStartedData == nil {
+		t.Fatal("expected run.started event")
+	}
+	if emitter.runStartedData.IntegrationBranch != "main" {
+		t.Errorf("expected integration branch %q, got %q", "main", emitter.runStartedData.IntegrationBranch)
+	}
+
+	// PR convergence must find chains (proves integrationBranch="main" was used)
+	if emitter.prConvergenceCalls < 1 {
+		t.Errorf("expected at least 1 pr_convergence.checked event, got %d", emitter.prConvergenceCalls)
+	}
+
+	// Implementation-feedback D-Mails must be generated from the chain
+	if len(emitter.dmailsGenerated) < 1 {
+		t.Errorf("expected at least 1 dmail generated, got %d", len(emitter.dmailsGenerated))
+	}
+}
+
 func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
 	// given: PRReader is nil, inbox channel delivers 1 report D-Mail
 	reportDMail := domain.DMail{
