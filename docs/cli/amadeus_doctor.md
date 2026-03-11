@@ -23,18 +23,6 @@ amadeus doctor [path] [flags]
   -v, --verbose         verbose output
 ```
 
-### Checks
-
-The doctor command runs multiple health checks including:
-
-- **git** — Git repository availability
-- **git-remote** — Remote repository connectivity
-- **gh** — GitHub CLI availability
-- **claude** — Claude Code CLI availability
-- **config** — `.gate/config.yaml` validity
-- **fsnotify** — File system notification support
-- **context-budget** — Estimates token overhead from tools, skills, plugins, MCP servers, and hook stdout in the Claude CLI context window. Warns when estimated usage exceeds a threshold (default 20K tokens).
-
 ### SEE ALSO
 
 * [amadeus](amadeus.md)	 - Divergence meter for your codebase
