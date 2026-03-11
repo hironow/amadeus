@@ -265,9 +265,9 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 		t.Errorf("expected consumed kind %q, got %q", domain.KindReport, emitter.inboxConsumed[0].Kind)
 	}
 
-	// Verify PR convergence was checked (pre-merge pipeline ran)
-	if emitter.prConvergenceCalls != 1 {
-		t.Errorf("expected 1 pr_convergence.checked event, got %d", emitter.prConvergenceCalls)
+	// Verify PR convergence was checked: once on startup + once on D-Mail arrival
+	if emitter.prConvergenceCalls != 2 {
+		t.Errorf("expected 2 pr_convergence.checked events (initial + inbox), got %d", emitter.prConvergenceCalls)
 	}
 
 	// Verify at least 1 implementation-feedback D-Mail generated

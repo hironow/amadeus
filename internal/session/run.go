@@ -74,6 +74,19 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		}
 	}
 
+	// Initial pre-merge check on startup (don't wait for first D-Mail)
+	if a.PRReader != nil {
+		if !opts.Quiet {
+			a.Logger.Info("amadeus run: running initial PR convergence check...")
+		}
+		dmails, prErr := a.runPreMergePipeline(ctx, integrationBranch)
+		if prErr != nil {
+			a.Logger.Warn("initial pre-merge pipeline error: %v", prErr)
+		} else if len(dmails) > 0 && !opts.Quiet {
+			a.Logger.OK("initial check: generated %d implementation-feedback D-Mail(s)", len(dmails))
+		}
+	}
+
 	if !opts.Quiet {
 		a.Logger.Info("amadeus run: waiting for inbox D-Mails...")
 	}
