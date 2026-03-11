@@ -4,6 +4,7 @@ package session
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -94,10 +95,10 @@ func (m *testInternalCheckStateProvider) Restore(result domain.CheckResult) { m.
 
 // fakeClaudeRunner returns a fixed JSON response for testing.
 type fakeClaudeRunner struct {
-	response []byte
+	response string
 }
 
-func (f *fakeClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
+func (f *fakeClaudeRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
 	return f.response, nil
 }
 
@@ -108,12 +109,12 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 	exporter := setupTestTracer(t)
 
 	// Minimal valid Claude response that ParseClaudeResponse can handle
-	fakeResp := []byte(`{
+	fakeResp := `{
 		"axes": {},
 		"dmails": [],
 		"reasoning": "test",
 		"impact_radius": []
-	}`)
+	}`
 
 	cfg := domain.DefaultConfig()
 	agg := domain.NewCheckAggregate(cfg)

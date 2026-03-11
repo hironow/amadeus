@@ -15,15 +15,15 @@ var templateFS embed.FS
 //go:embed templates/skills/*/SKILL.md
 var SkillTemplateFS embed.FS
 
-// BuildDiffCheckPrompt renders the diff_check template for the given language.
+// BuildDiffCheckPrompt renders the file-reference diff_check template for the given language.
 func BuildDiffCheckPrompt(lang string, params domain.DiffCheckParams) (string, error) {
-	name := fmt.Sprintf("templates/diff_check_%s.md.tmpl", lang)
+	name := fmt.Sprintf("templates/fileref_diff_check_%s.md.tmpl", lang)
 	return renderTemplate(name, params)
 }
 
-// BuildFullCheckPrompt renders the full_check template for the given language.
+// BuildFullCheckPrompt renders the file-reference full_check template for the given language.
 func BuildFullCheckPrompt(lang string, params domain.FullCheckParams) (string, error) {
-	name := fmt.Sprintf("templates/full_check_%s.md.tmpl", lang)
+	name := fmt.Sprintf("templates/fileref_full_check_%s.md.tmpl", lang)
 	return renderTemplate(name, params)
 }
 

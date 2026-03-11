@@ -202,10 +202,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		}
 	}
 
-	prompt, err := a.buildCheckPrompt(ctx, report, fullCheck, previous, opts.Quiet)
+	prompt, cleanup, err := a.buildCheckPrompt(ctx, report, fullCheck, previous, opts.Quiet)
 	if err != nil {
 		return fmt.Errorf("phase 2 (build prompt): %w", err)
 	}
+	defer cleanup()
 
 	if opts.DryRun {
 		w := a.DataOut

@@ -34,8 +34,8 @@ type fakeClaude struct {
 	response string
 }
 
-func (c *fakeClaude) Run(_ context.Context, _ string) ([]byte, error) {
-	return []byte(c.response), nil
+func (c *fakeClaude) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	return c.response, nil
 }
 
 type fakeStateReader struct {
