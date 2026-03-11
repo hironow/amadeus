@@ -74,6 +74,10 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		}
 	}
 
+	if !opts.Quiet {
+		a.Logger.Info("amadeus run: waiting for inbox D-Mails...")
+	}
+
 	// Main loop: event-driven via channel
 	for {
 		select {

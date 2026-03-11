@@ -217,6 +217,68 @@ func TestRunPreMergePipeline_withConflict(t *testing.T) {
 	}
 }
 
+func TestRunPreMergePipeline_manyPRs(t *testing.T) {
+	// given: 50 PRs — 3 chains + many orphans, simulating a busy repo.
+	// Chain 1: main <- feat-a <- feat-b
+	// Chain 2: main <- feat-x (with conflict)
+	// Chain 3: main <- feat-y <- feat-z <- feat-w
+	// Remaining: 44 orphaned PRs (base branch doesn't match integration)
+	var prs []domain.PRState
+
+	// Chain 1 (2 PRs)
+	prs = append(prs, mustPRState(t, "#1", "Feature A", "main", "feat-a", true, 1, nil))
+	prs = append(prs, mustPRState(t, "#2", "Feature B", "feat-a", "feat-b", true, 0, nil))
+
+	// Chain 2 (1 PR with conflict)
+	prs = append(prs, mustPRState(t, "#3", "Feature X", "main", "feat-x", false, 5, []string{"api.go"}))
+
+	// Chain 3 (3 PRs)
+	prs = append(prs, mustPRState(t, "#4", "Feature Y", "main", "feat-y", true, 0, nil))
+	prs = append(prs, mustPRState(t, "#5", "Feature Z", "feat-y", "feat-z", true, 0, nil))
+	prs = append(prs, mustPRState(t, "#6", "Feature W", "feat-z", "feat-w", true, 0, nil))
+
+	// 44 orphaned PRs (targeting "develop" not "main")
+	for i := 7; i <= 50; i++ {
+		prs = append(prs, mustPRState(t, fmt.Sprintf("#%d", i),
+			fmt.Sprintf("Orphan %d", i), "develop",
+			fmt.Sprintf("orphan-%d", i), true, 0, nil))
+	}
+
+	reader := &mockPRReader{prs: prs}
+	emitter := &mockEmitter{}
+	store := &mockStateReader{}
+	a := newTestAmadeusForPR(reader, emitter, store)
+
+	// when
+	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	// Chain 1 (2 PRs, needs action) + Chain 2 (conflict) + Chain 3 (3 PRs, needs action)
+	// = 3 D-Mails
+	if len(dmails) != 3 {
+		t.Errorf("expected 3 dmails for 3 actionable chains, got %d", len(dmails))
+	}
+
+	// pr_convergence.checked event
+	if emitter.prConvergenceCheckedData == nil {
+		t.Fatal("expected pr_convergence.checked event")
+	}
+	data := emitter.prConvergenceCheckedData
+	if data.TotalOpenPRs != 50 {
+		t.Errorf("TotalOpenPRs = %d, want 50", data.TotalOpenPRs)
+	}
+	if data.ConflictPRs != 1 {
+		t.Errorf("ConflictPRs = %d, want 1", data.ConflictPRs)
+	}
+	if data.DMails != 3 {
+		t.Errorf("DMails = %d, want 3", data.DMails)
+	}
+}
+
 func TestRunPreMergePipeline_singleMergeablePR(t *testing.T) {
 	// given: 1 PR, mergeable, not behind → no action needed
 	pr1 := mustPRState(t, "#5", "Clean PR", "main", "feat-clean", true, 0, nil)

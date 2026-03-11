@@ -27,6 +27,7 @@ func (a *Amadeus) runPreMergePipeline(ctx context.Context, integrationBranch str
 	defer span.End()
 
 	// 1. List all open PRs via gh CLI
+	a.Logger.Info("PR convergence: fetching open PRs...")
 	prs, err := a.PRReader.ListOpenPRs(ctx, integrationBranch)
 	if err != nil {
 		return nil, fmt.Errorf("list open PRs: %w", err)
@@ -36,6 +37,7 @@ func (a *Amadeus) runPreMergePipeline(ctx context.Context, integrationBranch str
 		a.Logger.Info("PR convergence: no open PRs")
 		return nil, nil
 	}
+	a.Logger.Info("PR convergence: fetched %d open PRs, analyzing chains...", len(prs))
 
 	// 2. Build convergence report (pure domain)
 	report := domain.BuildPRConvergenceReport(integrationBranch, prs)
