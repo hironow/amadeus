@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/platform"
@@ -28,7 +29,8 @@ type defaultClaudeRunner struct {
 
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
-func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, error) {
+// The w and opts parameters are accepted for interface compatibility but unused by amadeus.
+func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
 	claudeCmd := d.cmd
 	model := d.model
 	cmd := platform.NewShellCmd(ctx, claudeCmd,
@@ -51,7 +53,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 		if diagnostic == "" {
 			diagnostic = stdout.String()
 		}
-		return nil, fmt.Errorf("claude: %w\n%s", err, diagnostic)
+		return "", fmt.Errorf("claude: %w\n%s", err, diagnostic)
 	}
 
 	// Parse stream-json with span-emitting reader for OTel + Weave integration
@@ -61,10 +63,10 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 
 	result, messages, err := emitter.CollectAll()
 	if err != nil {
-		return nil, fmt.Errorf("stream-json parse: %w", err)
+		return "", fmt.Errorf("stream-json parse: %w", err)
 	}
 	if result == nil {
-		return nil, fmt.Errorf("no result message in stream-json output")
+		return "", fmt.Errorf("no result message in stream-json output")
 	}
 
 	// Set GenAI and Weave attributes on the parent invoke span
@@ -105,7 +107,7 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 		span.SetAttributes(initAttrs...)
 	}
 
-	return []byte(result.Result), nil
+	return result.Result, nil
 }
 
 // DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.

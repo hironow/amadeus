@@ -222,14 +222,14 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
-	rawResp, err := a.claudeRunner().Run(invokeCtx, prompt)
+	rawResp, err := a.claudeRunner().Run(invokeCtx, prompt, nil)
 	invokeSpan.End()
 	if err != nil {
 		span2.End()
 		return domain.MeterResult{}, fmt.Errorf("phase 2 (claude): %w", err)
 	}
 
-	claudeResp, err := domain.ParseClaudeResponse(rawResp)
+	claudeResp, err := domain.ParseClaudeResponse([]byte(rawResp))
 	if err != nil {
 		span2.End()
 		return domain.MeterResult{}, fmt.Errorf("phase 2 (parse): %w", err)
