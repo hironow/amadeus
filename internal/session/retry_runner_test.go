@@ -171,8 +171,44 @@ func TestRetryRunner_MaxAttemptsLessThanOne_DefaultsToOne(t *testing.T) {
 	}
 }
 
+func TestRetryRunner_TimeoutStopsHangingInner(t *testing.T) {
+	// given: inner blocks forever until context is cancelled
+	inner := &hangingRunner{}
+	runner := &session.RetryRunner{
+		Inner:       inner,
+		MaxAttempts: 100, // would take forever without timeout
+		BaseDelay:   0,
+		Timeout:     100 * time.Millisecond,
+		Logger:      &domain.NopLogger{},
+	}
+
+	// when
+	start := time.Now()
+	_, err := runner.Run(context.Background(), "test", io.Discard)
+	elapsed := time.Since(start)
+
+	// then: must terminate within a reasonable bound (not 100 retries)
+	if err == nil {
+		t.Fatal("expected error from timeout")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("timeout did not stop loop: elapsed %v", elapsed)
+	}
+	if inner.calls > 5 {
+		t.Errorf("expected few calls before timeout, got %d", inner.calls)
+	}
+}
+
+// hangingRunner blocks until context is cancelled, simulating a hanging subprocess.
+type hangingRunner struct {
+	calls int
+}
+
+func (h *hangingRunner) Run(ctx context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	h.calls++
+	<-ctx.Done()
+	return "", ctx.Err()
+}
+
 // Verify RetryRunner satisfies the ClaudeRunner interface at compile time.
 var _ port.ClaudeRunner = (*session.RetryRunner)(nil)
-
-// Ensure unused imports are used.
-var _ = time.Second
