@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/spf13/cobra"
@@ -254,6 +255,13 @@ func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid timeout_sec %q: must be non-negative integer", value)
 		}
 		cfg.TimeoutSec = n
+
+	case "wait_timeout":
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid wait_timeout %q: %w", value, err)
+		}
+		cfg.WaitTimeout = d
 
 	default:
 		return fmt.Errorf("unknown config key %q", key)

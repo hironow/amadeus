@@ -13,6 +13,8 @@ import (
 
 // runPreMergePipeline analyzes open PRs for dependency chains and conflicts,
 // then generates implementation-feedback D-Mails for chains needing action.
+// This is only active when PRReader is non-nil (i.e. --base is set).
+// Divergence-scoring-based impl feedback is handled separately by generateDMails.
 func (a *Amadeus) runPreMergePipeline(ctx context.Context, integrationBranch string) ([]domain.DMail, error) {
 	if a.PRReader == nil {
 		return nil, nil // PR convergence disabled

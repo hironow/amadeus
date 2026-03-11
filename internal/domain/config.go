@@ -29,6 +29,9 @@ const (
 	DefaultTimeoutSec = 1980
 )
 
+// DefaultWaitTimeout is the default D-Mail waiting phase timeout.
+const DefaultWaitTimeout = 30 * time.Minute
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
 	Lang            string            `yaml:"lang"`
@@ -40,6 +43,7 @@ type Config struct {
 	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
 	FullCheck       FullCheckConfig   `yaml:"full_check"`
 	Convergence     ConvergenceConfig `yaml:"convergence"`
+	WaitTimeout     time.Duration     `yaml:"wait_timeout,omitempty"`
 	Computed        ComputedConfig    `yaml:"computed,omitempty"`
 }
 
@@ -69,6 +73,7 @@ func DefaultConfig() Config {
 			Threshold:            3,
 			EscalationMultiplier: 2,
 		},
+		WaitTimeout: DefaultWaitTimeout,
 	}
 }
 

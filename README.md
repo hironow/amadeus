@@ -8,13 +8,16 @@ Amadeus uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to ev
 amadeus run
 ```
 
-This command starts a daemon that continuously executes a three-phase pipeline and monitors the inbox for incoming D-Mails via fsnotify:
+This command runs the five-phase divergence check pipeline, then enters a D-Mail waiting loop:
 
-1. **Phase 1 (Reading Steiner)** — Detect shifts: scan merged PRs or the full codebase for structural changes
-2. **Phase 2 (Divergence Meter)** — Measure divergence: Claude evaluates the changes against ADRs and DoDs, scoring four axes 0-100
-3. **Phase 3 (D-Mail)** — Route corrections: generate design-feedback / implementation-feedback D-Mails routed by severity
-4. **PR Convergence** — Read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails
-5. **Inbox Watcher** — Monitor inbox/ via fsnotify for real-time D-Mail reception with archive-based dedup
+1. **Phase 0** — Inbox consumption (scan inbound D-Mails)
+2. **Phase 1 (Reading Steiner)** — Detect shifts: scan merged PRs or the full codebase for structural changes
+3. **Phase 2 (Divergence Meter)** — Measure divergence: Claude evaluates the changes against ADRs and DoDs, scoring four axes 0-100
+4. **Phase 3 (D-Mail)** — Route corrections: generate `design-feedback` / `implementation-feedback` D-Mails based on divergence scoring
+5. **Phase 4 (Convergence)** — World Line Convergence detection
+6. **Waiting Loop** — Monitor inbox/ via fsnotify; on D-Mail arrival, re-run Phases 0-4 (timeout configurable via `--wait-timeout`, default 30m)
+
+With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails). Both modes generate `implementation-feedback` D-Mails from divergence scoring.
 
 ## Why "Amadeus"?
 
@@ -104,7 +107,10 @@ Amadeus produces corrective D-Mails (`design-feedback`, `implementation-feedback
 ## Architecture
 
 ```
-amadeus run (daemon)
+amadeus run [--base main]
+    |
+    |  Phase 0: Inbox Drain
+    |  +-- ScanInbox: consume inbound D-Mails
     |
     |  Phase 1: Reading Steiner
     |  +-- Diff mode: scan merged PRs since last check
@@ -117,20 +123,26 @@ amadeus run (daemon)
     |  +-- Parse scores per axis, compute weighted divergence
     |  +-- Detect divergence jumps (delta > threshold)
     |
-    |  Phase 3: D-Mail
+    |  Phase 3: D-Mail Generation (works with or without --base)
     |  +-- Generate D-Mails from Claude candidates
+    |  +-- ClassifyByAxes + ResolveFeedbackKinds -> impl / design feedback
     |  +-- Route by severity (all auto-sent to outbox)
     |  +-- Dual-write to outbox/ + archive/
     |
-    |  PR Convergence Pipeline
+    |  Phase 4: Convergence Detection
+    |  +-- Detect recurring patterns across D-Mails
+    |  +-- Generate convergence D-Mails
+    |
+    |  PR Convergence Pipeline (--base only)
     |  +-- GhPRReader: read open PR state via gh CLI
     |  +-- Build PRChain from PRState list
     |  +-- Generate PRConvergenceReport
     |  +-- Emit convergence D-Mail to outbox/
     |
-    |  Inbox Watcher (fsnotify)
+    |  Waiting Loop / Inbox Watcher (fsnotify)
     |  +-- MonitorInbox: watch inbox/ for new files
-    |  +-- ReceiveDMailFromInbox: parse, dedup, archive
+    |  +-- On D-Mail arrival: re-run check pipeline
+    |  +-- Timeout: configurable via --wait-timeout (default 30m)
     |
     v
 .gate/                  <- Persistent state
@@ -238,7 +250,7 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 | Command | Description |
 |---------|-------------|
-| `amadeus run` | Daemon mode: divergence check + PR convergence + fsnotify inbox watcher |
+| `amadeus run` | Divergence check + D-Mail waiting loop (add `--base main` for PR convergence daemon) |
 | `amadeus init` | Initialize `.gate/` directory with default config (`--force` to regenerate) |
 | `amadeus config show` | Show current configuration values |
 | `amadeus config set` | Update configuration values (e.g., `amadeus config set lang en`) |
@@ -261,14 +273,23 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 All commands accept an optional `[path]` argument. When omitted, the current working directory is used.
 
 ```bash
-# Daemon mode (divergence check + PR convergence + inbox watcher)
+# One-shot check + D-Mail waiting loop (impl feedback from divergence scoring)
 amadeus run
 
-# Daemon with full calibration
+# With PR convergence daemon (requires gh CLI)
+amadeus run --base main
+
+# Skip approval gate
+amadeus run --auto-approve
+
+# Full calibration
 amadeus run -f
 
-# Daemon with dry run (build prompt only, skip Claude call)
+# Dry run (build prompt only, skip Claude call)
 amadeus run -n
+
+# Custom waiting timeout (0 = no timeout, negative = disable waiting)
+amadeus run --wait-timeout 1h
 
 # Show/set configuration
 amadeus config show
@@ -335,6 +356,7 @@ lang: ja
 claude_cmd: claude
 model: opus
 timeout_sec: 1980
+wait_timeout: 30m  # D-Mail waiting phase timeout (0 = no timeout, negative = disable)
 
 weights:
   adr_integrity: 0.4
@@ -421,7 +443,7 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 
 - Go 1.26+
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-- [GitHub CLI (`gh`)](https://cli.github.com/) (required for PR convergence pipeline)
+- [GitHub CLI (`gh`)](https://cli.github.com/) (required only with `--base` for PR convergence pipeline)
 - [Docker](https://www.docker.com/) (optional, for Jaeger tracing)
 
 Run `amadeus doctor` to verify all prerequisites (multiple checks including git-remote, gh CLI, and fsnotify availability).
