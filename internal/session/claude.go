@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/platform"
@@ -105,6 +106,13 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Write
 	}
 	if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
 		span.SetAttributes(initAttrs...)
+	}
+
+	// Context budget measurement: estimate and record hook/plugin context consumption.
+	budget := platform.CalculateContextBudget(messages)
+	span.SetAttributes(budget.Attrs()...)
+	if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
+		_, _ = fmt.Fprintln(os.Stderr, "WARN: "+warning)
 	}
 
 	return result.Result, nil
