@@ -325,7 +325,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 15 results
+	// then: should have 17 results
 	if len(results) != 17 {
 		names := make([]string, len(results))
 		for i, r := range results {
@@ -373,7 +373,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "domain.doctor" {
 			found = true
-			// Should have 15 doctor.check events (one per check)
+			// Should have 17 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
@@ -495,7 +495,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// when
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
 
-	// then: should have 15 results
+	// then: should have 17 results
 	if len(results) != 17 {
 		names := make([]string, len(results))
 		for i, r := range results {

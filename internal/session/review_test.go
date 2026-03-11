@@ -18,10 +18,12 @@ import (
 
 // fakeReviewFixRunner implements port.ClaudeRunner for testing review fix cycles.
 type fakeReviewFixRunner struct {
-	runFunc func(ctx context.Context, prompt string) (string, error)
+	runFunc   func(ctx context.Context, prompt string) (string, error)
+	callCount int
 }
 
 func (f *fakeReviewFixRunner) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	f.callCount++
 	if f.runFunc != nil {
 		return f.runFunc(ctx, prompt)
 	}
@@ -159,7 +161,7 @@ func TestRunReviewGate_FailsAfterMaxCycles(t *testing.T) {
 	scriptPath := filepath.Join(dir, "review.sh")
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'style error'\nexit 1\n"), 0755)
 
-	// when — no Claude runner, so fix attempts will fail and exhaust cycles
+	// when — no Claude runner; fix attempts fail immediately and RunReviewGate should return non-passing without error
 	passed, err := RunReviewGate(ctx, scriptPath, nil, dir, 300, nil)
 
 	// then
@@ -256,6 +258,9 @@ exit 0
 	}
 	if !passed {
 		t.Error("expected passed=true after fix cycle resolves review")
+	}
+	if runner.callCount < 1 {
+		t.Error("expected fake runner to be invoked at least once")
 	}
 }
 

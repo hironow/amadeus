@@ -33,7 +33,7 @@ type ClaudeAdapter struct {
 
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
-// The w and opts parameters are accepted for interface compatibility but unused by amadeus.
+// The writer parameter is accepted for interface compatibility and ignored; opts are applied via port.ApplyOptions and control allowed tools, working directory, and continuation behavior.
 func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
 	cfg := port.ApplyOptions(opts...)
 	claudeCmd := a.ClaudeCmd

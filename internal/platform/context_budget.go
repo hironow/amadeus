@@ -6,8 +6,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// charsPerToken is the approximate ratio of characters to tokens.
-// Claude tokenizer averages ~4 characters per token for English text.
+// charsPerToken is the approximate ratio of bytes (UTF-8 text) to tokens.
+// Claude tokenizer averages ~4 bytes per token for typical English UTF-8 text.
 const charsPerToken = 4
 
 // tokensPerTool is the estimated token overhead per tool definition in context.

@@ -284,7 +284,7 @@ func TestContextBudgetAttrs_ReturnsAllFields(t *testing.T) {
 func TestEstimateTokens_TokensPerChar(t *testing.T) {
 	t.Parallel()
 
-	// given: 8 bytes of hook output (divisible by tokensPerChar=4)
+	// given: 8 bytes of hook output (divisible by charsPerToken=4)
 	messages := []*StreamMessage{
 		{
 			Type:    "system",
