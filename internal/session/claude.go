@@ -34,17 +34,34 @@ type ClaudeAdapter struct {
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
 // The w and opts parameters are accepted for interface compatibility but unused by amadeus.
-func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
+func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
+	cfg := port.ApplyOptions(opts...)
 	claudeCmd := a.ClaudeCmd
 	model := a.Model
-	cmd := platform.NewShellCmd(ctx, claudeCmd,
+
+	args := []string{
 		"--model", model,
 		"--verbose",
 		"--output-format", "stream-json",
-		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
 		"--dangerously-skip-permissions",
 		"--print",
-	)
+	}
+
+	// --allowedTools: use caller-specified tools, or default to DivergenceMeterAllowedTools.
+	allowedTools := DivergenceMeterAllowedTools
+	if len(cfg.AllowedTools) > 0 {
+		allowedTools = cfg.AllowedTools
+	}
+	args = append(args, "--allowedTools", strings.Join(allowedTools, ","))
+
+	if cfg.Continue {
+		args = append(args, "--continue")
+	}
+
+	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)
+	if cfg.WorkDir != "" {
+		cmd.Dir = cfg.WorkDir
+	}
 	cmd.Stdin = bytes.NewBufferString(prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

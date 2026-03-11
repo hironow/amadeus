@@ -4,13 +4,29 @@ package session
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
+
+// fakeReviewFixRunner implements port.ClaudeRunner for testing review fix cycles.
+type fakeReviewFixRunner struct {
+	runFunc func(ctx context.Context, prompt string) (string, error)
+}
+
+func (f *fakeReviewFixRunner) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	if f.runFunc != nil {
+		return f.runFunc(ctx, prompt)
+	}
+	return "", nil
+}
 
 // === RunReview ===
 
@@ -109,7 +125,7 @@ func TestRunReviewGate_EmptyCmd_Passes(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	passed, err := RunReviewGate(ctx, "", "", "", t.TempDir(), 300, nil)
+	passed, err := RunReviewGate(ctx, "", nil, t.TempDir(), 300, nil)
 
 	// then
 	if err != nil {
@@ -125,7 +141,7 @@ func TestRunReviewGate_PassingReview(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	passed, err := RunReviewGate(ctx, "echo ok", "", "", t.TempDir(), 300, nil)
+	passed, err := RunReviewGate(ctx, "echo ok", nil, t.TempDir(), 300, nil)
 
 	// then
 	if err != nil {
@@ -144,7 +160,7 @@ func TestRunReviewGate_FailsAfterMaxCycles(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'style error'\nexit 1\n"), 0755)
 
 	// when — no Claude runner, so fix attempts will fail and exhaust cycles
-	passed, err := RunReviewGate(ctx, scriptPath, "", "", dir, 300, nil)
+	passed, err := RunReviewGate(ctx, scriptPath, nil, dir, 300, nil)
 
 	// then
 	if err != nil {
@@ -161,7 +177,7 @@ func TestRunReviewGate_RespectsTimeout(t *testing.T) {
 	defer cancel()
 
 	// when
-	_, err := RunReviewGate(ctx, "sleep 10", "", "", t.TempDir(), 300, nil)
+	_, err := RunReviewGate(ctx, "sleep 10", nil, t.TempDir(), 300, nil)
 
 	// then
 	if err == nil {
@@ -177,7 +193,7 @@ func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'error'\nexit 1\n"), 0755)
 
 	// when
-	passed, err := RunReviewGate(ctx, scriptPath, "", "", dir, 300, nil, 1)
+	passed, err := RunReviewGate(ctx, scriptPath, nil, dir, 300, nil, 1)
 
 	// then
 	if err != nil {
@@ -193,7 +209,7 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	passed, err := RunReviewGate(ctx, "echo ok", "", "", t.TempDir(), 300, nil, 0)
+	passed, err := RunReviewGate(ctx, "echo ok", nil, t.TempDir(), 300, nil, 0)
 
 	// then
 	if err != nil {
@@ -227,14 +243,12 @@ fi
 exit 0
 `), 0755)
 
-	// Fake claude: just succeed (noop fix)
-	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 0\n"), 0755)
+	runner := &fakeReviewFixRunner{}
 
 	ctx := context.Background()
 
 	// when — review fail → fix (fake claude) → review pass
-	passed, err := RunReviewGate(ctx, reviewScript, fakeClaudeScript, "opus", dir, 300, nil, 3)
+	passed, err := RunReviewGate(ctx, reviewScript, runner, dir, 300, nil, 3)
 
 	// then
 	if err != nil {
@@ -253,13 +267,12 @@ func TestRunReviewGate_FixCycleExhausted(t *testing.T) {
 	reviewScript := filepath.Join(dir, "review.sh")
 	os.WriteFile(reviewScript, []byte("#!/bin/bash\necho 'persistent issue'\nexit 1\n"), 0755)
 
-	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 0\n"), 0755)
+	runner := &fakeReviewFixRunner{}
 
 	ctx := context.Background()
 
 	// when — all cycles exhausted
-	passed, err := RunReviewGate(ctx, reviewScript, fakeClaudeScript, "opus", dir, 300, nil, 2)
+	passed, err := RunReviewGate(ctx, reviewScript, runner, dir, 300, nil, 2)
 
 	// then
 	if err != nil {
@@ -275,36 +288,28 @@ func TestRunReviewGate_ReviewCommentsPropagatedToFix(t *testing.T) {
 	dir := t.TempDir()
 	initTestGitRepo(t, dir)
 
-	promptCapture := filepath.Join(dir, "captured-prompt.txt")
-
 	reviewScript := filepath.Join(dir, "review.sh")
 	os.WriteFile(reviewScript, []byte("#!/bin/bash\necho 'UNIQUE-REVIEW-COMMENT-XYZ-789'\nexit 1\n"), 0755)
 
-	// Fake claude captures -p argument to file
-	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte(`#!/bin/bash
-while [ $# -gt 0 ]; do
-  if [ "$1" = "-p" ]; then
-    echo "$2" > `+promptCapture+`
-    break
-  fi
-  shift
-done
-exit 0
-`), 0755)
+	var capturedPrompt string
+	runner := &fakeReviewFixRunner{
+		runFunc: func(_ context.Context, prompt string) (string, error) {
+			capturedPrompt = prompt
+			return "", nil
+		},
+	}
 
 	ctx := context.Background()
 
 	// when — review fails, fix is called with review comments in prompt
-	RunReviewGate(ctx, reviewScript, fakeClaudeScript, "opus", dir, 300, nil, 2)
+	RunReviewGate(ctx, reviewScript, runner, dir, 300, nil, 2)
 
 	// then — captured prompt should contain the review comments
-	captured, err := os.ReadFile(promptCapture)
-	if err != nil {
-		t.Fatalf("fix was not called (no captured prompt): %v", err)
+	if capturedPrompt == "" {
+		t.Fatal("fix was not called (no captured prompt)")
 	}
-	if !strings.Contains(string(captured), "UNIQUE-REVIEW-COMMENT-XYZ-789") {
-		t.Errorf("review comments not propagated to fix prompt, got: %s", string(captured))
+	if !strings.Contains(capturedPrompt, "UNIQUE-REVIEW-COMMENT-XYZ-789") {
+		t.Errorf("review comments not propagated to fix prompt, got: %s", capturedPrompt)
 	}
 }
 
@@ -316,13 +321,16 @@ func TestRunReviewGate_FixFailure_ReturnsFalse(t *testing.T) {
 	reviewScript := filepath.Join(dir, "review.sh")
 	os.WriteFile(reviewScript, []byte("#!/bin/bash\necho 'issue'\nexit 1\n"), 0755)
 
-	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 1\n"), 0755)
+	runner := &fakeReviewFixRunner{
+		runFunc: func(_ context.Context, _ string) (string, error) {
+			return "", fmt.Errorf("claude exited with non-zero")
+		},
+	}
 
 	ctx := context.Background()
 
 	// when — fix fails
-	passed, err := RunReviewGate(ctx, reviewScript, fakeClaudeScript, "opus", dir, 300, nil, 2)
+	passed, err := RunReviewGate(ctx, reviewScript, runner, dir, 300, nil, 2)
 
 	// then — should return false (not error)
 	if err != nil {

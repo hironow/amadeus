@@ -345,7 +345,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 	// Review Gate: run code review if configured
 	if a.ReviewCmd != "" {
-		passed, revErr := RunReviewGate(ctx, a.ReviewCmd, a.ClaudeCmd, a.ClaudeModel, a.RepoDir, 300, a.Logger)
+		passed, revErr := RunReviewGate(ctx, a.ReviewCmd, a.claudeRunner(), a.RepoDir, 300, a.Logger)
 		if revErr != nil {
 			a.Logger.Warn("Review gate error: %v", revErr)
 		} else if !passed {
