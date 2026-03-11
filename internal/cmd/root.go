@@ -103,7 +103,7 @@ func NewRootCommand() *cobra.Command {
 		newRebuildCommand(),
 		newStatusCommand(),
 		newVersionCommand(),
-		newUpdateCommand(),
+		newUpdateCmd(),
 		newConfigCommand(),
 	)
 

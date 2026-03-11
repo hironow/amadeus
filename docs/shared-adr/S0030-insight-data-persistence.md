@@ -53,13 +53,16 @@ State dir contents are gitignored individually (not the parent dir), allowing
 ## Consequences
 
 ### Positive
+
 - Accumulated knowledge persists across sessions and developers via git
 - Clear separation: insight data is semantic, not runtime state
 
 ### Negative
+
 - Gitignore becomes individual-entry pattern instead of parent-dir pattern
 - New state subdirectories require gitignore updates
 
 ### Neutral
+
 - Supersedes S0017 — all S0017 rules remain except for the new insights category
 - `*.local.*` pattern for env-specific data is unchanged

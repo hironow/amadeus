@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -42,6 +43,10 @@ type SpanEmittingStreamReader struct {
 	rawEvents    []string
 	maxValueLen  int
 	syntheticSeq int
+	sessionID    string         // captured from stream session_id for Weave thread_id
+	resultText   string         // captured from result message for Weave output.value
+	inputText    string         // caller-provided prompt for Weave input.value
+	initMsg      *StreamMessage // captured from system:init for InitAttrs()
 }
 
 // NewSpanEmittingStreamReader creates a SpanEmittingStreamReader.
@@ -58,6 +63,32 @@ func NewSpanEmittingStreamReader(reader *StreamReader, parentCtx context.Context
 // RawEvents returns the collected raw event strings.
 func (s *SpanEmittingStreamReader) RawEvents() []string {
 	return s.rawEvents
+}
+
+// WeaveThreadAttrs returns Weave thread attributes for the parent (turn) span.
+// The thread_id is derived from the Claude session_id seen in the stream.
+func (s *SpanEmittingStreamReader) WeaveThreadAttrs() []attribute.KeyValue {
+	if s.sessionID == "" {
+		return nil
+	}
+	return WeaveThreadTurnAttrs(s.sessionID)
+}
+
+// SetInput records the prompt text for Weave input.value mapping.
+func (s *SpanEmittingStreamReader) SetInput(prompt string) {
+	s.inputText = prompt
+}
+
+// WeaveIOAttrs returns Weave I/O attributes (input.value and output.value).
+func (s *SpanEmittingStreamReader) WeaveIOAttrs() []attribute.KeyValue {
+	var attrs []attribute.KeyValue
+	if s.inputText != "" {
+		attrs = append(attrs, WeaveInputVal.String(s.inputText))
+	}
+	if s.resultText != "" {
+		attrs = append(attrs, WeaveOutputVal.String(s.resultText))
+	}
+	return attrs
 }
 
 // CollectAll reads all messages, emitting tool spans, and returns the result.
@@ -88,6 +119,19 @@ func (s *SpanEmittingStreamReader) processMessage(msg *StreamMessage) {
 	raw, _ := json.Marshal(msg)
 	s.rawEvents = append(s.rawEvents, FormatRawEvent(msg.Type, string(raw), s.maxValueLen))
 
+	// Capture session_id for Weave thread_id (first non-empty wins).
+	if s.sessionID == "" && msg.SessionID != "" {
+		s.sessionID = msg.SessionID
+	}
+
+	// Capture result text for Weave output.value.
+	if msg.Type == "result" && msg.Result != "" {
+		s.resultText = msg.Result
+	}
+
+	// Extended handlers (hooks, thinking, rate_limit) — see span_emitting_ext.go
+	s.handleExtMessage(msg)
+
 	switch msg.Type {
 	case "assistant":
 		s.handleAssistant(msg)
@@ -109,8 +153,12 @@ func (s *SpanEmittingStreamReader) handleAssistant(msg *StreamMessage) {
 		}
 
 		spanName := "execute_tool " + tool.Name
+		toolAttrs := GenAIToolAttrs(tool.Name, toolID)
+		if s.sessionID != "" {
+			toolAttrs = append(toolAttrs, WeaveThreadNestedAttrs(s.sessionID)...)
+		}
 		_, toolSpan := s.tracer.Start(s.parentCtx, spanName, // nosemgrep: adr0003-otel-span-without-defer-end -- map-managed spans, End() in handleToolResult/endAllOpenSpans [permanent]
-			trace.WithAttributes(GenAIToolAttrs(tool.Name, toolID)...),
+			trace.WithAttributes(toolAttrs...),
 		)
 
 		if len(tool.Input) > 0 {

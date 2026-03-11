@@ -232,15 +232,17 @@ func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
 			Message: "inference failed: " + err.Error(),
-			Hint:    "check API key, quota, and model access",
+			Hint: `"signal: killed" = CLI startup too slow (timeout 60s); ` +
+				`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
+				`otherwise check API key, quota, and model access`,
 		}
 	}
 	if strings.TrimSpace(output) != "2" {
 		return domain.DoctorCheckResult{
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
-			Message: "unexpected response",
-			Hint:    "check API key, quota, and model access",
+			Message: "unexpected response: " + strings.TrimSpace(output),
+			Hint:    "model returned unexpected output; check model access and API quota",
 		}
 	}
 	return domain.DoctorCheckResult{
@@ -284,7 +286,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 				Name:    "SKILL.md",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
-				Hint:    `run "amadeus init --force" to regenerate skills with updated kinds (feedback → design-feedback / implementation-feedback)`,
+				Hint:    "deprecated kind 'feedback'; migrate to 'design-feedback' or 'implementation-feedback' (run 'amadeus init --force' to regenerate SKILL.md)",
 			}
 		}
 	}
@@ -373,8 +375,9 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
-			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
+			inferCtx, inferCancel := context.WithTimeout(ctx, 60*time.Second)
 			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			results = append(results, checkClaudeInference(string(inferOut), inferErr))
@@ -605,4 +608,18 @@ func checkConfig(path string) domain.DoctorCheckResult {
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s loaded and validated", path),
 	}
+}
+
+// filterEnv returns a copy of env with the named variable removed.
+// Used to unset CLAUDECODE so that doctor's inference check does not
+// trigger the nested-session guard in Claude Code.
+func filterEnv(env []string, name string) []string {
+	prefix := name + "="
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			out = append(out, e)
+		}
+	}
+	return out
 }

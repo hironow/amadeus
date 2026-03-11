@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/platform"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
@@ -216,4 +217,213 @@ func spanNames(spans []tracetest.SpanStub) []string {
 		names[i] = s.Name
 	}
 	return names
+}
+
+// findAttr returns the attribute value for the given key, or nil if not found.
+func findAttr(span tracetest.SpanStub, key attribute.Key) *attribute.Value {
+	for _, a := range span.Attributes {
+		if a.Key == key {
+			v := a.Value
+			return &v
+		}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Weave thread attribute tests (TDD Red)
+// ref: Weave thread organization design doc
+// ---------------------------------------------------------------------------
+
+func TestSpanEmittingStreamReader_weave_thread_id_from_session(t *testing.T) {
+	// given: NDJSON stream with session_id="sess-abc-123"
+	input := strings.Join([]string{
+		`{"type":"system","subtype":"init","session_id":"sess-abc-123"}`,
+		`{"type":"assistant","session_id":"sess-abc-123","message":{"id":"msg_1","role":"assistant","model":"claude-opus-4-6","content":[{"type":"text","text":"hello"}]}}`,
+		`{"type":"result","subtype":"success","session_id":"sess-abc-123","result":"hello","usage":{"input_tokens":10,"output_tokens":5},"stop_reason":"end_turn","num_turns":1}`,
+	}, "\n")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+
+	// when
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: emitter must expose WeaveThreadAttrs so the caller can set them
+	// on the parent span. The thread_id must come from the session_id.
+	threadAttrs := emitter.WeaveThreadAttrs()
+
+	gotThreadID := ""
+	gotIsTurn := false
+	for _, kv := range threadAttrs {
+		if kv.Key == "wandb.thread_id" {
+			gotThreadID = kv.Value.AsString()
+		}
+		if kv.Key == "wandb.is_turn" {
+			gotIsTurn = kv.Value.AsBool()
+		}
+	}
+
+	if gotThreadID != "sess-abc-123" {
+		t.Errorf("wandb.thread_id = %q, want %q", gotThreadID, "sess-abc-123")
+	}
+	if !gotIsTurn {
+		t.Error("wandb.is_turn should be true for the parent (turn) span")
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+}
+
+func TestSpanEmittingStreamReader_tool_spans_have_thread_id_no_turn(t *testing.T) {
+	// given: stream with tool_use in a session
+	input := strings.Join([]string{
+		`{"type":"system","subtype":"init","session_id":"sess-tool-test"}`,
+		`{"type":"assistant","session_id":"sess-tool-test","message":{"content":[{"type":"tool_use","name":"Read","id":"toolu_01","input":{"file_path":"/tmp/x"}}]}}`,
+		`{"type":"tool_result","tool_use_id":"toolu_01"}`,
+		`{"type":"result","subtype":"success","session_id":"sess-tool-test","result":"done","usage":{"input_tokens":100,"output_tokens":50},"stop_reason":"end_turn","num_turns":1}`,
+	}, "\n")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+
+	// when
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+
+	// then: tool child spans must have wandb.thread_id but NOT wandb.is_turn=true
+	spans := exporter.GetSpans()
+	for _, s := range spans {
+		if !strings.HasPrefix(s.Name, "execute_tool") {
+			continue
+		}
+
+		threadID := findAttr(s, "wandb.thread_id")
+		if threadID == nil {
+			t.Errorf("tool span %q missing wandb.thread_id", s.Name)
+		} else if threadID.AsString() != "sess-tool-test" {
+			t.Errorf("tool span %q wandb.thread_id = %q, want %q", s.Name, threadID.AsString(), "sess-tool-test")
+		}
+
+		isTurn := findAttr(s, "wandb.is_turn")
+		if isTurn != nil && isTurn.AsBool() {
+			t.Errorf("tool span %q must NOT have wandb.is_turn=true (nested spans are not turns)", s.Name)
+		}
+	}
+}
+
+func TestSpanEmittingStreamReader_weave_io_attrs(t *testing.T) {
+	// given: stream with text content and result
+	input := strings.Join([]string{
+		`{"type":"system","subtype":"init","session_id":"sess-io"}`,
+		`{"type":"assistant","session_id":"sess-io","message":{"id":"msg_1","role":"assistant","model":"claude-opus-4-6","content":[{"type":"text","text":"The answer is 42."}]}}`,
+		`{"type":"result","subtype":"success","session_id":"sess-io","result":"The answer is 42.","usage":{"input_tokens":10,"output_tokens":5},"stop_reason":"end_turn","num_turns":1}`,
+	}, "\n")
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	tracer := tp.Tracer("test")
+
+	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
+	emitter.SetInput("What is the meaning of life?")
+
+	// when
+	_, _, err := emitter.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: WeaveIOAttrs should contain both input.value and output.value
+	ioAttrs := emitter.WeaveIOAttrs()
+
+	gotInput := ""
+	gotOutput := ""
+	for _, kv := range ioAttrs {
+		if kv.Key == "input.value" {
+			gotInput = kv.Value.AsString()
+		}
+		if kv.Key == "output.value" {
+			gotOutput = kv.Value.AsString()
+		}
+	}
+
+	if gotInput != "What is the meaning of life?" {
+		t.Errorf("input.value = %q, want %q", gotInput, "What is the meaning of life?")
+	}
+	if gotOutput != "The answer is 42." {
+		t.Errorf("output.value = %q, want %q", gotOutput, "The answer is 42.")
+	}
+
+	parentSpan.End()
+	tp.ForceFlush(context.Background())
+}
+
+func TestGenAIWeaveThreadAttrs(t *testing.T) {
+	// given
+	threadID := "thread-test-456"
+
+	// when: create Weave thread attributes for a turn span
+	attrs := platform.WeaveThreadTurnAttrs(threadID)
+
+	// then
+	gotThreadID := ""
+	gotIsTurn := false
+	for _, kv := range attrs {
+		if kv.Key == "wandb.thread_id" {
+			gotThreadID = kv.Value.AsString()
+		}
+		if kv.Key == "wandb.is_turn" {
+			gotIsTurn = kv.Value.AsBool()
+		}
+	}
+
+	if gotThreadID != threadID {
+		t.Errorf("wandb.thread_id = %q, want %q", gotThreadID, threadID)
+	}
+	if !gotIsTurn {
+		t.Error("wandb.is_turn should be true for turn attrs")
+	}
+}
+
+func TestGenAIWeaveThreadNestedAttrs(t *testing.T) {
+	// given
+	threadID := "thread-test-456"
+
+	// when: create Weave thread attributes for a nested (non-turn) span
+	attrs := platform.WeaveThreadNestedAttrs(threadID)
+
+	// then
+	gotThreadID := ""
+	for _, kv := range attrs {
+		if kv.Key == "wandb.thread_id" {
+			gotThreadID = kv.Value.AsString()
+		}
+		if kv.Key == "wandb.is_turn" {
+			t.Error("nested attrs should NOT include wandb.is_turn")
+		}
+	}
+
+	if gotThreadID != threadID {
+		t.Errorf("wandb.thread_id = %q, want %q", gotThreadID, threadID)
+	}
 }

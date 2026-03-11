@@ -83,16 +83,18 @@ func emitResponse(content, outputFormat string) {
 }
 
 // wrapStreamJSON wraps a response body in stream-json NDJSON format.
-// Emits: system init -> assistant -> result (3 lines).
+// Matches real Claude CLI output: system init -> assistant(thinking) -> assistant(text) -> result.
+// The --verbose flag (required for stream-json) enables thinking blocks in the output.
 func wrapStreamJSON(body string) string {
 	escaped, _ := json.Marshal(body)
 	escapedStr := string(escaped) // includes surrounding quotes
 
-	initLine := `{"type":"system","subtype":"init","session_id":"fake-session","model":"claude-opus-4-6","tools":["Read","Write","Bash"]}`
-	assistantLine := fmt.Sprintf(`{"type":"assistant","session_id":"fake-session","message":{"id":"msg_fake","role":"assistant","content":[{"type":"text","text":%s}],"model":"claude-opus-4-6","stop_reason":"end_turn","usage":{"input_tokens":100,"output_tokens":50}}}`, escapedStr)
-	resultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake-session","result":%s,"is_error":false,"num_turns":1,"duration_ms":1000,"total_cost_usd":0.01,"usage":{"input_tokens":100,"output_tokens":50},"stop_reason":"end_turn"}`, escapedStr)
+	initLine := `{"type":"system","subtype":"init","session_id":"fake-session"}`
+	thinkingLine := `{"type":"assistant","session_id":"fake-session","message":{"id":"msg_fake","type":"message","role":"assistant","content":[{"type":"thinking","thinking":"Analyzing the request.","signature":"fake-sig"}],"model":"claude-opus-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":100,"output_tokens":10}},"parent_tool_use_id":null}`
+	assistantLine := fmt.Sprintf(`{"type":"assistant","session_id":"fake-session","message":{"id":"msg_fake","type":"message","role":"assistant","content":[{"type":"text","text":%s}],"model":"claude-opus-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":100,"output_tokens":50}},"parent_tool_use_id":null}`, escapedStr)
+	resultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake-session","result":%s,"is_error":false,"num_turns":1,"duration_ms":1000,"duration_api_ms":900,"total_cost_usd":0.01,"usage":{"input_tokens":100,"output_tokens":50},"stop_reason":"end_turn","uuid":"fake-uuid"}`, escapedStr)
 
-	return initLine + "\n" + assistantLine + "\n" + resultLine + "\n"
+	return initLine + "\n" + thinkingLine + "\n" + assistantLine + "\n" + resultLine + "\n"
 }
 
 // logPrompt appends the prompt text to a sequentially-named file in dir.

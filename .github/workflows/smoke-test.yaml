@@ -58,17 +58,17 @@ jobs:
           REPO_FULL: ${{ github.repository }}
         run: |
           LATEST=$(gh release view --repo "$REPO_FULL" --json tagName -q .tagName)
-          PREVIOUS=$(gh release list --repo "$REPO_FULL" --limit 2 --json tagName -q '.[1].tagName')
+          PREVIOUS=$(gh release list --repo "$REPO_FULL" --limit 2 --json tagName -q '.[1].tagName // ""')
           echo "LATEST=$LATEST" >> "$GITHUB_ENV"
           echo "PREVIOUS=$PREVIOUS" >> "$GITHUB_ENV"
           echo "Latest: $LATEST, Previous: $PREVIOUS"
 
       - name: Skip if no previous release
-        if: env.PREVIOUS == ''
+        if: env.PREVIOUS == '' || env.PREVIOUS == 'null'
         run: echo "No previous release found — skipping update smoke test"
 
       - name: Download previous release
-        if: env.PREVIOUS != ''
+        if: env.PREVIOUS != '' && env.PREVIOUS != 'null'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO_FULL: ${{ github.repository }}
@@ -82,16 +82,16 @@ jobs:
           "./$REPO_NAME" version
 
       - name: Verify update --check detects newer version
-        if: env.PREVIOUS != ''
+        if: env.PREVIOUS != '' && env.PREVIOUS != 'null'
         env:
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
           OUTPUT=$("./$REPO_NAME" update --check 2>&1)
           echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qi "update available"
+          echo "$OUTPUT" | grep -qiE "update available|new version available"
 
       - name: Run self-update
-        if: env.PREVIOUS != ''
+        if: env.PREVIOUS != '' && env.PREVIOUS != 'null'
         env:
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
@@ -99,7 +99,7 @@ jobs:
           echo "Update completed"
 
       - name: Verify updated version matches latest
-        if: env.PREVIOUS != ''
+        if: env.PREVIOUS != '' && env.PREVIOUS != 'null'
         env:
           REPO_NAME: ${{ github.event.repository.name }}
         run: |

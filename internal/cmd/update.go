@@ -9,7 +9,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newUpdateCommand() *cobra.Command {
+// isUpToDate returns true if current version is >= latest version.
+// Non-semver versions (e.g. "dev") are always considered out of date.
+func isUpToDate(current, latest string) bool {
+	cv, err := semver.NewVersion(current)
+	if err != nil {
+		return false
+	}
+	lv, err := semver.NewVersion(latest)
+	if err != nil {
+		return false
+	}
+	return !cv.LessThan(lv)
+}
+
+func newUpdateCmd() *cobra.Command {
 	var checkOnly bool
 
 	cmd := &cobra.Command{
@@ -44,6 +58,7 @@ installing.`,
 			}
 
 			cleanVersion := strings.TrimPrefix(Version, "v")
+			cleanLatest := strings.TrimPrefix(latest.Version(), "v")
 
 			if isUpToDate(Version, latest.Version()) {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", cleanVersion)
@@ -51,7 +66,7 @@ installing.`,
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", cleanVersion, latest.Version())
+				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", cleanVersion, cleanLatest)
 				return nil
 			}
 
@@ -64,7 +79,7 @@ installing.`,
 				return fmt.Errorf("update failed: %w", err)
 			}
 
-			fmt.Fprintf(cmd.ErrOrStderr(), "Updated to v%s\n", latest.Version())
+			fmt.Fprintf(cmd.ErrOrStderr(), "Updated to v%s\n", cleanLatest)
 			return nil
 		},
 	}
@@ -72,18 +87,4 @@ installing.`,
 	cmd.Flags().BoolVarP(&checkOnly, "check", "C", false, "Check for updates without installing")
 
 	return cmd
-}
-
-// isUpToDate returns true if current version is >= latest version.
-// Non-semver versions (e.g. "dev") are always considered out of date.
-func isUpToDate(current, latest string) bool {
-	cv, err := semver.NewVersion(current)
-	if err != nil {
-		return false
-	}
-	lv, err := semver.NewVersion(latest)
-	if err != nil {
-		return false
-	}
-	return !cv.LessThan(lv)
 }

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -48,10 +49,34 @@ type FullCheckParams struct {
 	DependencyMap     string
 }
 
+// stripMarkdownCodeBlock removes markdown code block wrappers (```json ... ```)
+// from data. Claude's stream-json result field is always a text string, so when
+// Claude is asked for JSON output, it may wrap the response in a markdown code
+// block. This function strips that wrapper to extract the raw JSON.
+func stripMarkdownCodeBlock(data []byte) []byte {
+	trimmed := bytes.TrimSpace(data)
+	if !bytes.HasPrefix(trimmed, []byte("```")) {
+		return trimmed
+	}
+	// Remove opening fence line (```json, ```JSON, or just ```)
+	if idx := bytes.IndexByte(trimmed, '\n'); idx >= 0 {
+		trimmed = trimmed[idx+1:]
+	} else {
+		return trimmed // no newline after opening fence — return trimmed as-is
+	}
+	// Remove closing fence
+	if idx := bytes.LastIndex(trimmed, []byte("```")); idx >= 0 {
+		trimmed = trimmed[:idx]
+	}
+	return bytes.TrimSpace(trimmed)
+}
+
 // ParseClaudeResponse parses raw JSON bytes into a ClaudeResponse.
+// Handles markdown code block wrappers that Claude may add around JSON output.
 func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
+	cleaned := stripMarkdownCodeBlock(data)
 	var resp ClaudeResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
+	if err := json.Unmarshal(cleaned, &resp); err != nil {
 		return resp, fmt.Errorf("failed to parse Claude response: %w", err)
 	}
 	return resp, nil

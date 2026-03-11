@@ -105,6 +105,64 @@ func TestParseClaudeResponse_WithoutImpactRadius_BackwardCompatible(t *testing.T
 	}
 }
 
+func TestParseClaudeResponse_MarkdownCodeBlock(t *testing.T) {
+	// given: Claude wraps JSON output in markdown code block (```json ... ```)
+	// This is the root cause of the "invalid character '`'" parse failure.
+	raw := "```json\n" + `{
+		"axes": {
+			"adr_integrity": {"score": 15, "details": "ADR-003 minor tension"},
+			"dod_fulfillment": {"score": 20, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "Minor tensions detected"
+	}` + "\n```"
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("expected ParseClaudeResponse to strip markdown wrapper, got: %v", err)
+	}
+	if resp.Axes[domain.AxisADR].Score != 15 {
+		t.Errorf("expected ADR score 15, got %d", resp.Axes[domain.AxisADR].Score)
+	}
+}
+
+func TestParseClaudeResponse_MarkdownCodeBlockBare(t *testing.T) {
+	// given: ``` without language specifier
+	raw := "```\n" + `{"axes":{},"dmails":[],"reasoning":"ok"}` + "\n```"
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("expected bare code block to parse, got: %v", err)
+	}
+	if resp.Reasoning != "ok" {
+		t.Errorf("expected reasoning 'ok', got %q", resp.Reasoning)
+	}
+}
+
+func TestParseClaudeResponse_MarkdownCodeBlockWithWhitespace(t *testing.T) {
+	// given: code block with leading/trailing whitespace
+	raw := "\n  ```json\n" + `{"axes":{},"dmails":[],"reasoning":"padded"}` + "\n```  \n"
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("expected whitespace-padded code block to parse, got: %v", err)
+	}
+	if resp.Reasoning != "padded" {
+		t.Errorf("expected reasoning 'padded', got %q", resp.Reasoning)
+	}
+}
+
 // fakeClaudeRunner returns a canned response for testing.
 type fakeClaudeRunner struct {
 	response string

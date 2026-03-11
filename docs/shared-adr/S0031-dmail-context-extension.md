@@ -37,17 +37,21 @@ context:
 ### Kind Validation Update
 
 Add to the known kind set (already implemented, not yet in S0005):
+
 - `implementation-feedback`
 - `design-feedback`
 
 ## Consequences
 
 ### Positive
+
 - Cross-tool insight propagation via D-Mail contract (no side-channel reads)
 - Backward-compatible — existing parsers ignore unknown fields
 
 ### Negative
+
 - All tools' D-Mail parsers need `context` field in struct
 
 ### Neutral
+
 - Amends S0005 (adds field, does not change existing fields)
