@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 const maxReviewGateCycles = 3
@@ -66,7 +68,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 // Returns (true, nil) if review passes or is skipped (empty reviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string, timeoutSec int, logger domain.Logger, budget ...int) (bool, error) {
+func RunReviewGate(ctx context.Context, reviewCmd string, runner port.ClaudeRunner, dir string, timeoutSec int, logger domain.Logger, budget ...int) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "amadeus.review")
 	defer span.End()
 
@@ -127,7 +129,7 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 		}
 
 		// Run Claude --continue to fix review comments
-		if err := runReviewFix(ctx, claudeCmd, model, dir, lastComments, timeoutSec, logger); err != nil {
+		if err := runReviewFix(ctx, runner, dir, lastComments, timeoutSec, logger); err != nil {
 			logger.Warn("Review fix failed: %v", err)
 			return false, nil
 		}
@@ -138,7 +140,11 @@ func RunReviewGate(ctx context.Context, reviewCmd, claudeCmd, model, dir string,
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, timeoutSec int, logger domain.Logger) error {
+func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments string, timeoutSec int, logger domain.Logger) error {
+	if runner == nil {
+		return fmt.Errorf("no ClaudeRunner configured for review fix")
+	}
+
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)
@@ -153,20 +159,10 @@ func runReviewFix(ctx context.Context, claudeCmd, model, dir, comments string, t
 	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
 	defer fixCancel()
 
-	cmd := platform.NewShellCmd(fixCtx, claudeCmd,
-		"--model", model,
-		"--continue",
-		"--dangerously-skip-permissions",
-		"--print",
-		"-p", prompt,
-	)
-	cmd.Dir = dir
-	cmd.WaitDelay = 3 * time.Second
-
-	logger.Info("Review fix: running %s --model %s --continue", claudeCmd, model)
-	out, err := cmd.CombinedOutput()
+	logger.Info("Review fix: running claude --continue in %s", dir)
+	_, err = runner.Run(fixCtx, prompt, io.Discard, port.WithContinue(), port.WithWorkDir(dir))
 	if err != nil {
-		return fmt.Errorf("claude fix: %w\noutput: %s", err, summarizeReview(string(out)))
+		return fmt.Errorf("claude fix: %w", err)
 	}
 	return nil
 }

@@ -449,6 +449,9 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			// Inference check: reuse login output if it contains "2"
 			inferResult := checkClaudeInference(strings.TrimSpace(extractStreamResult(string(loginOut))), loginErr)
 			results = append(results, inferResult)
+
+			// Context budget check: reuse login stream-json output
+			results = append(results, checkContextBudget(string(loginOut)))
 		}
 	}
 
@@ -695,6 +698,37 @@ func extractStreamResult(streamJSON string) string {
 		}
 	}
 	return ""
+}
+
+// checkContextBudget parses stream-json output from a Claude CLI invocation
+// and reports context budget health based on hooks, plugins, skills, and MCP servers.
+func checkContextBudget(streamJSON string) domain.DoctorCheckResult {
+	var messages []*platform.StreamMessage
+	for _, line := range strings.Split(streamJSON, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		msg, err := platform.ParseStreamMessage([]byte(line))
+		if err != nil {
+			continue
+		}
+		messages = append(messages, msg)
+	}
+
+	report := platform.CalculateContextBudget(messages)
+
+	result := domain.DoctorCheckResult{
+		Name:   "context-budget",
+		Status: domain.CheckOK,
+		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
+			report.EstimatedTokens, report.ToolCount, report.SkillCount,
+			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
+	}
+	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
+		result.Hint = "context consumption is high; consider reducing installed plugins/skills or using an allowlist"
+	}
+	return result
 }
 
 // filterEnv returns a copy of env with the named variable removed.

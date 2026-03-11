@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,26 +22,46 @@ var DivergenceMeterAllowedTools = []string{
 	"Bash(cat:*)",
 }
 
-// defaultClaudeRunner executes the real Claude CLI as a subprocess.
-type defaultClaudeRunner struct {
-	cmd   string // Claude CLI command name (from config)
-	model string // Claude model name (from config)
+// ClaudeAdapter executes the real Claude CLI as a subprocess.
+// Exported for composition (e.g. RetryRunner wrapping).
+type ClaudeAdapter struct {
+	ClaudeCmd  string        // Claude CLI command name (from config)
+	Model      string        // Claude model name (from config)
+	TimeoutSec int           // per-invocation timeout in seconds (reserved for future use)
+	Logger     domain.Logger // nil-safe; warnings are sent here instead of raw stderr
 }
 
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
-// The w and opts parameters are accepted for interface compatibility but unused by amadeus.
-func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
-	claudeCmd := d.cmd
-	model := d.model
-	cmd := platform.NewShellCmd(ctx, claudeCmd,
+// The writer parameter is accepted for interface compatibility and ignored; opts are applied via port.ApplyOptions and control allowed tools, working directory, and continuation behavior.
+func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
+	cfg := port.ApplyOptions(opts...)
+	claudeCmd := a.ClaudeCmd
+	model := a.Model
+
+	args := []string{
 		"--model", model,
 		"--verbose",
 		"--output-format", "stream-json",
-		"--allowedTools", strings.Join(DivergenceMeterAllowedTools, ","),
 		"--dangerously-skip-permissions",
 		"--print",
-	)
+	}
+
+	// --allowedTools: use caller-specified tools, or default to DivergenceMeterAllowedTools.
+	allowedTools := DivergenceMeterAllowedTools
+	if len(cfg.AllowedTools) > 0 {
+		allowedTools = cfg.AllowedTools
+	}
+	args = append(args, "--allowedTools", strings.Join(allowedTools, ","))
+
+	if cfg.Continue {
+		args = append(args, "--continue")
+	}
+
+	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)
+	if cfg.WorkDir != "" {
+		cmd.Dir = cfg.WorkDir
+	}
 	cmd.Stdin = bytes.NewBufferString(prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -107,11 +128,20 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Write
 		span.SetAttributes(initAttrs...)
 	}
 
+	// Context budget measurement: estimate and record hook/plugin context consumption.
+	budget := platform.CalculateContextBudget(messages)
+	span.SetAttributes(budget.Attrs()...)
+	if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
+		if a.Logger != nil {
+			a.Logger.Warn("%s", warning)
+		}
+	}
+
 	return result.Result, nil
 }
 
 // DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.
 // Both claudeCmd and model are expected to be set by the caller (from config).
-func DefaultClaudeRunner(claudeCmd string, model string) port.ClaudeRunner {
-	return &defaultClaudeRunner{cmd: claudeCmd, model: model}
+func DefaultClaudeRunner(claudeCmd string, model string, logger domain.Logger) port.ClaudeRunner {
+	return &ClaudeAdapter{ClaudeCmd: claudeCmd, Model: model, Logger: logger}
 }
