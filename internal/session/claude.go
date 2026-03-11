@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -22,18 +22,21 @@ var DivergenceMeterAllowedTools = []string{
 	"Bash(cat:*)",
 }
 
-// defaultClaudeRunner executes the real Claude CLI as a subprocess.
-type defaultClaudeRunner struct {
-	cmd   string // Claude CLI command name (from config)
-	model string // Claude model name (from config)
+// ClaudeAdapter executes the real Claude CLI as a subprocess.
+// Exported for composition (e.g. RetryRunner wrapping).
+type ClaudeAdapter struct {
+	ClaudeCmd  string        // Claude CLI command name (from config)
+	Model      string        // Claude model name (from config)
+	TimeoutSec int           // per-invocation timeout in seconds (reserved for future use)
+	Logger     domain.Logger // nil-safe; warnings are sent here instead of raw stderr
 }
 
 // Run executes the Claude CLI with the given prompt via stdin and returns raw output.
 // Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
 // The w and opts parameters are accepted for interface compatibility but unused by amadeus.
-func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
-	claudeCmd := d.cmd
-	model := d.model
+func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	claudeCmd := a.ClaudeCmd
+	model := a.Model
 	cmd := platform.NewShellCmd(ctx, claudeCmd,
 		"--model", model,
 		"--verbose",
@@ -112,7 +115,9 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Write
 	budget := platform.CalculateContextBudget(messages)
 	span.SetAttributes(budget.Attrs()...)
 	if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
-		_, _ = fmt.Fprintln(os.Stderr, "WARN: "+warning)
+		if a.Logger != nil {
+			a.Logger.Warn("%s", warning)
+		}
 	}
 
 	return result.Result, nil
@@ -120,6 +125,6 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string, _ io.Write
 
 // DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.
 // Both claudeCmd and model are expected to be set by the caller (from config).
-func DefaultClaudeRunner(claudeCmd string, model string) port.ClaudeRunner {
-	return &defaultClaudeRunner{cmd: claudeCmd, model: model}
+func DefaultClaudeRunner(claudeCmd string, model string, logger domain.Logger) port.ClaudeRunner {
+	return &ClaudeAdapter{ClaudeCmd: claudeCmd, Model: model, Logger: logger}
 }
