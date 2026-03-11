@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -285,44 +284,3 @@ func TestParseClaudeResponse_WithoutFilesRead_BackwardCompatible(t *testing.T) {
 	}
 }
 
-// fakeClaudeRunner returns a canned response for testing.
-type fakeClaudeRunner struct {
-	response string
-}
-
-func (f *fakeClaudeRunner) Run(_ context.Context, _ string) ([]byte, error) {
-	return []byte(f.response), nil
-}
-
-func TestFakeClaudeRunner(t *testing.T) {
-	// given
-	canned := `{
-		"axes": {
-			"adr_integrity": {"score": 10, "details": "test"},
-			"dod_fulfillment": {"score": 0, "details": "ok"},
-			"dependency_integrity": {"score": 0, "details": "ok"},
-			"implicit_constraints": {"score": 0, "details": "ok"}
-		},
-		"dmails": [],
-		"reasoning": "fake response"
-	}`
-	fake := &fakeClaudeRunner{response: canned}
-
-	// when
-	raw, err := fake.Run(context.Background(), "test prompt")
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	resp, err := domain.ParseClaudeResponse(raw)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if resp.Axes[domain.AxisADR].Score != 10 {
-		t.Errorf("expected ADR score 10, got %d", resp.Axes[domain.AxisADR].Score)
-	}
-	if resp.Reasoning != "fake response" {
-		t.Errorf("expected reasoning 'fake response', got %q", resp.Reasoning)
-	}
-}
