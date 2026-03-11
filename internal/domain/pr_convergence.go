@@ -139,7 +139,9 @@ func BuildPRConvergenceReport(integrationBranch string, prs []PRState) PRConverg
 // a parent PR always appears before any of its dependents.
 func buildChainBFS(root PRState, adjacency map[string][]PRState) PRChain {
 	chain := PRChain{}
+	visited := make(map[string]bool)
 	queue := []PRState{root}
+	visited[root.headBranch] = true
 	for len(queue) > 0 {
 		pr := queue[0]
 		queue = queue[1:]
@@ -148,8 +150,12 @@ func buildChainBFS(root PRState, adjacency map[string][]PRState) PRChain {
 			chain.HasConflict = true
 		}
 		// Follow children: PRs whose baseBranch == this PR's headBranch.
-		children := adjacency[pr.headBranch]
-		queue = append(queue, children...)
+		for _, child := range adjacency[pr.headBranch] {
+			if !visited[child.headBranch] {
+				visited[child.headBranch] = true
+				queue = append(queue, child)
+			}
+		}
 	}
 	return chain
 }
