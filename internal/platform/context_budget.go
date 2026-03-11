@@ -6,9 +6,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// tokensPerChar is the approximate ratio of characters to tokens.
+// charsPerToken is the approximate ratio of characters to tokens.
 // Claude tokenizer averages ~4 characters per token for English text.
-const tokensPerChar = 4
+const charsPerToken = 4
 
 // tokensPerTool is the estimated token overhead per tool definition in context.
 const tokensPerTool = 150
@@ -80,7 +80,7 @@ func CalculateContextBudget(messages []*StreamMessage) ContextBudgetReport {
 		report.SkillCount*tokensPerSkill +
 		report.PluginCount*tokensPerPlugin +
 		report.MCPServerCount*tokensPerMCPServer +
-		report.HookContextBytes/tokensPerChar
+		report.HookContextBytes/charsPerToken
 
 	return report
 }

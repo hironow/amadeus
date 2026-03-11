@@ -1,5 +1,7 @@
 package platform
 
+// white-box-reason: platform internals: tests unexported StreamMessage fields used by CalculateContextBudget
+
 import (
 	"testing"
 )
