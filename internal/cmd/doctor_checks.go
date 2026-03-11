@@ -389,8 +389,8 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 
 	for _, r := range results {
 		span.AddEvent("doctor.check", trace.WithAttributes(
-			attribute.String("check.name", r.Name),
-			attribute.String("check.status", r.Status.StatusLabel()),
+			attribute.String("check.name", platform.SanitizeUTF8(r.Name)),
+			attribute.String("check.status", platform.SanitizeUTF8(r.Status.StatusLabel())),
 		))
 	}
 

@@ -92,9 +92,9 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
 			}
 			span3.AddEvent("dmail.created", trace.WithAttributes(
-				attribute.String("dmail.name", dmail.Name),
-				attribute.String("dmail.kind", string(dmail.Kind)),
-				attribute.String("dmail.severity", string(dmail.Severity)),
+				attribute.String("dmail.name", platform.SanitizeUTF8(dmail.Name)),
+				attribute.String("dmail.kind", platform.SanitizeUTF8(string(dmail.Kind))),
+				attribute.String("dmail.severity", platform.SanitizeUTF8(string(dmail.Severity))),
 			))
 			dmails = append(dmails, dmail)
 		}

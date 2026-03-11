@@ -22,7 +22,7 @@ func (a *Amadeus) runPreMergePipeline(ctx context.Context, integrationBranch str
 
 	_, span := platform.Tracer.Start(ctx, "pr_convergence",
 		trace.WithAttributes(
-			attribute.String("integration_branch", integrationBranch),
+			attribute.String("integration_branch", platform.SanitizeUTF8(integrationBranch)),
 		))
 	defer span.End()
 

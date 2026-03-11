@@ -79,7 +79,11 @@ func (d *defaultClaudeRunner) Run(ctx context.Context, prompt string) ([]byte, e
 		}
 	}
 	if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-		span.SetAttributes(attribute.StringSlice("stream.raw_events", rawEvents))
+		sanitized := make([]string, len(rawEvents))
+		for i, ev := range rawEvents {
+			sanitized[i] = platform.SanitizeUTF8(ev)
+		}
+		span.SetAttributes(attribute.StringSlice("stream.raw_events", sanitized))
 	}
 	if result.SessionID != "" {
 		span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
