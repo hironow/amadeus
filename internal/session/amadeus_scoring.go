@@ -126,7 +126,7 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 			return "", nil, err
 		}
 
-		prompt, err := platform.BuildFileRefFullCheckPrompt(a.Config.ConfigLang(), domain.FileRefFullCheckParams{
+		prompt, err := platform.BuildFullCheckPrompt(a.Config.ConfigLang(), domain.FullCheckParams{
 			EvalDir: evalDir,
 		})
 		if err != nil {
@@ -173,7 +173,7 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		}
 	}
 
-	prompt, err := platform.BuildFileRefDiffCheckPrompt(a.Config.ConfigLang(), domain.FileRefDiffCheckParams{
+	prompt, err := platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
 		EvalDir:        evalDir,
 		HasPRReviews:   hasPRReviews,
 		LinkedIssueIDs: strings.Join(issueIDs, ", "),

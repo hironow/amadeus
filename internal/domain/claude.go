@@ -32,33 +32,15 @@ type ClaudeDMailCandidate struct {
 	Category    string   `json:"category,omitempty"`
 }
 
-// DiffCheckParams holds the template parameters for a diff-based check.
+// DiffCheckParams holds the template parameters for a file-reference diff check prompt.
 type DiffCheckParams struct {
-	PreviousScores  string
-	PRDiffs         string
-	RelevantADRs    string
-	LinkedDoDs      string
-	LinkedIssueIDs  string
-	PRReviewSummary string
-}
-
-// FullCheckParams holds the template parameters for a full calibration check.
-type FullCheckParams struct {
-	CodebaseStructure string
-	AllADRs           string
-	RecentDoDs        string
-	DependencyMap     string
-}
-
-// FileRefDiffCheckParams holds the template parameters for a file-reference diff check prompt.
-type FileRefDiffCheckParams struct {
 	EvalDir        string
 	HasPRReviews   bool
 	LinkedIssueIDs string
 }
 
-// FileRefFullCheckParams holds the template parameters for a file-reference full check prompt.
-type FileRefFullCheckParams struct {
+// FullCheckParams holds the template parameters for a file-reference full check prompt.
+type FullCheckParams struct {
 	EvalDir string
 }
 

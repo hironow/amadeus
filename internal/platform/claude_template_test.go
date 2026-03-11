@@ -8,32 +8,90 @@ import (
 	"github.com/hironow/amadeus/internal/platform"
 )
 
-func TestBuildDiffCheckPrompt(t *testing.T) {
+func TestBuildDiffCheckPrompt_ReferencesFilePaths(t *testing.T) {
+	// given
 	params := domain.DiffCheckParams{
-		PreviousScores: `{"divergence": 0.133}`,
-		PRDiffs:        "diff --git a/auth.go ...",
-		RelevantADRs:   "ADR-003: Use JWT for auth",
-		LinkedDoDs:     "Issue #42: Session timeout must be configurable",
+		EvalDir:        "/repo/.gate/.run/eval",
+		HasPRReviews:   true,
+		LinkedIssueIDs: "MY-123, MY-456",
 	}
-	prompt, err := platform.BuildDiffCheckPrompt("ja", params)
+
+	// when
+	prompt, err := platform.BuildDiffCheckPrompt("en", params)
+
+	// then
 	if err != nil {
-		t.Fatalf("BuildDiffCheckPrompt failed: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if prompt == "" {
-		t.Error("expected non-empty prompt")
-	}
-	for _, want := range []string{"Previous State", "Changes Since Last Check", "ADRs"} {
-		if !strings.Contains(prompt, want) {
-			t.Errorf("prompt missing expected section %q", want)
+	// Prompt must reference file paths, not embed content
+	for _, path := range []string{
+		"/repo/.gate/.run/eval/previous_scores.json",
+		"/repo/.gate/.run/eval/diff.patch",
+		"/repo/.gate/.run/eval/adrs.md",
+		"/repo/.gate/.run/eval/dods.md",
+		"/repo/.gate/.run/eval/pr_reviews.md",
+	} {
+		if !strings.Contains(prompt, path) {
+			t.Errorf("expected eval dir path %q in prompt", path)
 		}
 	}
+	if !strings.Contains(prompt, "files_read") {
+		t.Error("expected files_read instruction in prompt")
+	}
+	if !strings.Contains(prompt, "impact_radius") {
+		t.Error("expected impact_radius in JSON schema")
+	}
+	// Prompt must be small (<5K chars)
+	if len(prompt) > 5000 {
+		t.Errorf("expected prompt < 5000 chars, got %d", len(prompt))
+	}
 }
 
-func TestBuildDiffCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
+func TestBuildDiffCheckPrompt_NoPRReviews(t *testing.T) {
 	// given
 	params := domain.DiffCheckParams{
-		PreviousScores: `{"divergence": 0.1}`,
-		PRDiffs:        "diff --git a/auth.go ...",
+		EvalDir:      "/repo/.gate/.run/eval",
+		HasPRReviews: false,
+	}
+
+	// when
+	prompt, err := platform.BuildDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(prompt, "pr_reviews.md") {
+		t.Error("expected NO pr_reviews reference when HasPRReviews=false")
+	}
+}
+
+func TestBuildDiffCheckPrompt_WithLinkedIssues(t *testing.T) {
+	// given
+	params := domain.DiffCheckParams{
+		EvalDir:        "/repo/.gate/.run/eval",
+		LinkedIssueIDs: "MY-100, MY-200",
+	}
+
+	// when
+	prompt, err := platform.BuildDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "MY-100, MY-200") {
+		t.Error("expected linked issue IDs in prompt")
+	}
+	if !strings.Contains(prompt, "Linear MCP tool") {
+		t.Error("expected Linear MCP tool instruction for linked issues")
+	}
+}
+
+func TestBuildDiffCheckPrompt_Ja(t *testing.T) {
+	// given
+	params := domain.DiffCheckParams{
+		EvalDir: "/repo/.gate/.run/eval",
 	}
 
 	// when
@@ -43,135 +101,15 @@ func TestBuildDiffCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(prompt, "impact_radius") {
-		t.Error("expected 'impact_radius' in diff check JSON schema")
-	}
-}
-
-func TestBuildFullCheckPrompt_IncludesImpactRadiusSchema(t *testing.T) {
-	// given
-	params := domain.FullCheckParams{
-		CodebaseStructure: "src/",
-	}
-
-	// when
-	prompt, err := platform.BuildFullCheckPrompt("ja", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(prompt, "impact_radius") {
-		t.Error("expected 'impact_radius' in full check JSON schema")
-	}
-}
-
-func TestBuildFullCheckPrompt(t *testing.T) {
-	params := domain.FullCheckParams{
-		CodebaseStructure: "src/\n  auth/\n  cart/",
-		AllADRs:           "ADR-001: Use Go\nADR-003: JWT auth",
-		RecentDoDs:        "Issue #42: Session timeout",
-		DependencyMap:     "auth -> cart: forbidden",
-	}
-	prompt, err := platform.BuildFullCheckPrompt("ja", params)
-	if err != nil {
-		t.Fatalf("BuildFullCheckPrompt failed: %v", err)
-	}
-	if !strings.Contains(prompt, "FULL calibration") {
-		t.Error("prompt missing 'FULL calibration' section")
-	}
-	if !strings.Contains(prompt, "Codebase Structure") {
-		t.Error("prompt missing 'Codebase Structure' section")
-	}
-}
-
-func TestBuildDiffCheckPrompt_En(t *testing.T) {
-	// given
-	params := domain.DiffCheckParams{
-		PreviousScores: `{"divergence": 0.1}`,
-		PRDiffs:        "diff --git a/auth.go ...",
-	}
-
-	// when
-	prompt, err := platform.BuildDiffCheckPrompt("en", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(prompt, "Previous State") {
-		t.Error("expected 'Previous State' in en diff check prompt")
-	}
-	if !strings.Contains(prompt, "impact_radius") {
-		t.Error("expected 'impact_radius' in en diff check JSON schema")
-	}
-}
-
-func TestBuildFullCheckPrompt_En(t *testing.T) {
-	// given
-	params := domain.FullCheckParams{
-		CodebaseStructure: "src/",
-	}
-
-	// when
-	prompt, err := platform.BuildFullCheckPrompt("en", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(prompt, "FULL calibration") {
-		t.Error("expected 'FULL calibration' in en full check prompt")
-	}
-}
-
-func TestBuildDiffCheckPrompt_WithPRReviewSummary(t *testing.T) {
-	// given
-	params := domain.DiffCheckParams{
-		PreviousScores:  `{"divergence": 0.1}`,
-		PRDiffs:         "diff --git a/auth.go ...",
-		PRReviewSummary: "### PR #42\n- Review decision: CHANGES_REQUESTED\n",
-	}
-
-	// when
-	prompt, err := platform.BuildDiffCheckPrompt("en", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(prompt, "PR Review Signals") {
-		t.Error("prompt should contain 'PR Review Signals' section when PRReviewSummary is set")
-	}
-	if !strings.Contains(prompt, "CHANGES_REQUESTED") {
-		t.Error("prompt should contain the review summary content")
-	}
-}
-
-func TestBuildDiffCheckPrompt_WithoutPRReviewSummary(t *testing.T) {
-	// given
-	params := domain.DiffCheckParams{
-		PreviousScores: `{"divergence": 0.1}`,
-		PRDiffs:        "diff --git a/auth.go ...",
-	}
-
-	// when
-	prompt, err := platform.BuildDiffCheckPrompt("en", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if strings.Contains(prompt, "PR Review Signals") {
-		t.Error("prompt should NOT contain 'PR Review Signals' when PRReviewSummary is empty")
+	if !strings.Contains(prompt, "Eval Files (READ-ONLY)") {
+		t.Error("expected 'Eval Files (READ-ONLY)' in ja prompt")
 	}
 }
 
 func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 	// given
 	params := domain.DiffCheckParams{
-		PreviousScores: `{"divergence": 0.1}`,
-		PRDiffs:        "diff --git a/auth.go ...",
+		EvalDir: "/repo/.gate/.run/eval",
 	}
 
 	// when
@@ -183,87 +121,28 @@ func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestBuildFileRefDiffCheckPrompt_ReferencesFilePaths(t *testing.T) {
+func TestBuildFullCheckPrompt_ReferencesFilePaths(t *testing.T) {
 	// given
-	params := domain.FileRefDiffCheckParams{
-		EvalDir:        "/repo/.gate/.run/eval",
-		HasPRReviews:   true,
-		LinkedIssueIDs: "MY-123, MY-456",
-	}
-
-	// when
-	prompt, err := platform.BuildFileRefDiffCheckPrompt("en", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// Prompt must reference file paths, not embed content
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/previous_scores.json") {
-		t.Error("expected eval dir path for previous_scores")
-	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/diff.patch") {
-		t.Error("expected eval dir path for diff")
-	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/adrs.md") {
-		t.Error("expected eval dir path for adrs")
-	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/dods.md") {
-		t.Error("expected eval dir path for dods")
-	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/pr_reviews.md") {
-		t.Error("expected eval dir path for pr_reviews when HasPRReviews=true")
-	}
-	// Must include files_read instruction
-	if !strings.Contains(prompt, "files_read") {
-		t.Error("expected files_read instruction in prompt")
-	}
-	// Prompt must be small (<5K chars)
-	if len(prompt) > 5000 {
-		t.Errorf("expected prompt < 5000 chars, got %d", len(prompt))
-	}
-}
-
-func TestBuildFileRefDiffCheckPrompt_NoPRReviews(t *testing.T) {
-	// given
-	params := domain.FileRefDiffCheckParams{
-		EvalDir:      "/repo/.gate/.run/eval",
-		HasPRReviews: false,
-	}
-
-	// when
-	prompt, err := platform.BuildFileRefDiffCheckPrompt("en", params)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if strings.Contains(prompt, "pr_reviews.md") {
-		t.Error("expected NO pr_reviews reference when HasPRReviews=false")
-	}
-}
-
-func TestBuildFileRefFullCheckPrompt_ReferencesFilePaths(t *testing.T) {
-	// given
-	params := domain.FileRefFullCheckParams{
+	params := domain.FullCheckParams{
 		EvalDir: "/repo/.gate/.run/eval",
 	}
 
 	// when
-	prompt, err := platform.BuildFileRefFullCheckPrompt("en", params)
+	prompt, err := platform.BuildFullCheckPrompt("en", params)
 
 	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/adrs.md") {
-		t.Error("expected eval dir path for adrs")
-	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/codebase_structure.md") {
-		t.Error("expected eval dir path for codebase_structure")
-	}
-	if !strings.Contains(prompt, "/repo/.gate/.run/eval/dependency_map.md") {
-		t.Error("expected eval dir path for dependency_map")
+	for _, path := range []string{
+		"/repo/.gate/.run/eval/adrs.md",
+		"/repo/.gate/.run/eval/codebase_structure.md",
+		"/repo/.gate/.run/eval/dependency_map.md",
+		"/repo/.gate/.run/eval/dods.md",
+	} {
+		if !strings.Contains(prompt, path) {
+			t.Errorf("expected eval dir path %q in prompt", path)
+		}
 	}
 	if !strings.Contains(prompt, "files_read") {
 		t.Error("expected files_read instruction in prompt")
@@ -271,7 +150,28 @@ func TestBuildFileRefFullCheckPrompt_ReferencesFilePaths(t *testing.T) {
 	if !strings.Contains(prompt, "FULL calibration") {
 		t.Error("expected FULL calibration in prompt")
 	}
+	if !strings.Contains(prompt, "impact_radius") {
+		t.Error("expected impact_radius in JSON schema")
+	}
 	if len(prompt) > 5000 {
 		t.Errorf("expected prompt < 5000 chars, got %d", len(prompt))
+	}
+}
+
+func TestBuildFullCheckPrompt_Ja(t *testing.T) {
+	// given
+	params := domain.FullCheckParams{
+		EvalDir: "/repo/.gate/.run/eval",
+	}
+
+	// when
+	prompt, err := platform.BuildFullCheckPrompt("ja", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "FULL calibration") {
+		t.Error("expected 'FULL calibration' in ja full check prompt")
 	}
 }
