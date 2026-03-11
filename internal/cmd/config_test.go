@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -437,9 +438,78 @@ func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 		t.Errorf("Convergence.EscalationMultiplier: expected 2, got %d", loaded.Convergence.EscalationMultiplier)
 	}
 
+	// WaitTimeout
+	if loaded.WaitTimeout != domain.DefaultWaitTimeout {
+		t.Errorf("WaitTimeout: expected %v, got %v", domain.DefaultWaitTimeout, loaded.WaitTimeout)
+	}
+
 	// verify Computed is zero-value after round-trip of defaults
 	if loaded.Computed != (domain.ComputedConfig{}) {
 		t.Errorf("Computed: expected zero-value, got %+v", loaded.Computed)
+	}
+}
+
+func TestConfigSet_WaitTimeout_Valid(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+
+	// when
+	err := setAmadeusConfigField(&cfg, "wait_timeout", "10m")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.WaitTimeout != 10*time.Minute {
+		t.Errorf("WaitTimeout = %v, want 10m", cfg.WaitTimeout)
+	}
+}
+
+func TestConfigSet_WaitTimeout_Zero(t *testing.T) {
+	// given: zero disables timeout (infinite wait)
+	cfg := domain.DefaultConfig()
+
+	// when
+	err := setAmadeusConfigField(&cfg, "wait_timeout", "0s")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.WaitTimeout != 0 {
+		t.Errorf("WaitTimeout = %v, want 0", cfg.WaitTimeout)
+	}
+}
+
+func TestConfigSet_WaitTimeout_Negative(t *testing.T) {
+	// given: negative disables waiting mode
+	cfg := domain.DefaultConfig()
+
+	// when
+	err := setAmadeusConfigField(&cfg, "wait_timeout", "-1s")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.WaitTimeout != -1*time.Second {
+		t.Errorf("WaitTimeout = %v, want -1s", cfg.WaitTimeout)
+	}
+}
+
+func TestConfigSet_WaitTimeout_Invalid(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+
+	// when
+	err := setAmadeusConfigField(&cfg, "wait_timeout", "not-a-duration")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid wait_timeout")
+	}
+	if !strings.Contains(err.Error(), "invalid wait_timeout") {
+		t.Errorf("expected 'invalid wait_timeout' in error, got: %v", err)
 	}
 }
 

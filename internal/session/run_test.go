@@ -4,6 +4,7 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -400,5 +401,77 @@ func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
 	// And no D-Mails generated (no pre-merge, no post-merge)
 	if len(emitter.dmailsGenerated) != 0 {
 		t.Errorf("expected 0 dmails generated, got %d", len(emitter.dmailsGenerated))
+	}
+}
+
+func TestRun_channelClosedEmitsRunStopped(t *testing.T) {
+	// given: inbox channel that closes immediately
+	emitter := &runEmitter{}
+	git := &runGit{branch: "main", commit: "ccc3333"}
+	ch := make(chan domain.DMail)
+	close(ch)
+
+	a := &Amadeus{
+		Git:     git,
+		Logger:  &domain.NopLogger{},
+		InboxCh: ch,
+	}
+
+	opts := domain.RunOptions{}
+
+	// when
+	err := a.Run(context.Background(), opts, emitter, &runState{})
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	if !emitter.runStoppedCalled {
+		t.Fatal("expected run.stopped event")
+	}
+	if emitter.runStoppedData.Reason != "channel_closed" {
+		t.Errorf("expected reason %q, got %q", "channel_closed", emitter.runStoppedData.Reason)
+	}
+}
+
+func TestRun_currentBranchErrorFallsBackToMain(t *testing.T) {
+	// given: no BaseBranch set, CurrentBranch returns error → fallback to "main"
+	emitter := &runEmitter{}
+	git := &runGit{err: fmt.Errorf("not a git repo"), commit: "ddd4444"}
+
+	a := &Amadeus{
+		Git:     git,
+		Logger:  &domain.NopLogger{},
+		InboxCh: make(chan domain.DMail),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	opts := domain.RunOptions{} // no BaseBranch
+
+	// when
+	err := a.Run(ctx, opts, emitter, &runState{})
+
+	// then
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	if emitter.runStartedData == nil {
+		t.Fatal("expected run.started event")
+	}
+	if emitter.runStartedData.IntegrationBranch != "main" {
+		t.Errorf("expected fallback integration branch %q, got %q", "main", emitter.runStartedData.IntegrationBranch)
 	}
 }

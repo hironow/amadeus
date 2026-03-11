@@ -177,3 +177,64 @@ func TestMonitorInbox_Integration_DedupOnRestart(t *testing.T) {
 		t.Error("expected report-dup.md to remain in archive/")
 	}
 }
+
+func TestWaitForDMail_Integration_WithMonitorInbox(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	// given: inbox with no initial files, MonitorInbox + WaitForDMail
+	root := setupInboxArchiveDirs(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ch, err := session.MonitorInbox(ctx, root, &domain.NopLogger{})
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// when: write a D-Mail after a short delay (simulating phonewave delivery)
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		_ = os.WriteFile(filepath.Join(root, "inbox", "report-live.md"), dmailContent("report-live"), 0o644)
+	}()
+
+	arrived, waitErr := session.WaitForDMail(ctx, ch, 3*time.Second, &domain.NopLogger{})
+
+	// then: D-Mail arrived
+	if waitErr != nil {
+		t.Fatalf("WaitForDMail error: %v", waitErr)
+	}
+	if !arrived {
+		t.Error("expected arrived=true when D-Mail was written to inbox")
+	}
+}
+
+func TestWaitForDMail_Integration_TimeoutBeforeArrival(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	// given: inbox with no files, short timeout
+	root := setupInboxArchiveDirs(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ch, err := session.MonitorInbox(ctx, root, &domain.NopLogger{})
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// when: wait with very short timeout, no D-Mail arrives
+	arrived, waitErr := session.WaitForDMail(ctx, ch, 100*time.Millisecond, &domain.NopLogger{})
+
+	// then: timeout, no arrival
+	if waitErr != nil {
+		t.Fatalf("WaitForDMail error: %v", waitErr)
+	}
+	if arrived {
+		t.Error("expected arrived=false on timeout")
+	}
+}
