@@ -71,13 +71,60 @@ func stripMarkdownCodeBlock(data []byte) []byte {
 	return bytes.TrimSpace(trimmed)
 }
 
+// extractJSON finds the first top-level JSON object ({...}) in data by
+// scanning for the opening brace and matching it with the closing brace.
+// This handles cases where Claude wraps JSON in natural language text.
+func extractJSON(data []byte) []byte {
+	start := bytes.IndexByte(data, '{')
+	if start < 0 {
+		return data
+	}
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(data); i++ {
+		if escaped {
+			escaped = false
+			continue
+		}
+		c := data[i]
+		if c == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if c == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch c {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return data[start : i+1]
+			}
+		}
+	}
+	// Unbalanced braces — return from start to end as best-effort
+	return data[start:]
+}
+
 // ParseClaudeResponse parses raw JSON bytes into a ClaudeResponse.
-// Handles markdown code block wrappers that Claude may add around JSON output.
+// Handles markdown code block wrappers and text prefixes/suffixes that
+// Claude may add around JSON output.
 func ParseClaudeResponse(data []byte) (ClaudeResponse, error) {
 	cleaned := stripMarkdownCodeBlock(data)
 	var resp ClaudeResponse
 	if err := json.Unmarshal(cleaned, &resp); err != nil {
-		return resp, fmt.Errorf("failed to parse Claude response: %w", err)
+		// Fallback: try to extract JSON object from mixed text
+		extracted := extractJSON(cleaned)
+		if err2 := json.Unmarshal(extracted, &resp); err2 != nil {
+			return resp, fmt.Errorf("failed to parse Claude response: %w", err)
+		}
 	}
 	return resp, nil
 }
