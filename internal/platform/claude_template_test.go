@@ -101,8 +101,8 @@ func TestBuildDiffCheckPrompt_Ja(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(prompt, "Eval Files (READ-ONLY)") {
-		t.Error("expected 'Eval Files (READ-ONLY)' in ja prompt")
+	if !strings.Contains(prompt, "評価ファイル (READ-ONLY)") {
+		t.Error("expected '評価ファイル (READ-ONLY)' in ja prompt")
 	}
 }
 
@@ -173,5 +173,8 @@ func TestBuildFullCheckPrompt_Ja(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "FULL calibration") {
 		t.Error("expected 'FULL calibration' in ja full check prompt")
+	}
+	if !strings.Contains(prompt, "評価ファイル (READ-ONLY)") {
+		t.Error("expected '評価ファイル (READ-ONLY)' in ja full check prompt")
 	}
 }
