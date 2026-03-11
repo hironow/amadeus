@@ -182,3 +182,96 @@ func TestBuildDiffCheckPrompt_InvalidLang_ReturnsError(t *testing.T) {
 		t.Error("expected error for unsupported language 'fr'")
 	}
 }
+
+func TestBuildFileRefDiffCheckPrompt_ReferencesFilePaths(t *testing.T) {
+	// given
+	params := domain.FileRefDiffCheckParams{
+		EvalDir:        "/repo/.gate/.run/eval",
+		HasPRReviews:   true,
+		LinkedIssueIDs: "MY-123, MY-456",
+	}
+
+	// when
+	prompt, err := platform.BuildFileRefDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Prompt must reference file paths, not embed content
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/previous_scores.json") {
+		t.Error("expected eval dir path for previous_scores")
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/diff.patch") {
+		t.Error("expected eval dir path for diff")
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/adrs.md") {
+		t.Error("expected eval dir path for adrs")
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/dods.md") {
+		t.Error("expected eval dir path for dods")
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/pr_reviews.md") {
+		t.Error("expected eval dir path for pr_reviews when HasPRReviews=true")
+	}
+	// Must include files_read instruction
+	if !strings.Contains(prompt, "files_read") {
+		t.Error("expected files_read instruction in prompt")
+	}
+	// Prompt must be small (<5K chars)
+	if len(prompt) > 5000 {
+		t.Errorf("expected prompt < 5000 chars, got %d", len(prompt))
+	}
+}
+
+func TestBuildFileRefDiffCheckPrompt_NoPRReviews(t *testing.T) {
+	// given
+	params := domain.FileRefDiffCheckParams{
+		EvalDir:      "/repo/.gate/.run/eval",
+		HasPRReviews: false,
+	}
+
+	// when
+	prompt, err := platform.BuildFileRefDiffCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(prompt, "pr_reviews.md") {
+		t.Error("expected NO pr_reviews reference when HasPRReviews=false")
+	}
+}
+
+func TestBuildFileRefFullCheckPrompt_ReferencesFilePaths(t *testing.T) {
+	// given
+	params := domain.FileRefFullCheckParams{
+		EvalDir: "/repo/.gate/.run/eval",
+	}
+
+	// when
+	prompt, err := platform.BuildFileRefFullCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/adrs.md") {
+		t.Error("expected eval dir path for adrs")
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/codebase_structure.md") {
+		t.Error("expected eval dir path for codebase_structure")
+	}
+	if !strings.Contains(prompt, "/repo/.gate/.run/eval/dependency_map.md") {
+		t.Error("expected eval dir path for dependency_map")
+	}
+	if !strings.Contains(prompt, "files_read") {
+		t.Error("expected files_read instruction in prompt")
+	}
+	if !strings.Contains(prompt, "FULL calibration") {
+		t.Error("expected FULL calibration in prompt")
+	}
+	if len(prompt) > 5000 {
+		t.Errorf("expected prompt < 5000 chars, got %d", len(prompt))
+	}
+}

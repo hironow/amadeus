@@ -15,6 +15,7 @@ type ImpactEntry struct {
 
 // ClaudeResponse represents the structured JSON output from Claude.
 type ClaudeResponse struct {
+	FilesRead    []string               `json:"files_read,omitempty"`
 	Axes         map[Axis]AxisScore     `json:"axes"`
 	DMails       []ClaudeDMailCandidate `json:"dmails"`
 	Reasoning    string                 `json:"reasoning"`
@@ -47,6 +48,18 @@ type FullCheckParams struct {
 	AllADRs           string
 	RecentDoDs        string
 	DependencyMap     string
+}
+
+// FileRefDiffCheckParams holds the template parameters for a file-reference diff check prompt.
+type FileRefDiffCheckParams struct {
+	EvalDir        string
+	HasPRReviews   bool
+	LinkedIssueIDs string
+}
+
+// FileRefFullCheckParams holds the template parameters for a file-reference full check prompt.
+type FileRefFullCheckParams struct {
+	EvalDir string
 }
 
 // stripMarkdownCodeBlock removes markdown code block wrappers (```json ... ```)

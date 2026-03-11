@@ -122,8 +122,15 @@ var fixtures = []fixture{
 		content: fullCalibrationResponse,
 	},
 	{
-		keyword: "diff check",
+		keyword: "diff check (inline)",
 		match:   func(p string) bool { return strings.Contains(p, "Changes Since Last Check") },
+		content: diffCheckResponse,
+	},
+	{
+		keyword: "diff check (file-ref)",
+		match: func(p string) bool {
+			return strings.Contains(p, "Eval Files (READ-ONLY)") && !strings.Contains(p, "FULL calibration")
+		},
 		content: diffCheckResponse,
 	},
 }
@@ -132,6 +139,7 @@ var fixtures = []fixture{
 
 var defaultCleanResponse = strings.TrimSpace(`
 {
+  "files_read": ["adrs", "dods", "diff", "previous_scores"],
   "axes": {
     "adr_integrity": {"score": 5, "details": "Minor naming drift"},
     "dod_fulfillment": {"score": 0, "details": "All DoDs met"},
@@ -145,6 +153,7 @@ var defaultCleanResponse = strings.TrimSpace(`
 
 var fullCalibrationResponse = strings.TrimSpace(`
 {
+  "files_read": ["codebase_structure", "adrs", "dods", "dependency_map"],
   "axes": {
     "adr_integrity": {"score": 15, "details": "ADR-003 minor tension with auth module"},
     "dod_fulfillment": {"score": 20, "details": "Issue #42 edge case not covered"},
@@ -169,6 +178,7 @@ var fullCalibrationResponse = strings.TrimSpace(`
 
 var diffCheckResponse = strings.TrimSpace(`
 {
+  "files_read": ["adrs", "dods", "diff", "previous_scores"],
   "axes": {
     "adr_integrity": {"score": 10, "details": "Minor ADR tension"},
     "dod_fulfillment": {"score": 5, "details": "DoD partially met"},

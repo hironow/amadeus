@@ -239,6 +239,52 @@ func TestParseClaudeResponse_TextPrefixWithMarkdownBlock(t *testing.T) {
 	}
 }
 
+func TestParseClaudeResponse_WithFilesRead(t *testing.T) {
+	// given: response includes files_read field from file-reference prompt
+	raw := `{
+		"files_read": ["adrs", "dods", "diff", "previous_scores"],
+		"axes": {
+			"adr_integrity": {"score": 10, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "evaluated"
+	}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.FilesRead) != 4 {
+		t.Fatalf("expected 4 files_read entries, got %d", len(resp.FilesRead))
+	}
+	if resp.FilesRead[0] != "adrs" {
+		t.Errorf("expected first files_read to be 'adrs', got %q", resp.FilesRead[0])
+	}
+}
+
+func TestParseClaudeResponse_WithoutFilesRead_BackwardCompatible(t *testing.T) {
+	// given: old-style response without files_read
+	raw := `{
+		"axes": {"adr_integrity": {"score": 0, "details": "ok"}},
+		"dmails": [],
+		"reasoning": "ok"
+	}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.FilesRead != nil {
+		t.Errorf("expected nil FilesRead for old format, got %v", resp.FilesRead)
+	}
+}
+
 // fakeClaudeRunner returns a canned response for testing.
 type fakeClaudeRunner struct {
 	response string

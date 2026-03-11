@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -82,8 +84,9 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 }
 
 // buildCheckPrompt runs Phase 2a: collects ADRs, DoDs, and dependency map,
-// then builds the appropriate Claude prompt (full or diff).
-func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, fullCheck bool, previous domain.CheckResult, quiet bool) (string, error) {
+// writes eval files to .gate/.run/eval/, and builds a small file-reference prompt.
+// Returns the prompt, a cleanup function to remove eval files, and any error.
+func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, fullCheck bool, previous domain.CheckResult, quiet bool) (string, func(), error) {
 	repoRoot := a.RepoDir
 	allADRs, adrErr := CollectADRs(ctx, repoRoot)
 	if adrErr != nil && !quiet {
@@ -98,16 +101,56 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		a.Logger.Info("Warning: failed to collect dependency map: %v", depErr)
 	}
 
+	// Write eval files to .gate/.run/eval/ (repo-local, Claude-accessible)
+	evalDir := filepath.Join(repoRoot, domain.StateDir, ".run", "eval")
+	if err := os.MkdirAll(evalDir, 0o755); err != nil {
+		return "", nil, fmt.Errorf("create eval dir: %w", err)
+	}
+	cleanup := func() { os.RemoveAll(evalDir) }
+
 	if fullCheck {
-		return platform.BuildFullCheckPrompt(a.Config.ConfigLang(), domain.FullCheckParams{
-			CodebaseStructure: report.CodebaseStructure,
-			AllADRs:           allADRs,
-			RecentDoDs:        allDoDs,
-			DependencyMap:     depMap,
+		if err := writeEvalFile(evalDir, "codebase_structure.md", domain.EvalKindCodebaseStructure, report.CodebaseStructure); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+		if err := writeEvalFile(evalDir, "adrs.md", domain.EvalKindADRs, allADRs); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+		if err := writeEvalFile(evalDir, "dods.md", domain.EvalKindDoDs, allDoDs); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+		if err := writeEvalFile(evalDir, "dependency_map.md", domain.EvalKindDependencyMap, depMap); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+
+		prompt, err := platform.BuildFileRefFullCheckPrompt(a.Config.ConfigLang(), domain.FileRefFullCheckParams{
+			EvalDir: evalDir,
 		})
+		if err != nil {
+			cleanup()
+			return "", nil, err
+		}
+		return prompt, cleanup, nil
 	}
 
+	// Diff check: write eval files
 	prevJSON, _ := json.Marshal(previous)
+	if err := writeEvalFile(evalDir, "previous_scores.json", domain.EvalKindPreviousScores, string(prevJSON)); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if err := writeEvalFile(evalDir, "diff.patch", domain.EvalKindDiff, report.Diff); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if err := writeEvalFile(evalDir, "adrs.md", domain.EvalKindADRs, allADRs); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+
 	var prTitles []string
 	for _, pr := range report.MergedPRs {
 		prTitles = append(prTitles, pr.Title)
@@ -117,14 +160,39 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 	if len(issueIDs) > 0 {
 		linkedDoDs = allDoDs
 	}
-	return platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
-		PreviousScores:  string(prevJSON),
-		PRDiffs:         report.Diff,
-		RelevantADRs:    allADRs,
-		LinkedDoDs:      linkedDoDs,
-		LinkedIssueIDs:  strings.Join(issueIDs, ", "),
-		PRReviewSummary: domain.FormatPRReviewSummary(report.PRReviews),
+	if err := writeEvalFile(evalDir, "dods.md", domain.EvalKindDoDs, linkedDoDs); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+
+	hasPRReviews := len(report.PRReviews) > 0
+	if hasPRReviews {
+		if err := writeEvalFile(evalDir, "pr_reviews.md", domain.EvalKindPRReviews, domain.FormatPRReviewSummary(report.PRReviews)); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+	}
+
+	prompt, err := platform.BuildFileRefDiffCheckPrompt(a.Config.ConfigLang(), domain.FileRefDiffCheckParams{
+		EvalDir:        evalDir,
+		HasPRReviews:   hasPRReviews,
+		LinkedIssueIDs: strings.Join(issueIDs, ", "),
 	})
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return prompt, cleanup, nil
+}
+
+// writeEvalFile writes a single eval file with YAML front matter.
+func writeEvalFile(evalDir, filename string, kind domain.EvalFileKind, content string) error {
+	formatted := domain.FormatEvalFile(kind, content)
+	path := filepath.Join(evalDir, filename)
+	if err := os.WriteFile(path, []byte(formatted), 0o644); err != nil {
+		return fmt.Errorf("write eval file %s: %w", filename, err)
+	}
+	return nil
 }
 
 // runDivergenceMeter runs Phase 2b: executes Claude, parses the response,
@@ -165,6 +233,39 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 	if err != nil {
 		span2.End()
 		return domain.MeterResult{}, fmt.Errorf("phase 2 (parse): %w", err)
+	}
+
+	// Validate files_read: Claude must report reading all expected eval files.
+	// For diff checks: adrs, dods, diff, previous_scores (+ pr_reviews if present)
+	// For full checks: codebase_structure, adrs, dods, dependency_map
+	if claudeResp.FilesRead != nil {
+		var expectedKinds []string
+		if fullCheck {
+			expectedKinds = []string{
+				string(domain.EvalKindCodebaseStructure),
+				string(domain.EvalKindADRs),
+				string(domain.EvalKindDoDs),
+				string(domain.EvalKindDependencyMap),
+			}
+		} else {
+			expectedKinds = []string{
+				string(domain.EvalKindADRs),
+				string(domain.EvalKindDoDs),
+				string(domain.EvalKindDiff),
+				string(domain.EvalKindPreviousScores),
+			}
+		}
+		if readErr := domain.ValidateFilesRead(claudeResp.FilesRead, expectedKinds); readErr != nil {
+			span2.AddEvent("files_read.incomplete", trace.WithAttributes(
+				attribute.StringSlice("files_read.got", platform.SanitizeUTF8Slice(claudeResp.FilesRead)),
+				attribute.StringSlice("files_read.expected", platform.SanitizeUTF8Slice(expectedKinds)),
+			))
+			if !quiet {
+				a.Logger.Info("Warning: %v", readErr)
+			}
+			// Log but do not fail — Claude may have evaluated correctly despite
+			// not reporting all reads. Hard failure can be added later if needed.
+		}
 	}
 
 	meter := &domain.DivergenceMeter{Config: a.Config}
