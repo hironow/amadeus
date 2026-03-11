@@ -117,7 +117,7 @@ func (s *SpanEmittingStreamReader) InitAttrs() []attribute.KeyValue {
 		for i, srv := range msg.MCPServers {
 			names[i] = SanitizeUTF8(srv.Name)
 		}
-		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", names))
+		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", SanitizeUTF8Slice(names)))
 	}
 	if len(msg.Tools) > 0 {
 		attrs = append(attrs, attribute.Int("claude.init.tools_count", len(msg.Tools)))

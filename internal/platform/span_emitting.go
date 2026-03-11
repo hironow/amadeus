@@ -19,6 +19,15 @@ func SanitizeUTF8(s string) string {
 	return strings.ToValidUTF8(s, "\uFFFD")
 }
 
+// SanitizeUTF8Slice sanitizes each element of a string slice for OTel safety.
+func SanitizeUTF8Slice(ss []string) []string {
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		out[i] = SanitizeUTF8(s)
+	}
+	return out
+}
+
 // DefaultMaxValueLen is the default truncation limit for raw event values.
 const DefaultMaxValueLen = 512
 
