@@ -62,7 +62,7 @@ func stripMarkdownCodeBlock(data []byte) []byte {
 	if idx := bytes.IndexByte(trimmed, '\n'); idx >= 0 {
 		trimmed = trimmed[idx+1:]
 	} else {
-		return data // no newline after opening fence — return as-is
+		return trimmed // no newline after opening fence — return trimmed as-is
 	}
 	// Remove closing fence
 	if idx := bytes.LastIndex(trimmed, []byte("```")); idx >= 0 {

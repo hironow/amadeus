@@ -232,7 +232,7 @@ func findAttr(span tracetest.SpanStub, key attribute.Key) *attribute.Value {
 
 // ---------------------------------------------------------------------------
 // Weave thread attribute tests (TDD Red)
-// ref: /Users/nino/tap/refs/organize-otel-traces-into-threads.md
+// ref: Weave thread organization design doc
 // ---------------------------------------------------------------------------
 
 func TestSpanEmittingStreamReader_weave_thread_id_from_session(t *testing.T) {

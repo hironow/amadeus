@@ -552,8 +552,8 @@ func TestGoldenSkills_high_utilization_rate_limit(t *testing.T) {
 		if ev.Name == "rate_limit" {
 			for _, attr := range ev.Attributes {
 				if string(attr.Key) == "rate_limit.utilization" {
-					if attr.Value.AsString() != "0.92" {
-						t.Errorf("rate_limit.utilization = %q, want %q", attr.Value.AsString(), "0.92")
+					if attr.Value.AsFloat64() != 0.92 {
+						t.Errorf("rate_limit.utilization = %v, want %v", attr.Value.AsFloat64(), 0.92)
 					}
 					return
 				}

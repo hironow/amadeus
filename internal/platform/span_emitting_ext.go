@@ -1,8 +1,6 @@
 package platform
 
 import (
-	"fmt"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -171,7 +169,7 @@ func (s *SpanEmittingStreamReader) handleRateLimit(msg *StreamMessage) {
 			attrs = append(attrs, attribute.String("rate_limit.type", info.RateLimitType))
 		}
 		if info.Utilization > 0 {
-			attrs = append(attrs, attribute.String("rate_limit.utilization", fmt.Sprintf("%.2f", info.Utilization)))
+			attrs = append(attrs, attribute.Float64("rate_limit.utilization", info.Utilization))
 		}
 		if len(attrs) > 0 {
 			eventOpts = append(eventOpts, trace.WithAttributes(attrs...))
