@@ -3,6 +3,7 @@ package domain_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
@@ -345,6 +346,66 @@ func TestClassifyConvergenceScenario(t *testing.T) {
 				t.Errorf("expected action %q, got %q", tt.expectedAction, action)
 			}
 		})
+	}
+}
+
+func TestBuildPRChains_circularDependency_terminates(t *testing.T) {
+	// given: circular PR dependency: main <- feat-a <- feat-b <- feat-a (cycle)
+	// This MUST terminate without infinite loop. Without cycle detection in
+	// buildChainBFS, the queue grows unbounded and the test hangs.
+	pr1 := mustPRState(t, "#1", "A", "main", "feat-a", true, 0, nil)
+	pr2 := mustPRState(t, "#2", "B", "feat-a", "feat-b", true, 0, nil)
+	pr3 := mustPRState(t, "#3", "C", "feat-b", "feat-a", true, 0, nil) // cycle: feat-b -> feat-a
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		report := domain.BuildPRConvergenceReport("main", []domain.PRState{pr1, pr2, pr3})
+		// Chain should contain each PR at most once (3 unique PRs)
+		if len(report.Chains) != 1 {
+			t.Errorf("expected 1 chain, got %d", len(report.Chains))
+			return
+		}
+		chain := report.Chains[0]
+		if len(chain.PRs) > 3 {
+			t.Errorf("expected at most 3 PRs in chain (no duplicates), got %d", len(chain.PRs))
+		}
+	}()
+
+	select {
+	case <-done:
+		// OK — terminated
+	case <-time.After(5 * time.Second):
+		t.Fatal("buildChainBFS did not terminate — infinite loop detected (circular PR dependency)")
+	}
+}
+
+func TestBuildPRChains_selfLoop_terminates(t *testing.T) {
+	// given: PR whose head branch equals its own base's target (self-referential via adjacency)
+	// main <- feat-a, feat-a <- feat-a (self-loop)
+	pr1 := mustPRState(t, "#1", "A", "main", "feat-a", true, 0, nil)
+	pr2 := mustPRState(t, "#2", "Self", "feat-a", "feat-a", true, 0, nil) // self-loop
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		report := domain.BuildPRConvergenceReport("main", []domain.PRState{pr1, pr2})
+		if len(report.Chains) != 1 {
+			t.Errorf("expected 1 chain, got %d", len(report.Chains))
+			return
+		}
+		// Self-loop PR should appear at most once
+		chain := report.Chains[0]
+		if len(chain.PRs) > 2 {
+			t.Errorf("expected at most 2 PRs (no infinite duplication), got %d", len(chain.PRs))
+		}
+	}()
+
+	select {
+	case <-done:
+		// OK
+	case <-time.After(5 * time.Second):
+		t.Fatal("buildChainBFS did not terminate — infinite loop detected (self-loop PR)")
 	}
 }
 
