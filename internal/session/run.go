@@ -180,6 +180,9 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		return fmt.Errorf("post-merge (build prompt): %w", err)
 	}
 
+	if !opts.Quiet {
+		a.Logger.Info("Divergence Meter: evaluating with %s...", a.ClaudeModel)
+	}
 	meterResult, err := a.runDivergenceMeter(ctx, prompt, fullCheck, previous, opts.Quiet)
 	if err != nil {
 		return err

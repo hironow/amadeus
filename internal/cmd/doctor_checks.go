@@ -172,6 +172,55 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 	}
 }
 
+// checkClaudeLogin verifies the Claude CLI session is active by parsing
+// stream-json output from a minimal --print invocation. Detects expired
+// sessions ("Not logged in", "authentication_failed") and provides the
+// correct login command including any CLAUDE_CONFIG_DIR prefix from config.
+func checkClaudeLogin(stdout string, runErr error, claudeCmd string) domain.DoctorCheckResult {
+	loginHint := buildLoginHint(claudeCmd)
+
+	isAuthFailure := strings.Contains(stdout, "authentication_failed") ||
+		strings.Contains(stdout, "Not logged in")
+
+	if isAuthFailure {
+		return domain.DoctorCheckResult{
+			Name:    "claude-login",
+			Status:  domain.CheckFail,
+			Message: "not logged in",
+			Hint:    loginHint,
+		}
+	}
+
+	if runErr != nil {
+		return domain.DoctorCheckResult{
+			Name:    "claude-login",
+			Status:  domain.CheckFail,
+			Message: "login check failed: " + runErr.Error(),
+			Hint:    loginHint,
+		}
+	}
+
+	return domain.DoctorCheckResult{
+		Name:    "claude-login",
+		Status:  domain.CheckOK,
+		Message: "logged in",
+	}
+}
+
+// buildLoginHint constructs the correct login command from claudeCmd,
+// preserving any CLAUDE_CONFIG_DIR=... prefix so the user can copy-paste.
+func buildLoginHint(claudeCmd string) string {
+	env, _, _ := platform.ParseShellCommand(claudeCmd)
+	var prefix string
+	for _, e := range env {
+		if strings.HasPrefix(e, "CLAUDE_CONFIG_DIR=") {
+			prefix = e + " "
+			break
+		}
+	}
+	return fmt.Sprintf("run: %sclaude /login", prefix)
+}
+
 // checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
@@ -353,34 +402,53 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			Message: "skipped (claude not available)",
 		})
 	} else {
-		mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
-		cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
-		out, mcpErr := cmd.Output()
-		mcpCancel()
-		mcpOutput := string(out)
-		authResult := checkClaudeAuth(mcpOutput, mcpErr)
-		results = append(results, authResult)
+		// Login check: minimal --print to detect expired sessions
+		loginCtx, loginCancel := context.WithTimeout(ctx, 30*time.Second)
+		loginCmd := newShellCmd(loginCtx, claudeCmd, "--print", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+		loginCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
+		loginOut, loginErr := loginCmd.Output()
+		loginCancel()
+		loginResult := checkClaudeLogin(string(loginOut), loginErr, claudeCmd)
+		results = append(results, loginResult)
 
-		if authResult.Status != domain.CheckOK {
+		if loginResult.Status != domain.CheckOK {
+			results = append(results, domain.DoctorCheckResult{
+				Name:    "claude-auth",
+				Status:  domain.CheckSkip,
+				Message: "skipped (not logged in)",
+			})
 			results = append(results, domain.DoctorCheckResult{
 				Name:    "Linear MCP",
 				Status:  domain.CheckSkip,
-				Message: "skipped (claude not authenticated)",
+				Message: "skipped (not logged in)",
 			})
 			results = append(results, domain.DoctorCheckResult{
 				Name:    "claude-inference",
 				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
+				Message: "skipped (not logged in)",
 			})
 		} else {
-			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+			mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
+			cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
+			out, mcpErr := cmd.Output()
+			mcpCancel()
+			mcpOutput := string(out)
+			authResult := checkClaudeAuth(mcpOutput, mcpErr)
+			results = append(results, authResult)
 
-			inferCtx, inferCancel := context.WithTimeout(ctx, 60*time.Second)
-			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
-			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
-			inferOut, inferErr := inferCmd.Output()
-			inferCancel()
-			results = append(results, checkClaudeInference(string(inferOut), inferErr))
+			if authResult.Status != domain.CheckOK {
+				results = append(results, domain.DoctorCheckResult{
+					Name:    "Linear MCP",
+					Status:  domain.CheckSkip,
+					Message: "skipped (claude not authenticated)",
+				})
+			} else {
+				results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+			}
+
+			// Inference check: reuse login output if it contains "2"
+			inferResult := checkClaudeInference(strings.TrimSpace(extractStreamResult(string(loginOut))), loginErr)
+			results = append(results, inferResult)
 		}
 	}
 
@@ -608,6 +676,25 @@ func checkConfig(path string) domain.DoctorCheckResult {
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s loaded and validated", path),
 	}
+}
+
+// extractStreamResult parses stream-json output and returns the "result" field
+// from the result message. Used to reuse login check output for inference check.
+func extractStreamResult(streamJSON string) string {
+	for _, line := range strings.Split(streamJSON, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var msg struct {
+			Type   string `json:"type"`
+			Result string `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &msg); err == nil && msg.Type == "result" {
+			return msg.Result
+		}
+	}
+	return ""
 }
 
 // filterEnv returns a copy of env with the named variable removed.
