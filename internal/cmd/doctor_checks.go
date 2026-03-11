@@ -232,15 +232,15 @@ func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
 			Message: "inference failed: " + err.Error(),
-			Hint:    "check API key, quota, and model access",
+			Hint:    `if "signal: killed", Claude CLI startup may be slow (timeout is 60s); otherwise check API key, quota, and model access`,
 		}
 	}
 	if strings.TrimSpace(output) != "2" {
 		return domain.DoctorCheckResult{
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
-			Message: "unexpected response",
-			Hint:    "check API key, quota, and model access",
+			Message: "unexpected response: " + strings.TrimSpace(output),
+			Hint:    "model returned unexpected output; check model access and API quota",
 		}
 	}
 	return domain.DoctorCheckResult{
