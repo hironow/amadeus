@@ -221,7 +221,7 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
 	// New flag for run
 	cmd.Flags().String("base", "", "upstream branch for post-merge divergence check")
-	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting)")
+	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
 
 	return cmd
 }
