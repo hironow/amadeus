@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: tests unexported runWaitingLoop consecutive no-drift skip logic
+
 import (
 	"context"
 	"fmt"
