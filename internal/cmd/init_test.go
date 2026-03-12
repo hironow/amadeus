@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -8,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/cmd"
 )
 
 func TestInitCommand_AlreadyInitialized(t *testing.T) {
@@ -28,14 +28,14 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"init"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"init"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should fail with "already exists" or "already initialized"
 	if execErr == nil {
@@ -63,14 +63,14 @@ func TestInitCommand_AlreadyExists_SuggestsForce(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"init"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"init"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then
 	if execErr == nil {
@@ -98,14 +98,14 @@ func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"init", "--force"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"init", "--force"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then
 	if execErr != nil {

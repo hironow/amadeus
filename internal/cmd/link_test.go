@@ -1,31 +1,31 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/cmd"
 )
 
 func TestLinkCommand_RequiresExactTwoArgs(t *testing.T) {
-	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"link"})
+	rootCmd := cmd.NewRootCommand()
+	rootCmd.SetArgs([]string{"link"})
 	var errBuf bytes.Buffer
-	cmd.SetErr(&errBuf)
+	rootCmd.SetErr(&errBuf)
 
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for missing args")
 	}
 }
 
 func TestLinkCommand_TooManyArgs(t *testing.T) {
-	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"link", "a", "b", "c"})
+	rootCmd := cmd.NewRootCommand()
+	rootCmd.SetArgs([]string{"link", "a", "b", "c"})
 	var errBuf bytes.Buffer
-	cmd.SetErr(&errBuf)
+	rootCmd.SetErr(&errBuf)
 
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for too many args")
 	}

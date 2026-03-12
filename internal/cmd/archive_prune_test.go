@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -12,11 +10,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/amadeus/internal/cmd"
 )
 
 func TestArchivePrune_NegativeDays(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	root.SetArgs([]string{"archive-prune", "--days", "-5"})
 
 	// when
@@ -64,7 +64,7 @@ func TestArchivePrune_PrunesEventFiles(t *testing.T) {
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	var stderr bytes.Buffer
 	root.SetErr(&stderr)
 	root.SetArgs([]string{"archive-prune", "--days", "30", "--execute", "--yes"})
@@ -128,7 +128,7 @@ func TestArchivePrune_FailsWhenEventRecordFails(t *testing.T) {
 	}
 	defer os.Chdir(origDir) //nolint: restore working dir
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	var stderr bytes.Buffer
 	root.SetErr(&stderr)
 	root.SetArgs([]string{"archive-prune", "--days", "30", "--execute", "--yes"})
@@ -164,7 +164,7 @@ func TestArchivePrune_JSONOutput_DryRun(t *testing.T) {
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldEventFile, oldTime, oldTime)
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
@@ -213,7 +213,7 @@ func TestArchivePrune_JSONOutput_Execute(t *testing.T) {
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldEventFile, oldTime, oldTime)
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
@@ -261,7 +261,7 @@ func TestArchivePrune_TextOutput_StdoutClean(t *testing.T) {
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldEventFile, oldTime, oldTime)
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
@@ -285,7 +285,7 @@ func TestArchivePrune_TextOutput_StdoutClean(t *testing.T) {
 
 func TestArchivePrune_ZeroDays(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	root.SetArgs([]string{"archive-prune", "--days", "0"})
 
 	// when
