@@ -16,7 +16,16 @@ func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "doctor [path]",
 		Short: "Run health checks",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Run health checks on the amadeus environment.
+
+Each check reports one of four statuses: OK (passed), FAIL (exit 1),
+SKIP (dependency missing), WARN (advisory, exit 0).
+
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			jsonOut, _ := cmd.Flags().GetBool("json")

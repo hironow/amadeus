@@ -1,19 +1,18 @@
 ## amadeus doctor
 
-Run health checks against the current environment and project configuration.
+Run health checks
 
-Each check reports one of four statuses:
+### Synopsis
 
-- **OK** — check passed
-- **FAIL** — check failed (exit code 1)
-- **SKIP** — check was not applicable
-- **WARN** — advisory warning (exit code 0, not a failure)
+Run health checks on the amadeus environment.
 
-The `context-budget` check estimates total token usage across categories
-(tools, skills, plugins, mcp, hooks). When the threshold is exceeded
-(default 20,000 tokens), it reports WARN with a per-category token
-breakdown, marks the heaviest category, and provides a category-specific
-hint (e.g., trimming plugins via `.claude/settings.json`).
+Each check reports one of four statuses: OK (passed), FAIL (exit 1),
+SKIP (dependency missing), WARN (advisory, exit 0).
+
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.
 
 ```
 amadeus doctor [path] [flags]
