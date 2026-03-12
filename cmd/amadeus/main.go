@@ -16,19 +16,17 @@ func main() {
 }
 
 func run() int {
-	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	defer stop()
 
-	root := cmd.NewRootCommand()
-	// NOTE: No NormalizeArgs — single-dash long flags (e.g. -config) are intentionally
-	// unsupported per MY-334 POSIX-compliant flags policy. Use --config or -c instead.
+	rootCmd := cmd.NewRootCommand()
 	args := os.Args[1:]
-	if cmd.NeedsDefaultRun(root, args) {
+	if cmd.NeedsDefaultRun(rootCmd, args) {
 		args = append([]string{"run"}, args...)
 	}
-	root.SetArgs(args)
+	rootCmd.SetArgs(args)
 
-	err := root.ExecuteContext(ctx)
+	err := rootCmd.ExecuteContext(ctx)
 	if err != nil {
 		var silent *domain.SilentError
 		if !errors.As(err, &silent) {
