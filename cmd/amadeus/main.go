@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 
 	cmd "github.com/hironow/amadeus/internal/cmd"
 	"github.com/hironow/amadeus/internal/domain"
@@ -14,6 +16,9 @@ func main() {
 }
 
 func run() int {
+	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
+	defer cancel()
+
 	root := cmd.NewRootCommand()
 	// NOTE: No NormalizeArgs — single-dash long flags (e.g. -config) are intentionally
 	// unsupported per MY-334 POSIX-compliant flags policy. Use --config or -c instead.
@@ -23,12 +28,12 @@ func run() int {
 	}
 	root.SetArgs(args)
 
-	err := root.ExecuteContext(context.Background())
-	code := domain.ExitCode(err)
-	if code == 1 {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-	} else if code == 2 {
-		fmt.Fprintf(os.Stderr, "drift detected: %v\n", err)
+	err := root.ExecuteContext(ctx)
+	if err != nil {
+		var silent *domain.SilentError
+		if !errors.As(err, &silent) {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		}
 	}
-	return code
+	return domain.ExitCode(err)
 }

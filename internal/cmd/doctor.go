@@ -78,7 +78,7 @@ func printDoctorJSON(w io.Writer, results []domain.DoctorCheck) error {
 	}
 	fmt.Fprintln(w, string(data))
 	if hasFail {
-		return fmt.Errorf("some checks failed")
+		return &domain.SilentError{Err: fmt.Errorf("some checks failed")}
 	}
 	return nil
 }
@@ -120,7 +120,7 @@ func printDoctorText(w io.Writer, results []domain.DoctorCheck) error {
 	}
 	fmt.Fprintln(w, strings.Join(parts, ", ")+".")
 	if fails > 0 {
-		return fmt.Errorf("%d check(s) failed", fails)
+		return &domain.SilentError{Err: fmt.Errorf("%d check(s) failed", fails)}
 	}
 	return nil
 }

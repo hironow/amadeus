@@ -75,3 +75,35 @@ func TestExitCode_WrappedDriftError(t *testing.T) {
 		t.Errorf("expected 2 for wrapped DriftError, got %d", code)
 	}
 }
+
+func TestSilentError_ExitCode(t *testing.T) {
+	// given — SilentError wrapping a regular error
+	err := &domain.SilentError{Err: fmt.Errorf("1 check(s) failed")}
+
+	// then — ExitCode should return 1 (runtime error)
+	if code := domain.ExitCode(err); code != 1 {
+		t.Errorf("ExitCode(SilentError) = %d, want 1", code)
+	}
+}
+
+func TestSilentError_Unwrap(t *testing.T) {
+	// given
+	inner := fmt.Errorf("inner cause")
+	err := &domain.SilentError{Err: inner}
+
+	// then
+	if !errors.Is(err, inner) {
+		t.Error("errors.Is should find inner error through SilentError")
+	}
+}
+
+func TestSilentError_DetectedByErrorsAs(t *testing.T) {
+	// given
+	err := fmt.Errorf("command: %w", &domain.SilentError{Err: fmt.Errorf("fail")})
+
+	// then
+	var se *domain.SilentError
+	if !errors.As(err, &se) {
+		t.Error("errors.As should find SilentError in chain")
+	}
+}
