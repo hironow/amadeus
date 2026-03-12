@@ -982,7 +982,7 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 {"type":"result","result":"2"}`
 
 	// when
-	result := checkContextBudget(streamJSON)
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be OK (well under threshold)
 	if result.Status != domain.CheckOK {
@@ -1003,11 +1003,11 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 	streamJSON := strings.Join(lines, "\n")
 
 	// when
-	result := checkContextBudget(streamJSON)
+	result := checkContextBudget(streamJSON, "")
 
-	// then: should be OK but with hint (over threshold)
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	// then: should be WARN with hint (over threshold)
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v: %s", result.Status.StatusLabel(), result.Message)
 	}
 	if result.Hint == "" {
 		t.Error("expected non-empty hint for high usage")
@@ -1021,7 +1021,7 @@ func TestCheckContextBudget_EmptyStream(t *testing.T) {
 	streamJSON := ""
 
 	// when
-	result := checkContextBudget(streamJSON)
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be OK (nothing to measure)
 	if result.Status != domain.CheckOK {
@@ -1036,10 +1036,55 @@ func TestCheckContextBudget_NoInitMessage(t *testing.T) {
 	streamJSON := `{"type":"result","result":"2"}`
 
 	// when
-	result := checkContextBudget(streamJSON)
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be OK (no init = no overhead)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected OK for no-init stream, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
+	t.Parallel()
+
+	// given: stream with many skills (exceeds threshold)
+	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"}]}`
+	streamJSON := initMsg + "\n"
+
+	// when
+	result := checkContextBudget(streamJSON, "")
+
+	// then
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v", result.Status.StatusLabel())
+	}
+	if !strings.Contains(result.Message, "skills") {
+		t.Errorf("message should contain breakdown with 'skills', got: %s", result.Message)
+	}
+	if result.Hint == "" {
+		t.Error("expected hint for threshold exceeded")
+	}
+}
+
+func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
+	t.Parallel()
+
+	// given: project with .claude/settings.json
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".claude", "settings.json"), []byte(`{}`), 0o644)
+
+	initMsg := `{"type":"system","subtype":"init","skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an","ao","ap"]}`
+	streamJSON := initMsg + "\n"
+
+	// when
+	result := checkContextBudget(streamJSON, dir)
+
+	// then
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v", result.Status.StatusLabel())
+	}
+	if !strings.Contains(result.Hint, "見直して") {
+		t.Errorf("hint should say review settings, got: %s", result.Hint)
 	}
 }

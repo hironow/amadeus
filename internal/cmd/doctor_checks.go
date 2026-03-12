@@ -451,7 +451,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			results = append(results, inferResult)
 
 			// Context budget check: reuse login stream-json output
-			results = append(results, checkContextBudget(string(loginOut)))
+			results = append(results, checkContextBudget(string(loginOut), repoRoot))
 		}
 	}
 
@@ -702,7 +702,7 @@ func extractStreamResult(streamJSON string) string {
 
 // checkContextBudget parses stream-json output from a Claude CLI invocation
 // and reports context budget health based on hooks, plugins, skills, and MCP servers.
-func checkContextBudget(streamJSON string) domain.DoctorCheck {
+func checkContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 	var messages []*platform.StreamMessage
 	for _, line := range strings.Split(streamJSON, "\n") {
 		line = strings.TrimSpace(line)
@@ -717,17 +717,66 @@ func checkContextBudget(streamJSON string) domain.DoctorCheck {
 	}
 
 	report := platform.CalculateContextBudget(messages)
+	breakdown := report.DetailedBreakdown()
+
+	// Build detailed message lines
+	var lines []string
+	for _, item := range breakdown {
+		marker := ""
+		if item.Heaviest {
+			marker = " <- heaviest"
+		}
+		if item.Category == "hooks" {
+			if item.Bytes > 0 {
+				lines = append(lines, fmt.Sprintf("  hooks: %d bytes (%d tok)%s", item.Bytes, item.Tokens, marker))
+			}
+		} else {
+			if item.Count > 0 {
+				lines = append(lines, fmt.Sprintf("  %s: %d (%d tok)%s", item.Category, item.Count, item.Tokens, marker))
+			}
+		}
+	}
+
+	status := domain.CheckOK
+	msg := fmt.Sprintf("estimated %d tokens", report.EstimatedTokens)
+	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
+		status = domain.CheckWarn
+		msg = fmt.Sprintf("estimated %d tokens (threshold: %d)", report.EstimatedTokens, platform.DefaultContextBudgetThreshold)
+	}
+	if len(lines) > 0 {
+		msg += "\n" + strings.Join(lines, "\n")
+	}
 
 	result := domain.DoctorCheck{
-		Name:   "context-budget",
-		Status: domain.CheckOK,
-		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
-			report.EstimatedTokens, report.ToolCount, report.SkillCount,
-			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
+		Name:    "context-budget",
+		Status:  status,
+		Message: msg,
 	}
+
+	// Hint logic: only when threshold exceeded
 	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
-		result.Hint = "context consumption is high; consider reducing installed plugins/skills or using an allowlist"
+		projectSettings := filepath.Join(baseDir, ".claude", "settings.json")
+		if _, err := os.Stat(projectSettings); err == nil {
+			result.Hint = ".claude/settings.json の設定を見直してください"
+		} else {
+			var heaviest string
+			for _, item := range breakdown {
+				if item.Heaviest {
+					heaviest = item.Category
+					break
+				}
+			}
+			switch heaviest {
+			case "mcp_servers":
+				result.Hint = ".claude/settings.json をプロジェクトに作成し、必要な MCP server のみ定義を推奨"
+			case "tools":
+				result.Hint = "tools は plugins/MCP 由来 → .claude/settings.json で plugins/MCP を絞ることを推奨"
+			default:
+				result.Hint = ".claude/settings.json をプロジェクトに作成し、必要なプラグインのみ有効化を推奨"
+			}
+		}
 	}
+
 	return result
 }
 
