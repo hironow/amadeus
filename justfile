@@ -240,20 +240,40 @@ docs-check:
     @echo "docs-check passed"
 
 # Audit white-box-reason comments on same-package test files
+# Phase 1: every white-box test file must have a white-box-reason comment (FAIL)
+# Phase 2: per-package white-box file count must not exceed threshold (WARN → future FAIL)
 test-package-rationale-audit:
     #!/usr/bin/env bash
-    missing=0
+    set -euo pipefail
+    WB_LIMIT=10
+    fail=0
+    declare -A pkg_count
     while IFS= read -r f; do
+      dir=$(dirname "$f")
+      pkg_count["$dir"]=$(( ${pkg_count["$dir"]:-0} + 1 ))
       if ! grep -q 'white-box-reason:' "$f" 2>/dev/null; then
         echo "MISSING white-box-reason: $f" >&2
-        missing=$((missing + 1))
+        fail=$((fail + 1))
       fi
     done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null)
-    if [ "$missing" -gt 0 ]; then
-      echo "FAIL: $missing same-package test file(s) missing white-box-reason comment" >&2
+    if [ "$fail" -gt 0 ]; then
+      echo "FAIL: $fail same-package test file(s) missing white-box-reason comment" >&2
       exit 1
     fi
     echo "OK: all same-package test files have white-box-reason comments"
+    warn=0
+    for dir in "${!pkg_count[@]}"; do
+      n=${pkg_count[$dir]}
+      if [ "$n" -gt "$WB_LIMIT" ]; then
+        echo "WARN: $dir has $n white-box test files (limit: $WB_LIMIT) — consider extracting to external _test package" >&2
+        warn=$((warn + 1))
+      fi
+    done
+    if [ "$warn" -gt 0 ]; then
+      echo "WARN: $warn package(s) exceed white-box test limit of $WB_LIMIT"
+    else
+      echo "OK: all packages within white-box test limit ($WB_LIMIT)"
+    fi
 
 # Clean build artifacts
 clean:
