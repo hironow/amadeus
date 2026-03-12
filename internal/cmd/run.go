@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -192,25 +193,20 @@ func newRunCommand() *cobra.Command {
 				return fmt.Errorf("inbox monitor: %w", monErr)
 			}
 
-			// Waiting loop: wait for D-Mail → re-check → repeat
-			for {
-				arrived, waitErr := session.WaitForDMail(cmd.Context(), inboxCh, cfg.WaitTimeout, logger)
-				if waitErr != nil {
-					return waitErr
-				}
-				if !arrived {
-					return nil // timeout or cancel → clean exit
-				}
-
-				// Re-run check on D-Mail arrival
-				checkErr = usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), checkOpts,
-					a, cfg, logger, notifier, metrics)
-				if checkErr != nil {
-					if _, ok := checkErr.(*domain.DriftError); !ok {
-						return checkErr
-					}
-				}
-			}
+			// Waiting loop: wait for D-Mail → re-check → repeat.
+			// Skips expensive RunCheck after consecutive no-drift results
+			// while always draining the inbox channel promptly.
+			return runWaitingLoop(
+				cmd.Context(),
+				func(ctx context.Context) error {
+					return usecase.RunCheck(ctx, domain.NewExecuteCheckCommand(rp), checkOpts,
+						a, cfg, logger, notifier, metrics)
+				},
+				func(ctx context.Context) (bool, error) {
+					return session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
+				},
+				logger,
+			)
 		},
 	}
 
