@@ -13,23 +13,24 @@
 ## CLI Reference
 
 - [amadeus](cli/amadeus.md) — Root command
-- [amadeus init](cli/amadeus_init.md) — Initialize a project (`--force` to regenerate)
-- [amadeus run](cli/amadeus_run.md) — Daemon mode: divergence check + PR convergence + fsnotify inbox watcher
+- [amadeus init](cli/amadeus_init.md) — Initialize .gate directory
+- [amadeus run](cli/amadeus_run.md) — Run continuous divergence check and PR convergence
+- [amadeus config](cli/amadeus_config.md) — View or update configuration
 - [amadeus config show](cli/amadeus_config_show.md) — Show current configuration
 - [amadeus config set](cli/amadeus_config_set.md) — Update configuration values
-- [amadeus validate](cli/amadeus_validate.md) — Validate configuration
+- [amadeus validate](cli/amadeus_validate.md) — Validate config file
 - [amadeus log](cli/amadeus_log.md) — Show divergence log
-- [amadeus sync](cli/amadeus_sync.md) — Sync state
-- [amadeus mark-commented](cli/amadeus_mark-commented.md) — Mark D-Mails as commented
-- [amadeus status](cli/amadeus_status.md) — Show verification status
-- [amadeus doctor](cli/amadeus_doctor.md) — Diagnose configuration issues (context-budget per-item diagnostics, WARN status)
-- [amadeus clean](cli/amadeus_clean.md) — Clean state files
-- [amadeus rebuild](cli/amadeus_rebuild.md) — Rebuild state from events
-- [amadeus archive-prune](cli/amadeus_archive-prune.md) — Prune archived data
-- [amadeus install-hook](cli/amadeus_install-hook.md) — Install git hook
-- [amadeus uninstall-hook](cli/amadeus_uninstall-hook.md) — Uninstall git hook
-- [amadeus version](cli/amadeus_version.md) — Show version
-- [amadeus update](cli/amadeus_update.md) — Self-update
+- [amadeus sync](cli/amadeus_sync.md) — Show D-Mail sync status (JSON)
+- [amadeus mark-commented](cli/amadeus_mark-commented.md) — Record that a D-Mail has been posted as a comment
+- [amadeus status](cli/amadeus_status.md) — Show operational status
+- [amadeus doctor](cli/amadeus_doctor.md) — Run health checks
+- [amadeus clean](cli/amadeus_clean.md) — Remove state directory (.gate/)
+- [amadeus rebuild](cli/amadeus_rebuild.md) — Rebuild projections from event store
+- [amadeus archive-prune](cli/amadeus_archive-prune.md) — Prune old archived files
+- [amadeus install-hook](cli/amadeus_install-hook.md) — Install post-merge git hook
+- [amadeus uninstall-hook](cli/amadeus_uninstall-hook.md) — Remove post-merge git hook
+- [amadeus version](cli/amadeus_version.md) — Print version, commit, and build information
+- [amadeus update](cli/amadeus_update.md) — Self-update amadeus to the latest release
 
 ## Architecture Decision Records
 
