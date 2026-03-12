@@ -505,7 +505,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	}
 
 	// then: SKILL.md check should be present and OK
-	var skillResult domain.DoctorCheckResult
+	var skillResult domain.DoctorCheck
 	found := false
 	for _, r := range results {
 		if r.Name == "SKILL.md" {
@@ -539,7 +539,7 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{})
 
 	// then: claude-auth, Linear MCP, and claude-inference should be skipped
-	var authResult, mcpResult, inferResult domain.DoctorCheckResult
+	var authResult, mcpResult, inferResult domain.DoctorCheck
 	for _, r := range results {
 		switch r.Name {
 		case "claude-auth":
@@ -819,7 +819,7 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{})
 
 	// then: claude-login, claude-auth, Linear MCP, and claude-inference should be OK
-	var loginResult, authResult, mcpResult, inferResult domain.DoctorCheckResult
+	var loginResult, authResult, mcpResult, inferResult domain.DoctorCheck
 	for _, r := range results {
 		switch r.Name {
 		case "claude-login":

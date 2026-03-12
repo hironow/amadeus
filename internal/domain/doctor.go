@@ -7,10 +7,11 @@ const (
 	CheckOK CheckStatus = iota
 	CheckFail
 	CheckSkip
+	CheckWarn
 )
 
-// DoctorCheckResult holds the outcome of a single doctor check.
-type DoctorCheckResult struct {
+// DoctorCheck holds the outcome of a single doctor check.
+type DoctorCheck struct {
 	Name    string
 	Status  CheckStatus
 	Message string
@@ -26,7 +27,9 @@ func (s CheckStatus) StatusLabel() string {
 		return "FAIL"
 	case CheckSkip:
 		return "SKIP"
+	case CheckWarn:
+		return "WARN"
 	default:
-		return "?"
+		return "????"
 	}
 }

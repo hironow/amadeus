@@ -48,10 +48,10 @@ func OverrideLookPath(fn func(cmd string) (string, error)) func() {
 
 // checkTool verifies that a CLI tool is installed and executable.
 // Supports shell-like command strings with leading KEY=VALUE env vars and tilde paths.
-func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
+func checkTool(ctx context.Context, name string) domain.DoctorCheck {
 	path, err := lookPathShell(name)
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: "command not found",
@@ -61,7 +61,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 
 	out, err := newShellCmd(ctx, name, "--version").Output()
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("found at %s but --version failed: %v", path, err),
@@ -70,7 +70,7 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 	}
 
 	version := strings.TrimSpace(strings.Split(string(out), "\n")[0])
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    name,
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s (%s)", path, version),
@@ -80,18 +80,18 @@ func checkTool(ctx context.Context, name string) domain.DoctorCheckResult {
 // checkGitRepo verifies the given directory is inside a git repository.
 // Uses exec.Command directly (not newShellCmd) because cmd.Dir must be set,
 // and tests use real git repos via git init.
-func checkGitRepo(dir string) domain.DoctorCheckResult {
+func checkGitRepo(dir string) domain.DoctorCheck {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	cmd.Dir = dir
 	if err := cmd.Run(); err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Git Repository",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s is not a git repository", dir),
 			Hint:    `run "git init" or navigate to a git repository`,
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "Git Repository",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s is a git repository", dir),
@@ -100,12 +100,12 @@ func checkGitRepo(dir string) domain.DoctorCheckResult {
 
 // checkGitRemote verifies that at least one git remote is configured.
 // amadeus reads Pull Requests for divergence checks, so a remote is required.
-func checkGitRemote(dir string) domain.DoctorCheckResult {
+func checkGitRemote(dir string) domain.DoctorCheck {
 	cmd := exec.Command("git", "remote")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Git Remote",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("failed to check git remote in %s", dir),
@@ -113,7 +113,7 @@ func checkGitRemote(dir string) domain.DoctorCheckResult {
 		}
 	}
 	if strings.TrimSpace(string(out)) == "" {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Git Remote",
 			Status:  domain.CheckFail,
 			Message: "no remote configured",
@@ -121,7 +121,7 @@ func checkGitRemote(dir string) domain.DoctorCheckResult {
 		}
 	}
 	remotes := strings.Fields(strings.TrimSpace(string(out)))
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "Git Remote",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d remote(s): %s", len(remotes), strings.Join(remotes, ", ")),
@@ -129,11 +129,11 @@ func checkGitRemote(dir string) domain.DoctorCheckResult {
 }
 
 // checkGateDir verifies .gate/ directory exists and is writable.
-func checkGateDir(repoRoot string) domain.DoctorCheckResult {
+func checkGateDir(repoRoot string) domain.DoctorCheck {
 	dir := filepath.Join(repoRoot, domain.StateDir)
 	info, err := os.Stat(dir)
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: "not found — run 'amadeus init' first",
@@ -141,7 +141,7 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 		}
 	}
 	if !info.IsDir() {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s exists but is not a directory", dir),
@@ -150,7 +150,7 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 	}
 	probe := filepath.Join(dir, ".doctor_probe")
 	if err := os.WriteFile(probe, []byte("ok"), 0o644); err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("not writable: %v", err),
@@ -158,14 +158,14 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 		}
 	}
 	if err := os.Remove(probe); err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    ".gate/",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("probe cleanup failed: %v", err),
 			Hint:    "check file permissions on the .gate/ directory",
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    ".gate/",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s writable", dir),
@@ -176,14 +176,14 @@ func checkGateDir(repoRoot string) domain.DoctorCheckResult {
 // stream-json output from a minimal --print invocation. Detects expired
 // sessions ("Not logged in", "authentication_failed") and provides the
 // correct login command including any CLAUDE_CONFIG_DIR prefix from config.
-func checkClaudeLogin(stdout string, runErr error, claudeCmd string) domain.DoctorCheckResult {
+func checkClaudeLogin(stdout string, runErr error, claudeCmd string) domain.DoctorCheck {
 	loginHint := buildLoginHint(claudeCmd)
 
 	isAuthFailure := strings.Contains(stdout, "authentication_failed") ||
 		strings.Contains(stdout, "Not logged in")
 
 	if isAuthFailure {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "claude-login",
 			Status:  domain.CheckFail,
 			Message: "not logged in",
@@ -192,7 +192,7 @@ func checkClaudeLogin(stdout string, runErr error, claudeCmd string) domain.Doct
 	}
 
 	if runErr != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "claude-login",
 			Status:  domain.CheckFail,
 			Message: "login check failed: " + runErr.Error(),
@@ -200,7 +200,7 @@ func checkClaudeLogin(stdout string, runErr error, claudeCmd string) domain.Doct
 		}
 	}
 
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "claude-login",
 		Status:  domain.CheckOK,
 		Message: "logged in",
@@ -224,16 +224,16 @@ func buildLoginHint(claudeCmd string) string {
 // checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
-func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
+func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	if mcpErr != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "claude-auth",
 			Status:  domain.CheckFail,
 			Message: "not authenticated: " + mcpErr.Error(),
 			Hint:    `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "claude-auth",
 		Status:  domain.CheckOK,
 		Message: "authenticated",
@@ -243,9 +243,9 @@ func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
 // checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
+func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	if mcpErr != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("claude mcp list failed: %v", mcpErr),
@@ -256,7 +256,7 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
 	output := strings.ToLower(mcpOutput)
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "linear") && strings.Contains(line, "✓") && strings.Contains(line, "connected") {
-			return domain.DoctorCheckResult{
+			return domain.DoctorCheck{
 				Name:    "Linear MCP",
 				Status:  domain.CheckOK,
 				Message: "Linear MCP connected",
@@ -264,7 +264,7 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
 		}
 	}
 
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "Linear MCP",
 		Status:  domain.CheckFail,
 		Message: "Linear MCP not found or not connected in claude mcp list output",
@@ -275,9 +275,9 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheckResult {
 
 // checkClaudeInference determines if the Claude CLI can perform inference
 // by interpreting the result of a minimal "1+1=" prompt.
-func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
+func checkClaudeInference(output string, err error) domain.DoctorCheck {
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
 			Message: "inference failed: " + err.Error(),
@@ -287,14 +287,14 @@ func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
 		}
 	}
 	if strings.TrimSpace(output) != "2" {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
 			Message: "unexpected response: " + strings.TrimSpace(output),
 			Hint:    "model returned unexpected output; check model access and API quota",
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "claude-inference",
 		Status:  domain.CheckOK,
 		Message: "inference OK",
@@ -302,7 +302,7 @@ func checkClaudeInference(output string, err error) domain.DoctorCheckResult {
 }
 
 // checkSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
-func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
+func checkSkillMD(repoRoot string) domain.DoctorCheck {
 	skillsDir := filepath.Join(repoRoot, domain.StateDir, "skills")
 	required := []string{"dmail-sendable", "dmail-readable"}
 	var missing []string
@@ -313,7 +313,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 		}
 	}
 	if len(missing) > 0 {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "SKILL.md",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("missing: %s — run 'amadeus init'", strings.Join(missing, ", ")),
@@ -331,7 +331,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 		if strings.Contains(content, "kind: feedback") &&
 			!strings.Contains(content, "kind: design-feedback") &&
 			!strings.Contains(content, "kind: implementation-feedback") {
-			return domain.DoctorCheckResult{
+			return domain.DoctorCheck{
 				Name:    "SKILL.md",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
@@ -340,7 +340,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 		}
 	}
 
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "SKILL.md",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s (dmail-sendable, dmail-readable)", skillsDir),
@@ -349,7 +349,7 @@ func checkSkillMD(repoRoot string) domain.DoctorCheckResult {
 
 // runDoctor executes all health checks and returns the results.
 // Reads claude_cmd from the config file; falls back to domain.DefaultClaudeCmd on load error.
-func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheckResult {
+func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheck {
 	claudeCmd := domain.DefaultClaudeCmd
 	if cfg, err := loadConfig(configPath); err == nil {
 		claudeCmd = cfg.ClaudeCmd
@@ -358,11 +358,11 @@ func runDoctor(ctx context.Context, configPath string, repoRoot string, logger d
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger) []domain.DoctorCheckResult {
+func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger) []domain.DoctorCheck {
 	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 
-	var results []domain.DoctorCheckResult
+	var results []domain.DoctorCheck
 
 	// --- Binaries ---
 	results = append(results, checkTool(ctx, "git"))
@@ -386,17 +386,17 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 
 	// --- Connectivity ---
 	if claudeResult.Status != domain.CheckOK {
-		results = append(results, domain.DoctorCheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "claude-auth",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
-		results = append(results, domain.DoctorCheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "Linear MCP",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
-		results = append(results, domain.DoctorCheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
@@ -412,17 +412,17 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		results = append(results, loginResult)
 
 		if loginResult.Status != domain.CheckOK {
-			results = append(results, domain.DoctorCheckResult{
+			results = append(results, domain.DoctorCheck{
 				Name:    "claude-auth",
 				Status:  domain.CheckSkip,
 				Message: "skipped (not logged in)",
 			})
-			results = append(results, domain.DoctorCheckResult{
+			results = append(results, domain.DoctorCheck{
 				Name:    "Linear MCP",
 				Status:  domain.CheckSkip,
 				Message: "skipped (not logged in)",
 			})
-			results = append(results, domain.DoctorCheckResult{
+			results = append(results, domain.DoctorCheck{
 				Name:    "claude-inference",
 				Status:  domain.CheckSkip,
 				Message: "skipped (not logged in)",
@@ -437,7 +437,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			results = append(results, authResult)
 
 			if authResult.Status != domain.CheckOK {
-				results = append(results, domain.DoctorCheckResult{
+				results = append(results, domain.DoctorCheck{
 					Name:    "Linear MCP",
 					Status:  domain.CheckSkip,
 					Message: "skipped (claude not authenticated)",
@@ -469,17 +469,17 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 }
 
 // checkEventStore verifies events/ directory exists and all JSONL files are parseable.
-func checkEventStore(gateRoot string) domain.DoctorCheckResult {
+func checkEventStore(gateRoot string) domain.DoctorCheck {
 	eventsDir := filepath.Join(gateRoot, "events")
 	if _, err := os.Stat(eventsDir); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return domain.DoctorCheckResult{
+			return domain.DoctorCheck{
 				Name:    "Event Store",
 				Status:  domain.CheckSkip,
 				Message: "no events directory — run 'amadeus init'",
 			}
 		}
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Event Store",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("stat events: %v", err),
@@ -488,14 +488,14 @@ func checkEventStore(gateRoot string) domain.DoctorCheckResult {
 	}
 	count, err := countEventStoreEntries(eventsDir)
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Event Store",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("parse error: %v", err),
 			Hint:    "check event files in .gate/events/ for corruption",
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "Event Store",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d event(s) loaded", count),
@@ -534,18 +534,18 @@ func countEventStoreEntries(eventsDir string) (int, error) {
 }
 
 // checkDMailSchema validates all D-Mails in archive/ conform to schema v1.
-func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
+func checkDMailSchema(gateRoot string) domain.DoctorCheck {
 	archiveDir := filepath.Join(gateRoot, "archive")
 	entries, err := os.ReadDir(archiveDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return domain.DoctorCheckResult{
+			return domain.DoctorCheck{
 				Name:    "D-Mail Schema",
 				Status:  domain.CheckSkip,
 				Message: "no archive directory",
 			}
 		}
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "D-Mail Schema",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("read archive: %v", err),
@@ -560,7 +560,7 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 		}
 	}
 	if len(mdFiles) == 0 {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "D-Mail Schema",
 			Status:  domain.CheckSkip,
 			Message: "no D-Mails in archive",
@@ -585,14 +585,14 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 	}
 
 	if len(invalid) > 0 {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "D-Mail Schema",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%d/%d invalid: %s", len(invalid), len(mdFiles), strings.Join(invalid, ", ")),
 			Hint:    "re-send affected D-Mails or manually fix the frontmatter",
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "D-Mail Schema",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d D-Mail(s) valid", len(mdFiles)),
@@ -600,18 +600,18 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheckResult {
 }
 
 // checkSuccessRate calculates and reports the event-based success rate.
-func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheckResult {
+func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheck {
 	eventStore := session.NewEventStore(gateDir, logger)
 	rate, clean, total, err := usecase.ComputeSuccessRate(eventStore)
 	if err != nil || total == 0 {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "success-rate",
 			Status:  domain.CheckOK,
 			Message: "no events",
 		}
 	}
 
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "success-rate",
 		Status:  domain.CheckOK,
 		Message: domain.FormatSuccessRate(rate, clean, total),
@@ -620,10 +620,10 @@ func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheckRe
 
 // checkFsnotify verifies that the OS file watcher is available.
 // On Linux, inotify limits can prevent watcher creation.
-func checkFsnotify() domain.DoctorCheckResult {
+func checkFsnotify() domain.DoctorCheck {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "fsnotify",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("cannot create file watcher: %v", err),
@@ -631,7 +631,7 @@ func checkFsnotify() domain.DoctorCheckResult {
 		}
 	}
 	defer w.Close()
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "fsnotify",
 		Status:  domain.CheckOK,
 		Message: "file watcher available",
@@ -639,9 +639,9 @@ func checkFsnotify() domain.DoctorCheckResult {
 }
 
 // checkConfig validates that config.yaml exists and can be loaded.
-func checkConfig(path string) domain.DoctorCheckResult {
+func checkConfig(path string) domain.DoctorCheck {
 	if _, err := os.Stat(path); err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
@@ -650,7 +650,7 @@ func checkConfig(path string) domain.DoctorCheckResult {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
@@ -659,7 +659,7 @@ func checkConfig(path string) domain.DoctorCheckResult {
 	}
 	cfg := domain.DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", path, err),
@@ -667,14 +667,14 @@ func checkConfig(path string) domain.DoctorCheckResult {
 		}
 	}
 	if errs := domain.ValidateConfig(cfg); len(errs) > 0 {
-		return domain.DoctorCheckResult{
+		return domain.DoctorCheck{
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %s", path, strings.Join(errs, "; ")),
 			Hint:    `check config.yaml values; run "amadeus init" to regenerate`,
 		}
 	}
-	return domain.DoctorCheckResult{
+	return domain.DoctorCheck{
 		Name:    "Config",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s loaded and validated", path),
@@ -702,7 +702,7 @@ func extractStreamResult(streamJSON string) string {
 
 // checkContextBudget parses stream-json output from a Claude CLI invocation
 // and reports context budget health based on hooks, plugins, skills, and MCP servers.
-func checkContextBudget(streamJSON string) domain.DoctorCheckResult {
+func checkContextBudget(streamJSON string) domain.DoctorCheck {
 	var messages []*platform.StreamMessage
 	for _, line := range strings.Split(streamJSON, "\n") {
 		line = strings.TrimSpace(line)
@@ -718,7 +718,7 @@ func checkContextBudget(streamJSON string) domain.DoctorCheckResult {
 
 	report := platform.CalculateContextBudget(messages)
 
-	result := domain.DoctorCheckResult{
+	result := domain.DoctorCheck{
 		Name:   "context-budget",
 		Status: domain.CheckOK,
 		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",

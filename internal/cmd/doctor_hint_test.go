@@ -18,7 +18,7 @@ import (
 
 func TestPrintDoctorJSON_IncludesHint(t *testing.T) {
 	// given
-	results := []domain.DoctorCheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "test", Status: domain.CheckFail, Message: "failed", Hint: "fix it"},
 	}
 
@@ -40,7 +40,7 @@ func TestPrintDoctorJSON_IncludesHint(t *testing.T) {
 
 func TestPrintDoctorJSON_OmitsEmptyHint(t *testing.T) {
 	// given
-	results := []domain.DoctorCheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "test", Status: domain.CheckOK, Message: "ok"},
 	}
 
@@ -56,7 +56,7 @@ func TestPrintDoctorJSON_OmitsEmptyHint(t *testing.T) {
 
 func TestPrintDoctorText_ShowsHint(t *testing.T) {
 	// given
-	results := []domain.DoctorCheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "test", Status: domain.CheckFail, Message: "failed", Hint: "run init"},
 	}
 

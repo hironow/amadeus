@@ -52,7 +52,7 @@ type jsonCheck struct {
 	Hint    string `json:"hint,omitempty"`
 }
 
-func printDoctorJSON(w io.Writer, results []domain.DoctorCheckResult) error {
+func printDoctorJSON(w io.Writer, results []domain.DoctorCheck) error {
 	checks := make([]jsonCheck, len(results))
 	hasFail := false
 	for i, r := range results {
@@ -74,11 +74,11 @@ func printDoctorJSON(w io.Writer, results []domain.DoctorCheckResult) error {
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []domain.DoctorCheckResult) error {
+func printDoctorText(w io.Writer, results []domain.DoctorCheck) error {
 	fmt.Fprintln(w, "amadeus doctor — integrity health check")
 	fmt.Fprintln(w)
 
-	var fails, skips int
+	var fails, skips, warns int
 	for _, r := range results {
 		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
 		if r.Hint != "" {
@@ -89,17 +89,22 @@ func printDoctorText(w io.Writer, results []domain.DoctorCheckResult) error {
 			fails++
 		case domain.CheckSkip:
 			skips++
+		case domain.CheckWarn:
+			warns++
 		}
 	}
 
 	fmt.Fprintln(w)
-	if fails == 0 && skips == 0 {
+	if fails == 0 && skips == 0 && warns == 0 {
 		fmt.Fprintln(w, "All checks passed.")
 		return nil
 	}
 	var parts []string
 	if fails > 0 {
 		parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
+	}
+	if warns > 0 {
+		parts = append(parts, fmt.Sprintf("%d warning(s)", warns))
 	}
 	if skips > 0 {
 		parts = append(parts, fmt.Sprintf("%d skipped", skips))
