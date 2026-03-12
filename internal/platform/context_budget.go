@@ -89,6 +89,40 @@ func CalculateContextBudget(messages []*StreamMessage) ContextBudgetReport {
 // 20K tokens leaves reasonable headroom in a 200K context window.
 const DefaultContextBudgetThreshold = 20000
 
+// BudgetItem represents one category in the context budget breakdown.
+type BudgetItem struct {
+	Category string
+	Count    int
+	Bytes    int // only for hooks
+	Tokens   int
+	Heaviest bool
+}
+
+// DetailedBreakdown returns per-category token breakdown with heaviest marker.
+func (r ContextBudgetReport) DetailedBreakdown() []BudgetItem {
+	items := []BudgetItem{
+		{Category: "tools", Count: r.ToolCount, Tokens: r.ToolCount * tokensPerTool},
+		{Category: "skills", Count: r.SkillCount, Tokens: r.SkillCount * tokensPerSkill},
+		{Category: "plugins", Count: r.PluginCount, Tokens: r.PluginCount * tokensPerPlugin},
+		{Category: "mcp_servers", Count: r.MCPServerCount, Tokens: r.MCPServerCount * tokensPerMCPServer},
+		{Category: "hooks", Bytes: r.HookContextBytes, Tokens: r.HookContextBytes / charsPerToken},
+	}
+
+	maxTokens := 0
+	maxIdx := 0
+	for i, item := range items {
+		if item.Tokens > maxTokens {
+			maxTokens = item.Tokens
+			maxIdx = i
+		}
+	}
+	if maxTokens > 0 {
+		items[maxIdx].Heaviest = true
+	}
+
+	return items
+}
+
 // Attrs returns OTel span attributes for the context budget report.
 func (r ContextBudgetReport) Attrs() []attribute.KeyValue {
 	return []attribute.KeyValue{
