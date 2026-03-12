@@ -248,6 +248,8 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Subcommands
 
+Running `amadeus` without a subcommand defaults to `run` (divergence check + D-Mail waiting loop). This is the primary operation — measuring design drift and routing corrective D-Mails.
+
 | Command | Description |
 |---------|-------------|
 | `amadeus run` | Divergence check + D-Mail waiting loop (add `--base main` for PR convergence daemon) |
