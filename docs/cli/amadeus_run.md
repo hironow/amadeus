@@ -19,7 +19,7 @@ amadeus run [path] [flags]
       --notify-cmd string       external command for notifications ({title} and {message} placeholders)
   -q, --quiet                   summary-only output
       --review-cmd string       code review command after check (exit 0=pass, non-zero=comments)
-      --wait-timeout duration   D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting) (default 30m0s)
+      --wait-timeout duration   D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
 ```
 
 ### Options inherited from parent commands
