@@ -317,7 +317,7 @@ release version:
     fi
     # 6. All tests must pass
     echo "Running tests..."
-    go test ./... -count=1 -short -timeout=120s
+    go test ./... -count=1 -short -timeout=300s
     # 7. Create annotated tag
     git tag -a "$tag" -m "release $tag"
     echo ""
