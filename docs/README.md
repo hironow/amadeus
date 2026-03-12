@@ -22,7 +22,7 @@
 - [amadeus sync](cli/amadeus_sync.md) — Sync state
 - [amadeus mark-commented](cli/amadeus_mark-commented.md) — Mark D-Mails as commented
 - [amadeus status](cli/amadeus_status.md) — Show verification status
-- [amadeus doctor](cli/amadeus_doctor.md) — Diagnose configuration issues
+- [amadeus doctor](cli/amadeus_doctor.md) — Diagnose configuration issues (context-budget per-item diagnostics, WARN status)
 - [amadeus clean](cli/amadeus_clean.md) — Clean state files
 - [amadeus rebuild](cli/amadeus_rebuild.md) — Rebuild state from events
 - [amadeus archive-prune](cli/amadeus_archive-prune.md) — Prune archived data

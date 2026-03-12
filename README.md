@@ -255,7 +255,7 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 | `amadeus config show` | Show current configuration values |
 | `amadeus config set` | Update configuration values (e.g., `amadeus config set lang en`) |
 | `amadeus validate` | Validate `.gate/config.yaml` |
-| `amadeus doctor` | Check environment health (multiple checks: git, git-remote, gh, claude, config, fsnotify, context-budget, etc.) |
+| `amadeus doctor` | Check environment health (git, git-remote, gh, claude, config, fsnotify, context-budget with per-item diagnostics) |
 | `amadeus log` | Print check history and D-Mail log |
 | `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
 | `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
