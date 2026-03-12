@@ -220,3 +220,129 @@ func (r *errReader) Read(p []byte) (int, error) {
 	r.done = true
 	return n, nil
 }
+
+func TestCollectAll_without_result_message(t *testing.T) {
+	input := strings.Join([]string{
+		`{"type":"system","subtype":"init","session_id":"s1"}`,
+		`{"type":"assistant","session_id":"s1","message":{"content":[{"type":"text","text":"hi"}]}}`,
+	}, "\n")
+
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	result, messages, err := sr.CollectAll()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("result should be nil when no result message exists, got type=%q", result.Type)
+	}
+	if len(messages) != 2 {
+		t.Errorf("got %d messages, want 2", len(messages))
+	}
+}
+
+func TestCollectAll_with_io_error(t *testing.T) {
+	r := &errReader{
+		data: `{"type":"system","session_id":"s1"}` + "\n",
+		err:  io.ErrUnexpectedEOF,
+	}
+	sr := platform.NewStreamReader(r)
+	result, messages, err := sr.CollectAll()
+	if err == nil {
+		t.Fatal("expected error from CollectAll")
+	}
+	if errors.Is(err, io.EOF) {
+		t.Fatal("expected non-EOF error")
+	}
+	// partial results should still be returned
+	if len(messages) != 1 {
+		t.Errorf("got %d messages, want 1 (partial)", len(messages))
+	}
+	if result != nil {
+		t.Error("result should be nil (no result message before error)")
+	}
+}
+
+func TestStreamReader_invalid_json_only(t *testing.T) {
+	input := "not json line 1\nalso {bad json\n"
+	sr := platform.NewStreamReader(strings.NewReader(input))
+
+	_, err := sr.Next()
+	if !errors.Is(err, io.EOF) {
+		t.Errorf("expected io.EOF when all lines are invalid, got %v", err)
+	}
+}
+
+type spyLogger struct {
+	warnings []string
+}
+
+func (l *spyLogger) Warn(msg string, args ...any) {
+	l.warnings = append(l.warnings, msg)
+}
+
+func TestStreamReader_logger_receives_parse_warnings(t *testing.T) {
+	input := "bad json\n" + `{"type":"result","result":"ok"}` + "\n"
+	spy := &spyLogger{}
+
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	sr.SetLogger(spy)
+
+	msg, err := sr.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg.Type != "result" {
+		t.Errorf("got type %q, want result", msg.Type)
+	}
+	if len(spy.warnings) != 1 {
+		t.Errorf("got %d warnings, want 1", len(spy.warnings))
+	}
+	if len(spy.warnings) > 0 && spy.warnings[0] != "stream-json parse skip" {
+		t.Errorf("got warning %q, want 'stream-json parse skip'", spy.warnings[0])
+	}
+}
+
+func TestStreamReader_last_line_without_trailing_newline(t *testing.T) {
+	// No trailing newline — bufio.ReadBytes returns data + io.EOF together
+	input := `{"type":"result","result":"ok"}`
+
+	sr := platform.NewStreamReader(strings.NewReader(input))
+	msg, err := sr.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg.Type != "result" {
+		t.Errorf("got type %q, want result", msg.Type)
+	}
+	if msg.Result != "ok" {
+		t.Errorf("got result %q, want ok", msg.Result)
+	}
+
+	_, err = sr.Next()
+	if !errors.Is(err, io.EOF) {
+		t.Errorf("expected EOF after last message, got %v", err)
+	}
+}
+
+func TestStreamReader_large_line_over_default_bufio_size(t *testing.T) {
+	// Generate a line larger than default bufio size (4096) but within
+	// StreamReader's 256KB buffer
+	bigText := strings.Repeat("x", 100_000)
+	line := `{"type":"assistant","session_id":"s1","message":{"content":[{"type":"text","text":"` + bigText + `"}]}}`
+
+	sr := platform.NewStreamReader(strings.NewReader(line + "\n"))
+	msg, err := sr.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg.Type != "assistant" {
+		t.Errorf("got type %q, want assistant", msg.Type)
+	}
+	text, err := msg.ExtractText()
+	if err != nil {
+		t.Fatalf("ExtractText error: %v", err)
+	}
+	if len(text) != 100_000 {
+		t.Errorf("got text length %d, want 100000", len(text))
+	}
+}
