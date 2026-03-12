@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -10,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/cmd"
 )
 
 func TestCleanCmd_NothingToClean(t *testing.T) {
@@ -25,14 +25,14 @@ func TestCleanCmd_NothingToClean(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"clean", "--yes"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"clean", "--yes"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should succeed with "nothing to clean" message
 	if execErr != nil {
@@ -63,14 +63,14 @@ func TestCleanCmd_DeletesGateDir(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"clean", "--yes"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"clean", "--yes"})
 
 	// when
-	execErr := cmd.Execute()
+	execErr := rootCmd.Execute()
 
 	// then: should succeed and delete .gate/
 	if execErr != nil {

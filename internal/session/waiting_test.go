@@ -93,3 +93,26 @@ func TestWaitForDMail_ZeroTimeoutNoDeadline(t *testing.T) {
 		t.Error("expected arrived=true")
 	}
 }
+
+func TestWaitForDMail_ZeroTimeout_UsesMaxWaitDuration(t *testing.T) {
+	// given — timeout=0 should use maxWaitDuration safety cap, not block forever
+	cleanup := session.ExportSetMaxWaitDuration(20 * time.Millisecond)
+	t.Cleanup(cleanup)
+	ch := make(chan domain.DMail) // no D-Mail will arrive
+
+	// when
+	start := time.Now()
+	arrived, err := session.WaitForDMail(context.Background(), ch, 0, &domain.NopLogger{})
+	elapsed := time.Since(start)
+
+	// then — should return via safety cap, not hang
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if arrived {
+		t.Error("expected arrived=false on safety cap timeout")
+	}
+	if elapsed > 1*time.Second {
+		t.Errorf("expected quick return via safety cap, took %s", elapsed)
+	}
+}

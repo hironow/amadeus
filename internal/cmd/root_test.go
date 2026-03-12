@@ -1,48 +1,47 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"testing"
 
+	"github.com/hironow/amadeus/internal/cmd"
 	"github.com/spf13/cobra"
 )
 
 func TestNewRootCommand_HasPersistentFlags(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// then
 	for _, name := range []string{"config", "verbose", "lang"} {
-		if cmd.PersistentFlags().Lookup(name) == nil {
+		if rootCmd.PersistentFlags().Lookup(name) == nil {
 			t.Errorf("expected PersistentFlag %q to exist", name)
 		}
 	}
 	// shorthand checks
-	if sh := cmd.PersistentFlags().ShorthandLookup("c"); sh == nil || sh.Name != "config" {
+	if sh := rootCmd.PersistentFlags().ShorthandLookup("c"); sh == nil || sh.Name != "config" {
 		t.Error("expected -c shorthand for --config")
 	}
-	if sh := cmd.PersistentFlags().ShorthandLookup("v"); sh == nil || sh.Name != "verbose" {
+	if sh := rootCmd.PersistentFlags().ShorthandLookup("v"); sh == nil || sh.Name != "verbose" {
 		t.Error("expected -v shorthand for --verbose")
 	}
-	if sh := cmd.PersistentFlags().ShorthandLookup("l"); sh == nil || sh.Name != "lang" {
+	if sh := rootCmd.PersistentFlags().ShorthandLookup("l"); sh == nil || sh.Name != "lang" {
 		t.Error("expected -l shorthand for --lang")
 	}
 }
 
 func TestNewRootCommand_VersionOutput(t *testing.T) {
 	// given
-	origVersion := Version
-	Version = "1.2.3"
-	defer func() { Version = origVersion }()
-	cmd := NewRootCommand()
+	origVersion := cmd.Version
+	cmd.Version = "1.2.3"
+	defer func() { cmd.Version = origVersion }()
+	rootCmd := cmd.NewRootCommand()
 	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"--version"})
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"--version"})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -56,11 +55,11 @@ func TestNewRootCommand_VersionOutput(t *testing.T) {
 
 func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
-	cmd.SetArgs([]string{})
+	rootCmd := cmd.NewRootCommand()
+	rootCmd.SetArgs([]string{})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err == nil {
@@ -69,7 +68,7 @@ func TestNewRootCommand_NoArgsReturnsError(t *testing.T) {
 }
 
 func TestSubcommand_ShortAliases(t *testing.T) {
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// Build a map of subcommand name → *cobra.Command for easy lookup.
 	subs := map[string]*cobra.Command{}

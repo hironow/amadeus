@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"os/exec"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
@@ -57,4 +58,11 @@ func ExportWriteConvergenceInsight(a *Amadeus, alert domain.ConvergenceAlert, se
 // ExportHighScoringAxisDetails exposes highScoringAxisDetails for external tests.
 func ExportHighScoringAxisDetails(axes map[domain.Axis]domain.AxisScore) []string {
 	return highScoringAxisDetails(axes)
+}
+
+// ExportSetMaxWaitDuration overrides maxWaitDuration and returns a cleanup function.
+func ExportSetMaxWaitDuration(d time.Duration) func() {
+	old := maxWaitDuration
+	maxWaitDuration = d
+	return func() { maxWaitDuration = old }
 }

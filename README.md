@@ -288,7 +288,7 @@ amadeus run -f
 # Dry run (build prompt only, skip Claude call)
 amadeus run -n
 
-# Custom waiting timeout (0 = no timeout, negative = disable waiting)
+# Custom waiting timeout (0 = 24h safety cap, negative = disable waiting)
 amadeus run --wait-timeout 1h
 
 # Show/set configuration
@@ -356,7 +356,7 @@ lang: ja
 claude_cmd: claude
 model: opus
 timeout_sec: 1980
-wait_timeout: 30m  # D-Mail waiting phase timeout (0 = no timeout, negative = disable)
+wait_timeout: 30m  # D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable)
 
 weights:
   adr_integrity: 0.4
