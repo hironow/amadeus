@@ -913,6 +913,40 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	}
 }
 
+func TestFindSkillsRefDir_UsesBaseDir(t *testing.T) {
+	t.Parallel()
+
+	// given: skills-ref exists relative to baseDir but NOT relative to CWD
+	baseDir := t.TempDir()
+	skillsRefDir := filepath.Join(baseDir, "..", "skills-ref")
+	if err := os.MkdirAll(skillsRefDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: findSkillsRefDir uses baseDir (not CWD)
+	result := findSkillsRefDir(baseDir)
+
+	// then: should find the skills-ref directory
+	if result == "" {
+		t.Error("expected findSkillsRefDir to find skills-ref relative to baseDir, got empty string")
+	}
+}
+
+func TestFindSkillsRefDir_NotFound(t *testing.T) {
+	t.Parallel()
+
+	// given: no skills-ref anywhere near baseDir
+	baseDir := t.TempDir()
+
+	// when
+	result := findSkillsRefDir(baseDir)
+
+	// then
+	if result != "" {
+		t.Errorf("expected empty string, got %q", result)
+	}
+}
+
 func TestCheckContextBudget_LowUsage(t *testing.T) {
 	t.Parallel()
 

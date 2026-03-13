@@ -41,7 +41,9 @@ type StreamMessage struct {
 	MCPServers []MCPServerInfo `json:"mcp_servers,omitempty"`
 	Tools      []string        `json:"tools,omitempty"`
 	Skills     []string        `json:"skills,omitempty"`
-	Plugins    []PluginInfo    `json:"plugins,omitempty"`
+	// Plugins is populated by ParseStreamMessage. Supports both []PluginInfo (new)
+	// and []string (legacy Claude CLI) formats via custom unmarshalling.
+	Plugins []PluginInfo `json:"-"`
 }
 
 // MCPServerInfo represents a connected MCP server from system:init.
@@ -95,12 +97,50 @@ type ContentBlock struct {
 	Input     json.RawMessage `json:"input,omitempty"`
 }
 
-// ParseStreamMessage parses a single NDJSON line.
-func ParseStreamMessage(data []byte) (*StreamMessage, error) {
-	var msg StreamMessage
-	if err := json.Unmarshal(data, &msg); err != nil {
+// rawStreamMessage is used for intermediate parsing so that the plugins field
+// can be handled as json.RawMessage to support both []PluginInfo and []string.
+type rawStreamMessage struct {
+	StreamMessage
+	RawPlugins json.RawMessage `json:"plugins,omitempty"`
+}
+
+// parsePlugins tries to parse raw JSON as []PluginInfo first, falling back to
+// []string for backward compatibility with older Claude CLI versions.
+func parsePlugins(raw json.RawMessage) ([]PluginInfo, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	// Try []PluginInfo first (new format)
+	var plugins []PluginInfo
+	if err := json.Unmarshal(raw, &plugins); err == nil {
+		return plugins, nil
+	}
+
+	// Fall back to []string (legacy format)
+	var names []string
+	if err := json.Unmarshal(raw, &names); err != nil {
 		return nil, err
 	}
+	plugins = make([]PluginInfo, len(names))
+	for i, name := range names {
+		plugins[i] = PluginInfo{Name: name}
+	}
+	return plugins, nil
+}
+
+// ParseStreamMessage parses a single NDJSON line.
+func ParseStreamMessage(data []byte) (*StreamMessage, error) {
+	var raw rawStreamMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	msg := raw.StreamMessage
+	plugins, err := parsePlugins(raw.RawPlugins)
+	if err != nil {
+		return nil, err
+	}
+	msg.Plugins = plugins
 	return &msg, nil
 }
 

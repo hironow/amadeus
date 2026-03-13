@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -54,7 +53,7 @@ var installSkillsRefFn = func() error {
 	return cmd.Run()
 }
 
-// findSkillsRefDirFn searches for skills-ref submodule directory.
+// findSkillsRefDirFn searches for skills-ref submodule directory relative to baseDir.
 var findSkillsRefDirFn = findSkillsRefDir
 
 // generateSkillsFn regenerates SKILL.md files. Injectable for testing.
@@ -62,10 +61,10 @@ var generateSkillsFn = func(repoRoot string, logger domain.Logger) error {
 	return session.InitGateDir(filepath.Join(repoRoot, domain.StateDir), logger)
 }
 
-func findSkillsRefDir() string {
+func findSkillsRefDir(baseDir string) string {
 	candidates := []string{
-		filepath.Join("..", "skills-ref"),
-		filepath.Join("..", "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "..", "skills-ref"),
 	}
 	for _, c := range candidates {
 		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
@@ -85,7 +84,7 @@ func OverrideInstallSkillsRef(fn func() error) func() {
 
 // OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing
 // and returns a cleanup function.
-func OverrideFindSkillsRefDir(fn func() string) func() {
+func OverrideFindSkillsRefDir(fn func(string) string) func() {
 	old := findSkillsRefDirFn
 	findSkillsRefDirFn = fn
 	return func() { findSkillsRefDirFn = old }
@@ -510,7 +509,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	}
 
 	// --- skills-ref toolchain ---
-	results = append(results, checkSkillsRefToolchain(repair)...)
+	results = append(results, checkSkillsRefToolchain(repoRoot, repair)...)
 
 	// --- Metrics ---
 	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
@@ -521,28 +520,12 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		if data, err := os.ReadFile(pidPath); err == nil {
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
 			if pid > 0 {
-				proc, _ := os.FindProcess(pid)
-				if proc == nil {
+				if !platform.IsProcessAlive(pid) {
 					os.Remove(pidPath)
 					results = append(results, domain.DoctorCheck{
 						Name: "stale-pid", Status: domain.CheckFixed,
 						Message: "removed stale PID file",
 					})
-				} else if err := proc.Signal(syscall.Signal(0)); err != nil {
-					if errors.Is(err, syscall.EPERM) {
-						// Process alive but owned by another user — not stale
-						results = append(results, domain.DoctorCheck{
-							Name: "stale-pid", Status: domain.CheckSkip,
-							Message: fmt.Sprintf("PID %d alive (owned by another user)", pid),
-						})
-					} else {
-						// ESRCH or other error — truly stale
-						os.Remove(pidPath)
-						results = append(results, domain.DoctorCheck{
-							Name: "stale-pid", Status: domain.CheckFixed,
-							Message: "removed stale PID file",
-						})
-					}
 				}
 			}
 		}
@@ -729,7 +712,7 @@ func checkFsnotify() domain.DoctorCheck {
 }
 
 // checkSkillsRefToolchain verifies that the skills-ref tool is available.
-func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
+func checkSkillsRefToolchain(repoRoot string, repair bool) []domain.DoctorCheck {
 	if _, err := lookPathShell("skills-ref"); err == nil {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
@@ -744,7 +727,7 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
 		}}
 	}
-	subDir := findSkillsRefDirFn()
+	subDir := findSkillsRefDirFn(repoRoot)
 	if subDir != "" {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
