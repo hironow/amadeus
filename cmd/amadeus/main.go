@@ -27,6 +27,14 @@ func run() int {
 	rootCmd.SetArgs(args)
 
 	err := rootCmd.ExecuteContext(ctx)
+
+	// Signal-induced context cancellation is not an application error.
+	// Exit with 128+SIGINT=130 per UNIX convention instead of printing
+	// "error: context canceled" and exiting with code 1.
+	if err != nil && errors.Is(err, context.Canceled) && ctx.Err() != nil {
+		return 130
+	}
+
 	if err != nil {
 		var silent *domain.SilentError
 		if !errors.As(err, &silent) {
