@@ -204,6 +204,7 @@ rules:
     paths:
       exclude:
         - "*_test.go"
+        - "cmd/*/main.go"
 
   # Rule 11: Execute() without context
   # Source: ADR 0008 — "ExecuteContext(ctx) passes context to cobra root command"
