@@ -307,6 +307,20 @@ rules:
     fix: |
       $ARGS = append($ARGS, "--verbose", "--output-format", "stream-json")
 
+  # Rule 18: []string literal with stream-json without --verbose
+  - id: s0032-string-slice-stream-json-without-verbose
+    languages: [go]
+    message: |
+      []string リテラルに "--output-format", "stream-json" を含む場合、
+      "--verbose" も含めてください。Claude CLI 2.1.x では必須です。
+      Ref: Shared ADR S0032
+    severity: ERROR
+    patterns:
+      - pattern: |
+          []string{..., "--output-format", "stream-json", ...}
+      - pattern-not: |
+          []string{..., "--verbose", ..., "--output-format", "stream-json", ...}
+
   # --- D4: Resource leak detection ---
 
   # Rule 13: sql.Open without defer Close
