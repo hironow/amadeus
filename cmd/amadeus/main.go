@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 
@@ -55,10 +56,16 @@ func run() int {
 		return 130
 	}
 
+	return handleError(err, os.Stderr)
+}
+
+// handleError processes an error from command execution, printing to w only
+// when the error is not silent. Returns the appropriate exit code.
+func handleError(err error, w io.Writer) int {
 	if err != nil {
 		var silent *domain.SilentError
 		if !errors.As(err, &silent) {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			fmt.Fprintf(w, "error: %v\n", err)
 		}
 	}
 	return domain.ExitCode(err)
