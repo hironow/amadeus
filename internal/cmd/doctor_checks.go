@@ -243,13 +243,15 @@ func checkGateDir(repoRoot string, repair bool) domain.DoctorCheck {
 // checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
-func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
+// claudeCmd is the configured command string (may include env prefix).
+func checkClaudeAuth(mcpOutput string, mcpErr error, claudeCmd string) domain.DoctorCheck {
 	if mcpErr != nil {
+		hint := buildLoginHint(claudeCmd)
 		return domain.DoctorCheck{
 			Name:    "claude-auth",
 			Status:  domain.CheckWarn,
 			Message: "not authenticated: " + mcpErr.Error(),
-			Hint:    `run "claude login" to authenticate`,
+			Hint:    hint,
 		}
 	}
 	return domain.DoctorCheck{
@@ -257,6 +259,31 @@ func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
 		Status:  domain.CheckOK,
 		Message: "authenticated",
 	}
+}
+
+// buildLoginHint constructs a login hint that preserves any env prefix
+// from the configured claude command (e.g. "CLAUDE_CONFIG_DIR=/path claude").
+func buildLoginHint(claudeCmd string) string {
+	envPrefix := extractEnvPrefix(claudeCmd)
+	if envPrefix == "" {
+		return `run "claude login" to authenticate`
+	}
+	return fmt.Sprintf(`run "%s claude login" to authenticate`, envPrefix)
+}
+
+// extractEnvPrefix extracts leading KEY=VALUE pairs from a command string.
+// Returns the env prefix portion or empty string if none.
+func extractEnvPrefix(cmd string) string {
+	parts := strings.Fields(cmd)
+	var envParts []string
+	for _, p := range parts {
+		if strings.Contains(p, "=") {
+			envParts = append(envParts, p)
+		} else {
+			break
+		}
+	}
+	return strings.Join(envParts, " ")
 }
 
 // checkLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
@@ -459,52 +486,45 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			Message: "skipped (claude not available)",
 		})
 	} else {
+		// Run mcp list (may fail due to auth or broken MCP config)
 		mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
 		cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
 		out, mcpErr := cmd.Output()
 		mcpCancel()
 		mcpOutput := string(out)
 
-		authResult := checkClaudeAuth(mcpOutput, mcpErr)
+		authResult := checkClaudeAuth(mcpOutput, mcpErr, claudeCmd)
 		results = append(results, authResult)
 
-		if authResult.Status != domain.CheckOK {
+		// Linear MCP: skip if mcp list failed
+		if mcpErr != nil {
 			results = append(results, domain.DoctorCheck{
 				Name:    "linear-mcp",
 				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
-			})
-			results = append(results, domain.DoctorCheck{
-				Name:    "claude-inference",
-				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
-			})
-			results = append(results, domain.DoctorCheck{
-				Name:    "context-budget",
-				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
+				Message: "skipped (mcp list failed)",
 			})
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+		}
 
-			inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
-			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-			inferOut, inferErr := inferCmd.Output()
-			inferCancel()
-			inferOutput := string(inferOut)
-			inferResult := checkClaudeInference(strings.TrimSpace(extractStreamResult(inferOutput)), inferErr)
-			results = append(results, inferResult)
+		// Inference: run independently of mcp list result (only needs claude binary)
+		inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
+		inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+		inferOut, inferErr := inferCmd.Output()
+		inferCancel()
+		inferOutput := string(inferOut)
+		inferResult := checkClaudeInference(strings.TrimSpace(extractStreamResult(inferOutput)), inferErr)
+		results = append(results, inferResult)
 
-			// Context budget check: skip if inference failed
-			if inferResult.Status != domain.CheckOK {
-				results = append(results, domain.DoctorCheck{
-					Name:    "context-budget",
-					Status:  domain.CheckSkip,
-					Message: "skipped (inference failed)",
-				})
-			} else {
-				results = append(results, checkContextBudget(inferOutput, repoRoot))
-			}
+		// Context budget check: skip if inference failed
+		if inferResult.Status != domain.CheckOK {
+			results = append(results, domain.DoctorCheck{
+				Name:    "context-budget",
+				Status:  domain.CheckSkip,
+				Message: "skipped (inference failed)",
+			})
+		} else {
+			results = append(results, checkContextBudget(inferOutput, repoRoot))
 		}
 	}
 

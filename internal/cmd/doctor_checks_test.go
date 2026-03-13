@@ -200,7 +200,7 @@ func TestCheckClaudeAuth_Authenticated(t *testing.T) {
 	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
 
 	// when
-	result := checkClaudeAuth(mcpOutput, nil)
+	result := checkClaudeAuth(mcpOutput, nil, "claude")
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -216,7 +216,7 @@ func TestCheckClaudeAuth_NotAuthenticated(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkClaudeAuth("", mcpErr)
+	result := checkClaudeAuth("", mcpErr, "claude")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -224,6 +224,25 @@ func TestCheckClaudeAuth_NotAuthenticated(t *testing.T) {
 	}
 	if !strings.Contains(result.Hint, "claude login") {
 		t.Errorf("expected hint to mention 'claude login', got: %s", result.Hint)
+	}
+}
+
+func TestCheckClaudeAuth_NotAuthenticated_WithEnvPrefix(t *testing.T) {
+	// given
+	mcpErr := fmt.Errorf("exit status 1")
+
+	// when
+	result := checkClaudeAuth("", mcpErr, "CLAUDE_CONFIG_DIR=/foo claude")
+
+	// then
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected domain.CheckWarn, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "CLAUDE_CONFIG_DIR=/foo") {
+		t.Errorf("expected hint to include env prefix, got: %s", result.Hint)
+	}
+	if !strings.Contains(result.Hint, "login") {
+		t.Errorf("expected hint to mention login, got: %s", result.Hint)
 	}
 }
 
@@ -578,6 +597,67 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	}
 	if !strings.Contains(inferResult.Message, "claude not available") {
 		t.Errorf("expected 'claude not available' in inference message, got: %s", inferResult.Message)
+	}
+}
+
+func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
+	// given: claude binary exists but mcp list fails
+	callCount := 0
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+		callCount++
+		// First call: mcp list → fail
+		for _, arg := range args {
+			if arg == "list" {
+				return exec.Command("false")
+			}
+			if arg == "--print" {
+				// inference call → succeed with "2"
+				return exec.Command("echo", `{"type":"result","result":"2"}`)
+			}
+		}
+		// default: version check
+		return exec.Command("echo", "1.0.0")
+	})
+	defer cleanupCmd()
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
+		return "/usr/local/bin/" + cmdLine, nil
+	})
+	defer cleanupPath()
+
+	dir := t.TempDir()
+	divRoot := filepath.Join(dir, ".gate")
+	os.MkdirAll(divRoot, 0o755)
+	cfg := domain.DefaultConfig()
+	data, _ := yaml.Marshal(cfg)
+	os.WriteFile(filepath.Join(divRoot, "config.yaml"), data, 0o644)
+	exec.Command("git", "init", dir).Run()
+
+	ctx := context.Background()
+	configPath := filepath.Join(divRoot, "config.yaml")
+
+	// when
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false)
+
+	// then: claude-auth should WARN, linear-mcp should SKIP, but inference should NOT be skipped
+	var authResult, mcpResult, inferResult domain.DoctorCheck
+	for _, r := range results {
+		switch r.Name {
+		case "claude-auth":
+			authResult = r
+		case "linear-mcp":
+			mcpResult = r
+		case "claude-inference":
+			inferResult = r
+		}
+	}
+	if authResult.Status != domain.CheckWarn {
+		t.Errorf("claude-auth: expected WARN, got %v: %s", authResult.Status, authResult.Message)
+	}
+	if mcpResult.Status != domain.CheckSkip {
+		t.Errorf("linear-mcp: expected SKIP, got %v: %s", mcpResult.Status, mcpResult.Message)
+	}
+	if inferResult.Status == domain.CheckSkip {
+		t.Errorf("claude-inference: should NOT be skipped when mcp list fails, got SKIP: %s", inferResult.Message)
 	}
 }
 
