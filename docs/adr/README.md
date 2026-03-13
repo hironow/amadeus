@@ -62,3 +62,7 @@
 | [0011](0011-root-package-layer-separation.md) | Root Package Layer Separation |
 | [0012](0012-usecase-adapter-dependency-inversion.md) | Usecase-Adapter Dependency Inversion |
 | [0013](0013-parse-dont-validate-commands.md) | Parse-Don't-Validate Commands |
+| [0014](0014-feedback-kind-split.md) | Feedback Kind Split |
+| [0015](0015-pr-convergence-conductor-role.md) | PR Convergence Conductor Role |
+| [0016](0016-fsnotify-inbox-watcher.md) | fsnotify Inbox Watcher |
+| [0018](0018-claude-cli-stream-json-requires-verbose.md) | Claude CLI stream-json Requires --verbose |
