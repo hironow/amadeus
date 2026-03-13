@@ -395,8 +395,24 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkGitRemote(repoRoot))
 
 	// --- State ---
-	results = append(results, checkGateDir(repoRoot, repair))
-	results = append(results, checkConfig(configPath))
+	gateDirResult := checkGateDir(repoRoot, repair)
+	results = append(results, gateDirResult)
+
+	// When .gate/ was just created by repair, regenerate skills/config before
+	// checking config so that config.yaml exists by the time checkConfig runs.
+	if gateDirResult.Status == domain.CheckFixed {
+		if err := generateSkillsFn(repoRoot, logger); err != nil {
+			results = append(results, domain.DoctorCheck{
+				Name: "Config", Status: domain.CheckFail,
+				Message: fmt.Sprintf("generateSkills after .gate/ repair failed: %v", err),
+				Hint:    `run "amadeus init" manually`,
+			})
+		} else {
+			results = append(results, checkConfig(configPath))
+		}
+	} else {
+		results = append(results, checkConfig(configPath))
+	}
 
 	// --- Data ---
 	skillResult := checkSkillMD(repoRoot)
@@ -506,12 +522,27 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
 			if pid > 0 {
 				proc, _ := os.FindProcess(pid)
-				if proc == nil || proc.Signal(syscall.Signal(0)) != nil {
+				if proc == nil {
 					os.Remove(pidPath)
 					results = append(results, domain.DoctorCheck{
 						Name: "stale-pid", Status: domain.CheckFixed,
 						Message: "removed stale PID file",
 					})
+				} else if err := proc.Signal(syscall.Signal(0)); err != nil {
+					if errors.Is(err, syscall.EPERM) {
+						// Process alive but owned by another user — not stale
+						results = append(results, domain.DoctorCheck{
+							Name: "stale-pid", Status: domain.CheckSkip,
+							Message: fmt.Sprintf("PID %d alive (owned by another user)", pid),
+						})
+					} else {
+						// ESRCH or other error — truly stale
+						os.Remove(pidPath)
+						results = append(results, domain.DoctorCheck{
+							Name: "stale-pid", Status: domain.CheckFixed,
+							Message: "removed stale PID file",
+						})
+					}
 				}
 			}
 		}
