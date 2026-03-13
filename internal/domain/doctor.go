@@ -8,6 +8,7 @@ const (
 	CheckFail
 	CheckSkip
 	CheckWarn
+	CheckFixed
 )
 
 // DoctorCheck holds the outcome of a single doctor check.
@@ -29,6 +30,8 @@ func (s CheckStatus) StatusLabel() string {
 		return "SKIP"
 	case CheckWarn:
 		return "WARN"
+	case CheckFixed:
+		return "FIX"
 	default:
 		return "????"
 	}

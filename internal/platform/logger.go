@@ -103,6 +103,8 @@ func StatusColor(s domain.CheckStatus) string {
 		return ansiBoldRed
 	case domain.CheckSkip:
 		return ansiGray
+	case domain.CheckFixed:
+		return ansiBoldBlue
 	default:
 		return ""
 	}
