@@ -276,6 +276,37 @@ rules:
       - pattern-not: attribute.StringSlice($KEY, platform.SanitizeUTF8Slice(...))
       - pattern-not: attribute.StringSlice($KEY, SanitizeUTF8Slice(...))
 
+  # --- S0032: Claude CLI stream-json requires --verbose ---
+
+  # Rule 16: --output-format stream-json without --verbose
+  # Source: S0032 — Claude CLI 2.1.x requires --verbose with --print --output-format stream-json
+  - id: s0032-stream-json-without-verbose
+    languages: [go]
+    message: |
+      "--output-format", "stream-json" を使用する場合は "--verbose" フラグが必須です。
+      Claude CLI 2.1.x では --print --output-format stream-json に --verbose が必要です。
+      --verbose がないと exit status 1 で即座に失敗します。
+      Ref: Shared ADR S0032 — CVD-friendly signal color palette (同 CLI 仕様変更時に発見)
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $CMD := $FUNC($CTX, $NAME, ..., "--output-format", "stream-json", ...)
+      - pattern-not: |
+          $CMD := $FUNC($CTX, $NAME, ..., "--verbose", ..., "--output-format", "stream-json", ...)
+
+  # Rule 17: args append with stream-json without --verbose
+  - id: s0032-args-append-stream-json-without-verbose
+    languages: [go]
+    message: |
+      "--output-format", "stream-json" を append する前に "--verbose" を append してください。
+      Claude CLI 2.1.x では --verbose が必須です。
+      Ref: Shared ADR S0032
+    severity: ERROR
+    pattern: |
+      $ARGS = append($ARGS, "--output-format", "stream-json")
+    fix: |
+      $ARGS = append($ARGS, "--verbose", "--output-format", "stream-json")
+
   # --- D4: Resource leak detection ---
 
   # Rule 13: sql.Open without defer Close
