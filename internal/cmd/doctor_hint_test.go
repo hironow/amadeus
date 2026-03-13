@@ -108,7 +108,7 @@ func TestCheckGateDir_NotExist_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := checkGateDir(dir)
+	result := checkGateDir(dir, false)
 
 	// then
 	if result.Hint == "" {

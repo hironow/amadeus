@@ -170,7 +170,7 @@ func TestCheckGateDir_Exists(t *testing.T) {
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	result := checkGateDir(dir)
+	result := checkGateDir(dir, false)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
@@ -178,9 +178,20 @@ func TestCheckGateDir_Exists(t *testing.T) {
 
 func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
-	result := checkGateDir(dir)
+	result := checkGateDir(dir, false)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckGateDir_RepairCreatesMissing(t *testing.T) {
+	dir := t.TempDir()
+	result := checkGateDir(dir, true)
+	if result.Status != domain.CheckFixed {
+		t.Errorf("expected domain.CheckFixed, got %v: %s", result.Status, result.Message)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".gate")); err != nil {
+		t.Error(".gate/ should have been created")
 	}
 }
 

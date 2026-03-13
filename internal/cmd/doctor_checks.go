@@ -182,15 +182,31 @@ func checkGitRemote(dir string) domain.DoctorCheck {
 }
 
 // checkGateDir verifies .gate/ directory exists and is writable.
-func checkGateDir(repoRoot string) domain.DoctorCheck {
+// When repair is true and the directory is missing, it creates it.
+func checkGateDir(repoRoot string, repair bool) domain.DoctorCheck {
 	dir := filepath.Join(repoRoot, domain.StateDir)
 	info, err := os.Stat(dir)
 	if err != nil {
+		if !repair {
+			return domain.DoctorCheck{
+				Name:    ".gate/",
+				Status:  domain.CheckFail,
+				Message: "not found — run 'amadeus init' first",
+				Hint:    `run "amadeus init" or "amadeus doctor --repair"`,
+			}
+		}
+		if mkErr := os.MkdirAll(dir, 0755); mkErr != nil {
+			return domain.DoctorCheck{
+				Name:    ".gate/",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("cannot create %s: %v", dir, mkErr),
+				Hint:    `check directory permissions or run "amadeus init"`,
+			}
+		}
 		return domain.DoctorCheck{
 			Name:    ".gate/",
-			Status:  domain.CheckFail,
-			Message: "not found — run 'amadeus init' first",
-			Hint:    `run "amadeus init" first`,
+			Status:  domain.CheckFixed,
+			Message: fmt.Sprintf("created %s", dir),
 		}
 	}
 	if !info.IsDir() {
@@ -379,7 +395,7 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkGitRemote(repoRoot))
 
 	// --- State ---
-	results = append(results, checkGateDir(repoRoot))
+	results = append(results, checkGateDir(repoRoot, repair))
 	results = append(results, checkConfig(configPath))
 
 	// --- Data ---
