@@ -25,7 +25,7 @@ var _ domain.BannerLogger = (*Logger)(nil)
 const (
 	ansiReset       = "\033[0m"
 	ansiCyan        = "\033[36m"   // INFO — blue axis, universally visible
-	ansiBoldGreen   = "\033[1;32m" // OK   — convention + bold brightness for CVD
+	ansiBoldBlue    = "\033[1;34m" // OK   — blue axis, universally visible for red-green CVD
 	ansiYellow      = "\033[33m"   // WARN — yellow axis, safe for common CVD
 	ansiBoldRed     = "\033[1;31m" // ERR  — convention + bold brightness for CVD
 	ansiGray        = "\033[90m"   // DBUG — brightness-only, no hue dependency
@@ -83,6 +83,33 @@ func (l *Logger) colorPrefix(prefix, color string) string {
 	return color + prefix + ansiReset
 }
 
+// Colorize wraps text with the given ANSI color code if color output is enabled.
+// Returns plain text when color is disabled (NO_COLOR env or non-terminal output).
+func (l *Logger) Colorize(text, color string) string {
+	if l.noColor {
+		return text
+	}
+	return color + text + ansiReset
+}
+
+// StatusColor returns the ANSI color code for a doctor check status.
+func StatusColor(s domain.CheckStatus) string {
+	switch s {
+	case domain.CheckOK:
+		return ansiBoldBlue
+	case domain.CheckWarn:
+		return ansiYellow
+	case domain.CheckFail:
+		return ansiBoldRed
+	case domain.CheckSkip:
+		return ansiGray
+	case domain.CheckFixed:
+		return ansiBoldBlue
+	default:
+		return ""
+	}
+}
+
 func (l *Logger) logLine(prefix, color, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
@@ -106,7 +133,7 @@ func (l *Logger) Info(format string, args ...any) {
 
 // OK prints a success message.
 func (l *Logger) OK(format string, args ...any) {
-	l.logLine(" OK ", ansiBoldGreen, format, args...)
+	l.logLine(" OK ", ansiBoldBlue, format, args...)
 }
 
 // Warn prints a warning message.

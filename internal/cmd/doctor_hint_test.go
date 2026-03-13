@@ -12,13 +12,14 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 // --- STRUCTURAL tests: Hint field rendering ---
 
 func TestPrintDoctorJSON_IncludesHint(t *testing.T) {
 	// given
-	results := []domain.DoctorCheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "test", Status: domain.CheckFail, Message: "failed", Hint: "fix it"},
 	}
 
@@ -40,7 +41,7 @@ func TestPrintDoctorJSON_IncludesHint(t *testing.T) {
 
 func TestPrintDoctorJSON_OmitsEmptyHint(t *testing.T) {
 	// given
-	results := []domain.DoctorCheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "test", Status: domain.CheckOK, Message: "ok"},
 	}
 
@@ -56,13 +57,14 @@ func TestPrintDoctorJSON_OmitsEmptyHint(t *testing.T) {
 
 func TestPrintDoctorText_ShowsHint(t *testing.T) {
 	// given
-	results := []domain.DoctorCheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "test", Status: domain.CheckFail, Message: "failed", Hint: "run init"},
 	}
 
 	// when
 	var buf bytes.Buffer
-	_ = printDoctorText(&buf, results)
+	logger := platform.NewLogger(&buf, false)
+	_ = printDoctorText(&buf, logger, results)
 
 	// then
 	if !strings.Contains(buf.String(), "hint: run init") {
@@ -106,7 +108,7 @@ func TestCheckGateDir_NotExist_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := checkGateDir(dir)
+	result := checkGateDir(dir, false)
 
 	// then
 	if result.Hint == "" {

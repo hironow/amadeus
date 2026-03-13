@@ -74,6 +74,14 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		if diagnostic == "" {
 			diagnostic = stdout.String()
 		}
+		// Suppress raw NDJSON from user-facing errors; log full content
+		// at debug level so it remains available with --verbose.
+		if platform.IsNDJSON(diagnostic) {
+			if a.Logger != nil {
+				a.Logger.Debug("claude raw output:\n%s", diagnostic)
+			}
+			diagnostic = platform.SummarizeNDJSON(diagnostic)
+		}
 		return "", fmt.Errorf("claude: %w\n%s", err, diagnostic)
 	}
 

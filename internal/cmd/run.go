@@ -162,10 +162,11 @@ func newRunCommand() *cobra.Command {
 			// With --base: daemon loop with inbox monitoring + post-merge checks.
 			// Adds PR convergence analysis (via PRReader/gh) on top of divergence scoring.
 			if baseBranch != "" {
-				return usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
+				runErr := usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
 					CheckOptions: checkOpts,
 					BaseBranch:   baseBranch,
 				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
+				return tryWriteHandover(cmd.Context(), runErr, repoRoot, "divergence run with --base "+baseBranch, logger)
 			}
 
 			// Without --base: one-shot check + D-Mail waiting loop.
@@ -196,7 +197,7 @@ func newRunCommand() *cobra.Command {
 			// Waiting loop: wait for D-Mail → re-check → repeat.
 			// Skips expensive RunCheck after consecutive no-drift results
 			// while always draining the inbox channel promptly.
-			return runWaitingLoop(
+			waitErr := runWaitingLoop(
 				cmd.Context(),
 				func(ctx context.Context) error {
 					return usecase.RunCheck(ctx, domain.NewExecuteCheckCommand(rp), checkOpts,
@@ -207,6 +208,7 @@ func newRunCommand() *cobra.Command {
 				},
 				logger,
 			)
+			return tryWriteHandover(cmd.Context(), waitErr, repoRoot, "divergence check waiting loop", logger)
 		},
 	}
 
