@@ -40,7 +40,8 @@ hint recommends adjusting .claude/settings.json.`,
 			}
 
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
-			results := runDoctor(cmd.Context(), configPath, repoRoot, logger)
+			repair, _ := cmd.Flags().GetBool("repair")
+			results := runDoctor(cmd.Context(), configPath, repoRoot, logger, repair)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)
@@ -50,6 +51,7 @@ hint recommends adjusting .claude/settings.json.`,
 	}
 
 	cmd.Flags().BoolP("json", "j", false, "output as JSON")
+	cmd.Flags().Bool("repair", false, "Auto-fix repairable issues")
 
 	return cmd
 }

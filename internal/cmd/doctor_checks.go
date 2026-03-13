@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -44,6 +46,57 @@ func OverrideLookPath(fn func(cmd string) (string, error)) func() {
 	old := lookPathShell
 	lookPathShell = fn
 	return func() { lookPathShell = old }
+}
+
+// installSkillsRefFn runs "uv tool install skills-ref". Injectable for testing.
+var installSkillsRefFn = func() error {
+	cmd := exec.Command("uv", "tool", "install", "skills-ref")
+	return cmd.Run()
+}
+
+// findSkillsRefDirFn searches for skills-ref submodule directory.
+var findSkillsRefDirFn = findSkillsRefDir
+
+// generateSkillsFn regenerates SKILL.md files. Injectable for testing.
+var generateSkillsFn = func(repoRoot string, logger domain.Logger) error {
+	return session.InitGateDir(filepath.Join(repoRoot, domain.StateDir), logger)
+}
+
+func findSkillsRefDir() string {
+	candidates := []string{
+		filepath.Join("..", "skills-ref"),
+		filepath.Join("..", "..", "skills-ref"),
+	}
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
+
+// OverrideInstallSkillsRef replaces the skills-ref installer for testing and
+// returns a cleanup function.
+func OverrideInstallSkillsRef(fn func() error) func() {
+	old := installSkillsRefFn
+	installSkillsRefFn = fn
+	return func() { installSkillsRefFn = old }
+}
+
+// OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing
+// and returns a cleanup function.
+func OverrideFindSkillsRefDir(fn func() string) func() {
+	old := findSkillsRefDirFn
+	findSkillsRefDirFn = fn
+	return func() { findSkillsRefDirFn = old }
+}
+
+// OverrideGenerateSkills replaces the skill generator for testing and returns a
+// cleanup function.
+func OverrideGenerateSkills(fn func(string, domain.Logger) error) func() {
+	old := generateSkillsFn
+	generateSkillsFn = fn
+	return func() { generateSkillsFn = old }
 }
 
 // checkTool verifies that a CLI tool is installed and executable.
@@ -300,16 +353,16 @@ func checkSkillMD(repoRoot string) domain.DoctorCheck {
 
 // runDoctor executes all health checks and returns the results.
 // Reads claude_cmd from the config file; falls back to domain.DefaultClaudeCmd on load error.
-func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger) []domain.DoctorCheck {
+func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger, repair bool) []domain.DoctorCheck {
 	claudeCmd := domain.DefaultClaudeCmd
 	if cfg, err := loadConfig(configPath); err == nil {
 		claudeCmd = cfg.ClaudeCmd
 	}
-	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger)
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger, repair)
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger) []domain.DoctorCheck {
+func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger, repair bool) []domain.DoctorCheck {
 	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 
@@ -330,7 +383,24 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkConfig(configPath))
 
 	// --- Data ---
-	results = append(results, checkSkillMD(repoRoot))
+	skillResult := checkSkillMD(repoRoot)
+	if repair && skillResult.Status == domain.CheckFail {
+		if err := generateSkillsFn(repoRoot, logger); err == nil {
+			recheck := checkSkillMD(repoRoot)
+			if recheck.Status == domain.CheckOK {
+				results = append(results, domain.DoctorCheck{
+					Name: "SKILL.md", Status: domain.CheckFixed,
+					Message: "regenerated SKILL.md files",
+				})
+			} else {
+				results = append(results, skillResult)
+			}
+		} else {
+			results = append(results, skillResult)
+		}
+	} else {
+		results = append(results, skillResult)
+	}
 	results = append(results, checkEventStore(filepath.Join(repoRoot, domain.StateDir)))
 	results = append(results, checkDMailSchema(filepath.Join(repoRoot, domain.StateDir)))
 	results = append(results, checkFsnotify())
@@ -407,8 +477,29 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		}
 	}
 
+	// --- skills-ref toolchain ---
+	results = append(results, checkSkillsRefToolchain(repair)...)
+
 	// --- Metrics ---
 	results = append(results, checkSuccessRate(filepath.Join(repoRoot, domain.StateDir), logger))
+
+	// --- Repair: stale PID cleanup ---
+	if repair {
+		pidPath := filepath.Join(repoRoot, domain.StateDir, "watch.pid")
+		if data, err := os.ReadFile(pidPath); err == nil {
+			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			if pid > 0 {
+				proc, _ := os.FindProcess(pid)
+				if proc == nil || proc.Signal(syscall.Signal(0)) != nil {
+					os.Remove(pidPath)
+					results = append(results, domain.DoctorCheck{
+						Name: "stale-pid", Status: domain.CheckFixed,
+						Message: "removed stale PID file",
+					})
+				}
+			}
+		}
+	}
 
 	for _, r := range results {
 		span.AddEvent("doctor.check", trace.WithAttributes(
@@ -588,6 +679,49 @@ func checkFsnotify() domain.DoctorCheck {
 		Status:  domain.CheckOK,
 		Message: "file watcher available",
 	}
+}
+
+// checkSkillsRefToolchain verifies that the skills-ref tool is available.
+func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
+	if _, err := lookPathShell("skills-ref"); err == nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "skills-ref found on PATH",
+		}}
+	}
+	_, uvErr := lookPathShell("uv")
+	if uvErr != nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckWarn,
+			Message: "uv not found on PATH: SKILL.md spec validation is unavailable",
+			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
+		}}
+	}
+	subDir := findSkillsRefDirFn()
+	if subDir != "" {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "uv + submodule ready",
+		}}
+	}
+	if repair {
+		if err := installSkillsRefFn(); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: fmt.Sprintf("uv tool install skills-ref failed: %v", err),
+				Hint:    `try manually: "uv tool install skills-ref"`,
+			}}
+		}
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckFixed,
+			Message: "installed skills-ref via uv tool install",
+		}}
+	}
+	return []domain.DoctorCheck{{
+		Name: "skills-ref", Status: domain.CheckWarn,
+		Message: "uv found but skills-ref not installed",
+		Hint:    `run "amadeus doctor --repair" or "uv tool install skills-ref"`,
+	}}
 }
 
 // checkConfig validates that config.yaml exists and can be loaded.

@@ -323,18 +323,18 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false)
 
-	// then: should have 16 results
-	if len(results) != 16 {
+	// then: should have 17 results
+	if len(results) != 17 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 16 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 17 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "linear-mcp", "claude-inference", "context-budget", "success-rate"}
+	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "linear-mcp", "claude-inference", "context-budget", "skills-ref", "success-rate"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -365,7 +365,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir, &domain.NopLogger{})
+	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir, &domain.NopLogger{}, false)
 
 	// then: domain.doctor span should exist
 	spans := exp.GetSpans()
@@ -373,15 +373,15 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "domain.doctor" {
 			found = true
-			// Should have 16 doctor.check events (one per check)
+			// Should have 17 doctor.check events (one per check)
 			eventCount := 0
 			for _, event := range s.Events {
 				if event.Name == "doctor.check" {
 					eventCount++
 				}
 			}
-			if eventCount != 16 {
-				t.Errorf("expected 16 doctor.check events, got %d", eventCount)
+			if eventCount != 17 {
+				t.Errorf("expected 17 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -493,15 +493,15 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{})
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false)
 
-	// then: should have 16 results
-	if len(results) != 16 {
+	// then: should have 17 results
+	if len(results) != 17 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 16 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 17 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
@@ -536,7 +536,7 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when: pass a nonexistent claude command
-	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{})
+	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false)
 
 	// then: claude-auth, Linear MCP, and claude-inference should be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -782,7 +782,7 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, repoRoot, &domain.NopLogger{})
+	results := runDoctor(ctx, configPath, repoRoot, &domain.NopLogger{}, false)
 
 	// then: success-rate check should be present
 	var found bool
@@ -816,7 +816,7 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{})
+	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false)
 
 	// then: claude-auth, linear-mcp, and claude-inference should be OK
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -923,7 +923,7 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 
 	// given: stream-json with many tools/skills/plugins + large hook output
 	var lines []string
-	lines = append(lines, `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Bash","Glob","Grep","Agent","mcp__a__t1","mcp__b__t2","mcp__c__t3","mcp__d__t4","mcp__e__t5","mcp__f__t6","mcp__g__t7","mcp__h__t8"],"skills":["s1","s2","s3","s4","s5","s6","s7","s8","s9","s10","s11","s12","s13","s14","s15","s16","s17","s18","s19","s20","s21","s22","s23","s24","s25","s26","s27","s28","s29","s30","s31","s32","s33","s34","s35","s36","s37","s38","s39","s40"],"plugins":["p1","p2","p3","p4","p5","p6","p7","p8"],"mcp_servers":[{"name":"a","status":"connected"},{"name":"b","status":"connected"},{"name":"c","status":"connected"},{"name":"d","status":"connected"},{"name":"e","status":"connected"},{"name":"f","status":"connected"}]}`)
+	lines = append(lines, `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Bash","Glob","Grep","Agent","mcp__a__t1","mcp__b__t2","mcp__c__t3","mcp__d__t4","mcp__e__t5","mcp__f__t6","mcp__g__t7","mcp__h__t8"],"skills":["s1","s2","s3","s4","s5","s6","s7","s8","s9","s10","s11","s12","s13","s14","s15","s16","s17","s18","s19","s20","s21","s22","s23","s24","s25","s26","s27","s28","s29","s30","s31","s32","s33","s34","s35","s36","s37","s38","s39","s40"],"plugins":[{"name":"p1"},{"name":"p2"},{"name":"p3"},{"name":"p4"},{"name":"p5"},{"name":"p6"},{"name":"p7"},{"name":"p8"}],"mcp_servers":[{"name":"a","status":"connected"},{"name":"b","status":"connected"},{"name":"c","status":"connected"},{"name":"d","status":"connected"},{"name":"e","status":"connected"},{"name":"f","status":"connected"}]}`)
 	// Add large hook response (simulate ~80K chars of hook context)
 	largeStdout := strings.Repeat("x", 80000)
 	lines = append(lines, fmt.Sprintf(`{"type":"system","subtype":"hook_response","hook_id":"h1","stdout":"%s","exit_code":0}`, largeStdout))
@@ -976,7 +976,7 @@ func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
 	t.Parallel()
 
 	// given: stream with many skills (exceeds threshold)
-	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"}]}`
+	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":[{"name":"p1"},{"name":"p2"},{"name":"p3"},{"name":"p4"},{"name":"p5"}],"mcp_servers":[{"name":"linear","status":"connected"}]}`
 	streamJSON := initMsg + "\n"
 
 	// when
