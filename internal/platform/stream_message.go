@@ -41,13 +41,19 @@ type StreamMessage struct {
 	MCPServers []MCPServerInfo `json:"mcp_servers,omitempty"`
 	Tools      []string        `json:"tools,omitempty"`
 	Skills     []string        `json:"skills,omitempty"`
-	Plugins    []string        `json:"plugins,omitempty"`
+	Plugins    []PluginInfo    `json:"plugins,omitempty"`
 }
 
 // MCPServerInfo represents a connected MCP server from system:init.
 type MCPServerInfo struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
+}
+
+// PluginInfo represents a loaded plugin from system:init.
+type PluginInfo struct {
+	Name string `json:"name"`
+	Path string `json:"path,omitempty"`
 }
 
 // RateLimitInfo holds rate limit details from Claude Code rate_limit_event.
