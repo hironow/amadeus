@@ -21,8 +21,9 @@ amadeus doctor [path] [flags]
 ### Options
 
 ```
-  -h, --help   help for doctor
-  -j, --json   output as JSON
+  -h, --help     help for doctor
+  -j, --json     output as JSON
+      --repair   Auto-fix repairable issues
 ```
 
 ### Options inherited from parent commands

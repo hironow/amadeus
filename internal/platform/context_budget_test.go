@@ -1,5 +1,7 @@
 package platform
 
+// white-box-reason: tests internal ContextBudget parsing from stream output
+
 import "testing"
 
 func TestContextBudgetReport_DetailedBreakdown(t *testing.T) {
