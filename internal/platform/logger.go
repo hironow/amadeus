@@ -83,6 +83,31 @@ func (l *Logger) colorPrefix(prefix, color string) string {
 	return color + prefix + ansiReset
 }
 
+// Colorize wraps text with the given ANSI color code if color output is enabled.
+// Returns plain text when color is disabled (NO_COLOR env or non-terminal output).
+func (l *Logger) Colorize(text, color string) string {
+	if l.noColor {
+		return text
+	}
+	return color + text + ansiReset
+}
+
+// StatusColor returns the ANSI color code for a doctor check status.
+func StatusColor(s domain.CheckStatus) string {
+	switch s {
+	case domain.CheckOK:
+		return ansiBoldGreen
+	case domain.CheckWarn:
+		return ansiYellow
+	case domain.CheckFail:
+		return ansiBoldRed
+	case domain.CheckSkip:
+		return ansiGray
+	default:
+		return ""
+	}
+}
+
 func (l *Logger) logLine(prefix, color, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")

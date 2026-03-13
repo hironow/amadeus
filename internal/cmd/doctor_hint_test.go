@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 )
 
 // --- STRUCTURAL tests: Hint field rendering ---
@@ -62,7 +63,8 @@ func TestPrintDoctorText_ShowsHint(t *testing.T) {
 
 	// when
 	var buf bytes.Buffer
-	_ = printDoctorText(&buf, results)
+	logger := platform.NewLogger(&buf, false)
+	_ = printDoctorText(&buf, logger, results)
 
 	// then
 	if !strings.Contains(buf.String(), "hint: run init") {

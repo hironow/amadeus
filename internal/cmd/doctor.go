@@ -45,7 +45,7 @@ hint recommends adjusting .claude/settings.json.`,
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)
 			}
-			return printDoctorText(cmd.ErrOrStderr(), results)
+			return printDoctorText(cmd.ErrOrStderr(), logger, results)
 		},
 	}
 
@@ -83,13 +83,14 @@ func printDoctorJSON(w io.Writer, results []domain.DoctorCheck) error {
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []domain.DoctorCheck) error {
+func printDoctorText(w io.Writer, logger *platform.Logger, results []domain.DoctorCheck) error {
 	fmt.Fprintln(w, "amadeus doctor — integrity health check")
 	fmt.Fprintln(w)
 
 	var fails, skips, warns int
 	for _, r := range results {
-		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		label := logger.Colorize(fmt.Sprintf("%-4s", r.Status.StatusLabel()), platform.StatusColor(r.Status))
+		fmt.Fprintf(w, "  [%s] %-16s %s\n", label, r.Name, r.Message)
 		if r.Hint != "" {
 			fmt.Fprintf(w, "         %-16s hint: %s\n", "", r.Hint)
 		}

@@ -68,8 +68,13 @@ func NewShellCmd(ctx context.Context, cmdLine string, args ...string) *exec.Cmd 
 	allArgs = append(allArgs, cmdArgs...)
 	allArgs = append(allArgs, args...)
 	cmd := exec.CommandContext(ctx, bin, allArgs...)
+	// Always start from os.Environ() and filter CLAUDECODE to prevent
+	// nested-session errors when invoking the Claude CLI as a subprocess.
+	base := FilterEnv(os.Environ(), "CLAUDECODE")
 	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
+		cmd.Env = append(base, env...)
+	} else {
+		cmd.Env = base
 	}
 	return cmd
 }
@@ -79,6 +84,19 @@ func NewShellCmd(ctx context.Context, cmdLine string, args ...string) *exec.Cmd 
 func LookPathShell(cmdLine string) (string, error) {
 	_, bin, _ := ParseShellCommand(cmdLine)
 	return exec.LookPath(bin)
+}
+
+// FilterEnv returns a copy of env with all entries matching "name=..." removed.
+// Used to strip environment variables (e.g. CLAUDECODE) before invoking subprocesses.
+func FilterEnv(env []string, name string) []string {
+	prefix := name + "="
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // isEnvKey checks if s is a valid environment variable name ([A-Za-z_][A-Za-z0-9_]*).
