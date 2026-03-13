@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestFileHandoverWriter_WritesMarkdown(t *testing.T) {
@@ -18,7 +19,7 @@ func TestFileHandoverWriter_WritesMarkdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := &FileHandoverWriter{}
+	w := &session.FileHandoverWriter{}
 	state := domain.HandoverState{
 		Tool:       "amadeus",
 		Operation:  "divergence",
@@ -64,7 +65,7 @@ func TestFileHandoverWriter_OverwritesPrevious(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := &FileHandoverWriter{}
+	w := &session.FileHandoverWriter{}
 	first := domain.HandoverState{
 		Tool: "amadeus", Operation: "divergence",
 		Timestamp: time.Now(), InProgress: "first",
@@ -96,7 +97,7 @@ func TestFileHandoverWriter_RespectsContextCancellation(t *testing.T) {
 	cancel()
 
 	dir := t.TempDir()
-	w := &FileHandoverWriter{}
+	w := &session.FileHandoverWriter{}
 	state := domain.HandoverState{
 		Tool: "amadeus", Operation: "divergence", Timestamp: time.Now(),
 	}
