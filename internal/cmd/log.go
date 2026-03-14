@@ -16,7 +16,21 @@ func newLogCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "log [path]",
 		Short: "Show divergence log",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Display the divergence log from the event store.
+
+Reads events from .gate/events/ and presents a chronological log of
+divergence checks, D-Mail generation, and sync activity. If [path] is
+omitted, the current working directory is used. Use --json to output
+structured JSON for piping into downstream commands.`,
+		Example: `  # Show divergence log for current directory
+  amadeus log
+
+  # Output as JSON for scripting
+  amadeus log --json
+
+  # Show log for a specific project
+  amadeus log /path/to/project`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			jsonOut, _ := cmd.Flags().GetBool("json")

@@ -15,7 +15,21 @@ func newValidateCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate [path]",
 		Short: "Validate config file",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Validate the amadeus configuration file.
+
+Reads .gate/config.yaml (or the path specified by --config) and checks
+all fields against the configuration schema. Reports individual
+validation errors with [FAIL] markers. If [path] is omitted, the
+current working directory is used.`,
+		Example: `  # Validate config in current directory
+  amadeus validate
+
+  # Validate a specific project
+  amadeus validate /path/to/project
+
+  # Validate a specific config file
+  amadeus validate --config /path/to/config.yaml`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 

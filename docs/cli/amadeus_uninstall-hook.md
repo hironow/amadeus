@@ -2,8 +2,22 @@
 
 Remove post-merge git hook
 
+### Synopsis
+
+Remove the amadeus post-merge git hook from the current repository.
+
+Only removes the hook if it was installed by amadeus. The command must
+be run from within a git repository.
+
 ```
 amadeus uninstall-hook [flags]
+```
+
+### Examples
+
+```
+  # Remove the post-merge hook
+  amadeus uninstall-hook
 ```
 
 ### Options
@@ -24,5 +38,4 @@ amadeus uninstall-hook [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
-
+* [amadeus](amadeus.md)  - Divergence meter for your codebase

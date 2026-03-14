@@ -18,7 +18,12 @@ func newSyncCommand() *cobra.Command {
 		Use:   "sync [path]",
 		Short: "Show D-Mail sync status (JSON)",
 		Long:  "Output unsynced D-Mails and pending Linear comments as JSON.",
-		Args:  cobra.MaximumNArgs(1),
+		Example: `  # Show sync status for current directory
+  amadeus sync
+
+  # Show sync status for a specific project
+  amadeus sync /path/to/project`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			repoRoot, err := resolveTargetDir(args)

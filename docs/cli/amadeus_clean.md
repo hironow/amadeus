@@ -10,6 +10,19 @@ Delete the .gate/ directory to reset to a clean state. Use 'amadeus init' to rei
 amadeus clean [path] [flags]
 ```
 
+### Examples
+
+```
+  # Clean current directory (interactive confirmation)
+  amadeus clean
+
+  # Clean a specific project directory
+  amadeus clean /path/to/project
+
+  # Skip confirmation prompt
+  amadeus clean --yes
+```
+
 ### Options
 
 ```
@@ -29,5 +42,4 @@ amadeus clean [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
-
+* [amadeus](amadeus.md)  - Divergence meter for your codebase
