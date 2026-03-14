@@ -2,11 +2,13 @@ package session
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -189,3 +191,48 @@ func normalizeToRFC3339(s string) string {
 	}
 	return s
 }
+
+// IndexWriter writes domain.IndexEntry records to a JSONL index file.
+type IndexWriter struct{}
+
+// Append appends entries to the index file using flock for concurrency safety.
+func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	var buf []byte
+	for _, e := range entries {
+		line, err := json.Marshal(e)
+		if err != nil {
+			return fmt.Errorf("marshal index entry: %w", err)
+		}
+		buf = append(buf, line...)
+		buf = append(buf, '\n')
+	}
+
+	lockPath := indexPath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("open lock: %w", err)
+	}
+	defer lockFile.Close()
+
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("flock: %w", err)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
+	f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("open index: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(buf); err != nil {
+		return fmt.Errorf("write index: %w", err)
+	}
+
+	return nil
+}
+

@@ -1,11 +1,15 @@
 package session_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -150,3 +154,134 @@ func TestExtractMeta_NoIssueID(t *testing.T) {
 		t.Errorf("issue: got %q, want empty", entry.Issue)
 	}
 }
+
+func TestIndexWriter_Append_CreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.jsonl")
+
+	w := &session.IndexWriter{}
+	entries := []domain.IndexEntry{
+		{Timestamp: "2026-03-10T14:30:00Z", Operation: "divergence", Issue: "ENG-1", Status: "success", Tool: "amadeus", Path: "archive/report.md", Summary: "test"},
+	}
+
+	if err := w.Append(indexPath, entries); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	data, _ := os.ReadFile(indexPath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+
+	var got domain.IndexEntry
+	if err := json.Unmarshal([]byte(lines[0]), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Issue != "ENG-1" {
+		t.Errorf("issue: got %q, want %q", got.Issue, "ENG-1")
+	}
+}
+
+func TestIndexWriter_Append_AppendsToExisting(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.jsonl")
+
+	w := &session.IndexWriter{}
+	e1 := []domain.IndexEntry{{Timestamp: "t1", Operation: "o1", Tool: "amadeus", Path: "p1", Summary: "s1"}}
+	e2 := []domain.IndexEntry{{Timestamp: "t2", Operation: "o2", Tool: "amadeus", Path: "p2", Summary: "s2"}}
+
+	w.Append(indexPath, e1)
+	w.Append(indexPath, e2)
+
+	data, _ := os.ReadFile(indexPath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d", len(lines))
+	}
+}
+
+func TestIndexWriter_Append_ValidJSON(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.jsonl")
+
+	w := &session.IndexWriter{}
+	entries := []domain.IndexEntry{
+		{Timestamp: "t1", Operation: "o1", Tool: "amadeus", Path: "p1", Summary: "summary with \"quotes\""},
+		{Timestamp: "t2", Operation: "o2", Tool: "amadeus", Path: "p2", Summary: "s2"},
+	}
+	w.Append(indexPath, entries)
+
+	data, _ := os.ReadFile(indexPath)
+	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var e domain.IndexEntry
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Errorf("line %d invalid JSON: %v", i, err)
+		}
+	}
+}
+
+func TestIndexWriter_Append_EmptyEntries(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.jsonl")
+
+	w := &session.IndexWriter{}
+	if err := w.Append(indexPath, nil); err != nil {
+		t.Fatalf("append nil: %v", err)
+	}
+
+	_, statErr := os.Stat(indexPath)
+	if !os.IsNotExist(statErr) {
+		t.Errorf("expected no file for empty entries")
+	}
+}
+
+func TestIndexWriter_Append_ConcurrentSafe(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.jsonl")
+
+	w := &session.IndexWriter{}
+	const goroutines = 10
+	const entriesPerGoroutine = 5
+
+	var wg sync.WaitGroup
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			var entries []domain.IndexEntry
+			for j := 0; j < entriesPerGoroutine; j++ {
+				entries = append(entries, domain.IndexEntry{
+					Timestamp: fmt.Sprintf("t-%d-%d", id, j),
+					Operation: "divergence",
+					Tool:      "amadeus",
+					Path:      fmt.Sprintf("p-%d-%d", id, j),
+					Summary:   fmt.Sprintf("s-%d-%d", id, j),
+				})
+			}
+			if err := w.Append(indexPath, entries); err != nil {
+				t.Errorf("goroutine %d: %v", id, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	data, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	expected := goroutines * entriesPerGoroutine
+	if len(lines) != expected {
+		t.Fatalf("expected %d lines, got %d", expected, len(lines))
+	}
+
+	for i, line := range lines {
+		var e domain.IndexEntry
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Errorf("line %d invalid JSON: %v\nline: %s", i, err, line)
+		}
+	}
+}
+
