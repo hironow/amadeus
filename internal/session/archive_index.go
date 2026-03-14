@@ -2,8 +2,14 @@ package session
 
 import (
 	"bufio"
+	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 const maxSummaryLen = 100
@@ -56,4 +62,130 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max]
+}
+
+var (
+	issueIDRe = regexp.MustCompile(`[A-Z]+-\d+`)
+	dateRe    = regexp.MustCompile(`(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})`)
+	statusRe  = regexp.MustCompile(`\*\*Status\*\*:\s*(success|failed|skipped)`)
+)
+
+var opFromTool = map[string]string{
+	"paintress": "expedition",
+	"amadeus":   "divergence",
+	"sightjack": "wave",
+	"phonewave": "dmail",
+}
+
+// ExtractMeta populates a domain.IndexEntry from a markdown file, extracting
+// operation type, issue ID, status, timestamp, and summary.
+func ExtractMeta(filePath, stateDir, tool string) domain.IndexEntry {
+	relPath, err := filepath.Rel(stateDir, filePath)
+	if err != nil {
+		relPath = filePath
+	}
+
+	entry := domain.IndexEntry{
+		Tool:    tool,
+		Path:    relPath,
+		Summary: ExtractSummary(filePath),
+	}
+
+	// Determine operation from first path segment.
+	firstSeg := relPath
+	if idx := strings.IndexByte(relPath, filepath.Separator); idx >= 0 {
+		firstSeg = relPath[:idx]
+	}
+	if idx := strings.IndexByte(firstSeg, '/'); idx >= 0 {
+		firstSeg = firstSeg[:idx]
+	}
+	switch firstSeg {
+	case "archive":
+		entry.Operation = "dmail"
+	default:
+		entry.Operation = opFromTool[tool]
+	}
+
+	data, readErr := os.ReadFile(filePath)
+	if readErr != nil {
+		return entry
+	}
+	content := string(data)
+
+	if m := issueIDRe.FindString(content); m != "" {
+		entry.Issue = m
+	}
+
+	if m := statusRe.FindStringSubmatch(content); len(m) > 1 {
+		entry.Status = m[1]
+	} else {
+		entry.Status = "unknown"
+	}
+
+	entry.Timestamp = extractTimestamp(filePath, content)
+	return entry
+}
+
+func extractTimestamp(filePath, content string) string {
+	lines := strings.Split(content, "\n")
+	inFM := false
+	for i, line := range lines {
+		if i == 0 && strings.TrimSpace(line) == "---" {
+			inFM = true
+			continue
+		}
+		if inFM {
+			if strings.TrimSpace(line) == "---" {
+				break
+			}
+			trimmed := strings.TrimSpace(line)
+			// Priority 1a: updated_at in frontmatter
+			if strings.HasPrefix(trimmed, "updated_at:") {
+				val := strings.TrimSpace(strings.TrimPrefix(trimmed, "updated_at:"))
+				val = strings.Trim(val, "\"'")
+				if val != "" {
+					return val
+				}
+			}
+			// Priority 1b: date in frontmatter (normalize bare YYYY-MM-DD to RFC3339)
+			if strings.HasPrefix(trimmed, "date:") {
+				val := strings.TrimSpace(strings.TrimPrefix(trimmed, "date:"))
+				val = strings.Trim(val, "\"'")
+				if val != "" {
+					return normalizeToRFC3339(val)
+				}
+			}
+		}
+	}
+
+	// Priority 2: **Date**: line in body
+	for _, line := range lines {
+		if strings.Contains(line, "**Date**:") {
+			if m := dateRe.FindStringSubmatch(line); len(m) > 2 {
+				return fmt.Sprintf("%sT%sZ", m[1], m[2])
+			}
+		}
+	}
+
+	// Priority 3: date in filename
+	dateOnlyRe := regexp.MustCompile(`(\d{4}-\d{2}-\d{2})`)
+	fname := filepath.Base(filePath)
+	if m := dateOnlyRe.FindStringSubmatch(fname); len(m) > 1 {
+		return fmt.Sprintf("%sT00:00:00Z", m[1])
+	}
+
+	// Priority 4: mtime
+	info, statErr := os.Stat(filePath)
+	if statErr != nil {
+		return time.Now().UTC().Format(time.RFC3339)
+	}
+	return info.ModTime().UTC().Format(time.RFC3339)
+}
+
+func normalizeToRFC3339(s string) string {
+	dateOnlyRe := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	if dateOnlyRe.MatchString(s) {
+		return s + "T00:00:00Z"
+	}
+	return s
 }
