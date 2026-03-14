@@ -5,8 +5,8 @@ import "time"
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
 type HandoverState struct {
-	Tool         string            // "amadeus"
-	Operation    string            // "divergence"
+	Tool         string // "amadeus"
+	Operation    string // "divergence"
 	Timestamp    time.Time
 	InProgress   string            // Current task description
 	Completed    []string          // What was done

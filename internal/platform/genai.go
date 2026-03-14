@@ -95,9 +95,9 @@ func GenAIToolAttrs(toolName, callID string) []attribute.KeyValue {
 // Weave thread attribute keys.
 // See: https://docs.wandb.ai/guides/weave/guides/tracking/tracing/#organize-traces-into-threads
 const (
-	WeaveThreadID = attribute.Key("wandb.thread_id")
-	WeaveIsTurn   = attribute.Key("wandb.is_turn")
-	WeaveInputVal = attribute.Key("input.value")
+	WeaveThreadID  = attribute.Key("wandb.thread_id")
+	WeaveIsTurn    = attribute.Key("wandb.is_turn")
+	WeaveInputVal  = attribute.Key("input.value")
 	WeaveOutputVal = attribute.Key("output.value")
 )
 

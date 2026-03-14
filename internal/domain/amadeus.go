@@ -24,6 +24,7 @@ func (e *DriftError) Error() string {
 //	nil        → 0 (success)
 //	DriftError → 2 (drift detected)
 //	other      → 1 (runtime error)
+//
 // SilentError wraps an error whose message has already been printed to stderr
 // by the command itself. main.go should suppress output for this error
 // while still honouring the exit code via ExitCode.

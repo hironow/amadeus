@@ -283,4 +283,3 @@ func TestParseClaudeResponse_WithoutFilesRead_BackwardCompatible(t *testing.T) {
 		t.Errorf("expected nil FilesRead for old format, got %v", resp.FilesRead)
 	}
 }
-

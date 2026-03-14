@@ -31,9 +31,9 @@ func run() int {
 	defer signal.Stop(sigCh)
 
 	go func() {
-		<-sigCh        // 1st signal: cancel work
+		<-sigCh // 1st signal: cancel work
 		workCancel()
-		<-sigCh        // 2nd signal: cancel outer (NO os.Exit!)
+		<-sigCh // 2nd signal: cancel outer (NO os.Exit!)
 		outerCancel()
 	}()
 
