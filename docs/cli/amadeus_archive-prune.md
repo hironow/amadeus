@@ -38,12 +38,12 @@ amadeus archive-prune [path] [flags]
 ### Options
 
 ```
-  -d, --days int       Retention days (default 30)
-  -n, --dry-run        Dry-run mode (default behavior, explicit for scripting)
-  -x, --execute        Execute pruning (default: dry-run)
-  -h, --help           help for archive-prune
-      --rebuild-index  Rebuild archive index from existing files without pruning
-  -y, --yes            Skip confirmation prompt
+  -d, --days int        Retention days (default 30)
+  -n, --dry-run         Dry-run mode (default behavior, explicit for scripting)
+  -x, --execute         Execute pruning (default: dry-run)
+  -h, --help            help for archive-prune
+      --rebuild-index   Rebuild archive index from existing files without pruning
+  -y, --yes             Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
