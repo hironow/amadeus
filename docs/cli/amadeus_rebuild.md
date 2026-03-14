@@ -12,6 +12,16 @@ inbox.consumed events contain only metadata, not the full D-Mail content.
 amadeus rebuild [path] [flags]
 ```
 
+### Examples
+
+```
+  # Rebuild projections in current directory
+  amadeus rebuild
+
+  # Rebuild for a specific project
+  amadeus rebuild /path/to/project
+```
+
 ### Options
 
 ```

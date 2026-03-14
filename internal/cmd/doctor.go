@@ -25,6 +25,17 @@ The context-budget check estimates token consumption per category
 (tools, skills, plugins, mcp, hooks) and marks the heaviest.
 When the threshold (20,000 tokens) is exceeded, a category-specific
 hint recommends adjusting .claude/settings.json.`,
+		Example: `  # Run environment check in current directory
+  amadeus doctor
+
+  # Check a specific project directory
+  amadeus doctor /path/to/project
+
+  # JSON output for scripting
+  amadeus doctor -o json
+
+  # Auto-fix repairable issues
+  amadeus doctor --repair`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")

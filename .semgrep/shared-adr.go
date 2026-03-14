@@ -18,7 +18,7 @@ var platform struct {
 	SanitizeUTF8Slice func([]string) []string
 }
 
-func SanitizeUTF8(s string) string      { return s }
+func SanitizeUTF8(s string) string           { return s }
 func SanitizeUTF8Slice(ss []string) []string { return ss }
 
 // === ADR 0001: cobra.Command must use RunE, not Run ===

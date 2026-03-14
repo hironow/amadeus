@@ -11,6 +11,7 @@ import (
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/usecase/port"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,10 @@ Pass --execute to actually remove the files.`,
   amadeus archive-prune --days 7 --execute
 
   # JSON output for scripting
-  amadeus archive-prune -o json`,
+  amadeus archive-prune -o json
+
+  # Rebuild archive index from existing files
+  amadeus archive-prune --rebuild-index`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
@@ -52,6 +56,22 @@ Pass --execute to actually remove the files.`,
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
+			}
+
+			rebuildIndex, _ := cmd.Flags().GetBool("rebuild-index")
+			if rebuildIndex {
+				if execute || dryRunExplicit {
+					return fmt.Errorf("--rebuild-index cannot be combined with --execute or --dry-run")
+				}
+				divRoot := filepath.Join(repoRoot, domain.StateDir)
+				indexPath := filepath.Join(divRoot, "archive", "index.jsonl")
+				iw := &session.IndexWriter{}
+				n, rbErr := iw.Rebuild(indexPath, divRoot, "amadeus")
+				if rbErr != nil {
+					return fmt.Errorf("rebuild index: %w", rbErr)
+				}
+				logger.Info("Rebuilt index: %d entries → %s", n, indexPath)
+				return nil
 			}
 
 			rp, rpErr := domain.NewRepoPath(repoRoot)
@@ -97,6 +117,9 @@ Pass --execute to actually remove the files.`,
 					EventFiles:        result.EventCandidates,
 				}
 				if execute {
+					// Index archive candidates before deletion
+					indexArchiveCandidates(result.ArchiveCandidates, divRoot, logger)
+
 					eventStore := session.NewEventStore(divRoot, logger)
 					totalCount, execErr := usecase.ExecutePrune(cmd.Context(), result, eventStore, archiveOps, divRoot, logger)
 					if execErr != nil {
@@ -159,6 +182,9 @@ Pass --execute to actually remove the files.`,
 				}
 			}
 
+			// Index archive candidates before deletion
+			indexArchiveCandidates(result.ArchiveCandidates, divRoot, logger)
+
 			// usecase → execute prune + emit event
 			eventStore := session.NewEventStore(divRoot, logger)
 			totalCount, err := usecase.ExecutePrune(cmd.Context(), result, eventStore, archiveOps, divRoot, logger)
@@ -175,6 +201,28 @@ Pass --execute to actually remove the files.`,
 	cmd.Flags().BoolP("execute", "x", false, "Execute pruning (default: dry-run)")
 	cmd.Flags().BoolP("dry-run", "n", false, "Dry-run mode (default behavior, explicit for scripting)")
 	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().Bool("rebuild-index", false, "Rebuild archive index from existing files without pruning")
 
 	return cmd
+}
+
+// indexArchiveCandidates indexes .md archive candidates before deletion.
+func indexArchiveCandidates(candidates []port.PruneCandidate, divRoot string, logger domain.Logger) {
+	var indexEntries []domain.IndexEntry
+	for _, c := range candidates {
+		if filepath.Ext(c.Path) != ".md" {
+			continue
+		}
+		indexEntries = append(indexEntries, session.ExtractMeta(c.Path, divRoot, "amadeus"))
+	}
+	if len(indexEntries) == 0 {
+		return
+	}
+	indexPath := filepath.Join(divRoot, "archive", "index.jsonl")
+	iw := &session.IndexWriter{}
+	if err := iw.Append(indexPath, indexEntries); err != nil {
+		logger.Warn("index append: %v", err)
+	} else {
+		logger.Info("Indexed %d entries → %s", len(indexEntries), indexPath)
+	}
 }

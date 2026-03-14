@@ -14,7 +14,15 @@ func newCleanCommand() *cobra.Command {
 		Use:   "clean [path]",
 		Short: "Remove state directory (.gate/)",
 		Long:  "Delete the .gate/ directory to reset to a clean state. Use 'amadeus init' to reinitialize.",
-		Args:  cobra.MaximumNArgs(1),
+		Example: `  # Clean current directory (interactive confirmation)
+  amadeus clean
+
+  # Clean a specific project directory
+  amadeus clean /path/to/project
+
+  # Skip confirmation prompt
+  amadeus clean --yes`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {

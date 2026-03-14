@@ -16,7 +16,28 @@ func newInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init [path]",
 		Short: "Initialize .gate directory",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Initialize the .gate/ state directory for amadeus divergence tracking.
+
+Creates the directory structure required by amadeus: config.yaml,
+events/, .run/, archive/, and insights/. If [path] is omitted, the
+current working directory is used. Use --force to reinitialize an
+existing .gate/ directory.
+
+Optionally configure an OpenTelemetry backend (Jaeger or Weave) with
+the --otel-backend flag. The generated .otel.env file is written into
+.gate/ and loaded automatically on subsequent runs.`,
+		Example: `  # Initialize in current directory
+  amadeus init
+
+  # Initialize a specific project directory
+  amadeus init /path/to/project
+
+  # Reinitialize (overwrite existing .gate/)
+  amadeus init --force
+
+  # Initialize with Jaeger OTel backend
+  amadeus init --otel-backend jaeger`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {

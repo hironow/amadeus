@@ -7,17 +7,17 @@ import (
 
 // StreamMessage represents a single NDJSON line from Claude Code --output-format stream-json.
 type StreamMessage struct {
-	Type       string          `json:"type"`
-	Subtype    string          `json:"subtype,omitempty"`
-	UUID       string          `json:"uuid,omitempty"`
-	SessionID  string          `json:"session_id,omitempty"`
-	Message    json.RawMessage `json:"message,omitempty"`
-	Result     string          `json:"result,omitempty"`
-	Usage      *Usage          `json:"usage,omitempty"`
-	TotalCost  float64         `json:"total_cost_usd,omitempty"`
-	NumTurns   int             `json:"num_turns,omitempty"`
-	Duration   int64           `json:"duration_ms,omitempty"`
-	IsError    bool            `json:"is_error,omitempty"`
+	Type            string          `json:"type"`
+	Subtype         string          `json:"subtype,omitempty"`
+	UUID            string          `json:"uuid,omitempty"`
+	SessionID       string          `json:"session_id,omitempty"`
+	Message         json.RawMessage `json:"message,omitempty"`
+	Result          string          `json:"result,omitempty"`
+	Usage           *Usage          `json:"usage,omitempty"`
+	TotalCost       float64         `json:"total_cost_usd,omitempty"`
+	NumTurns        int             `json:"num_turns,omitempty"`
+	Duration        int64           `json:"duration_ms,omitempty"`
+	IsError         bool            `json:"is_error,omitempty"`
 	StopReason      string          `json:"stop_reason,omitempty"`
 	ToolUseID       string          `json:"tool_use_id,omitempty"`
 	ParentToolUseID string          `json:"parent_tool_use_id,omitempty"`

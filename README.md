@@ -157,7 +157,8 @@ amadeus run [--base main]
     |   +-- convergence.md    <- Convergence insights (Why enriched from archive D-Mails)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
-    +-- archive/              <- All D-Mails (gitignored)
+    +-- archive/              <- Permanent D-Mail audit trail (git-tracked)
+    |   +-- index.jsonl       <- Archive index (JSONL, metadata of pruned/existing .md files)
 ```
 
 ### Scoring Axes
@@ -248,90 +249,36 @@ Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Subcommands
 
-Running `amadeus` without a subcommand defaults to `run` (divergence check + D-Mail waiting loop). This is the primary operation — measuring design drift and routing corrective D-Mails.
+Running `amadeus` without a subcommand defaults to `run` (divergence check + D-Mail waiting loop).
 
 | Command | Description |
 |---------|-------------|
-| `amadeus run` | Divergence check + D-Mail waiting loop (add `--base main` for PR convergence daemon) |
-| `amadeus init` | Initialize `.gate/` directory with default config (`--force` to regenerate) |
-| `amadeus config show` | Show current configuration values |
-| `amadeus config set` | Update configuration values (e.g., `amadeus config set lang en`) |
-| `amadeus validate` | Validate `.gate/config.yaml` |
-| `amadeus doctor` | Check environment health (git, git-remote, gh, claude, config, fsnotify, context-budget with per-item diagnostics) |
-| `amadeus log` | Print check history and D-Mail log |
-| `amadeus sync` | Show D-Mail × Issue comment sync status (JSON) |
-| `amadeus mark-commented <name> <id>` | Record a D-Mail × Issue pair as commented |
-| `amadeus status [path]` | Show amadeus operational status |
-| `amadeus clean [path]` | Remove state directory (`.gate/`) |
-| `amadeus rebuild [path]` | Rebuild projections from event store |
-| `amadeus archive-prune` | Prune old archived D-Mail files |
-| `amadeus install-hook` | Install git post-merge hook |
-| `amadeus uninstall-hook` | Remove git post-merge hook |
-| `amadeus version` | Print version, commit, and build date |
-| `amadeus update` | Self-update to the latest release |
+| `run` | Divergence check + D-Mail waiting loop |
+| `init` | Initialize `.gate/` directory |
+| `doctor` | Check environment health |
+| `config show` / `config set` | View or update configuration |
+| `validate` | Validate config file |
+| `log` | Print check history and D-Mail log |
+| `sync` | Show D-Mail × Issue comment sync status |
+| `mark-commented` | Record a D-Mail × Issue pair as commented |
+| `status` | Show operational status |
+| `clean` | Remove state directory |
+| `rebuild` | Rebuild projections from event store |
+| `archive-prune` | Prune old archived D-Mail files |
+| `install-hook` / `uninstall-hook` | Manage git post-merge hook |
+| `version` | Print version info |
+| `update` | Self-update to the latest release |
 
-## Usage
+All commands accept an optional `[path]` argument (defaults to cwd). For flags, examples, and full reference per subcommand, see [docs/cli/](docs/cli/).
 
-All commands accept an optional `[path]` argument. When omitted, the current working directory is used.
+## Quick Start
 
 ```bash
-# One-shot check + D-Mail waiting loop (impl feedback from divergence scoring)
-amadeus run
-
-# With PR convergence daemon (requires gh CLI)
-amadeus run --base main
-
-# Skip approval gate
-amadeus run --auto-approve
-
-# Full calibration
-amadeus run -f
-
-# Dry run (build prompt only, skip Claude call)
-amadeus run -n
-
-# Custom waiting timeout (0 = 24h safety cap, negative = disable waiting)
-amadeus run --wait-timeout 1h
-
-# Show/set configuration
-amadeus config show
-amadeus config set lang en
-amadeus config set full_check.interval 20
-
-# Show D-Mail × Issue comment sync status
-amadeus sync
-
-# Mark a D-Mail × Issue pair as commented
-amadeus mark-commented feedback-001 MY-250
-
-# Mark-commented with JSON output
-amadeus mark-commented feedback-001 MY-250 -j
-
-# Prune archived D-Mails older than 90 days (dry run)
-amadeus archive-prune -d 90 -n
-
-# JSON output for scripting
-amadeus log -j | jq '.dmails[] | select(.severity == "high")'
-
-# Version info as JSON
-amadeus version -j
-
-# Check for updates without installing
-amadeus update -C
+amadeus init            # set up .gate/
+amadeus run             # divergence check + D-Mail loop
+amadeus run -n          # dry run
+amadeus run --base main # PR convergence daemon
 ```
-
-## Options
-
-### Global Flags
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--config` | `-c` | `.gate/config.yaml` | Config file path |
-| `--verbose` | `-v` | `false` | Verbose logging |
-| `--output` | `-o` | `text` | Output format: `text` or `json` |
-| `--lang` | `-l` | | Output language (`ja`, `en`) |
-
-For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
 ## Exit Codes
 

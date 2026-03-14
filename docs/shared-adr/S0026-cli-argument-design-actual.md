@@ -12,8 +12,8 @@ diverged from actual implementation:
 - phonewave `run`: S0024 said `[paths...]` (variadic), implementation is `NoArgs`
 - sightjack `run`/`scan`: S0024 said `<path>` (required), implementation is `[path]` (optional, defaults to cwd)
 
-paintress `run <repo-path>` (required) and amadeus `check [path]` (optional)
-matched S0024 and remain unchanged.
+paintress `run [path]` (optional, defaults to cwd) and amadeus `check [path]` (optional)
+are consistent with sightjack's pattern.
 
 ## Decision
 
@@ -25,7 +25,7 @@ subcommand uses the argument shape that matches its operational semantics:
 | phonewave | `run` | (none) | `NoArgs` | Daemon reads config for watch directories; no positional args needed |
 | sightjack | `scan [path]` | optional | `MaximumNArgs(1)` | Defaults to cwd; explicit path optional for convenience |
 | sightjack | `run [path]` | optional | `MaximumNArgs(1)` | Same as scan (convergence mode) |
-| paintress | `run <repo-path>` | required | `ExactArgs(1)` | Prevents accidental expeditions in wrong directory |
+| paintress | `run [path]` | optional | `MaximumNArgs(1)` | Defaults to cwd; consistent with other tools |
 | amadeus | `check [path]` | optional | `MaximumNArgs(1)` | Drift detection in current project; cwd default appropriate |
 
 ### Design Rationale
@@ -36,8 +36,8 @@ subcommand uses the argument shape that matches its operational semantics:
 - **sightjack** defaults to cwd because scan/run targets the current repository,
   and requiring an explicit path adds friction without preventing mistakes
   (the user is already in the repository).
-- **paintress** retains required path because expeditions execute code changes
-  and an accidental run in the wrong directory is destructive.
+- **paintress** defaults to cwd for consistency with sightjack and amadeus.
+  The expedition target is validated before execution.
 - **amadeus** defaults to cwd for the same reason as sightjack — integrity
   checks are read-only and safe to run in the current directory.
 
@@ -50,10 +50,9 @@ subcommand uses the argument shape that matches its operational semantics:
 
 ### Negative
 
-- No single argument pattern across all tools
-- New users must learn per-tool conventions
+- phonewave's `init`/`add`/`remove` still require explicit paths (daemon management commands)
 
 ### Neutral
 
-- phonewave's config-based approach and paintress's explicit path are the two
-  poles; sightjack and amadeus share the optional-with-cwd-default middle ground
+- sightjack, paintress, and amadeus share `[path]` optional with cwd default;
+  phonewave uses `NoArgs` for daemon commands and `<repo-path>` required for repo management

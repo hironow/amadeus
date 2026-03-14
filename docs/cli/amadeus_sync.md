@@ -10,6 +10,16 @@ Output unsynced D-Mails and pending Linear comments as JSON.
 amadeus sync [path] [flags]
 ```
 
+### Examples
+
+```
+  # Show sync status for current directory
+  amadeus sync
+
+  # Show sync status for a specific project
+  amadeus sync /path/to/project
+```
+
 ### Options
 
 ```

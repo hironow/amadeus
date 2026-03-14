@@ -10,6 +10,19 @@ Mark a D-Mail × Issue pair as commented in the sync state.
 amadeus mark-commented <dmail-name> <issue-id> [path] [flags]
 ```
 
+### Examples
+
+```
+  # Mark a D-Mail as commented on an issue
+  amadeus mark-commented calibration-2024-01-15 PROJ-42
+
+  # Mark in a specific project directory
+  amadeus mark-commented calibration-2024-01-15 PROJ-42 /path/to/project
+
+  # Output confirmation as JSON
+  amadeus mark-commented calibration-2024-01-15 PROJ-42 --json
+```
+
 ### Options
 
 ```

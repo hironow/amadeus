@@ -19,7 +19,15 @@ func newMarkCommentedCommand() *cobra.Command {
 		Use:   "mark-commented <dmail-name> <issue-id> [path]",
 		Short: "Record that a D-Mail has been posted as a comment",
 		Long:  "Mark a D-Mail × Issue pair as commented in the sync state.",
-		Args:  cobra.RangeArgs(2, 3),
+		Example: `  # Mark a D-Mail as commented on an issue
+  amadeus mark-commented calibration-2024-01-15 PROJ-42
+
+  # Mark in a specific project directory
+  amadeus mark-commented calibration-2024-01-15 PROJ-42 /path/to/project
+
+  # Output confirmation as JSON
+  amadeus mark-commented calibration-2024-01-15 PROJ-42 --json`,
+		Args: cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dmailName := args[0]
 			issueID := args[1]

@@ -17,6 +17,11 @@ func newRebuildCommand() *cobra.Command {
 		Long: "Replays all events from .gate/events/ to regenerate .run/ projection files and archive/ D-Mails from scratch.\n" +
 			"NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed because\n" +
 			"inbox.consumed events contain only metadata, not the full D-Mail content.",
+		Example: `  # Rebuild projections in current directory
+  amadeus rebuild
+
+  # Rebuild for a specific project
+  amadeus rebuild /path/to/project`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot, err := resolveTargetDir(args)

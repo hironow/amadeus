@@ -10,12 +10,12 @@ import (
 
 func TestInsightEntry_Format(t *testing.T) {
 	entry := domain.InsightEntry{
-		Title: "auth module CI flaky",
-		What:  "3 consecutive CI failures on auth module changes",
-		Why:   "OAuth token refresh times out in GitHub Actions network",
-		How:   "Extend OAuth timeout to 30s in CI environment",
-		When:  "CI environment with auth module changes",
-		Who:   "paintress expedition #28, #30, #31",
+		Title:       "auth module CI flaky",
+		What:        "3 consecutive CI failures on auth module changes",
+		Why:         "OAuth token refresh times out in GitHub Actions network",
+		How:         "Extend OAuth timeout to 30s in CI environment",
+		When:        "CI environment with auth module changes",
+		Who:         "paintress expedition #28, #30, #31",
 		Constraints: "May self-resolve with OAuth provider changes",
 		Extra: map[string]string{
 			"failure-type":   "ci-red",

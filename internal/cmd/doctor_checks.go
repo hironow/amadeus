@@ -922,4 +922,3 @@ func checkContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 
 	return result
 }
-

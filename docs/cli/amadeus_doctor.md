@@ -18,6 +18,22 @@ hint recommends adjusting .claude/settings.json.
 amadeus doctor [path] [flags]
 ```
 
+### Examples
+
+```
+  # Run environment check in current directory
+  amadeus doctor
+
+  # Check a specific project directory
+  amadeus doctor /path/to/project
+
+  # JSON output for scripting
+  amadeus doctor -o json
+
+  # Auto-fix repairable issues
+  amadeus doctor --repair
+```
+
 ### Options
 
 ```
