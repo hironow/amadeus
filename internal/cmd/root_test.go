@@ -117,3 +117,19 @@ func TestSubcommand_ShortAliases(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRootCommand_NoColorFlag(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when
+	f := rootCmd.PersistentFlags().Lookup("no-color")
+
+	// then
+	if f == nil {
+		t.Fatal("--no-color PersistentFlag not found")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--no-color default = %q, want %q", f.DefValue, "false")
+	}
+}

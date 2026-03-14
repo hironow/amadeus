@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/cmd"
+	"github.com/spf13/cobra"
 )
 
 func TestInitCommand_AlreadyInitialized(t *testing.T) {
@@ -110,5 +111,29 @@ func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
 	// then
 	if execErr != nil {
 		t.Fatalf("init --force failed: %v", execErr)
+	}
+}
+
+func TestInitCommand_OtelFlags_Exist(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when — find init subcommand
+	var initCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "init" {
+			initCmd = sub
+			break
+		}
+	}
+	if initCmd == nil {
+		t.Fatal("init subcommand not found")
+	}
+
+	// then — otel flags exist
+	for _, flag := range []string{"otel-backend", "otel-entity", "otel-project"} {
+		if initCmd.Flags().Lookup(flag) == nil {
+			t.Errorf("init flag --%s not found", flag)
+		}
 	}
 }

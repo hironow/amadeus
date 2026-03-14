@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/cmd"
+	"github.com/spf13/cobra"
 )
 
 func TestArchivePrune_NegativeDays(t *testing.T) {
@@ -297,5 +298,89 @@ func TestArchivePrune_ZeroDays(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Days must be positive") {
 		t.Errorf("expected 'Days must be positive' in error, got: %v", err)
+	}
+}
+
+func TestArchivePrune_RebuildIndexFlag_Exists(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when — find archive-prune subcommand
+	var apCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "archive-prune" {
+			apCmd = sub
+			break
+		}
+	}
+	if apCmd == nil {
+		t.Fatal("archive-prune subcommand not found")
+	}
+
+	// then
+	f := apCmd.Flags().Lookup("rebuild-index")
+	if f == nil {
+		t.Fatal("--rebuild-index flag not found on archive-prune")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--rebuild-index default = %q, want %q", f.DefValue, "false")
+	}
+}
+
+func TestArchivePrune_RebuildIndex_ConflictsWithExecute(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	rootCmd.SetArgs([]string{"archive-prune", "--rebuild-index", "--execute"})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then — should fail with conflict error
+	if err == nil {
+		t.Fatal("expected error when combining --rebuild-index with --execute")
+	}
+	if !strings.Contains(err.Error(), "rebuild-index") {
+		t.Errorf("error should mention rebuild-index, got: %v", err)
+	}
+}
+
+func TestArchivePrune_RebuildIndex_CreatesIndex(t *testing.T) {
+	// given — state directory with archive subdirectory
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".gate")
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0o755)
+	// Create a minimal archive file so rebuild has something to index
+	os.WriteFile(filepath.Join(archiveDir, "2025-01-01.jsonl"), []byte(`{"id":"1","tool":"amadeus"}`+"\n"), 0o644)
+
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"archive-prune", "--rebuild-index"})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then — should succeed and create index file
+	if err != nil {
+		t.Fatalf("--rebuild-index failed: %v", err)
+	}
+	indexPath := filepath.Join(archiveDir, "index.jsonl")
+	if _, statErr := os.Stat(indexPath); os.IsNotExist(statErr) {
+		t.Error("expected index.jsonl to be created by --rebuild-index")
 	}
 }
