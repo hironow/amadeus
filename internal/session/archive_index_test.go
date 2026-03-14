@@ -2,7 +2,9 @@ package session_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -231,7 +233,7 @@ func TestIndexWriter_Append_EmptyEntries(t *testing.T) {
 	}
 
 	_, statErr := os.Stat(indexPath)
-	if !os.IsNotExist(statErr) {
+	if !errors.Is(statErr, fs.ErrNotExist) {
 		t.Errorf("expected no file for empty entries")
 	}
 }
