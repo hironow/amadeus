@@ -3,7 +3,6 @@ package cmd_test
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
@@ -30,14 +29,7 @@ func TestStatusCmd_SubcommandExists(t *testing.T) {
 func TestStatusCmd_JSONOutput(t *testing.T) {
 	// given: initialize .gate/ via init command
 	dir := t.TempDir()
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	initRoot := cmd.NewRootCommand()
 	initBuf := new(bytes.Buffer)

@@ -2,7 +2,6 @@ package cmd_test
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
@@ -47,10 +46,7 @@ func TestInstallHookCmd_NoArgsAllowed(t *testing.T) {
 
 func TestInstallHookCmd_FailsOutsideGitRepo(t *testing.T) {
 	// given: temp dir that is NOT a git repository
-	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Chdir(t.TempDir())
 
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -108,10 +104,7 @@ func TestUninstallHookCmd_NoArgsAllowed(t *testing.T) {
 
 func TestUninstallHookCmd_FailsOutsideGitRepo(t *testing.T) {
 	// given: temp dir that is NOT a git repository
-	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Chdir(t.TempDir())
 
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)

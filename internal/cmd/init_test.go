@@ -20,14 +20,7 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 	}
 
 	// amadeus init uses os.Getwd(), so chdir to temp dir
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -55,14 +48,7 @@ func TestInitCommand_AlreadyExists_SuggestsForce(t *testing.T) {
 		t.Fatalf("create gate dir: %v", err)
 	}
 
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -90,14 +76,7 @@ func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
 		t.Fatalf("create gate dir: %v", err)
 	}
 
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -117,14 +96,7 @@ func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
 func TestInitCmd_OtelBackend_CreatesOtelEnv(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)

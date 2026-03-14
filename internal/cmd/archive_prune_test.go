@@ -61,9 +61,7 @@ func TestArchivePrune_PrunesEventFiles(t *testing.T) {
 	}
 
 	// when: run archive-prune with --execute --yes from the temp dir
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	t.Chdir(tmpDir)
 
 	root := cmd.NewRootCommand()
 	var stderr bytes.Buffer
@@ -123,11 +121,7 @@ func TestArchivePrune_FailsWhenEventRecordFails(t *testing.T) {
 	defer os.Chmod(eventsDir, 0o755) //nolint: restore for cleanup
 
 	// when
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir) //nolint: restore working dir
+	t.Chdir(tmpDir)
 
 	root := cmd.NewRootCommand()
 	var stderr bytes.Buffer
@@ -335,9 +329,7 @@ func TestArchivePrune_RebuildIndex_ConflictsWithExecute(t *testing.T) {
 	rootCmd.SetErr(buf)
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	t.Chdir(dir)
 
 	rootCmd.SetArgs([]string{"archive-prune", "--rebuild-index", "--execute"})
 
@@ -362,9 +354,7 @@ func TestArchivePrune_RebuildIndex_CreatesIndex(t *testing.T) {
 	// Create a minimal archive file so rebuild has something to index
 	os.WriteFile(filepath.Join(archiveDir, "2025-01-01.jsonl"), []byte(`{"id":"1","tool":"amadeus"}`+"\n"), 0o644)
 
-	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
