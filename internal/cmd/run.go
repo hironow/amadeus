@@ -166,7 +166,16 @@ func newRunCommand() *cobra.Command {
 					CheckOptions: checkOpts,
 					BaseBranch:   baseBranch,
 				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
-				return tryWriteHandover(cmd.Context(), runErr, repoRoot, "divergence run with --base "+baseBranch, logger)
+					return tryWriteHandover(cmd.Context(), runErr, repoRoot, domain.HandoverState{
+					Tool:       "amadeus",
+					Operation:  "divergence",
+					InProgress: "divergence run with --base " + baseBranch,
+					PartialState: map[string]string{
+						"BaseBranch": baseBranch,
+						"DryRun":     fmt.Sprintf("%v", checkOpts.DryRun),
+						"Full":       fmt.Sprintf("%v", checkOpts.Full),
+					},
+				}, logger)
 			}
 
 			// Without --base: one-shot check + D-Mail waiting loop.
@@ -179,7 +188,15 @@ func newRunCommand() *cobra.Command {
 				a, cfg, logger, notifier, metrics)
 			if checkErr != nil {
 				if _, ok := checkErr.(*domain.DriftError); !ok {
-					return checkErr
+					return tryWriteHandover(cmd.Context(), checkErr, repoRoot, domain.HandoverState{
+						Tool:       "amadeus",
+						Operation:  "divergence",
+						InProgress: "initial divergence check (no --base)",
+						PartialState: map[string]string{
+							"DryRun": fmt.Sprintf("%v", checkOpts.DryRun),
+							"Full":   fmt.Sprintf("%v", checkOpts.Full),
+						},
+					}, logger)
 				}
 			}
 
@@ -208,7 +225,25 @@ func newRunCommand() *cobra.Command {
 				},
 				logger,
 			)
-			return tryWriteHandover(cmd.Context(), waitErr, repoRoot, "divergence check waiting loop", logger)
+			if waitErr != nil {
+				return tryWriteHandover(cmd.Context(), waitErr, repoRoot, domain.HandoverState{
+					Tool:       "amadeus",
+					Operation:  "divergence",
+					InProgress: "divergence check waiting loop",
+					Completed:  []string{"Initial divergence check completed"},
+					Remaining:  []string{"D-Mail waiting loop interrupted"},
+					PartialState: map[string]string{"Phase": "waiting"},
+				}, logger)
+			}
+			// waitErr==nil but ctx may be cancelled (WaitForDMail returns (false, nil) on cancel)
+			writeHandoverOnCancel(cmd.Context(), repoRoot, domain.HandoverState{
+				Tool:       "amadeus",
+				Operation:  "divergence",
+				InProgress: "D-Mail waiting phase (clean exit on Ctrl+C)",
+				Completed:  []string{"Initial divergence check completed"},
+				PartialState: map[string]string{"Phase": "waiting-cancelled"},
+			}, logger)
+			return waitErr
 		},
 	}
 
