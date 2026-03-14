@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -218,10 +217,10 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 	}
 	defer lockFile.Close()
 
-	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+	if err := flockLock(lockFile.Fd()); err != nil {
 		return fmt.Errorf("flock: %w", err)
 	}
-	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	defer flockUnlock(lockFile.Fd())
 
 	f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -253,10 +252,10 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) {
 	}
 	defer lockFile.Close()
 
-	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+	if err := flockLock(lockFile.Fd()); err != nil {
 		return 0, fmt.Errorf("flock: %w", err)
 	}
-	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	defer flockUnlock(lockFile.Fd())
 
 	var entries []domain.IndexEntry
 	for _, sub := range indexDirs {
