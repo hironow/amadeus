@@ -236,3 +236,63 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 	return nil
 }
 
+var indexDirs = []string{"archive", "journal", "journals", "insights"}
+
+// Rebuild scans known subdirectories for .md files, extracts metadata, and
+// overwrites the index file atomically using a temp+rename strategy under flock.
+func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) {
+	indexDir := filepath.Dir(indexPath)
+	if err := os.MkdirAll(indexDir, 0755); err != nil {
+		return 0, fmt.Errorf("mkdir index dir: %w", err)
+	}
+
+	lockPath := indexPath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return 0, fmt.Errorf("open lock: %w", err)
+	}
+	defer lockFile.Close()
+
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+		return 0, fmt.Errorf("flock: %w", err)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
+	var entries []domain.IndexEntry
+	for _, sub := range indexDirs {
+		dir := filepath.Join(stateDir, sub)
+		if _, statErr := os.Stat(dir); statErr != nil {
+			continue
+		}
+		filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
+			if walkErr != nil || d.IsDir() {
+				return nil
+			}
+			if filepath.Ext(path) != ".md" {
+				return nil
+			}
+			entries = append(entries, ExtractMeta(path, stateDir, tool))
+			return nil
+		})
+	}
+
+	tmpPath := indexPath + ".tmp"
+	var buf []byte
+	for _, e := range entries {
+		line, marshalErr := json.Marshal(e)
+		if marshalErr != nil {
+			return 0, fmt.Errorf("marshal: %w", marshalErr)
+		}
+		buf = append(buf, line...)
+		buf = append(buf, '\n')
+	}
+
+	if err := os.WriteFile(tmpPath, buf, 0644); err != nil {
+		return 0, fmt.Errorf("write tmp: %w", err)
+	}
+	if err := os.Rename(tmpPath, indexPath); err != nil {
+		return 0, fmt.Errorf("rename: %w", err)
+	}
+
+	return len(entries), nil
+}

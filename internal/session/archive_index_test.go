@@ -285,3 +285,90 @@ func TestIndexWriter_Append_ConcurrentSafe(t *testing.T) {
 	}
 }
 
+func TestIndexWriter_Rebuild_ScansAllMd(t *testing.T) {
+	stateDir := t.TempDir()
+	archiveDir := filepath.Join(stateDir, "archive")
+	journalDir := filepath.Join(stateDir, "journal")
+	os.MkdirAll(archiveDir, 0755)
+	os.MkdirAll(journalDir, 0755)
+
+	os.WriteFile(filepath.Join(archiveDir, "report-a.md"), []byte("# Report A\n"), 0644)
+	os.WriteFile(filepath.Join(journalDir, "001.md"), []byte("# Journal 1\n"), 0644)
+	os.WriteFile(filepath.Join(archiveDir, "data.jsonl"), []byte("not indexed\n"), 0644)
+
+	indexPath := filepath.Join(stateDir, "archive", "index.jsonl")
+	w := &session.IndexWriter{}
+	n, err := w.Rebuild(indexPath, stateDir, "amadeus")
+	if err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 entries, got %d", n)
+	}
+}
+
+func TestIndexWriter_Rebuild_OverwritesExisting(t *testing.T) {
+	stateDir := t.TempDir()
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0755)
+	os.WriteFile(filepath.Join(archiveDir, "report.md"), []byte("# Only Report\n"), 0644)
+
+	indexPath := filepath.Join(archiveDir, "index.jsonl")
+	os.WriteFile(indexPath, []byte("{\"ts\":\"old\"}\n{\"ts\":\"old2\"}\n"), 0644)
+
+	w := &session.IndexWriter{}
+	n, _ := w.Rebuild(indexPath, stateDir, "amadeus")
+	if n != 1 {
+		t.Errorf("expected 1 entry, got %d", n)
+	}
+
+	data, _ := os.ReadFile(indexPath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line after rebuild, got %d", len(lines))
+	}
+}
+
+func TestIndexWriter_Rebuild_EmptyDir(t *testing.T) {
+	stateDir := t.TempDir()
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0755)
+
+	indexPath := filepath.Join(archiveDir, "index.jsonl")
+	w := &session.IndexWriter{}
+	n, err := w.Rebuild(indexPath, stateDir, "amadeus")
+	if err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 entries, got %d", n)
+	}
+}
+
+func TestIndexWriter_Rebuild_MissingDirs(t *testing.T) {
+	stateDir := t.TempDir()
+	indexPath := filepath.Join(stateDir, "archive", "index.jsonl")
+
+	w := &session.IndexWriter{}
+	n, err := w.Rebuild(indexPath, stateDir, "phonewave")
+	if err != nil {
+		t.Fatalf("rebuild with missing dirs should succeed: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 entries, got %d", n)
+	}
+}
+
+func TestIndexWriter_Rebuild_SkipsIndexFile(t *testing.T) {
+	stateDir := t.TempDir()
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0755)
+	os.WriteFile(filepath.Join(archiveDir, "report.md"), []byte("# Report\n"), 0644)
+
+	indexPath := filepath.Join(archiveDir, "index.jsonl")
+	w := &session.IndexWriter{}
+	n, _ := w.Rebuild(indexPath, stateDir, "amadeus")
+	if n != 1 {
+		t.Errorf("expected 1 entry (not including index.jsonl), got %d", n)
+	}
+}
