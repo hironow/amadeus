@@ -30,16 +30,20 @@ amadeus archive-prune [path] [flags]
 
   # JSON output for scripting
   amadeus archive-prune -o json
+
+  # Rebuild archive index from existing files
+  amadeus archive-prune --rebuild-index
 ```
 
 ### Options
 
 ```
-  -d, --days int   Retention days (default 30)
-  -n, --dry-run    Dry-run mode (default behavior, explicit for scripting)
-  -x, --execute    Execute pruning (default: dry-run)
-  -h, --help       help for archive-prune
-  -y, --yes        Skip confirmation prompt
+  -d, --days int       Retention days (default 30)
+  -n, --dry-run        Dry-run mode (default behavior, explicit for scripting)
+  -x, --execute        Execute pruning (default: dry-run)
+  -h, --help           help for archive-prune
+      --rebuild-index  Rebuild archive index from existing files without pruning
+  -y, --yes            Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -54,5 +58,4 @@ amadeus archive-prune [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
-
+* [amadeus](amadeus.md)  - Divergence meter for your codebase

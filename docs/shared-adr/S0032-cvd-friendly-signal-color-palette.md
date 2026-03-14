@@ -22,6 +22,7 @@ Adopt a **signal light palette** (blue, yellow, red) as the base, with gray as a
 | INFO | Cyan | `\033[36m` | N/A (blue-green axis) |
 
 Design principles:
+
 - **3-color signal base**: Blue-Yellow-Red provides 3-way discrimination safe for all common CVD types (blue-yellow axis is preserved by protanopia/deuteranopia)
 - **4th color is achromatic**: Gray carries no hue, distinguishable purely by brightness regardless of color vision
 - **5th color stays on blue axis**: Cyan (INFO) is perceptually close to blue, not confused with red or yellow
@@ -33,13 +34,16 @@ Reference: Wong (2011), Nature Methods "Points of view: Color blindness"
 ## Consequences
 
 ### Positive
+
 - Red-green CVD users can distinguish all status levels
 - Consistent palette across all 4 tools
 - `NO_COLOR` and non-terminal detection already respected
 
 ### Negative
+
 - Users accustomed to green=OK convention may need brief adjustment
 - Bold blue is less "obviously success" than green for color-normal users
 
 ### Neutral
+
 - Banner colors (inverted green/cyan for D-MAIL SEND/RECV) are unaffected; they use inverted display mode which provides sufficient visual separation independent of hue

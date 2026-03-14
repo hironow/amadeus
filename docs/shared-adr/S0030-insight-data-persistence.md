@@ -12,36 +12,39 @@ shared via git.
 
 This value is environment-independent, contains no absolute paths, and is pure
 semantic content — distinct from runtime state (`.run/`), events (`events/`), and
-transient D-Mails (`inbox/outbox/archive/`).
+transient D-Mail queues (`inbox/outbox/`).
 
 ## Decision
 
-Add a new persistence category **"insight data"** to the data persistence boundaries:
+Add persistence categories for environment-independent semantic data to the data persistence boundaries:
 
 | Category | Location | Git-tracked | Content |
 |----------|----------|-------------|---------|
 | State/cache | `.run/` | No | SQLite, runtime logs |
 | Events | `events/` | No | JSONL event store |
-| D-Mail | `inbox/outbox/archive/` | No | Inter-tool messages |
-| Config | `config.yaml` | Varies | Tool settings |
+| D-Mail queue | `inbox/`, `outbox/` | No | Transient inter-tool messages |
+| D-Mail archive | `archive/` | **Yes** | Permanent audit trail, index.jsonl |
+| Config | `config.yaml` | **Yes** | Project-level tool settings (shared across clones) |
+| Skills | `skills/` | No | Regenerated from embedded templates by init |
+| Journal | `journal/` | **Yes** | Expedition reports (paintress only) |
 | **Insight data** | **`insights/`** | **Yes** | **Semantic knowledge (what/why/how)** |
 
 ### Gitignore Strategy
 
 State dir contents are gitignored individually (not the parent dir), allowing
-`insights/` to remain tracked:
+semantic data directories to remain tracked:
 
-    # Tool runtime state — individual ignores (insights/ is git-tracked)
-    .expedition/.run/
-    .expedition/events/
-    .expedition/inbox/
-    .expedition/outbox/
-    .expedition/archive/
-    .expedition/journal/
-    .expedition/skills/
-    .expedition/config.yaml
-    .expedition/.otel.env
-    .expedition/.gitignore
+```gitignore
+# Tool runtime state — individual ignores
+# git-tracked: insights/, archive/, config.yaml (and journal/ for paintress)
+.expedition/.run/
+.expedition/events/
+.expedition/inbox/
+.expedition/outbox/
+.expedition/skills/
+.expedition/.otel.env
+.expedition/.gitignore
+```
 
 ### Insight File Rules
 

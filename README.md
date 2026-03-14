@@ -157,7 +157,8 @@ amadeus run [--base main]
     |   +-- convergence.md    <- Convergence insights (Why enriched from archive D-Mails)
     +-- outbox/               <- Outgoing D-Mails (gitignored)
     +-- inbox/                <- Incoming D-Mails (gitignored)
-    +-- archive/              <- All D-Mails (gitignored)
+    +-- archive/              <- Permanent D-Mail audit trail (git-tracked)
+    |   +-- index.jsonl       <- Archive index (JSONL, metadata of pruned/existing .md files)
 ```
 
 ### Scoring Axes
@@ -264,7 +265,7 @@ Running `amadeus` without a subcommand defaults to `run` (divergence check + D-M
 | `amadeus status [path]` | Show amadeus operational status |
 | `amadeus clean [path]` | Remove state directory (`.gate/`) |
 | `amadeus rebuild [path]` | Rebuild projections from event store |
-| `amadeus archive-prune` | Prune old archived D-Mail files |
+| `amadeus archive-prune` | Prune old archived D-Mail files (`--rebuild-index` to rebuild JSONL index) |
 | `amadeus install-hook` | Install git post-merge hook |
 | `amadeus uninstall-hook` | Remove git post-merge hook |
 | `amadeus version` | Print version, commit, and build date |
@@ -309,6 +310,9 @@ amadeus mark-commented feedback-001 MY-250 -j
 
 # Prune archived D-Mails older than 90 days (dry run)
 amadeus archive-prune -d 90 -n
+
+# Rebuild archive index from existing files
+amadeus archive-prune --rebuild-index
 
 # JSON output for scripting
 amadeus log -j | jq '.dmails[] | select(.severity == "high")'

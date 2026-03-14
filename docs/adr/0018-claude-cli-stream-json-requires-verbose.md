@@ -8,6 +8,7 @@
 Doctor の `claude-inference` チェックが `exit status 1` で常に失敗していた。エラーヒントは API key/quota/model access や CLAUDECODE env var リークを示唆していたが、実際の原因はそのどちらでもなかった。
 
 手動実行で判明したエラー:
+
 ```
 Error: When using --print, --output-format=stream-json requires --verbose
 ```
@@ -25,12 +26,15 @@ Claude CLI を `--output-format stream-json` で呼び出す全ての箇所に `
 ## Consequences
 
 ### Positive
+
 - Doctor の `claude-inference` チェックが正常動作するようになった
 - `context-budget` チェックも inference 成功に依存するため連鎖的に復活
 - semgrep ルールにより同じ問題の再発を静的に防止
 
 ### Negative
+
 - Claude CLI のフラグ仕様変更に対する脆弱性が露呈した（CLI のバージョンアップで壊れうる）
 
 ### Neutral
+
 - `--verbose` は stream-json 出力に init メッセージ等のメタデータを含めるためのフラグであり、出力量が若干増える
