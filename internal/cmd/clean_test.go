@@ -16,14 +16,7 @@ func TestCleanCmd_NothingToClean(t *testing.T) {
 	// given: empty directory with no .gate/
 	dir := t.TempDir()
 
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -54,14 +47,7 @@ func TestCleanCmd_DeletesGateDir(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
