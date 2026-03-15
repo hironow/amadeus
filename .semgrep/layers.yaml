@@ -38,8 +38,8 @@ rules:
     languages: [go]
     message: |
       root パッケージから internal/ への import は禁止です。
-      root は doc.go のみ（go:embed が必要な場合を除く）。
-      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+      Why: root は doc.go のみで構成され、internal/ への依存は層構造に違反する (hexagonal architecture)
+      How: import 先の型・関数を internal/ 層内で完結させるか、cmd/ に移動してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -64,8 +64,8 @@ rules:
     languages: [go]
     message: |
       session 層から cmd 層への import は禁止です。
-      session は eventsource, port, platform, domain を import できます。
-      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+      Why: session は adapter 実装層であり、composition root である cmd に依存すると循環参照を引き起こす (hexagonal architecture)
+      How: session は eventsource, port, platform, domain のみ import してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -86,8 +86,8 @@ rules:
     languages: [go]
     message: |
       domain 層から上位層への import は禁止です。
-      domain は pure functions のみ（I/O なし、context.Context なし）。
-      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+      Why: domain は pure functions・型のみで構成され、上位層への依存は層構造の根幹を破壊する (hexagonal architecture)
+      How: I/O や context.Context を使う処理は session 層または port 層に移動してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -107,9 +107,9 @@ rules:
   - id: layer-eventsource-no-import-upper
     languages: [go]
     message: |
-      eventsource 層 (event persistence adapter, AWS Event Sourcing pattern) から上位層への import は禁止です。
-      eventsource → domain のみ。
-      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+      eventsource 層から上位層への import は禁止です。
+      Why: eventsource は event persistence adapter であり、domain のみに依存すべきである (event sourcing pattern)
+      How: eventsource → domain のみ許可。上位層のロジックは usecase または session に移動してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -130,9 +130,8 @@ rules:
     languages: [go]
     message: |
       cmd 層から eventsource 層への直接 import は禁止です。
-      usecase 層のファクトリ関数を経由してください。
-      依存方向: cmd → usecase → session → eventsource（cmd → eventsource は禁止）
-      Ref: Shared ADR S0008 — cmd-eventsource-import-prohibition
+      Why: cmd → eventsource の直接依存は層のバイパスであり、依存方向 cmd → usecase → session → eventsource に違反する (ADR S0008)
+      How: usecase 層のファクトリ関数を経由してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -153,8 +152,8 @@ rules:
     languages: [go]
     message: |
       usecase 層から cmd 層への import は禁止です。
-      usecase は usecase/port, domain のみ import できます（session は禁止: layer-usecase-no-import-session）。
-      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
+      Why: usecase はオーケストレーション層であり、composition root である cmd に依存すると循環参照を引き起こす (ADR S0015)
+      How: usecase は usecase/port, domain のみ import してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -175,8 +174,8 @@ rules:
     languages: [go]
     message: |
       usecase 層から eventsource 層への直接 import は禁止です。
-      session 層のファクトリ関数を経由してください。
-      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
+      Why: usecase は port interface 経由で I/O を行うべきであり、eventsource への直接依存は dependency inversion に違反する (ADR S0015)
+      How: session 層のファクトリ関数を経由してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -197,9 +196,8 @@ rules:
     languages: [go]
     message: |
       session 層から usecase 本体への import は禁止です。
-      session は usecase/port (Output Port) のみ import 可能です。
-      session は eventsource, usecase/port, platform, domain を import できます。
-      Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
+      Why: session は adapter 実装であり、usecase 本体に依存すると hexagonal architecture の port-adapter 境界が崩壊する (ADR S0015)
+      How: session は usecase/port (Output Port) のみ import 可能。eventsource, platform, domain も許可されます
     severity: ERROR
     patterns:
       - pattern-either:
@@ -220,8 +218,8 @@ rules:
     languages: [go]
     message: |
       usecase 層から session 層への直接 import は禁止です。
-      usecase/port の Output Port interface を経由してください。
-      wiring は cmd (composition root) で行います。
+      Why: usecase が session に直接依存すると dependency inversion が崩れ、テスタビリティが失われる (hexagonal architecture)
+      How: usecase/port の Output Port interface を経由し、wiring は cmd (composition root) で行ってください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -245,8 +243,8 @@ rules:
     languages: [go]
     message: |
       internal/ から root パッケージへの import は禁止です。
-      root パッケージの型・関数は internal/domain に移動済みです。
-      internal/domain を import してください。
+      Why: root パッケージの型・関数は internal/domain に移動済みであり、逆方向の依存は層構造に違反する
+      How: internal/domain を import してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -267,9 +265,8 @@ rules:
     languages: [go]
     message: |
       platform 層から上位層への import は禁止です。
-      platform は domain のみ import できます。
-      platform は cross-cutting infrastructure（logger, telemetry, metrics）のみ。
-      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+      Why: platform は cross-cutting infrastructure（logger, telemetry, metrics）であり、domain のみに依存すべきである (hexagonal architecture)
+      How: platform は domain のみ import してください。上位層のロジックは適切な層に移動してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -290,9 +287,8 @@ rules:
     languages: [go]
     message: |
       domain 層で I/O stdlib パッケージの import は禁止です。
-      domain は pure functions のみ。I/O は session 層で行ってください。
-      context.Context を使う interface は port 層に配置してください。
-      Ref: Shared ADR S0007 — root-infrastructure-and-layer-conventions
+      Why: domain は pure functions のみで構成され、I/O を含むと副作用が混入しテスタビリティが損なわれる (hexagonal architecture)
+      How: I/O は session 層で行い、context.Context を使う interface は port 層に配置してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -316,8 +312,9 @@ rules:
     severity: ERROR
     pattern-regex: 'api\.linear\.app'
     message: |
-      Direct Linear API access is prohibited.
-      Use MCP via Claude instead.
+      Linear API への直接アクセスは禁止です。
+      Why: Linear は MCP 経由で Claude を通じてアクセスする設計であり、直接 API 呼び出しはその境界を迂回する
+      How: MCP 経由で Claude を使用してください
     paths:
       include:
         - "/internal/**"
@@ -330,8 +327,8 @@ rules:
     languages: [go]
     message: |
       port 層から上位層への import は禁止です。
-      port は domain (+ stdlib: context, errors 等) のみ import できます。
-      具体的な I/O 実装は session, platform 層に配置してください。
+      Why: port は interface 契約のみを定義する層であり、具体実装への依存は dependency inversion に違反する (hexagonal architecture)
+      How: port は domain (+ stdlib: context, errors 等) のみ import し、具体的な I/O 実装は session, platform 層に配置してください
     severity: ERROR
     patterns:
       - pattern-either:
@@ -354,7 +351,8 @@ rules:
     pattern-regex: '(LinearConfig|ClaudeConfig|Wandb|Jaeger)'
     message: |
       domain 層に vendor 固有の語彙が含まれています。
-      汎用的な名前を使用してください（例: IssueTrackerConfig, AIAssistantConfig）。
+      Why: domain 層は外部サービスに依存しない pure な層であり、vendor 名の混入はその独立性を損なう (hexagonal architecture)
+      How: 汎用的な名前を使用してください（例: IssueTrackerConfig, AIAssistantConfig）
     paths:
       include:
         - "/internal/domain/**"
@@ -376,7 +374,8 @@ rules:
         - "*_test.go"
     message: |
       session 層から domain.NewEvent() の直接呼び出しは禁止です。
-      event 生成は usecase 層の aggregate 経由で行ってください。
+      Why: event 生成は aggregate の責務であり、session が直接生成するとビジネスルールのバイパスが発生する (event sourcing pattern)
+      How: usecase 層の aggregate 経由で event を生成してください
 
   # --- Rule: No direct aggregate creation in session layer ---
 
@@ -391,7 +390,8 @@ rules:
         - "*_test.go"
     message: |
       session 層から domain.New*Aggregate() の直接呼び出しは禁止です。
-      aggregate の生成は usecase 層で行い、session にはパラメータとして渡してください。
+      Why: aggregate のライフサイクル管理は usecase 層の責務であり、session が直接生成するとオーケストレーションの一貫性が崩れる
+      How: usecase 層で aggregate を生成し、session にはパラメータとして渡してください
 
   # --- Rule 16: No I/O contract interface in domain layer ---
 
@@ -407,7 +407,8 @@ rules:
         - "/internal/domain/doc.go"
     message: |
       domain 層に I/O 契約 interface の定義は禁止です。
-      I/O 契約は port 層に配置してください。
+      Why: domain は pure な型・関数のみで構成され、I/O 契約を含むと domain の独立性が損なわれる (hexagonal architecture)
+      How: I/O 契約 interface は port 層に配置してください
 
   # --- Rule 17: No shell exec command ---
 
@@ -426,7 +427,8 @@ rules:
         - "*_test.go"
     message: |
       shell 経由のコマンド実行は禁止です。
-      exec.Command で直接実行可能ファイルを指定してください。
+      Why: shell を介すとインジェクション攻撃のリスクがあり、引数の解釈も不安定になる
+      How: exec.Command で直接実行可能ファイルを指定してください（例: exec.Command("git", "status")）
 
   # --- Rule 18: No ambiguous type names ---
 
@@ -440,7 +442,9 @@ rules:
       exclude:
         - "*_test.go"
     message: |
-      曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
+      曖昧な型命名（Manager, Service, Helper, Util, Impl, Base, Facade）は禁止です。
+      Why: 曖昧な名前は責務の肥大化を招き、コードの意図が不明確になる
+      How: 具体的な責務を表す名前を使用してください（例: TaskManager → TaskOrchestrator, ReviewService → ReviewEngine）
 
   # --- Rule 19: No import of deprecated internal/port ---
 
@@ -454,7 +458,9 @@ rules:
       exclude:
         - "*_test.go"
     message: |
-      internal/port は廃止済みです。internal/usecase/port を使用してください。
+      internal/port は廃止済みです。
+      Why: port 層は internal/usecase/port に統合されており、旧パスへの依存は廃止済みコードへの参照となる
+      How: internal/usecase/port を import してください
 
   # --- Rule 20: Session layer must not reference aggregate types directly ---
 
@@ -469,7 +475,8 @@ rules:
         - "*_test.go"
     message: |
       session 層で *domain.*Aggregate 型の直接使用は禁止です。
-      usecase/port の EventEmitter / StateProvider interface を経由してください。
+      Why: session が aggregate 型に直接依存すると、usecase 層の抽象化が無意味になり層境界が崩れる (hexagonal architecture)
+      How: usecase/port の EventEmitter / StateProvider interface を経由してください
 
   # --- Rule 21: Session layer must not call aggregate methods ---
 
@@ -484,7 +491,8 @@ rules:
         - "*_test.go"
     message: |
       session 層から aggregate のメソッド直接呼び出しは禁止です。
-      usecase/port の EventEmitter / StateProvider interface を経由してください。
+      Why: aggregate のメソッドは usecase 層が管理すべきビジネスロジックであり、session からの直接呼び出しは層境界の違反となる
+      How: usecase/port の EventEmitter / StateProvider interface を経由してください
 
   # --- Rule 22: Domain must not use embed or text/template ---
 
@@ -507,7 +515,8 @@ rules:
         - "*_test.go"
     message: |
       domain 層で embed / text/template の import は禁止です。
-      template 責務は platform 層に配置してください。
+      Why: embed はファイルシステム依存、text/template は I/O 寄りの責務であり、pure な domain 層に含めるべきではない
+      How: template 責務は platform 層に配置してください
 
   # --- Rule 23: No state dir literal in filepath.Join ---
 
@@ -525,7 +534,8 @@ rules:
         - "/internal/domain/**"
     message: |
       filepath.Join での state dir literal ".gate" 直書きは禁止です。
-      domain.StateDir 定数を使用してください。
+      Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
+      How: domain.StateDir 定数を使用してください
 
   # --- Rule: session must not implement event persistence (todo 73) ---
   - id: layer-session-no-event-persistence
@@ -540,11 +550,8 @@ rules:
         - "**/store_factory.go"
     message: |
       session 層で .jsonl ファイル操作は禁止です。
-      event persistence は internal/eventsource に限定してください (AWS Event Sourcing pattern)。
-      修正手順:
-      1. event persistence ロジックを internal/eventsource へ移動する
-      2. session は store_factory.go 経由で eventsource を利用する
-      Ref: docs/conformance.md
+      Why: event persistence は eventsource 層の専管事項であり、session が直接操作すると責務境界が崩れる (event sourcing pattern)
+      How: event persistence ロジックを internal/eventsource へ移動し、session は store_factory.go 経由で利用してください
 
   # --- Rule: No Validate() method on domain commands ---
 
@@ -557,11 +564,8 @@ rules:
         - "/internal/domain/**"
     message: |
       domain commands に Validate() []error メソッドは禁止です。
-      Parse-Don't-Validate パターンを使用してください。
-      修正手順:
-      1. New*() コンストラクタで validated domain primitives を受け取る
-      2. Validate() メソッドを削除する
-      理由: always-valid domain model (okite skill: parse-dont-validate)
+      Why: Parse-Don't-Validate パターンにより always-valid domain model を維持すべきであり、後付けの Validate は不正状態の存在を許容してしまう
+      How: New*() コンストラクタで validated domain primitives を受け取り、Validate() メソッドを削除してください
 
   # --- Rule: Law of Demeter dot-chain guard ---
 
@@ -578,9 +582,8 @@ rules:
         - "*_test.go"
     message: |
       session 層で 3段以上の dot-chain が検出されました。
-      Tell-Don't-Ask 原則に従い、中間オブジェクトに委譲メソッドを追加してください。
-      誤検知の場合は nosemgrep を付与してください。
-      Ref: okite skill: law-of-demeter, tell-dont-ask
+      Why: 過度な dot-chain は Law of Demeter に違反し、内部構造への密結合を引き起こす (Tell-Don't-Ask 原則)
+      How: 中間オブジェクトに委譲メソッドを追加してください。誤検知の場合は nosemgrep を付与してください
 
   # --- Rule: session 2-level dot-access prevention ---
 
@@ -595,10 +598,8 @@ rules:
         - "*_test.go"
     message: |
       session 層で .Session.Method() の 2-level アクセスが検出されました。
-      禁止: <var>.Session.<Method>() — Session 構造体への直接アクセス
-      許可: <var>.<forwardingMethod>() — forwarding メソッド経由
-      除外: *_test.go
-      Ref: Tell-Don't-Ask, Law of Demeter
+      Why: Session 構造体への直接アクセスは Law of Demeter に違反し、内部構造への密結合を生む (Tell-Don't-Ask 原則)
+      How: forwarding メソッド経由でアクセスしてください（例: x.Session.Method() → x.method()）
 
   # --- Rule: No hardcoded "claude" literal in exec arguments ---
 
@@ -615,7 +616,9 @@ rules:
       exclude:
         - "*_test.go"
     message: |
-      Do not hardcode "claude" as exec argument. Use config.ClaudeCmd.
+      exec 引数に "claude" リテラルのハードコードは禁止です。
+      Why: 実行可能ファイル名のハードコードは環境差異やテスト時のモック切替を困難にする
+      How: config.ClaudeCmd を使用してください
 
   # --- Rule: No empty-string fallback in session layer ---
 
@@ -637,10 +640,5 @@ rules:
         - "*_test.go"
     message: |
       session 層での空文字 fallback 代入は禁止です。
-      config のデフォルト値は domain 定数 → config loading で設定してください。
-      session 層で「念のため」fallback すると:
-      - config 設定ミスが検出不能になる
-      - デフォルト値が複数箇所に散らばり一貫性が壊れる
-      - テスト時に config を差し替えても上書きされる
-      修正: config loading (session/config.go) で空文字チェックを行い、
-      domain.Default* 定数を使用してください。
+      Why: session 層での fallback は config 設定ミスを隠蔽し、デフォルト値が散在して一貫性が壊れる
+      How: config loading (session/config.go) で空文字チェックを行い、domain.Default* 定数を使用してください

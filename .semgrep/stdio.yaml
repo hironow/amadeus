@@ -13,9 +13,8 @@ rules:
     languages: [go]
     message: |
       session 層で fmt.Print/Println/Printf を直接呼ばないでください。
-      stdout にデータが混入し、パイプやリダイレクトで後続処理が壊れます。
-      ログは注入された logger を使用し、データ出力は io.Writer 引数を介してください。
-      Ref: docs/adr/0002-stdio-convention.md
+      Why: stdout にデータが混入し、パイプやリダイレクトで後続処理が壊れます (stdio convention)。
+      How: ログは注入された logger を使用し、データ出力は io.Writer 引数を介してください。
     severity: ERROR
     pattern-either:
       - pattern: fmt.Print(...)
@@ -32,8 +31,8 @@ rules:
     languages: [go]
     message: |
       eventsource 層で fmt.Print/Println/Printf を直接呼ばないでください。
-      eventsource はデータ永続化層であり、stdout/stderr への出力は不適切です。
-      Ref: docs/adr/0002-stdio-convention.md
+      Why: eventsource はデータ永続化層であり、stdout/stderr への出力は不適切です (stdio convention)。
+      How: ログは注入された logger を使用し、データ出力は io.Writer 引数を介してください。
     severity: ERROR
     pattern-either:
       - pattern: fmt.Print(...)
@@ -51,9 +50,8 @@ rules:
     languages: [go]
     message: |
       cmd 層以外で os.Stdout を参照しないでください。
-      session / eventsource 層は stdout にアクセスすべきではありません。
-      データ出力が必要な場合は io.Writer を引数として受け取ってください。
-      Ref: docs/adr/0002-stdio-convention.md
+      Why: session / eventsource 層は stdout にアクセスすべきではありません (stdio convention)。
+      How: データ出力が必要な場合は io.Writer を引数として受け取ってください。
     severity: ERROR
     pattern: os.Stdout
     paths:
@@ -70,9 +68,8 @@ rules:
     languages: [go]
     message: |
       cmd 層以外で os.Stderr を直接参照しないでください。
-      ログ出力は注入された logger を通じて行ってください。
-      cmd 層で cmd.ErrOrStderr() から logger を構築し、DI で渡すのが正しいパターンです。
-      Ref: docs/adr/0002-stdio-convention.md
+      Why: ログ出力は注入された logger を通じて行うべきです (stdio convention)。
+      How: cmd 層で cmd.ErrOrStderr() から logger を構築し、DI で渡してください。
     severity: ERROR
     pattern: os.Stderr
     paths:
@@ -90,10 +87,8 @@ rules:
     languages: [go]
     message: |
       cmd 層以外で os.Stdin を直接参照しないでください。
-      対話入力は /dev/tty (Windows: CONIN$) から読み取るか、
-      cmd.InOrStdin() を cobra 層で呼び出して io.Reader として渡してください。
-      stdin はパイプ入力に予約されています。
-      Ref: docs/adr/0002-stdio-convention.md
+      Why: stdin はパイプ入力に予約されており、internal 層からの直接参照は不適切です (stdio convention)。
+      How: 対話入力は /dev/tty (Windows: CONIN$) から読み取るか、cmd.InOrStdin() を cobra 層で呼び出して io.Reader として渡してください。
     severity: ERROR
     pattern: os.Stdin
     paths:
@@ -111,9 +106,8 @@ rules:
     languages: [go]
     message: |
       root パッケージで fmt.Print/Println/Printf を直接呼ばないでください。
-      root パッケージは types, constants, pure functions のみを含みます。
-      副作用（stdout への出力を含む）は session 層以上で実行してください。
-      Ref: docs/adr/0002-stdio-convention.md
+      Why: root パッケージは types, constants, pure functions のみを含み、副作用は禁止です (stdio convention)。
+      How: stdout への出力を含む副作用は session 層以上で実行してください。
     severity: ERROR
     pattern-either:
       - pattern: fmt.Print(...)

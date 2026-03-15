@@ -15,9 +15,8 @@ rules:
     languages: [go]
     message: |
       strings.Join(..., "\n") を exported 関数/メソッドの戻り値に使わないでください。
-      この戻り値が Logger.Info() 等に渡されると、2行目以降のログプレフィックスが
-      欠落し、ログのパースや可読性が壊れます。
-      1行サマリー形式に変換するか、呼び出し側で各行を個別にログ出力してください。
+      Why: この戻り値が Logger.Info() 等に渡されると、2行目以降のログプレフィックスが欠落し、ログのパースや可読性が壊れます。
+      How: 1行サマリー形式に変換するか、呼び出し側で各行を個別にログ出力してください。
     severity: WARNING
     pattern: 'return strings.Join($SLICE, "\n")'
     paths:
