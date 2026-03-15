@@ -22,9 +22,8 @@ rules:
     languages: [go]
     message: |
       cobra.Command で Run フィールドを使用しないでください。
-      RunE を使用して error を返すようにしてください。
-      Run は error を返せないため、main() での exit code 制御ができなくなります。
-      Ref: Shared ADR 0001 — cobra-cli-framework
+      Why: Run は error を返せないため、main() での exit code 制御ができなくなります (cobra CLI convention)。
+      How: RunE を使用して error を返すようにしてください。
     severity: ERROR
     pattern: |
       &cobra.Command{
@@ -41,8 +40,8 @@ rules:
     languages: [go]
     message: |
       otel.SetTracerProvider() は InitTracer() 内でのみ呼び出してください。
-      TracerProvider の設定を分散させると noop デフォルトの保証が崩れます。
-      Ref: Shared ADR 0003 — opentelemetry-noop-default
+      Why: TracerProvider の設定を分散させると noop デフォルトの保証が崩れます (OTel noop-default)。
+      How: InitTracer() 関数内に集約してください。
     severity: ERROR
     patterns:
       - pattern: otel.SetTracerProvider(...)
@@ -60,9 +59,8 @@ rules:
     languages: [go]
     message: |
       otel.SetMeterProvider() は InitTracer() 内でのみ呼び出してください。
-      MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
-      TracerProvider と同様に集中管理してください。
-      Ref: Shared ADR 0003 — opentelemetry-noop-default
+      Why: MeterProvider の設定を分散させると noop デフォルトの保証が崩れます (OTel noop-default)。
+      How: TracerProvider と同様に InitTracer() 関数内に集中管理してください。
     severity: WARNING
     patterns:
       - pattern: otel.SetMeterProvider(...)
@@ -80,9 +78,8 @@ rules:
     languages: [go]
     message: |
       tracer.Start() で作成した span に defer $SPAN.End() がありません。
-      span が End されないとメモリリークし、エクスポーターにも送信されません。
-      startRootSpan 等の別関数で End する場合は nosemgrep を付与してください。
-      Ref: Shared ADR 0003 — opentelemetry-noop-default
+      Why: span が End されないとメモリリークし、エクスポーターにも送信されません (OTel noop-default)。
+      How: defer $SPAN.End() を追加してください。startRootSpan 等の別関数で End する場合は nosemgrep を付与してください。
     severity: ERROR
     patterns:
       - pattern: |
@@ -100,10 +97,8 @@ rules:
     languages: [go]
     message: |
       fsnotify.NewWatcher() の後に defer $W.Close() がありません。
-      watcher のファイルディスクリプタがリークします。
-      同一関数内で defer watcher.Close() を呼び出すか、
-      struct に保存して別途 Close する場合は nosemgrep を付与してください。
-      Ref: Shared ADR 0005 — fsnotify-daemon-design
+      Why: watcher のファイルディスクリプタがリークします (fsnotify daemon design)。
+      How: 同一関数内で defer watcher.Close() を呼び出してください。struct に保存して別途 Close する場合は nosemgrep を付与してください。
     severity: ERROR
     patterns:
       - pattern: |
@@ -119,10 +114,8 @@ rules:
     languages: [go]
     message: |
       文字列連結 (+ "/" +) でファイルパスを構築しないでください。
-      filepath.Join() を使用してください。
-      OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
-      マップキーや表示用ラベルの場合は nosemgrep を付与してください。
-      Ref: Shared ADR 0005 — fsnotify-daemon-design
+      Why: OS 間のパス区切り文字の違いを吸収できず、重複スラッシュも正規化されません (fsnotify daemon design)。
+      How: filepath.Join() を使用してください。マップキーや表示用ラベルの場合は nosemgrep を付与してください。
     severity: WARNING
     pattern-regex: '\+\s*"/"\s*\+'
     paths:
@@ -135,9 +128,8 @@ rules:
     languages: [go]
     message: |
       $M.Lock() の直後に defer $M.Unlock() がありません。
-      Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
-      条件付き Unlock が必要な場合は nosemgrep を付与してください。
-      Ref: Shared ADR 0005 — fsnotify-daemon-design
+      Why: Lock/Unlock のペアリングを忘れるとデッドロックの原因になります (fsnotify daemon design)。
+      How: defer $M.Unlock() を追加してください。条件付き Unlock が必要な場合は nosemgrep を付与してください。
     severity: ERROR
     patterns:
       - pattern: $M.Lock()
@@ -153,11 +145,9 @@ rules:
   - id: adr0007-testcontainers-generic-without-terminate
     languages: [go]
     message: |
-      testcontainers.GenericContainer() で作成したコンテナに
-      Terminate() が呼ばれていません。
-      defer func() { container.Terminate(ctx) }() または
-      t.Cleanup(func() { container.Terminate(ctx) }) で確実に停止してください。
-      Ref: phonewave docs/adr/0007-testcontainers-docker-e2e.md
+      testcontainers.GenericContainer() で作成したコンテナに Terminate() が呼ばれていません。
+      Why: コンテナリソースがリークし、テスト後にポートやメモリが解放されません (Docker E2E testing)。
+      How: defer func() { container.Terminate(ctx) }() または t.Cleanup(func() { container.Terminate(ctx) }) で確実に停止してください。
     severity: ERROR
     patterns:
       - pattern: |
@@ -176,9 +166,8 @@ rules:
     languages: [go]
     message: |
       Docker E2E テスト (_docker_test.go) でモックを使用しないでください。
-      全ての依存は実サービスで構成してください。
-      モックが必要なテストは integration テストに移動してください。
-      Ref: phonewave docs/adr/0007-testcontainers-docker-e2e.md
+      Why: 全ての依存は実サービスで構成すべきです (Docker E2E testing)。
+      How: モックが必要なテストは integration テストに移動してください。
     severity: WARNING
     pattern-either:
       - pattern: gomock.NewController(...)
@@ -196,9 +185,8 @@ rules:
     languages: [go]
     message: |
       signal.Notify() ではなく signal.NotifyContext() を使用してください。
-      signal.NotifyContext は context のキャンセルチェーンに統合され、
-      goroutine リークのリスクも低減されます。
-      Ref: phonewave docs/adr/0008-signal-context-propagation.md
+      Why: signal.NotifyContext は context のキャンセルチェーンに統合され、goroutine リークのリスクも低減されます (signal context propagation)。
+      How: signal.Notify(ch, signals...) を ctx, stop := signal.NotifyContext(ctx, signals...) に置き換えてください。
     severity: ERROR
     pattern: signal.Notify(...)
     paths:
@@ -212,10 +200,8 @@ rules:
     languages: [go]
     message: |
       $CMD.Execute() ではなく $CMD.ExecuteContext(ctx) を使用してください。
-      Execute() ではシグナルコンテキストが cobra コマンドに伝播されません。
-      signal.NotifyContext で作成した ctx を渡すことで、
-      Ctrl+C 時にコマンドツリー全体が適切にキャンセルされます。
-      Ref: phonewave docs/adr/0008-signal-context-propagation.md
+      Why: Execute() ではシグナルコンテキストが cobra コマンドに伝播されず、Ctrl+C 時にキャンセルされません (signal context propagation)。
+      How: signal.NotifyContext で作成した ctx を $CMD.ExecuteContext(ctx) に渡してください。
     severity: ERROR
     pattern: $CMD.Execute()
     paths:
@@ -232,9 +218,8 @@ rules:
     languages: [go]
     message: |
       cobra コマンド内で os.Getwd() を使用しないでください。
-      状態ディレクトリは configBase(cmd) から取得してください。
-      CWD 依存はテストの非決定性とパスのずれを引き起こします。
-      Ref: phonewave docs/adr/0009-config-relative-state-directory.md
+      Why: CWD 依存はテストの非決定性とパスのずれを引き起こします (config-relative state directory)。
+      How: 状態ディレクトリは configBase(cmd) から取得してください。
     severity: WARNING
     patterns:
       - pattern: os.Getwd()
@@ -253,10 +238,8 @@ rules:
     languages: [go]
     message: |
       attribute.String() に SanitizeUTF8 でラップされていない変数を渡しています。
-      外部データ（Claude 出力、ファイルシステムイベント、エラーメッセージ）には
-      無効な UTF-8 バイトが含まれる可能性があり、OTel export 時にエラーになります。
-      platform.SanitizeUTF8(val) または SanitizeUTF8(val) でラップしてください。
-      文字列リテラルの場合は nosemgrep を付与してください。
+      Why: 外部データ（Claude 出力、ファイルシステムイベント、エラーメッセージ）には無効な UTF-8 バイトが含まれる可能性があり、OTel export 時にエラーになります。
+      How: platform.SanitizeUTF8(val) または SanitizeUTF8(val) でラップしてください。文字列リテラルの場合は nosemgrep を付与してください。
     severity: ERROR
     patterns:
       - pattern: attribute.String($KEY, $VAL)
@@ -269,8 +252,8 @@ rules:
     languages: [go]
     message: |
       attribute.StringSlice() に渡すスライスの各要素を SanitizeUTF8 でラップしてください。
-      platform.SanitizeUTF8Slice(vals) または SanitizeUTF8Slice(vals) でラップしてください。
-      外部データには無効な UTF-8 バイトが含まれる可能性があります。
+      Why: 外部データには無効な UTF-8 バイトが含まれる可能性があり、OTel export 時にエラーになります。
+      How: platform.SanitizeUTF8Slice(vals) または SanitizeUTF8Slice(vals) でラップしてください。
     severity: ERROR
     patterns:
       - pattern: attribute.StringSlice($KEY, $VAL)
@@ -285,9 +268,8 @@ rules:
     languages: [go]
     message: |
       "--output-format", "stream-json" を使用する場合は "--verbose" フラグが必須です。
-      Claude CLI 2.1.x では --print --output-format stream-json に --verbose が必要です。
-      --verbose がないと exit status 1 で即座に失敗します。
-      Ref: Shared ADR S0032 — CVD-friendly signal color palette (同 CLI 仕様変更時に発見)
+      Why: Claude CLI 2.1.x では --print --output-format stream-json に --verbose が必要で、ないと exit status 1 で即座に失敗します (S0032)。
+      How: "--verbose" を "--output-format", "stream-json" の前に追加してください。
     severity: ERROR
     patterns:
       - pattern: |
@@ -302,8 +284,8 @@ rules:
     languages: [go]
     message: |
       "--output-format", "stream-json" を append する前に "--verbose" を append してください。
-      Claude CLI 2.1.x では --verbose が必須です。
-      Ref: Shared ADR S0032
+      Why: Claude CLI 2.1.x では --verbose が必須で、ないと exit status 1 で即座に失敗します (S0032)。
+      How: $ARGS = append($ARGS, "--verbose") を "--output-format", "stream-json" の append の前に追加してください。
     severity: ERROR
     patterns:
       - pattern: |
@@ -312,20 +294,28 @@ rules:
           $ARGS = append($ARGS, "--verbose")
           ...
           $ARGS = append($ARGS, "--output-format", "stream-json")
+      - pattern-not-inside: |
+          $ARGS = append($ARGS, ..., "--verbose", ...)
+          ...
+          $ARGS = append($ARGS, "--output-format", "stream-json")
+    fix: |
+      $ARGS = append($ARGS, "--verbose", "--output-format", "stream-json")
 
   # Rule 18: []string literal with stream-json without --verbose
   - id: s0032-string-slice-stream-json-without-verbose
     languages: [go]
     message: |
-      []string リテラルに "--output-format", "stream-json" を含む場合、
-      "--verbose" も含めてください。Claude CLI 2.1.x では必須です。
-      Ref: Shared ADR S0032
+      []string リテラルに "--output-format", "stream-json" を含む場合、"--verbose" も含めてください。
+      Why: Claude CLI 2.1.x では --verbose が必須で、ないと exit status 1 で即座に失敗します (S0032)。
+      How: []string リテラルに "--verbose" を追加してください。
     severity: ERROR
     patterns:
       - pattern: |
           []string{..., "--output-format", "stream-json", ...}
       - pattern-not: |
           []string{..., "--verbose", ..., "--output-format", "stream-json", ...}
+      - pattern-not: |
+          []string{..., "--output-format", "stream-json", ..., "--verbose", ...}
 
   # --- D4: Resource leak detection ---
 
@@ -335,9 +325,8 @@ rules:
     languages: [go]
     message: |
       sql.Open() の後に defer $DB.Close() がありません。
-      データベース接続がリークし、SQLite の WAL ロックが解放されません。
-      struct に保存して別途 Close する場合は nosemgrep を付与してください。
-      Ref: CLAUDE.md (SQLite WAL cooperative model)
+      Why: データベース接続がリークし、SQLite の WAL ロックが解放されません (SQLite WAL cooperative model)。
+      How: defer $DB.Close() を追加してください。struct に保存して別途 Close する場合は nosemgrep を付与してください。
     severity: ERROR
     patterns:
       - pattern: |
