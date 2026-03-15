@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 
-	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
 )
 
@@ -27,34 +25,6 @@ var cmdBadExit = &cobra.Command{
 		os.Exit(1)
 		return nil
 	},
-}
-
-func badSignalNotify() {
-	ch := make(chan os.Signal, 1)
-	// ruleid: signal-notify-without-stop
-	signal.Notify(ch, os.Interrupt)
-}
-
-func goodSignalNotify() {
-	ch := make(chan os.Signal, 1)
-	// ok: signal-notify-without-stop
-	signal.Notify(ch, os.Interrupt)
-	defer signal.Stop(ch)
-}
-
-func badSemverMustParse() {
-	// ruleid: semver-must-parse-panic
-	_ = semver.MustParse("1.0.0")
-}
-
-func badDevTTY() error {
-	// ruleid: devtty-hard-fail-needs-fallback
-	tty, err := os.Open("/dev/tty")
-	if err != nil {
-		return err
-	}
-	_ = tty
-	return nil
 }
 
 // === WARNING severity rules ===
@@ -101,7 +71,3 @@ func badOnFinalize() {
 	cobra.OnFinalize(func() {})
 }
 
-func badIsNotExist() {
-	// ruleid: prefer-errors-is-for-not-exist
-	_ = os.IsNotExist(nil)
-}

@@ -1,0 +1,68 @@
+rules:
+  # ==========================================================================
+  # General Go safety and correctness rules
+  # Applicable to any Go project — not cobra-specific
+  # ==========================================================================
+
+  - id: signal-notify-without-stop
+    languages: [go]
+    message: |
+      signal.Notify を呼んだ後に signal.Stop を defer していません。
+      Why: goroutine リークの原因になります。
+      How: defer signal.Stop(ch) を追加してください。
+    severity: ERROR
+    patterns:
+      - pattern: |
+          signal.Notify($CH, ...)
+      - pattern-not-inside: |
+          signal.Notify($CH, ...)
+          ...
+          defer signal.Stop($CH)
+      - pattern-not-inside: |
+          signal.Notify($CH, ...)
+          ...
+          signal.Stop($CH)
+
+  - id: semver-must-parse-panic
+    languages: [go]
+    message: |
+      semver.MustParse() は無効なバージョン文字列で panic します。
+      Why: 開発ビルド ("dev") やコミットハッシュが渡されると即 crash します。
+      How: semver.NewVersion() でエラーハンドリングしてください。
+    severity: ERROR
+    pattern: semver.MustParse($VERSION)
+
+  - id: prefer-errors-is-for-not-exist
+    languages: [go]
+    message: |
+      os.IsNotExist() は wrapped error をアンラップしません。
+      Why: fmt.Errorf("%w", err) 等で wrap された場合に検出できなくなります。
+      How: errors.Is(err, fs.ErrNotExist) を使用してください (Go 1.13+)。
+    severity: ERROR
+    pattern: os.IsNotExist(...)
+
+  - id: devtty-hard-fail-needs-fallback
+    languages: [go]
+    message: |
+      /dev/tty エラー時に即 return しています。
+      Why: Windows/CI 環境では /dev/tty が常に失敗し、コマンドが使用不能になります。
+      How: cmd.InOrStdin() へフォールバックしてください。
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $TTY, $ERR := os.Open("/dev/tty")
+          if $ERR != nil {
+            return ...
+          }
+
+  - id: raw-nanosecond-duration
+    languages: [go]
+    message: |
+      生のナノ秒リテラルは可読性が低いです。
+      Why: 9桁以上の数値は桁数を数えないと意味がわかりません。
+      How: time.Second, time.Minute 等の定数を使用してください (例: 5_000_000_000 → 5 * time.Second)。
+    severity: ERROR
+    pattern-regex: '(?<!["\x60])\b\d{9,}\b(?!["\x60])'
+    paths:
+      exclude:
+        - "*_test.go"
