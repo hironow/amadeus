@@ -518,25 +518,6 @@ rules:
       Why: embed はファイルシステム依存、text/template は I/O 寄りの責務であり、pure な domain 層に含めるべきではない
       How: template 責務は platform 層に配置してください
 
-  # --- Rule 23: No state dir literal in filepath.Join ---
-
-  - id: no-state-dir-literal-in-path-join
-    languages: [go]
-    severity: ERROR
-    pattern-either:
-      - pattern: filepath.Join($X, ".gate")
-      - pattern: filepath.Join($X, ".gate", ...)
-    paths:
-      include:
-        - "/internal/**"
-      exclude:
-        - "*_test.go"
-        - "/internal/domain/**"
-    message: |
-      filepath.Join での state dir literal ".gate" 直書きは禁止です。
-      Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
-      How: domain.StateDir 定数を使用してください
-
   # --- Rule: session must not implement event persistence (todo 73) ---
   - id: layer-session-no-event-persistence
     languages: [generic]
@@ -585,22 +566,6 @@ rules:
       Why: 過度な dot-chain は Law of Demeter に違反し、内部構造への密結合を引き起こす (Tell-Don't-Ask 原則)
       How: 中間オブジェクトに委譲メソッドを追加してください。誤検知の場合は nosemgrep を付与してください
 
-  # --- Rule: session 2-level dot-access prevention ---
-
-  - id: session-no-raw-session-field-access
-    languages: [go]
-    severity: ERROR
-    pattern-regex: '\b\w+\.Session\.\w+'
-    paths:
-      include:
-        - "/internal/session/**"
-      exclude:
-        - "*_test.go"
-    message: |
-      session 層で .Session.Method() の 2-level アクセスが検出されました。
-      Why: Session 構造体への直接アクセスは Law of Demeter に違反し、内部構造への密結合を生む (Tell-Don't-Ask 原則)
-      How: forwarding メソッド経由でアクセスしてください（例: x.Session.Method() → x.method()）
-
   # --- Rule: No hardcoded "claude" literal in exec arguments ---
 
   - id: config-no-hardcoded-claude-literal
@@ -642,3 +607,19 @@ rules:
       session 層での空文字 fallback 代入は禁止です。
       Why: session 層での fallback は config 設定ミスを隠蔽し、デフォルト値が散在して一貫性が壊れる
       How: config loading (session/config.go) で空文字チェックを行い、domain.Default* 定数を使用してください
+
+  # --- Rule: No raw .Session. field access (Law of Demeter) ---
+
+  - id: session-no-raw-session-field-access
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\b\w+\.Session\.\w+'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層で .Session.Method() の 2-level アクセスが検出されました。
+      Why: Session 構造体への直接アクセスは Law of Demeter に違反し、内部構造への密結合を生む (Tell-Don't-Ask 原則)
+      How: forwarding メソッド経由でアクセスしてください（例: x.Session.Method() → x.method()）

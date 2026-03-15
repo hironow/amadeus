@@ -1,0 +1,24 @@
+rules:
+  # ==========================================================================
+  # amadeus-specific layer rules
+  # Rules that reference amadeus domain concepts or literals
+  # ==========================================================================
+
+  # --- Rule: No state dir literal in filepath.Join ---
+
+  - id: no-state-dir-literal-in-path-join
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: filepath.Join($X, ".gate")
+      - pattern: filepath.Join($X, ".gate", ...)
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/domain/**"
+    message: |
+      filepath.Join での state dir literal ".gate" 直書きは禁止です。
+      Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
+      How: domain.StateDir 定数を使用してください
