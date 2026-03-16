@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 func TestStdinApprover_Yes(t *testing.T) {
@@ -258,4 +260,50 @@ type blockingReader struct{}
 
 func (r *blockingReader) Read(p []byte) (int, error) {
 	select {} //nolint:staticcheck // intentional blocking for test
+}
+
+func TestBuildApprover_AutoApprove(t *testing.T) {
+	// given
+	cfg := domain.FlagApproverConfig{AutoApprove: true}
+
+	// when
+	approver := session.BuildApprover(cfg, nil, nil)
+
+	// then
+	if _, ok := approver.(*port.AutoApprover); !ok {
+		t.Errorf("expected AutoApprover, got %T", approver)
+	}
+}
+
+func TestBuildApprover_CmdApprover(t *testing.T) {
+	// given
+	cfg := domain.FlagApproverConfig{ApproveCmd: "echo approve"}
+
+	// when
+	approver := session.BuildApprover(cfg, nil, nil)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected CmdApprover, got AutoApprover")
+	}
+}
+
+func TestBuildApprover_StdinApprover(t *testing.T) {
+	// given
+	cfg := domain.FlagApproverConfig{}
+	input := strings.NewReader("")
+
+	// when
+	approver := session.BuildApprover(cfg, input, new(bytes.Buffer))
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected StdinApprover, got AutoApprover")
+	}
 }
