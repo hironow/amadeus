@@ -33,6 +33,7 @@ amadeus sync [path] [flags]
   -l, --lang string     output language (ja, en)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
+  -q, --quiet           Suppress all stderr output
   -v, --verbose         verbose output
 ```
 
