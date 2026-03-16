@@ -58,6 +58,8 @@ func NewRootCommand() *cobra.Command {
 			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger.Header("amadeus", Version)
+			logger.Section(cmd.Name())
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("amadeus", Version)
 			shutdownMeter = initMeter("amadeus", Version)
