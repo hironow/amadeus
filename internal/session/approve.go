@@ -7,7 +7,23 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
+
+// BuildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writer) port.Approver {
+	switch {
+	case cfg.IsAutoApprove():
+		return &port.AutoApprover{}
+	case cfg.ApproveCmdString() != "":
+		return NewCmdApprover(cfg.ApproveCmdString())
+	default:
+		return NewStdinApprover(input, promptOut)
+	}
+}
 
 // StdinApprover prompts the human on a terminal and reads y/yes for approval.
 // Empty input or any other response is treated as denial (safe default).

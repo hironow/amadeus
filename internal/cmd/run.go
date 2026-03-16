@@ -107,16 +107,10 @@ If [path] is omitted, the current working directory is used. Requires
 			// Wire approver
 			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
 			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
-
-			var approver port.Approver
-			switch {
-			case autoApprove:
-				approver = &port.AutoApprover{}
-			case approveCmd != "":
-				approver = session.NewCmdApprover(approveCmd)
-			default:
-				approver = &port.AutoApprover{} // default: no gate
-			}
+			approver := session.BuildApprover(
+				domain.FlagApproverConfig{AutoApprove: autoApprove, ApproveCmd: approveCmd},
+				cmd.InOrStdin(), cmd.ErrOrStderr(),
+			)
 
 			// Wire notifier
 			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
