@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -11,16 +12,24 @@ import (
 
 // dataOut writes a formatted line to DataOut (stdout / machine-facing).
 func (a *Amadeus) dataOut(format string, args ...any) {
-	fmt.Fprintf(a.DataOut, "  "+format+"\n", args...)
+	w := a.DataOut
+	if w == nil {
+		w = io.Discard
+	}
+	fmt.Fprintf(w, "  "+format+"\n", args...)
 }
 
 // writeDataJSON marshals v as indented JSON and writes it to DataOut.
 func (a *Amadeus) writeDataJSON(v any) error {
+	w := a.DataOut
+	if w == nil {
+		w = io.Discard
+	}
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal JSON: %w", err)
 	}
-	fmt.Fprintln(a.DataOut, string(data))
+	fmt.Fprintln(w, string(data))
 	return nil
 }
 
