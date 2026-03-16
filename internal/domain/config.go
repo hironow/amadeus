@@ -32,6 +32,25 @@ const (
 // DefaultWaitTimeout is the default D-Mail waiting phase timeout.
 const DefaultWaitTimeout = 30 * time.Minute
 
+// ApproverConfig describes how approval behavior is configured.
+// Implemented by FlagApproverConfig. Used by session.BuildApprover.
+type ApproverConfig interface {
+	IsAutoApprove() bool
+	ApproveCmdString() string
+}
+
+// FlagApproverConfig adapts CLI flag values to the ApproverConfig interface.
+type FlagApproverConfig struct {
+	AutoApprove bool
+	ApproveCmd  string
+}
+
+// IsAutoApprove reports whether auto-approve is enabled.
+func (f FlagApproverConfig) IsAutoApprove() bool { return f.AutoApprove }
+
+// ApproveCmdString returns the approval command string.
+func (f FlagApproverConfig) ApproveCmdString() string { return f.ApproveCmd }
+
 // Config holds the complete Amadeus configuration.
 type Config struct {
 	Lang            string            `yaml:"lang"`

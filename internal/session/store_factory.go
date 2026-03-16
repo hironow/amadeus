@@ -2,6 +2,9 @@ package session
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -10,6 +13,16 @@ import (
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
+
+// EnsureRunDir creates the .run/ directory under stateDir if it does not exist.
+// Call once before opening stores that write to .run/ (idempotent).
+func EnsureRunDir(stateDir string) error {
+	runDir := filepath.Join(stateDir, ".run")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return fmt.Errorf("ensure run dir: %w", err)
+	}
+	return nil
+}
 
 // NewEventStore creates an event store for the given state directory.
 // eventsource is the event persistence adapter (AWS Event Sourcing pattern).

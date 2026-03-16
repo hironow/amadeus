@@ -8,7 +8,7 @@ tool=$(basename "$(pwd)")
 
 # --- Mandatory items ---
 for item in .dockerignore .github .gitignore .goreleaser.yaml \
-    .markdownlint-cli2.yaml .markdownlint.json .mcp.json \
+    .markdownlint-cli2.yaml .markdownlint.json \
     .pre-commit-config.yaml .semgrep .semgrepignore \
     LICENSE README.md cmd doc.go docker docs go.mod go.sum \
     internal justfile mise.toml scripts tests; do

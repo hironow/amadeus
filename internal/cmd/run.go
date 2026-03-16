@@ -104,19 +104,16 @@ If [path] is omitted, the current working directory is used. Requires
 				cfg.Lang = lang
 			}
 
-			// Wire approver
-			autoApprove, _ := cmd.Flags().GetBool("auto-approve")
+			// Wire approver (default: no gate — amadeus uses explicit --approve-cmd to enable)
 			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
-
-			var approver port.Approver
-			switch {
-			case autoApprove:
-				approver = &port.AutoApprover{}
-			case approveCmd != "":
-				approver = session.NewCmdApprover(approveCmd)
-			default:
-				approver = &port.AutoApprover{} // default: no gate
+			autoApprove := approveCmd == ""
+			if v, _ := cmd.Flags().GetBool("auto-approve"); v {
+				autoApprove = true
 			}
+			approver := session.BuildApprover(
+				domain.FlagApproverConfig{AutoApprove: autoApprove, ApproveCmd: approveCmd},
+				cmd.InOrStdin(), cmd.ErrOrStderr(),
+			)
 
 			// Wire notifier
 			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
