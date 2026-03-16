@@ -307,3 +307,34 @@ func TestBuildApprover_StdinApprover(t *testing.T) {
 		t.Error("expected StdinApprover, got AutoApprover")
 	}
 }
+
+func TestAutoApprover_AlwaysApproves(t *testing.T) {
+	// given
+	a := &port.AutoApprover{}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected AutoApprover to always approve")
+	}
+}
+
+func TestStdinApprover_ShowsMessage(t *testing.T) {
+	// given
+	input := strings.NewReader("y\n")
+	out := new(bytes.Buffer)
+	a := session.NewStdinApprover(input, out)
+
+	// when
+	a.RequestApproval(context.Background(), "Continue check?")
+
+	// then
+	if !strings.Contains(out.String(), "Continue? [y/N]") {
+		t.Errorf("prompt not shown, got: %q", out.String())
+	}
+}
