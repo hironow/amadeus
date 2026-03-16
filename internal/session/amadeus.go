@@ -209,11 +209,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	defer cleanup()
 
 	if opts.DryRun {
-		w := a.DataOut
-		if w == nil {
-			w = io.Discard
-		}
-		fmt.Fprintln(w, prompt)
+		fmt.Fprintln(a.DataOut, prompt)
 		return nil
 	}
 
