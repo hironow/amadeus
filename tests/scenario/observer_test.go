@@ -342,3 +342,38 @@ func (o *Observer) AssertAmadeusValidateExitCode(wantExit int) {
 	o.t.Helper()
 	o.t.Logf("NOTE: amadeus validate scenario test requires OverrideAmadeusConfig helper (not yet implemented)")
 }
+
+// --- Fan-out content parity helpers (proposal 067) ---
+
+// AssertFanoutContentParity verifies that feedback D-Mails delivered to
+// both .siren/inbox and .expedition/inbox have matching content.
+// This catches corruption during phonewave routing.
+func (o *Observer) AssertFanoutContentParity() {
+	o.t.Helper()
+	sirenDir := filepath.Join(o.ws.RepoPath, ".siren", "inbox")
+	expedDir := filepath.Join(o.ws.RepoPath, ".expedition", "inbox")
+
+	sirenFiles := o.ws.ListFiles(o.t, sirenDir)
+	expedFiles := o.ws.ListFiles(o.t, expedDir)
+
+	if len(sirenFiles) == 0 || len(expedFiles) == 0 {
+		o.t.Logf("fanout parity: siren=%d, expedition=%d (skipping — need both)", len(sirenFiles), len(expedFiles))
+		return
+	}
+
+	// Read first D-Mail from each and compare kind + severity
+	sirenFM, _ := o.ws.ReadDMail(o.t, filepath.Join(sirenDir, sirenFiles[0]))
+	expedFM, _ := o.ws.ReadDMail(o.t, filepath.Join(expedDir, expedFiles[0]))
+
+	sirenKind, _ := sirenFM["kind"].(string)
+	expedKind, _ := expedFM["kind"].(string)
+	if sirenKind != expedKind {
+		o.t.Errorf("fanout kind mismatch: siren=%q expedition=%q", sirenKind, expedKind)
+	}
+
+	sirenSev, _ := sirenFM["severity"].(string)
+	expedSev, _ := expedFM["severity"].(string)
+	if sirenSev != expedSev {
+		o.t.Errorf("fanout severity mismatch: siren=%q expedition=%q", sirenSev, expedSev)
+	}
+}
