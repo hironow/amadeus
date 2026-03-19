@@ -3,6 +3,7 @@
 package scenario_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -117,4 +118,100 @@ func (o *Observer) WaitForClosedLoop(timeout time.Duration) {
 	o.ws.WaitForDMail(o.t, ".expedition", "inbox", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".gate", "archive", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".siren", "inbox", stepTimeout)
+}
+
+// --- Prompt assertion helpers (009, 001, 013) ---
+
+// AssertPromptCount verifies that fake-claude was called exactly wantCount times
+// by counting log files in PromptLogDir. A count of 0 suggests the real API
+// may have been called instead of fake-claude.
+func (o *Observer) AssertPromptCount(wantCount int) {
+	o.t.Helper()
+	entries, err := os.ReadDir(o.ws.PromptLogDir())
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir %s: %v", o.ws.PromptLogDir(), err)
+	}
+	got := len(entries)
+	if got != wantCount {
+		if got == 0 {
+			o.t.Errorf("prompt count: got 0, want %d — fake-claude may not have been invoked (real API called?)", wantCount)
+		} else {
+			o.t.Errorf("prompt count: got %d, want %d", got, wantCount)
+		}
+	}
+}
+
+// AssertPromptContains verifies that at least one logged prompt contains
+// all of the specified substrings. This ensures the LLM Judge received
+// the expected input (e.g., ADR file references, DoD content).
+func (o *Observer) AssertPromptContains(wantSubstrings []string) {
+	o.t.Helper()
+	entries, err := os.ReadDir(o.ws.PromptLogDir())
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir: %v", err)
+	}
+	if len(entries) == 0 {
+		o.t.Fatal("no prompt logs found — cannot verify prompt content")
+	}
+
+	for _, substr := range wantSubstrings {
+		found := false
+		for _, entry := range entries {
+			data, err := os.ReadFile(filepath.Join(o.ws.PromptLogDir(), entry.Name()))
+			if err != nil {
+				continue
+			}
+			if strings.Contains(string(data), substr) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			o.t.Errorf("prompt content: no logged prompt contains %q", substr)
+		}
+	}
+}
+
+// AssertPromptQuality is a composite guard that verifies both call count
+// and prompt content in a single call. Combines AssertPromptCount and
+// AssertPromptContains for convenience.
+func (o *Observer) AssertPromptQuality(wantCount int, wantContains []string) {
+	o.t.Helper()
+	o.AssertPromptCount(wantCount)
+	if len(wantContains) > 0 {
+		o.AssertPromptContains(wantContains)
+	}
+}
+
+// --- D-Mail field assertion helpers (004) ---
+
+// AssertDMailSeverity verifies that a D-Mail file has the expected severity
+// field in its frontmatter. This tests the CalcDivergence → DetermineSeverity
+// → D-Mail frontmatter pipeline end-to-end.
+func (o *Observer) AssertDMailSeverity(path, expectedSeverity string) {
+	o.t.Helper()
+	fm, _ := o.ws.ReadDMail(o.t, path)
+	severity, ok := fm["severity"].(string)
+	if !ok {
+		o.t.Errorf("D-Mail %s: missing severity field in frontmatter", path)
+		return
+	}
+	if severity != expectedSeverity {
+		o.t.Errorf("D-Mail %s: got severity %q, want %q", path, severity, expectedSeverity)
+	}
+}
+
+// AssertDMailAction verifies that a D-Mail file has the expected action
+// field in its frontmatter (e.g., "escalate", "monitor", "none").
+func (o *Observer) AssertDMailAction(path, expectedAction string) {
+	o.t.Helper()
+	fm, _ := o.ws.ReadDMail(o.t, path)
+	action, ok := fm["action"].(string)
+	if !ok {
+		o.t.Errorf("D-Mail %s: missing action field in frontmatter", path)
+		return
+	}
+	if action != expectedAction {
+		o.t.Errorf("D-Mail %s: got action %q, want %q", path, action, expectedAction)
+	}
 }
