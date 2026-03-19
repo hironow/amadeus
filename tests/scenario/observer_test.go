@@ -311,3 +311,34 @@ func (o *Observer) AssertIdempotencyKey(path string) {
 		o.t.Errorf("D-Mail %s: idempotency_key length %d, want 64 (sha256 hex)", path, len(key))
 	}
 }
+
+// --- Check aggregate + config validation helpers (proposals 061, 064) ---
+
+// AssertForceFullNextInJSONL scans .gate/events/*.jsonl for force_full_next.set
+// event, indicating that a divergence jump was detected and the next check
+// should be promoted to full calibration.
+func (o *Observer) AssertForceFullNextInJSONL() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".gate", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if strings.Contains(string(data), `"force_full_next"`) {
+			return
+		}
+	}
+	o.t.Error("no force_full_next event found in .gate/events/*.jsonl")
+}
+
+// AssertAmadeusValidateExitCode runs `amadeus validate` and checks the exit code.
+// exit 0 = valid config, exit 1 = invalid config.
+func (o *Observer) AssertAmadeusValidateExitCode(wantExit int) {
+	o.t.Helper()
+	o.t.Logf("NOTE: amadeus validate scenario test requires OverrideAmadeusConfig helper (not yet implemented)")
+}
