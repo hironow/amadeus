@@ -1,0 +1,10 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 0, "details": "Clean"},
+    "dod_fulfillment": {"score": 0, "details": "Clean"},
+    "dependency_integrity": {"score": 0, "details": "Clean"},
+    "implicit_constraints": {"score": 0, "details": "No issues"}
+  },
+  "dmails": [],
+  "reasoning": "No divergence detected. All axes score zero."
+}

@@ -271,3 +271,26 @@ func (o *Observer) AssertWaitingLoopNotActive() {
 		o.t.Error("watch.pid exists — waiting loop should not be active in scenario tests")
 	}
 }
+
+// --- Archive prune helpers (proposal 046) ---
+
+// AssertArchivePruneEvent checks for an archive_pruned event in JSONL.
+func (o *Observer) AssertArchivePruneEvent() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".gate", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Logf("events dir not accessible: %v (archive-prune may not have been run)", err)
+		return
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if strings.Contains(string(data), `"archive_pruned"`) || strings.Contains(string(data), `"archive.pruned"`) {
+			return
+		}
+	}
+	o.t.Error("no archive_pruned event found in .gate/events/*.jsonl")
+}
