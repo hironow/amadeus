@@ -215,3 +215,21 @@ func (o *Observer) AssertDMailAction(path, expectedAction string) {
 		o.t.Errorf("D-Mail %s: got action %q, want %q", path, action, expectedAction)
 	}
 }
+
+// --- Diff check assertion helpers (proposal 025) ---
+
+// AssertDMailCount verifies the number of D-Mail .md files in a mailbox directory.
+func (o *Observer) AssertDMailCount(toolDir, mailbox string, wantCount int) {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, toolDir, mailbox)
+	files := o.ws.ListFiles(o.t, dir)
+	var mdCount int
+	for _, f := range files {
+		if strings.HasSuffix(f, ".md") {
+			mdCount++
+		}
+	}
+	if mdCount != wantCount {
+		o.t.Errorf("%s/%s: got %d D-Mails, want %d", toolDir, mailbox, mdCount, wantCount)
+	}
+}
