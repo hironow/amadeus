@@ -1,0 +1,17 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 0, "details": "Clean"},
+    "dod_fulfillment": {"score": 0, "details": "Clean"},
+    "dependency_integrity": {"score": 85, "details": "Critical: go.mod adds unauthorized dependency"},
+    "implicit_constraints": {"score": 0, "details": "No issues"}
+  },
+  "dmails": [
+    {
+      "description": "Unauthorized dependency detected — triggers DepForceMedium override",
+      "detail": "go.mod adds github.com/unknown/unsafe-lib not listed in dependency allowlist. Dependency integrity score 85 exceeds force-medium threshold of 80.",
+      "issues": ["DEP-1"],
+      "targets": ["go.mod"]
+    }
+  ],
+  "reasoning": "Dependency integrity score 85 exceeds force-medium threshold of 80, escalating severity from low to medium."
+}
