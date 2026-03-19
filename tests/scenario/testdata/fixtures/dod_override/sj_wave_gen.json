@@ -1,0 +1,13 @@
+{
+  "cluster_name": "Auth",
+  "waves": [{
+    "id": "auth-w1",
+    "cluster_name": "Auth",
+    "title": "Add DoD",
+    "description": "Define acceptance criteria",
+    "status": "available",
+    "actions": [{"type": "add_dod", "issue_id": "AUTH-1", "description": "Add DoD for login", "detail": ""}],
+    "prerequisites": [],
+    "delta": {"before": 0.35, "after": 0.65}
+  }]
+}

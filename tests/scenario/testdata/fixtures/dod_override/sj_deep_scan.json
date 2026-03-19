@@ -1,0 +1,9 @@
+{
+  "name": "Auth",
+  "completeness": 0.35,
+  "issues": [
+    {"id": "AUTH-1", "identifier": "AUTH-1", "title": "Login flow", "completeness": 0.3, "gaps": ["DoD missing"]},
+    {"id": "AUTH-2", "identifier": "AUTH-2", "title": "Token refresh", "completeness": 0.4, "gaps": ["Tests missing"]}
+  ],
+  "observations": ["Auth depends on API"]
+}
