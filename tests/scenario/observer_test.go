@@ -233,3 +233,41 @@ func (o *Observer) AssertDMailCount(toolDir, mailbox string, wantCount int) {
 		o.t.Errorf("%s/%s: got %d D-Mails, want %d", toolDir, mailbox, mdCount, wantCount)
 	}
 }
+
+// --- Convergence and inbox watcher helpers (proposals 037, 038) ---
+
+// AssertConvergenceDMail verifies that a convergence D-Mail was generated
+// in the .gate archive after divergence dropped below threshold.
+func (o *Observer) AssertConvergenceDMail() {
+	o.t.Helper()
+	o.AssertArchiveContains(".gate", []string{"convergence"})
+}
+
+// AssertNoConvergenceDMail verifies that no convergence D-Mail exists
+// in the .gate archive (divergence still above threshold).
+func (o *Observer) AssertNoConvergenceDMail() {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, ".gate", "archive")
+	files := o.ws.ListFiles(o.t, dir)
+	for _, f := range files {
+		if !strings.HasSuffix(f, ".md") {
+			continue
+		}
+		path := filepath.Join(dir, f)
+		fm, _ := o.ws.ReadDMail(o.t, path)
+		if kind, ok := fm["kind"].(string); ok && kind == "convergence" {
+			o.t.Error("unexpected convergence D-Mail found in .gate/archive")
+			return
+		}
+	}
+}
+
+// AssertWaitingLoopNotActive verifies that amadeus is not in daemon/waiting
+// mode. Checks that no .gate/run/watch.pid file exists.
+func (o *Observer) AssertWaitingLoopNotActive() {
+	o.t.Helper()
+	pidPath := filepath.Join(o.ws.RepoPath, ".gate", "run", "watch.pid")
+	if _, err := os.Stat(pidPath); err == nil {
+		o.t.Error("watch.pid exists — waiting loop should not be active in scenario tests")
+	}
+}
