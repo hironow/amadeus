@@ -294,3 +294,20 @@ func (o *Observer) AssertArchivePruneEvent() {
 	}
 	o.t.Error("no archive_pruned event found in .gate/events/*.jsonl")
 }
+
+// --- Idempotency key helpers (proposal 055) ---
+
+// AssertIdempotencyKey reads a D-Mail file and verifies it contains a
+// non-empty idempotency_key field in frontmatter (64-char hex hash).
+func (o *Observer) AssertIdempotencyKey(path string) {
+	o.t.Helper()
+	fm, _ := o.ws.ReadDMail(o.t, path)
+	key, ok := fm["idempotency_key"].(string)
+	if !ok || key == "" {
+		o.t.Errorf("D-Mail %s: missing or empty idempotency_key", path)
+		return
+	}
+	if len(key) != 64 {
+		o.t.Errorf("D-Mail %s: idempotency_key length %d, want 64 (sha256 hex)", path, len(key))
+	}
+}
