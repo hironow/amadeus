@@ -235,6 +235,31 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 	return nil
 }
 
+// EntryCount returns the number of entries (non-empty lines) in the index file.
+// Returns 0 if the file does not exist.
+func (w *IndexWriter) EntryCount(indexPath string) (int, error) {
+	f, err := os.Open(indexPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("open index: %w", err)
+	}
+	defer f.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
+			count++
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return count, fmt.Errorf("scan index: %w", err)
+	}
+	return count, nil
+}
+
 var indexDirs = []string{"archive", "journal", "journals", "insights"}
 
 // Rebuild scans known subdirectories for .md files, extracts metadata, and
