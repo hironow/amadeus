@@ -3,7 +3,9 @@ package session
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -240,7 +242,7 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 func (w *IndexWriter) EntryCount(indexPath string) (int, error) {
 	f, err := os.Open(indexPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return 0, nil
 		}
 		return 0, fmt.Errorf("open index: %w", err)
