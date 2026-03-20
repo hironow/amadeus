@@ -168,6 +168,60 @@ func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
 	}
 }
 
+func TestDetermineSeverity_ImplicitOverrideForceMedium(t *testing.T) {
+	// given: low divergence but high implicit_constraints score with override configured
+	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 90},
+	}}
+	cfg := domain.DefaultThresholds()
+	cfg.PerAxisOverride.ImplicitForceMedium = 80
+
+	// when
+	sev := domain.DetermineSeverity(result, cfg)
+
+	// then
+	if sev.Severity != domain.SeverityMedium {
+		t.Errorf("expected medium (implicit override), got %s", sev.Severity)
+	}
+	if !sev.Overridden {
+		t.Error("expected override flag to be true")
+	}
+}
+
+func TestDetermineSeverity_ImplicitOverrideBelowThreshold(t *testing.T) {
+	// given: implicit score below override threshold
+	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 50},
+	}}
+	cfg := domain.DefaultThresholds()
+	cfg.PerAxisOverride.ImplicitForceMedium = 80
+
+	// when
+	sev := domain.DetermineSeverity(result, cfg)
+
+	// then
+	if sev.Severity != domain.SeverityLow {
+		t.Errorf("expected low (below threshold), got %s", sev.Severity)
+	}
+}
+
+func TestDetermineSeverity_ImplicitOverrideZeroDisabled(t *testing.T) {
+	// given: ImplicitForceMedium=0 (default/disabled) should not trigger
+	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 90},
+	}}
+	cfg := domain.DefaultThresholds()
+	// ImplicitForceMedium is 0 by default
+
+	// when
+	sev := domain.DetermineSeverity(result, cfg)
+
+	// then: should remain low since override is disabled
+	if sev.Severity != domain.SeverityLow {
+		t.Errorf("expected low (override disabled), got %s", sev.Severity)
+	}
+}
+
 func TestNormalizeSeverity(t *testing.T) {
 	tests := []struct {
 		name     string

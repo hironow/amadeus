@@ -81,9 +81,10 @@ type Thresholds struct {
 
 // PerAxisOverride holds per-axis critical thresholds that escalate severity.
 type PerAxisOverride struct {
-	ADRForceHigh   int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
-	DoDForceHigh   int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
-	DepForceMedium int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
+	ADRForceHigh       int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
+	DoDForceHigh       int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
+	DepForceMedium     int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
+	ImplicitForceMedium int `yaml:"implicit_constraints_force_medium" json:"implicit_constraints_force_medium"`
 }
 
 // SeverityConfig combines thresholds and per-axis overrides.
@@ -185,6 +186,12 @@ func DetermineSeverity(result DivergenceResult, config SeverityConfig) Divergenc
 		severity = SeverityHigh
 	}
 	if result.Axes[AxisDependency].Score >= config.PerAxisOverride.DepForceMedium {
+		if severity == SeverityLow {
+			overridden = true
+			severity = SeverityMedium
+		}
+	}
+	if config.PerAxisOverride.ImplicitForceMedium > 0 && result.Axes[AxisImplicit].Score >= config.PerAxisOverride.ImplicitForceMedium {
 		if severity == SeverityLow {
 			overridden = true
 			severity = SeverityMedium
