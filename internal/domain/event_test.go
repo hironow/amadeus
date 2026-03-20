@@ -508,6 +508,92 @@ func TestTrimCheckHistory_DefaultMaxKeep(t *testing.T) {
 	}
 }
 
+func TestClassifyStopReason_TableDriven(t *testing.T) {
+	cases := []struct {
+		reason   string
+		expected domain.StopCategory
+	}{
+		// Graceful patterns
+		{"", domain.StopGraceful},
+		{"normal exit", domain.StopGraceful},
+		{"context canceled", domain.StopGraceful},
+		{"context deadline exceeded", domain.StopGraceful}, // must NOT match transient
+		// User patterns
+		{"signal", domain.StopUser},
+		{"SIGTERM received", domain.StopUser},
+		{"user requested shutdown", domain.StopUser},
+		// IO error patterns
+		{"read error", domain.StopIOError},
+		{"write failed", domain.StopIOError},
+		{"EOF encountered", domain.StopIOError},
+		// Transient patterns
+		{"timeout", domain.StopTransient},
+		{"connection refused", domain.StopTransient},
+		{"temporary failure", domain.StopTransient},
+		// Unknown fallback
+		{"unexpected panic xyz", domain.StopUnknown},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.reason, func(t *testing.T) {
+			// when
+			got := domain.ClassifyStopReason(tc.reason)
+
+			// then
+			if got != tc.expected {
+				t.Errorf("ClassifyStopReason(%q) = %q, want %q", tc.reason, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestIsCriticalStop_OnlyIOErrorIsCritical(t *testing.T) {
+	cases := []struct {
+		cat      domain.StopCategory
+		critical bool
+	}{
+		{domain.StopGraceful, false},
+		{domain.StopUser, false},
+		{domain.StopIOError, true},
+		{domain.StopTransient, false},
+		{domain.StopUnknown, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.cat), func(t *testing.T) {
+			// when
+			got := domain.IsCriticalStop(tc.cat)
+
+			// then
+			if got != tc.critical {
+				t.Errorf("IsCriticalStop(%q) = %v, want %v", tc.cat, got, tc.critical)
+			}
+		})
+	}
+}
+
+func TestStopCategoryConstants(t *testing.T) {
+	// given: all stop category constants must be distinct non-empty strings
+	cats := []domain.StopCategory{
+		domain.StopGraceful,
+		domain.StopUser,
+		domain.StopIOError,
+		domain.StopTransient,
+		domain.StopUnknown,
+	}
+
+	seen := make(map[domain.StopCategory]bool)
+	for _, c := range cats {
+		if c == "" {
+			t.Error("found empty StopCategory constant")
+		}
+		if seen[c] {
+			t.Errorf("duplicate StopCategory: %q", c)
+		}
+		seen[c] = true
+	}
+}
+
 func TestConvergenceDetectedDataMarshalRoundTrip(t *testing.T) {
 	// given
 	data := domain.ConvergenceDetectedData{
