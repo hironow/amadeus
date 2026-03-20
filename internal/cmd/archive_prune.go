@@ -125,6 +125,7 @@ Pass --execute to actually remove the files.`,
 					if execErr != nil {
 						return execErr
 					}
+					rebuildIndexAfterPrune(divRoot, logger)
 					out.ArchiveDeleted = len(result.ArchiveCandidates)
 					out.EventDeleted = totalCount - len(result.ArchiveCandidates)
 				}
@@ -191,6 +192,7 @@ Pass --execute to actually remove the files.`,
 			if err != nil {
 				return err
 			}
+			rebuildIndexAfterPrune(divRoot, logger)
 
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)
 			return nil
@@ -204,6 +206,19 @@ Pass --execute to actually remove the files.`,
 	cmd.Flags().Bool("rebuild-index", false, "Rebuild archive index from existing files without pruning")
 
 	return cmd
+}
+
+// rebuildIndexAfterPrune compacts the archive index by rebuilding it,
+// removing entries for files that no longer exist on disk.
+func rebuildIndexAfterPrune(divRoot string, logger domain.Logger) {
+	indexPath := filepath.Join(divRoot, "archive", "index.jsonl")
+	iw := &session.IndexWriter{}
+	n, err := iw.Rebuild(indexPath, divRoot, "amadeus")
+	if err != nil {
+		logger.Warn("index compaction: %v", err)
+	} else {
+		logger.Info("Compacted index: %d entries → %s", n, indexPath)
+	}
 }
 
 // indexArchiveCandidates indexes .md archive candidates before deletion.
