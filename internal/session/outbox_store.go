@@ -248,6 +248,33 @@ func (s *SQLiteOutboxStore) PruneFlushed(ctx context.Context) (int, error) {
 	return int(deleted), nil
 }
 
+// DeadLetterCount returns the number of items that have exceeded maxRetryCount
+// and are permanently stuck in the staging table.
+func (s *SQLiteOutboxStore) DeadLetterCount(ctx context.Context) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: dead letter count: %w", err)
+	}
+	return count, nil
+}
+
+// PurgeDeadLetters deletes items that have exceeded maxRetryCount.
+// Returns the number of purged items.
+func (s *SQLiteOutboxStore) PurgeDeadLetters(ctx context.Context) (int, error) {
+	result, err := s.db.ExecContext(ctx,
+		`DELETE FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount)
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: purge dead letters: %w", err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: rows affected: %w", err)
+	}
+	return int(deleted), nil
+}
+
 // IncrementalVacuum reclaims free pages without acquiring an exclusive lock.
 // Call after bulk deletes (e.g., archive-prune) to shrink the DB file.
 // Requires PRAGMA auto_vacuum=INCREMENTAL set at DB open time.
