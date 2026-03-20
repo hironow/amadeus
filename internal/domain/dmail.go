@@ -184,6 +184,23 @@ func validateTargets(targets []string) []string {
 	return errs
 }
 
+// SanitizeTargets removes self-referencing targets from a D-Mail's target list.
+// It filters out targets that match the sender identity or the kind string prefix,
+// preventing routing loops where a D-Mail targets itself.
+func SanitizeTargets(senderIdentity string, kind DMailKind, targets []string) []string {
+	var result []string
+	for _, target := range targets {
+		if target == senderIdentity {
+			continue
+		}
+		if target == string(kind) {
+			continue
+		}
+		result = append(result, target)
+	}
+	return result
+}
+
 // ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
 func ParseDMail(data []byte) (DMail, error) {
 	str := string(data)

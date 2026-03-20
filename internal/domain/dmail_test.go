@@ -1078,6 +1078,40 @@ func TestValidateDMail_NoTargets_IsValid(t *testing.T) {
 	}
 }
 
+func TestSanitizeTargets_RemovesSelfReference(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"auth/session.go", "amadeus", "api/handler.go"})
+	if len(targets) != 2 {
+		t.Fatalf("expected 2 targets, got %d: %v", len(targets), targets)
+	}
+	if targets[0] != "auth/session.go" || targets[1] != "api/handler.go" {
+		t.Errorf("unexpected targets: %v", targets)
+	}
+}
+
+func TestSanitizeTargets_RemovesKindPrefix(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"design-feedback", "auth/session.go"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d: %v", len(targets), targets)
+	}
+	if targets[0] != "auth/session.go" {
+		t.Errorf("unexpected target: %v", targets)
+	}
+}
+
+func TestSanitizeTargets_NothingToRemove(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"auth/session.go", "api/handler.go"})
+	if len(targets) != 2 {
+		t.Fatalf("expected 2 targets, got %d: %v", len(targets), targets)
+	}
+}
+
+func TestSanitizeTargets_EmptyTargets(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, nil)
+	if targets != nil {
+		t.Errorf("expected nil, got %v", targets)
+	}
+}
+
 func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test", Body: "Content.\n"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
