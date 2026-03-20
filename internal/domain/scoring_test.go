@@ -355,6 +355,65 @@ func TestResolveFeedbackKinds_Disagreement(t *testing.T) {
 	}
 }
 
+func TestValidateAxesPresent_AllPresent(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+		domain.AxisImplicit:   {Score: 40},
+	}
+	missing := domain.ValidateAxesPresent(axes)
+	if len(missing) != 0 {
+		t.Errorf("expected no missing axes, got %v", missing)
+	}
+}
+
+func TestValidateAxesPresent_MissingOne(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+	}
+	missing := domain.ValidateAxesPresent(axes)
+	if len(missing) != 1 {
+		t.Fatalf("expected 1 missing axis, got %d: %v", len(missing), missing)
+	}
+	if missing[0] != domain.AxisImplicit {
+		t.Errorf("expected missing axis %q, got %q", domain.AxisImplicit, missing[0])
+	}
+}
+
+func TestValidateAxesPresent_EmptyMap(t *testing.T) {
+	missing := domain.ValidateAxesPresent(map[domain.Axis]domain.AxisScore{})
+	if len(missing) != 4 {
+		t.Errorf("expected 4 missing axes, got %d", len(missing))
+	}
+}
+
+func TestValidateAxesPresent_NilMap(t *testing.T) {
+	missing := domain.ValidateAxesPresent(nil)
+	if len(missing) != 4 {
+		t.Errorf("expected 4 missing axes, got %d", len(missing))
+	}
+}
+
+func TestRequiredAxes_Contains_AllFourAxes(t *testing.T) {
+	expected := map[domain.Axis]bool{
+		domain.AxisADR:        true,
+		domain.AxisDoD:        true,
+		domain.AxisDependency: true,
+		domain.AxisImplicit:   true,
+	}
+	if len(domain.RequiredAxes) != 4 {
+		t.Fatalf("expected 4 required axes, got %d", len(domain.RequiredAxes))
+	}
+	for _, axis := range domain.RequiredAxes {
+		if !expected[axis] {
+			t.Errorf("unexpected required axis: %q", axis)
+		}
+	}
+}
+
 func TestDivergenceMeter_ProcessResponse_HighSeverity(t *testing.T) {
 	meter := &domain.DivergenceMeter{
 		Config: domain.DefaultConfig(),

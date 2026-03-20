@@ -106,6 +106,21 @@ func DefaultThresholds() SeverityConfig {
 	}
 }
 
+// RequiredAxes lists the axes that must be present for a valid divergence calculation.
+var RequiredAxes = []Axis{AxisADR, AxisDoD, AxisDependency, AxisImplicit}
+
+// ValidateAxesPresent checks that all required axes are present in the map.
+// Returns a list of missing axis names, or nil if all are present.
+func ValidateAxesPresent(axes map[Axis]AxisScore) []Axis {
+	var missing []Axis
+	for _, axis := range RequiredAxes {
+		if _, ok := axes[axis]; !ok {
+			missing = append(missing, axis)
+		}
+	}
+	return missing
+}
+
 // CalcDivergence computes the weighted divergence score from axis scores.
 func CalcDivergence(axes map[Axis]AxisScore, weights Weights) DivergenceResult {
 	internal := float64(axes[AxisADR].Score)*weights.ADRIntegrity +
