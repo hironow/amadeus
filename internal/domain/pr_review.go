@@ -34,15 +34,24 @@ func (pr PRReview) HasCIFailure() bool {
 // FormatPRReviewSummary formats a slice of PRReviews into a human-readable
 // summary string suitable for inclusion in a Claude prompt.
 // Returns empty string if no reviews are provided.
-// truncateRuneSafe truncates a string to at most maxRunes runes,
-// appending "..." if truncation occurs. This is safe for multi-byte
-// UTF-8 characters (Japanese, Chinese, etc.) unlike byte-level truncation.
+// truncationMarker is appended when a string is truncated.
+const truncationMarker = "...(truncated)"
+
+// truncateRuneSafe truncates a string to at most maxRunes runes (including
+// the truncation marker), appending "...(truncated)" if truncation occurs.
+// This is safe for multi-byte UTF-8 characters (Japanese, Chinese, etc.)
+// unlike byte-level truncation.
 func truncateRuneSafe(s string, maxRunes int) string {
 	if utf8.RuneCountInString(s) <= maxRunes {
 		return s
 	}
+	markerLen := utf8.RuneCountInString(truncationMarker)
+	cutAt := maxRunes - markerLen
+	if cutAt < 0 {
+		cutAt = 0
+	}
 	runes := []rune(s)
-	return string(runes[:maxRunes]) + "..."
+	return string(runes[:cutAt]) + truncationMarker
 }
 
 // totalBudgetRunes is the maximum rune count for the entire PR review summary.

@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -87,8 +88,8 @@ func TestFormatPRReviewSummary_TruncatesLongComments(t *testing.T) {
 	if strings.Contains(got, longBody) {
 		t.Error("long comment body should be truncated")
 	}
-	if !strings.Contains(got, "...") {
-		t.Error("truncated comment should end with ...")
+	if !strings.Contains(got, "...(truncated)") {
+		t.Error("truncated comment should end with ...(truncated)")
 	}
 }
 
@@ -119,8 +120,8 @@ func TestFormatPRReviewSummary_UTF8SafeTruncation(t *testing.T) {
 	if strings.Contains(got, japaneseBody) {
 		t.Error("expected Japanese comment to be truncated")
 	}
-	if !strings.Contains(got, "...") {
-		t.Error("truncated comment should end with ...")
+	if !strings.Contains(got, "...(truncated)") {
+		t.Error("truncated comment should end with ...(truncated)")
 	}
 }
 
@@ -137,6 +138,31 @@ func TestFormatPRReviewSummary_ShortCommentNotTruncated(t *testing.T) {
 	got := domain.FormatPRReviewSummary(reviews)
 	if !strings.Contains(got, body) {
 		t.Error("short comment should not be truncated")
+	}
+}
+
+func TestFormatPRReviewSummary_TotalBudgetEnforced(t *testing.T) {
+	// given: 50 PRs each with long comments that would exceed 8000 runes total
+	var reviews []domain.PRReview
+	for i := 0; i < 50; i++ {
+		reviews = append(reviews, domain.PRReview{
+			Number:         fmt.Sprintf("#%d", i+1),
+			ReviewDecision: "CHANGES_REQUESTED",
+			CIStatus:       "FAILURE",
+			Comments: []domain.PRComment{
+				{Author: "reviewer", Body: strings.Repeat("x", 400), State: "SUBMITTED"},
+				{Author: "author", Body: strings.Repeat("y", 400), State: "SUBMITTED"},
+			},
+		})
+	}
+
+	// when
+	got := domain.FormatPRReviewSummary(reviews)
+
+	// then: output must not exceed 8000 runes
+	runeCount := len([]rune(got))
+	if runeCount > 8000 {
+		t.Errorf("total budget exceeded: got %d runes, want <= 8000", runeCount)
 	}
 }
 
