@@ -29,6 +29,9 @@ func FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]port.PruneC
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
+		if e.Type()&os.ModeSymlink != 0 {
+			continue
+		}
 		info, err := e.Info()
 		if err != nil {
 			return nil, fmt.Errorf("stat %s: %w", e.Name(), err)

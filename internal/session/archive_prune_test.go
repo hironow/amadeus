@@ -185,6 +185,47 @@ func TestPruneFiles_DeletesFiles(t *testing.T) {
 	}
 }
 
+func TestFindPruneCandidates_IgnoresSymlinks(t *testing.T) {
+	// given: a symlink to an old .md file
+	dir := t.TempDir()
+	realFile := filepath.Join(dir, "real.md")
+	if err := os.WriteFile(realFile, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-31 * 24 * time.Hour)
+	if err := os.Chtimes(realFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	archiveDir := t.TempDir()
+	symlinkPath := filepath.Join(archiveDir, "linked.md")
+	if err := os.Symlink(realFile, symlinkPath); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+	// Also add a regular old file to confirm it IS picked up
+	regularFile := filepath.Join(archiveDir, "regular.md")
+	if err := os.WriteFile(regularFile, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(regularFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	candidates, err := session.FindPruneCandidates(archiveDir, 30*24*time.Hour)
+
+	// then
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate (regular file only), got %d", len(candidates))
+	}
+	if filepath.Base(candidates[0].Path) != "regular.md" {
+		t.Errorf("expected regular.md, got %s", filepath.Base(candidates[0].Path))
+	}
+}
+
 func TestPruneFiles_EmptyList(t *testing.T) {
 	// when
 	count, err := session.PruneFiles(nil)
