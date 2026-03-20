@@ -121,6 +121,7 @@ func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedDat
 func (a *CheckAggregate) RecordCheck(result CheckResult, now time.Time) ([]Event, error) {
 	result.CheckCountSinceFull = a.checkCount
 	result.ForceFullNext = a.forceFullNext
+	a.forceFullNext = false
 
 	checkEv, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: result}, now)
 	if err != nil {

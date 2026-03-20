@@ -192,6 +192,75 @@ func TestCheckAggregate_RecordCheck_GateDeniedFullCheckSkipsBaseline(t *testing.
 	}
 }
 
+func TestCheckAggregate_RecordCheck_ClearsForceFullNext(t *testing.T) {
+	// given: forceFullNext is true
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	agg.SetForceFullNext(true)
+	result := domain.CheckResult{
+		CheckedAt:  time.Now().UTC(),
+		Commit:     "abc123",
+		Type:       domain.CheckTypeFull,
+		Divergence: 0.15,
+	}
+
+	// when
+	_, err := agg.RecordCheck(result, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: forceFullNext should be cleared
+	if agg.ForceFullNext() {
+		t.Error("expected ForceFullNext to be false after RecordCheck")
+	}
+}
+
+func TestCheckAggregate_RecordCheck_ClearsForceFullNext_GateDenied(t *testing.T) {
+	// given: forceFullNext is true, check is gate-denied
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	agg.SetForceFullNext(true)
+	result := domain.CheckResult{
+		CheckedAt:  time.Now().UTC(),
+		Commit:     "abc123",
+		Type:       domain.CheckTypeFull,
+		Divergence: 0.15,
+		GateDenied: true,
+	}
+
+	// when
+	_, err := agg.RecordCheck(result, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: forceFullNext should be cleared even on gate-denied
+	if agg.ForceFullNext() {
+		t.Error("expected ForceFullNext to be false after gate-denied RecordCheck")
+	}
+}
+
+func TestCheckAggregate_RecordCheck_NoForceFullNext_RemainsFalse(t *testing.T) {
+	// given: forceFullNext is not set
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	result := domain.CheckResult{
+		CheckedAt:  time.Now().UTC(),
+		Commit:     "abc123",
+		Type:       domain.CheckTypeDiff,
+		Divergence: 0.15,
+	}
+
+	// when
+	_, err := agg.RecordCheck(result, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then
+	if agg.ForceFullNext() {
+		t.Error("expected ForceFullNext to remain false")
+	}
+}
+
 func TestCheckAggregate_RecordCheck_FullCheckProducesBaselineEvent(t *testing.T) {
 	// given
 	agg := domain.NewCheckAggregate(domain.DefaultConfig())
