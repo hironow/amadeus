@@ -151,6 +151,9 @@ func ValidateDMail(dmail DMail) []string {
 	if dmail.Action != "" && !validActions[dmail.Action] {
 		errs = append(errs, fmt.Sprintf("invalid action %q", dmail.Action))
 	}
+	if strings.TrimSpace(dmail.Body) == "" {
+		errs = append(errs, "body is required")
+	}
 	return errs
 }
 

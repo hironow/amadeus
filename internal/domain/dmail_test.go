@@ -247,6 +247,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 		Kind:          domain.KindDesignFeedback,
 		Description:   "ADR violation detected",
 		Severity:      domain.SeverityHigh,
+		Body:          "Details.\n",
 	}
 	errs := domain.ValidateDMail(dmail)
 	if len(errs) != 0 {
@@ -262,6 +263,7 @@ func TestValidateDMail_AllKinds(t *testing.T) {
 			Kind:          kind,
 			Description:   "test",
 			Severity:      domain.SeverityLow,
+			Body:          "Content.\n",
 		}
 		errs := domain.ValidateDMail(dmail)
 		if len(errs) != 0 {
@@ -326,6 +328,7 @@ func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 		Name:          "feedback-001",
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
+		Body:          "Content.\n",
 	}
 	errs := domain.ValidateDMail(dmail)
 	if len(errs) != 0 {
@@ -616,6 +619,7 @@ func TestValidateDMail_CIResultKind(t *testing.T) {
 		Name:          "ci-result-pr42-run1",
 		Kind:          domain.KindCIResult,
 		Description:   "GitHub Actions CI run for PR #42",
+		Body:          "CI results.\n",
 	}
 
 	// when
@@ -690,6 +694,7 @@ func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
 		Name:          "feedback-001",
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
+		Body:          "Content.\n",
 	}
 
 	// when
@@ -709,6 +714,7 @@ func TestValidateDMail_AllActions(t *testing.T) {
 			Kind:          domain.KindDesignFeedback,
 			Description:   "test",
 			Action:        action,
+			Body:          "Content.\n",
 		}
 		errs := domain.ValidateDMail(dmail)
 		if len(errs) != 0 {
@@ -906,15 +912,68 @@ func TestMarshalDMail_NilContextOmitted(t *testing.T) {
 	}
 }
 
+func TestValidateDMail_EmptyBody_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if e == "body is required" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'body is required' error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_WhitespaceOnlyBody_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "   \n\t  ",
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if e == "body is required" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'body is required' error for whitespace-only body, got %v", errs)
+	}
+}
+
+func TestValidateDMail_NonEmptyBody_IsValid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "# Details\n\nSome content.\n",
+	}
+	errs := domain.ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for non-empty body, got %v", errs)
+	}
+}
+
 func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
-	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test"}
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test", Body: "Content.\n"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 		t.Errorf("expected valid, got: %v", errs)
 	}
 }
 
 func TestValidateDMail_ImplFeedbackKind(t *testing.T) {
-	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindImplFeedback, Description: "test"}
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindImplFeedback, Description: "test", Body: "Content.\n"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 		t.Errorf("expected valid, got: %v", errs)
 	}

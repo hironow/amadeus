@@ -688,6 +688,7 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 		Severity:      domain.SeverityHigh,
+		Body:          "Content.\n",
 	}
 	data, err := domain.MarshalDMail(dmail)
 	if err != nil {
