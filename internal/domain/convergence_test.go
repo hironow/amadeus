@@ -348,6 +348,55 @@ func TestAnalyzeConvergence_DeduplicatesDMailNamesPerTarget(t *testing.T) {
 	}
 }
 
+func TestAnalyzeConvergence_DuplicateDMailEntries_Deduplicated(t *testing.T) {
+	// given: same D-Mail name appears as separate entries (event replay duplication)
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []domain.DMail{
+		{Name: "feedback-001", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-001", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-002", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+	}
+	cfg := domain.ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := domain.AnalyzeConvergence(dmails, cfg, now)
+
+	// then: deduplicated count is 2, not 3 — should NOT meet threshold
+	if len(alerts) != 0 {
+		t.Errorf("expected 0 alerts (duplicate entries should be deduplicated), got %d", len(alerts))
+	}
+}
+
+func TestAnalyzeConvergence_DuplicateDMailEntries_StillTriggersWhenGenuine(t *testing.T) {
+	// given: 3 distinct D-Mail names + 1 duplicate entry from replay
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []domain.DMail{
+		{Name: "feedback-001", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-001", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-002", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+		{Name: "feedback-003", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-20T12:00:00Z"}},
+	}
+	cfg := domain.ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := domain.AnalyzeConvergence(dmails, cfg, now)
+
+	// then: deduplicated count is 3 (unique names), meets threshold
+	if len(alerts) != 1 {
+		t.Fatalf("expected 1 alert, got %d", len(alerts))
+	}
+	if alerts[0].Count != 3 {
+		t.Errorf("expected count 3 after dedup, got %d", alerts[0].Count)
+	}
+}
+
 func TestAnalyzeConvergence_ExcludesConvergenceDMails(t *testing.T) {
 	// given: 2 feedback D-Mails + 1 convergence D-Mail targeting same area
 	// Without filtering, count=3 would meet threshold=3 and trigger an alert.
