@@ -1078,6 +1078,73 @@ func TestValidateDMail_NoTargets_IsValid(t *testing.T) {
 	}
 }
 
+func TestDMailIdempotencyKey_DifferentIssues_DifferentKey(t *testing.T) {
+	dmail1 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Issues: []string{"MY-42"},
+	}
+	dmail2 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Issues: []string{"MY-99"},
+	}
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
+	if key1 == key2 {
+		t.Error("different issues should produce different keys")
+	}
+}
+
+func TestDMailIdempotencyKey_DifferentSeverity_DifferentKey(t *testing.T) {
+	dmail1 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Severity: domain.SeverityLow,
+	}
+	dmail2 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Severity: domain.SeverityHigh,
+	}
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
+	if key1 == key2 {
+		t.Error("different severity should produce different keys")
+	}
+}
+
+func TestDMailIdempotencyKey_IssueOrderIndependent(t *testing.T) {
+	dmail1 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same.\n",
+		Issues: []string{"MY-42", "MY-99"},
+	}
+	dmail2 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same.\n",
+		Issues: []string{"MY-99", "MY-42"},
+	}
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
+	if key1 != key2 {
+		t.Error("same issues in different order should produce same key")
+	}
+}
+
+func TestDMailIdempotencyKey_DoesNotMutateIssues(t *testing.T) {
+	issues := []string{"MY-99", "MY-42"}
+	dmail := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "body.\n",
+		Issues: issues,
+	}
+	domain.DMailIdempotencyKey(dmail)
+	if issues[0] != "MY-99" || issues[1] != "MY-42" {
+		t.Error("original issues slice was mutated")
+	}
+}
+
 func TestSanitizeTargets_RemovesSelfReference(t *testing.T) {
 	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"auth/session.go", "amadeus", "api/handler.go"})
 	if len(targets) != 2 {

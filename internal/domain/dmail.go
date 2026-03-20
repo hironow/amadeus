@@ -237,7 +237,7 @@ func ParseDMail(data []byte) (DMail, error) {
 }
 
 // DMailIdempotencyKey computes a SHA256 content-based idempotency key from
-// the core fields of a DMail (name, kind, description, body).
+// the core fields of a DMail (name, kind, description, body, issues, severity).
 func DMailIdempotencyKey(dmail DMail) string {
 	h := sha256.New()
 	h.Write([]byte(dmail.Name))
@@ -247,6 +247,14 @@ func DMailIdempotencyKey(dmail DMail) string {
 	h.Write([]byte(dmail.Description))
 	h.Write([]byte{0})
 	h.Write([]byte(dmail.Body))
+	h.Write([]byte{0})
+	// Include sorted issues to prevent collision when same content has different issues
+	issuesCopy := make([]string, len(dmail.Issues))
+	copy(issuesCopy, dmail.Issues)
+	sort.Strings(issuesCopy)
+	h.Write([]byte(strings.Join(issuesCopy, ",")))
+	h.Write([]byte{0})
+	h.Write([]byte(string(dmail.Severity)))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
