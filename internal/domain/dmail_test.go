@@ -1199,3 +1199,91 @@ func TestValidateDMail_OldFeedbackKind_Invalid(t *testing.T) {
 		t.Error("expected validation error for old feedback kind")
 	}
 }
+
+func TestParseDMailStrict_ValidInput(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "ADR-003 violation detected"
+severity: high
+---
+
+# ADR-003 Violation
+
+Body text.
+`
+	// given: valid frontmatter with known fields only
+	// when
+	dmail, err := domain.ParseDMailStrict([]byte(raw))
+	// then
+	if err != nil {
+		t.Fatalf("ParseDMailStrict failed on valid input: %v", err)
+	}
+	if dmail.Name != "feedback-001" {
+		t.Errorf("expected name feedback-001, got %s", dmail.Name)
+	}
+	if dmail.Kind != domain.KindDesignFeedback {
+		t.Errorf("expected kind design-feedback, got %s", dmail.Kind)
+	}
+	if dmail.Severity != domain.SeverityHigh {
+		t.Errorf("expected severity high, got %s", dmail.Severity)
+	}
+}
+
+func TestParseDMailStrict_RejectsUnknownField(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "strict test"
+unknown_field: "this should be rejected"
+---
+
+Body text.
+`
+	// given: frontmatter with an unknown field
+	// when
+	_, err := domain.ParseDMailStrict([]byte(raw))
+	// then: strict parser must return an error
+	if err == nil {
+		t.Error("ParseDMailStrict expected error for unknown frontmatter field, got nil")
+	}
+}
+
+func TestParseDMailStrict_ExistingParseDMailAcceptsUnknownField(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "strict test"
+unknown_field: "silently ignored"
+---
+
+Body text.
+`
+	// given: the lenient parser should still accept unknown fields (backward compat)
+	// when
+	_, err := domain.ParseDMail([]byte(raw))
+	// then
+	if err != nil {
+		t.Errorf("ParseDMail should accept unknown fields, got error: %v", err)
+	}
+}
+
+func TestParseDMailStrict_NestedContextValidation(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "context validation"
+context:
+  unknown_nested: "should fail"
+---
+
+Body text.
+`
+	// given: frontmatter with unknown nested field in context
+	// when
+	_, err := domain.ParseDMailStrict([]byte(raw))
+	// then: strict parser must reject unknown nested fields
+	if err == nil {
+		t.Error("ParseDMailStrict expected error for unknown nested field in context, got nil")
+	}
+}

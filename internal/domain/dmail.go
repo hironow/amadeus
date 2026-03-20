@@ -201,25 +201,23 @@ func SanitizeTargets(senderIdentity string, kind DMailKind, targets []string) []
 	return result
 }
 
-// ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
-func ParseDMail(data []byte) (DMail, error) {
+// splitFrontmatter splits raw D-Mail bytes into the YAML frontmatter bytes and Markdown body string.
+// Returns an error if the opening or closing frontmatter delimiters are missing.
+func splitFrontmatter(data []byte) (yamlPart []byte, bodyPart string, err error) {
 	str := string(data)
 	if !strings.HasPrefix(str, "---\n") {
-		return DMail{}, fmt.Errorf("missing opening frontmatter delimiter")
+		return nil, "", fmt.Errorf("missing opening frontmatter delimiter")
 	}
 	rest := str[4:] // skip opening "---\n"
 	idx := strings.Index(rest, "\n---\n")
 	if idx < 0 {
-		return DMail{}, fmt.Errorf("missing closing frontmatter delimiter")
+		return nil, "", fmt.Errorf("missing closing frontmatter delimiter")
 	}
-	yamlPart := rest[:idx]
-	bodyPart := rest[idx+5:] // skip "\n---\n"
+	return []byte(rest[:idx]), rest[idx+5:], nil // skip "\n---\n"
+}
 
-	var fm dmailFrontmatter
-	if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
-		return DMail{}, fmt.Errorf("parse frontmatter: %w", err)
-	}
-
+// fmToDMail converts a parsed dmailFrontmatter and body into a DMail.
+func fmToDMail(fm dmailFrontmatter, bodyPart string) DMail {
 	return DMail{
 		SchemaVersion: fm.SchemaVersion,
 		Name:          fm.Name,
@@ -233,7 +231,41 @@ func ParseDMail(data []byte) (DMail, error) {
 		Metadata:      fm.Metadata,
 		Context:       fm.Context,
 		Body:          strings.TrimLeft(bodyPart, "\n"),
-	}, nil
+	}
+}
+
+// ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
+func ParseDMail(data []byte) (DMail, error) {
+	yamlPart, bodyPart, err := splitFrontmatter(data)
+	if err != nil {
+		return DMail{}, err
+	}
+
+	var fm dmailFrontmatter
+	if err := yaml.Unmarshal(yamlPart, &fm); err != nil {
+		return DMail{}, fmt.Errorf("parse frontmatter: %w", err)
+	}
+
+	return fmToDMail(fm, bodyPart), nil
+}
+
+// ParseDMailStrict parses a D-Mail from raw bytes like ParseDMail, but rejects unknown frontmatter fields.
+// Use this variant in trusted pipelines where strict schema conformance is required.
+func ParseDMailStrict(data []byte) (DMail, error) {
+	yamlPart, bodyPart, err := splitFrontmatter(data)
+	if err != nil {
+		return DMail{}, err
+	}
+
+	dec := yaml.NewDecoder(bytes.NewReader(yamlPart))
+	dec.KnownFields(true)
+
+	var fm dmailFrontmatter
+	if err := dec.Decode(&fm); err != nil {
+		return DMail{}, fmt.Errorf("parse frontmatter (strict): %w", err)
+	}
+
+	return fmToDMail(fm, bodyPart), nil
 }
 
 // DMailIdempotencyKey computes a SHA256 content-based idempotency key from
