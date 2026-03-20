@@ -206,12 +206,12 @@ func TestDetermineSeverity_ImplicitOverrideBelowThreshold(t *testing.T) {
 }
 
 func TestDetermineSeverity_ImplicitOverrideZeroDisabled(t *testing.T) {
-	// given: ImplicitForceMedium=0 (default/disabled) should not trigger
+	// given: ImplicitForceMedium=0 (explicitly disabled) should not trigger
 	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
 		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 90},
 	}}
 	cfg := domain.DefaultThresholds()
-	// ImplicitForceMedium is 0 by default
+	cfg.PerAxisOverride.ImplicitForceMedium = 0 // explicitly disable
 
 	// when
 	sev := domain.DetermineSeverity(result, cfg)

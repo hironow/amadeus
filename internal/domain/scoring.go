@@ -101,9 +101,10 @@ func DefaultThresholds() SeverityConfig {
 			MediumMax: 0.500000,
 		},
 		PerAxisOverride: PerAxisOverride{
-			ADRForceHigh:   60,
-			DoDForceHigh:   70,
-			DepForceMedium: 80,
+			ADRForceHigh:        60,
+			DoDForceHigh:        70,
+			DepForceMedium:      80,
+			ImplicitForceMedium: 80,
 		},
 	}
 }
@@ -278,7 +279,16 @@ type DivergenceMeter struct {
 // ProcessResponse takes a ClaudeResponse, runs CalcDivergence and
 // DetermineSeverity, and returns a MeterResult.
 func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
-	divergence := CalcDivergence(resp.Axes, dm.Config.Weights)
+	// #089: Clamp axes to [0,100] before scoring to handle out-of-range LLM outputs.
+	clamped := ClampAxesMap(resp.Axes)
+
+	// #123: Validate all required axes are present and record any missing.
+	missing := ValidateAxesPresent(clamped)
+
+	divergence := CalcDivergence(clamped, dm.Config.Weights)
+	// #124: Populate MissingAxes from validation result.
+	divergence.MissingAxes = missing
+
 	severityCfg := SeverityConfig{
 		Thresholds:      dm.Config.Thresholds,
 		PerAxisOverride: dm.Config.PerAxisOverride,
