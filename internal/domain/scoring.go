@@ -41,11 +41,12 @@ func DefaultWeights() Weights {
 
 // DivergenceResult holds the complete result of a divergence calculation.
 type DivergenceResult struct {
-	Value      float64            `json:"divergence"`
-	Internal   float64            `json:"internal"`
-	Axes       map[Axis]AxisScore `json:"axes"`
-	Severity   Severity           `json:"severity"`
-	Overridden bool               `json:"overridden"`
+	Value       float64            `json:"divergence"`
+	Internal    float64            `json:"internal"`
+	Axes        map[Axis]AxisScore `json:"axes"`
+	Severity    Severity           `json:"severity"`
+	Overridden  bool               `json:"overridden"`
+	MissingAxes []Axis             `json:"missing_axes,omitempty"`
 }
 
 // Severity represents the D-Mail severity tier.
@@ -145,17 +146,20 @@ func ClampAxesMap(axes map[Axis]AxisScore) map[Axis]AxisScore {
 }
 
 // CalcDivergence computes the weighted divergence score from axis scores.
+// If required axes are missing, it returns a result with MissingAxes populated.
 func CalcDivergence(axes map[Axis]AxisScore, weights Weights) DivergenceResult {
 	internal := float64(axes[AxisADR].Score)*weights.ADRIntegrity +
 		float64(axes[AxisDoD].Score)*weights.DoDFulfillment +
 		float64(axes[AxisDependency].Score)*weights.DependencyIntegrity +
 		float64(axes[AxisImplicit].Score)*weights.ImplicitConstraints
 
-	return DivergenceResult{
+	result := DivergenceResult{
 		Value:    internal / 100.0,
 		Internal: internal,
 		Axes:     axes,
 	}
+	result.MissingAxes = ValidateAxesPresent(axes)
+	return result
 }
 
 // DetermineSeverity applies threshold and per-axis override rules.

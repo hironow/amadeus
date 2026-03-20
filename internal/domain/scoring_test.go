@@ -62,6 +62,39 @@ func TestCalcDivergence_WeightedSum(t *testing.T) {
 	}
 }
 
+func TestCalcDivergence_MissingAxis_ReportsMissing(t *testing.T) {
+	// given: axes map missing AxisImplicit
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+	}
+
+	// when
+	result := domain.CalcDivergence(axes, domain.DefaultWeights())
+
+	// then: MissingAxes should list the missing axis
+	if len(result.MissingAxes) != 1 {
+		t.Fatalf("expected 1 missing axis, got %d: %v", len(result.MissingAxes), result.MissingAxes)
+	}
+	if result.MissingAxes[0] != domain.AxisImplicit {
+		t.Errorf("expected missing %q, got %q", domain.AxisImplicit, result.MissingAxes[0])
+	}
+}
+
+func TestCalcDivergence_AllPresent_NoMissing(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+		domain.AxisImplicit:   {Score: 40},
+	}
+	result := domain.CalcDivergence(axes, domain.DefaultWeights())
+	if len(result.MissingAxes) != 0 {
+		t.Errorf("expected no missing axes, got %v", result.MissingAxes)
+	}
+}
+
 func TestDetermineSeverity_Low(t *testing.T) {
 	result := domain.DivergenceResult{Internal: 10.0, Value: 0.10, Axes: map[domain.Axis]domain.AxisScore{
 		domain.AxisADR: {Score: 10}, domain.AxisDoD: {Score: 10}, domain.AxisDependency: {Score: 10}, domain.AxisImplicit: {Score: 10},
