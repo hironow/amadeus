@@ -192,6 +192,67 @@ func TestCheckAggregate_RecordCheck_GateDeniedFullCheckSkipsBaseline(t *testing.
 	}
 }
 
+func TestCheckAggregate_ShouldFullCheck_SuppressedDuringCooldown(t *testing.T) {
+	// given: forceFullNext is true, then full check completes
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	agg.SetForceFullNext(true)
+	agg.AdvanceCheckCount(true) // triggers cooldown
+
+	// when: check if another full check should run
+	shouldFull := agg.ShouldFullCheck(false)
+
+	// then: should be suppressed during cooldown
+	if shouldFull {
+		t.Error("expected ShouldFullCheck to return false during cooldown")
+	}
+	if agg.CooldownRemaining() != 3 {
+		t.Errorf("expected cooldown 3, got %d", agg.CooldownRemaining())
+	}
+}
+
+func TestCheckAggregate_ShouldFullCheck_FiresAfterCooldownExpires(t *testing.T) {
+	// given: force full check, advance to trigger cooldown
+	cfg := domain.DefaultConfig()
+	cfg.FullCheck.Interval = 1 // low interval so it triggers after cooldown
+	agg := domain.NewCheckAggregate(cfg)
+	agg.SetForceFullNext(true)
+	agg.AdvanceCheckCount(true) // cooldown starts at 3
+
+	// when: advance 3 diff checks to expire cooldown
+	for range 3 {
+		agg.AdvanceCheckCount(false)
+	}
+
+	// then: cooldown expired, should allow full check
+	if agg.CooldownRemaining() != 0 {
+		t.Errorf("expected cooldown 0, got %d", agg.CooldownRemaining())
+	}
+	// checkCount is now 3, interval is 1, so should be true
+	if !agg.ShouldFullCheck(false) {
+		t.Error("expected ShouldFullCheck to return true after cooldown expires")
+	}
+}
+
+func TestCheckAggregate_AdvanceCheckCount_ClearsForceFullAndStartsCooldown(t *testing.T) {
+	// given: forceFullNext is true
+	agg := domain.NewCheckAggregate(domain.DefaultConfig())
+	agg.SetForceFullNext(true)
+
+	// when: advance with full check
+	agg.AdvanceCheckCount(true)
+
+	// then: forceFullNext cleared, cooldown started
+	if agg.ForceFullNext() {
+		t.Error("expected ForceFullNext to be false after AdvanceCheckCount(true)")
+	}
+	if agg.CheckCount() != 0 {
+		t.Errorf("expected check count 0, got %d", agg.CheckCount())
+	}
+	if agg.CooldownRemaining() != 3 {
+		t.Errorf("expected cooldown 3, got %d", agg.CooldownRemaining())
+	}
+}
+
 func TestCheckAggregate_RecordCheck_ClearsForceFullNext(t *testing.T) {
 	// given: forceFullNext is true
 	agg := domain.NewCheckAggregate(domain.DefaultConfig())

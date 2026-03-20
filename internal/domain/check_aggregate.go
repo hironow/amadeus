@@ -4,13 +4,18 @@ import (
 	"time"
 )
 
+// defaultForceFullCooldown is the number of check cycles to skip after a
+// force-full-next check completes, preventing rapid consecutive full checks.
+const defaultForceFullCooldown = 3
+
 // CheckAggregate encapsulates the domain logic for amadeus check operations.
 // It owns the check count, force-full-next flag, and previous result state,
 // enforcing invariants and producing events as return values (no side effects).
 type CheckAggregate struct {
-	config        Config
-	checkCount    int
-	forceFullNext bool
+	config            Config
+	checkCount        int
+	forceFullNext     bool
+	cooldownRemaining int
 }
 
 // NewCheckAggregate creates a new CheckAggregate with the given config.
@@ -41,21 +46,37 @@ func (a *CheckAggregate) SetForceFullNext(v bool) {
 
 // ShouldFullCheck determines whether the next check should be a full scan.
 // Returns true if forceFlag is set, ForceFullNext is true, or the check count
-// has reached the configured interval.
+// has reached the configured interval. Suppressed during cooldown period.
 func (a *CheckAggregate) ShouldFullCheck(forceFlag bool) bool {
+	if a.cooldownRemaining > 0 {
+		return false
+	}
 	if forceFlag || a.forceFullNext {
 		return true
 	}
 	return a.checkCount >= a.config.FullCheck.Interval
 }
 
+// CooldownRemaining returns the remaining cooldown cycles.
+func (a *CheckAggregate) CooldownRemaining() int {
+	return a.cooldownRemaining
+}
+
 // AdvanceCheckCount updates the internal check counter.
-// If fullCheck is true, the counter resets to 0; otherwise it increments by 1.
+// If fullCheck is true, the counter resets to 0 and starts cooldown if
+// forceFullNext was active. Otherwise it increments by 1 and decrements cooldown.
 func (a *CheckAggregate) AdvanceCheckCount(fullCheck bool) {
 	if fullCheck {
 		a.checkCount = 0
+		if a.forceFullNext {
+			a.cooldownRemaining = defaultForceFullCooldown
+			a.forceFullNext = false
+		}
 	} else {
 		a.checkCount++
+		if a.cooldownRemaining > 0 {
+			a.cooldownRemaining--
+		}
 	}
 }
 
