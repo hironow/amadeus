@@ -27,6 +27,7 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 	// Group D-Mails by target within the time window
 	type targetInfo struct {
 		dmailNames []string
+		seen       map[string]bool
 		firstSeen  time.Time
 		lastSeen   time.Time
 	}
@@ -51,10 +52,17 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 		for _, target := range d.Targets {
 			info, exists := targets[target]
 			if !exists {
-				info = &targetInfo{firstSeen: created, lastSeen: created}
+				info = &targetInfo{
+					firstSeen: created,
+					lastSeen:  created,
+					seen:      make(map[string]bool),
+				}
 				targets[target] = info
 			}
-			info.dmailNames = append(info.dmailNames, d.Name)
+			if !info.seen[d.Name] {
+				info.seen[d.Name] = true
+				info.dmailNames = append(info.dmailNames, d.Name)
+			}
 			if created.Before(info.firstSeen) {
 				info.firstSeen = created
 			}

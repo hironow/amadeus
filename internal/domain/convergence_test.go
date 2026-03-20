@@ -325,6 +325,29 @@ func TestAnalyzeConvergence_DefaultEscalationMultiplier(t *testing.T) {
 	}
 }
 
+func TestAnalyzeConvergence_DeduplicatesDMailNamesPerTarget(t *testing.T) {
+	// given: a single DMail targeting the same area twice (duplicate targets)
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []domain.DMail{
+		{Name: "feedback-001", Targets: []string{"auth/session.go", "auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-002", Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+	}
+	cfg := domain.ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := domain.AnalyzeConvergence(dmails, cfg, now)
+
+	// then: feedback-001 should count only once for auth/session.go, total=2, below threshold=3
+	if len(alerts) != 0 {
+		t.Errorf("expected 0 alerts (deduped count=2 < threshold=3), got %d", len(alerts))
+		if len(alerts) > 0 {
+			t.Errorf("alert count: %d, dmails: %v", alerts[0].Count, alerts[0].DMails)
+		}
+	}
+}
+
 func TestAnalyzeConvergence_ExcludesConvergenceDMails(t *testing.T) {
 	// given: 2 feedback D-Mails + 1 convergence D-Mail targeting same area
 	// Without filtering, count=3 would meet threshold=3 and trigger an alert.
