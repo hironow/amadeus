@@ -374,3 +374,37 @@ func TestIndexWriter_Rebuild_SkipsIndexFile(t *testing.T) {
 		t.Errorf("expected 1 entry (not including index.jsonl), got %d", n)
 	}
 }
+
+func TestIndexWriter_Rebuild_ReportsWalkErrors(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: running as root")
+	}
+	// given: an archive directory with a readable file and an unreadable subdirectory
+	stateDir := t.TempDir()
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0755)
+	os.WriteFile(filepath.Join(archiveDir, "good.md"), []byte("# Good\n"), 0644)
+
+	unreadableDir := filepath.Join(archiveDir, "restricted")
+	os.MkdirAll(unreadableDir, 0755)
+	os.WriteFile(filepath.Join(unreadableDir, "hidden.md"), []byte("# Hidden\n"), 0644)
+	os.Chmod(unreadableDir, 0000)
+	defer os.Chmod(unreadableDir, 0755)
+
+	indexPath := filepath.Join(stateDir, "index.jsonl")
+	w := &session.IndexWriter{}
+
+	// when
+	n, err := w.Rebuild(indexPath, stateDir, "amadeus")
+
+	// then: should still index the good file but report the walk error
+	if n < 1 {
+		t.Errorf("expected at least 1 entry, got %d", n)
+	}
+	if err == nil {
+		t.Error("expected error for unreadable directory")
+	}
+	if err != nil && !strings.Contains(err.Error(), "walk error") {
+		t.Errorf("expected walk error message, got %v", err)
+	}
+}
