@@ -36,6 +36,26 @@ const (
 	EventPRConvergenceChecked EventType = "pr_convergence.checked"
 )
 
+// validEventTypes is the set of recognized EventType values.
+var validEventTypes = map[EventType]bool{
+	EventCheckCompleted:       true,
+	EventBaselineUpdated:      true,
+	EventForceFullNextSet:     true,
+	EventDMailGenerated:       true,
+	EventInboxConsumed:        true,
+	EventDMailCommented:       true,
+	EventConvergenceDetected:  true,
+	EventArchivePruned:        true,
+	EventRunStarted:           true,
+	EventRunStopped:           true,
+	EventPRConvergenceChecked: true,
+}
+
+// ValidEventType returns true if the given EventType is recognized.
+func ValidEventType(t EventType) bool {
+	return validEventTypes[t]
+}
+
 // Event is the envelope for all domain events in the event store.
 type Event struct {
 	ID        string          `json:"id"`
@@ -53,6 +73,8 @@ func ValidateEvent(e Event) error {
 	}
 	if e.Type == "" {
 		errs = append(errs, "Type is required")
+	} else if !ValidEventType(e.Type) {
+		errs = append(errs, fmt.Sprintf("Type %q is not a recognized event type", e.Type))
 	}
 	if e.Timestamp.IsZero() {
 		errs = append(errs, "Timestamp must not be zero")

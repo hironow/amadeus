@@ -56,6 +56,9 @@ func TestEventTypeConstants(t *testing.T) {
 		domain.EventDMailCommented,
 		domain.EventConvergenceDetected,
 		domain.EventArchivePruned,
+		domain.EventRunStarted,
+		domain.EventRunStopped,
+		domain.EventPRConvergenceChecked,
 	}
 
 	seen := make(map[domain.EventType]bool)
@@ -356,6 +359,51 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("expected error for empty ID")
+	}
+}
+
+func TestValidateEvent_UnknownType(t *testing.T) {
+	// given: event with a typo in the type
+	event := domain.Event{
+		ID:        "test-001",
+		Type:      domain.EventType("check.complete"), // typo: missing 'd'
+		Timestamp: time.Now(),
+		Data:      json.RawMessage(`{"result":{}}`),
+	}
+
+	// when
+	err := domain.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for unknown event type")
+	}
+}
+
+func TestValidEventType_AllConstants(t *testing.T) {
+	allTypes := []domain.EventType{
+		domain.EventCheckCompleted,
+		domain.EventBaselineUpdated,
+		domain.EventForceFullNextSet,
+		domain.EventDMailGenerated,
+		domain.EventInboxConsumed,
+		domain.EventDMailCommented,
+		domain.EventConvergenceDetected,
+		domain.EventArchivePruned,
+		domain.EventRunStarted,
+		domain.EventRunStopped,
+		domain.EventPRConvergenceChecked,
+	}
+	for _, et := range allTypes {
+		if !domain.ValidEventType(et) {
+			t.Errorf("ValidEventType(%q) = false, expected true", et)
+		}
+	}
+}
+
+func TestValidEventType_UnknownReturnsFalse(t *testing.T) {
+	if domain.ValidEventType("totally.unknown") {
+		t.Error("expected false for unknown event type")
 	}
 }
 
