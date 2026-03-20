@@ -72,7 +72,7 @@ func TestFormatPRReviewSummary_WithReviews(t *testing.T) {
 }
 
 func TestFormatPRReviewSummary_TruncatesLongComments(t *testing.T) {
-	longBody := strings.Repeat("x", 300)
+	longBody := strings.Repeat("x", 600)
 	reviews := []domain.PRReview{
 		{
 			Number: "#1",
@@ -89,6 +89,54 @@ func TestFormatPRReviewSummary_TruncatesLongComments(t *testing.T) {
 	}
 	if !strings.Contains(got, "...") {
 		t.Error("truncated comment should end with ...")
+	}
+}
+
+func TestFormatPRReviewSummary_UTF8SafeTruncation(t *testing.T) {
+	// given: a comment body with multi-byte Japanese characters
+	// Each Japanese character is 3 bytes in UTF-8
+	japaneseBody := strings.Repeat("あ", 600) // 600 runes, 1800 bytes
+	reviews := []domain.PRReview{
+		{
+			Number: "#1",
+			Comments: []domain.PRComment{
+				{Author: "reviewer", Body: japaneseBody, State: "SUBMITTED"},
+			},
+		},
+	}
+
+	// when
+	got := domain.FormatPRReviewSummary(reviews)
+
+	// then: should not contain invalid UTF-8 sequences
+	for i, r := range got {
+		if r == '\uFFFD' {
+			t.Errorf("found invalid UTF-8 replacement character at position %d", i)
+			break
+		}
+	}
+	// should be truncated (600 runes > 500 per-comment limit)
+	if strings.Contains(got, japaneseBody) {
+		t.Error("expected Japanese comment to be truncated")
+	}
+	if !strings.Contains(got, "...") {
+		t.Error("truncated comment should end with ...")
+	}
+}
+
+func TestFormatPRReviewSummary_ShortCommentNotTruncated(t *testing.T) {
+	body := "Short comment"
+	reviews := []domain.PRReview{
+		{
+			Number: "#1",
+			Comments: []domain.PRComment{
+				{Author: "a", Body: body, State: "SUBMITTED"},
+			},
+		},
+	}
+	got := domain.FormatPRReviewSummary(reviews)
+	if !strings.Contains(got, body) {
+		t.Error("short comment should not be truncated")
 	}
 }
 
