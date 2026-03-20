@@ -198,5 +198,22 @@ func ValidateConfig(cfg Config) []string {
 		errs = append(errs, fmt.Sprintf("full_check.on_divergence_jump must be non-negative (got %f)", cfg.FullCheck.OnDivergenceJump))
 	}
 
+	// Cross-field semantic constraints
+
+	// Check #1: OnDivergenceJump >= MediumMax skips medium severity entirely
+	if cfg.FullCheck.OnDivergenceJump >= cfg.Thresholds.MediumMax {
+		errs = append(errs, fmt.Sprintf(
+			"full_check.on_divergence_jump (%f) must be less than thresholds.medium_max (%f)",
+			cfg.FullCheck.OnDivergenceJump, cfg.Thresholds.MediumMax))
+	}
+
+	// Check #3: WaitTimeout must not exceed WindowDays * 24h (when WaitTimeout is positive)
+	if cfg.WaitTimeout > 0 && cfg.WaitTimeout > time.Duration(cfg.Convergence.WindowDays)*24*time.Hour {
+		errs = append(errs, fmt.Sprintf(
+			"wait_timeout (%v) must not exceed convergence.window_days (%d) * 24h (%v)",
+			cfg.WaitTimeout, cfg.Convergence.WindowDays,
+			time.Duration(cfg.Convergence.WindowDays)*24*time.Hour))
+	}
+
 	return errs
 }
