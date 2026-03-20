@@ -28,4 +28,5 @@ type CheckResult struct {
 	CheckCountSinceFull int                `json:"check_count_since_full"`
 	ForceFullNext       bool               `json:"force_full_next,omitempty"`
 	GateDenied          bool               `json:"gate_denied,omitempty"`
+	CooldownRemaining   int                `json:"cooldown_remaining,omitempty"`
 }

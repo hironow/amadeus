@@ -27,6 +27,7 @@ func NewCheckAggregate(cfg Config) *CheckAggregate {
 func (a *CheckAggregate) Restore(result CheckResult) {
 	a.checkCount = result.CheckCountSinceFull
 	a.forceFullNext = result.ForceFullNext
+	a.cooldownRemaining = result.CooldownRemaining
 }
 
 // CheckCount returns the current check count since last full check.
@@ -142,6 +143,7 @@ func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedDat
 func (a *CheckAggregate) RecordCheck(result CheckResult, now time.Time) ([]Event, error) {
 	result.CheckCountSinceFull = a.checkCount
 	result.ForceFullNext = a.forceFullNext
+	result.CooldownRemaining = a.cooldownRemaining
 	a.forceFullNext = false
 
 	checkEv, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: result}, now)
