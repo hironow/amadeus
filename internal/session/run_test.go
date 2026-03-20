@@ -438,6 +438,45 @@ func TestRun_channelClosedEmitsRunStopped(t *testing.T) {
 	}
 }
 
+func TestRun_monitorInboxError_emitsRunStopped(t *testing.T) {
+	// given: InboxCh is nil, RepoDir is invalid → MonitorInbox should fail
+	emitter := &runEmitter{}
+	git := &runGit{branch: "main", commit: "eee5555"}
+
+	a := &Amadeus{
+		Git:     git,
+		Logger:  &domain.NopLogger{},
+		RepoDir: "/nonexistent/path/that/does/not/exist",
+		// InboxCh is nil, so Run will call MonitorInbox which should fail
+	}
+
+	opts := domain.RunOptions{}
+
+	// when
+	err := a.Run(context.Background(), opts, emitter, &runState{})
+
+	// then: should return error
+	if err == nil {
+		t.Fatal("expected error from MonitorInbox failure")
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+
+	// run.started should have been emitted before the error
+	if !emitter.runStartedCalled {
+		t.Error("expected run.started event before error")
+	}
+
+	// run.stopped should be emitted via defer on error path
+	if !emitter.runStoppedCalled {
+		t.Error("expected run.stopped event on error exit")
+	}
+	if emitter.runStoppedData != nil && emitter.runStoppedData.Reason != "error" {
+		t.Errorf("expected reason %q, got %q", "error", emitter.runStoppedData.Reason)
+	}
+}
+
 func TestRun_currentBranchErrorFallsBackToMain(t *testing.T) {
 	// given: no BaseBranch set, CurrentBranch returns error → fallback to "main"
 	emitter := &runEmitter{}

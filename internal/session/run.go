@@ -54,6 +54,17 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		return fmt.Errorf("emit run started: %w", err)
 	}
 
+	// Ensure run.stopped is emitted on any post-started error exit.
+	// The signal and channel_closed paths emit their own run.stopped,
+	// so this defer only fires when runErr is non-nil.
+	var runErr error
+	defer func() {
+		if runErr != nil {
+			stopNow := time.Now().UTC()
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "error"}, stopNow)
+		}
+	}()
+
 	if !opts.Quiet {
 		a.Logger.Info("amadeus run: integration point = %s", integrationBranch)
 		if opts.BaseBranch != "" {
@@ -70,7 +81,8 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		var monErr error
 		inboxCh, monErr = MonitorInbox(ctx, stateDir, a.Logger)
 		if monErr != nil {
-			return fmt.Errorf("inbox monitor: %w", monErr)
+			runErr = fmt.Errorf("inbox monitor: %w", monErr)
+			return runErr
 		}
 	}
 
