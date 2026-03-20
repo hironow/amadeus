@@ -1287,3 +1287,108 @@ Body text.
 		t.Error("ParseDMailStrict expected error for unknown nested field in context, got nil")
 	}
 }
+
+func TestVerifyIdempotencyKey_NilMetadata(t *testing.T) {
+	// given: a DMail with no metadata (nil map)
+	dmail := domain.DMail{
+		Name:        "feedback-001",
+		Kind:        domain.KindDesignFeedback,
+		Description: "ADR violation",
+		Body:        "Details.\n",
+		Metadata:    nil,
+	}
+
+	// when
+	err := domain.VerifyIdempotencyKey(dmail)
+
+	// then: lenient - no key present means no mismatch
+	if err != nil {
+		t.Errorf("expected nil error for nil metadata, got: %v", err)
+	}
+}
+
+func TestVerifyIdempotencyKey_EmptyKey(t *testing.T) {
+	// given: a DMail with metadata but empty idempotency_key
+	dmail := domain.DMail{
+		Name:        "feedback-001",
+		Kind:        domain.KindDesignFeedback,
+		Description: "ADR violation",
+		Body:        "Details.\n",
+		Metadata:    map[string]string{"idempotency_key": ""},
+	}
+
+	// when
+	err := domain.VerifyIdempotencyKey(dmail)
+
+	// then: lenient - empty string means no key present
+	if err != nil {
+		t.Errorf("expected nil error for empty idempotency_key, got: %v", err)
+	}
+}
+
+func TestVerifyIdempotencyKey_RoundTrip(t *testing.T) {
+	// given: a DMail marshaled (which injects idempotency_key) then parsed back
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-roundtrip",
+		Kind:          domain.KindImplFeedback,
+		Description:   "roundtrip check",
+		Issues:        []string{"MY-545"},
+		Severity:      domain.SeverityMedium,
+		Body:          "# Roundtrip\n\nContent here.\n",
+	}
+
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+
+	parsed, err := domain.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+
+	// when
+	err = domain.VerifyIdempotencyKey(parsed)
+
+	// then: key in metadata must match recomputed key
+	if err != nil {
+		t.Errorf("expected nil error on valid roundtrip, got: %v", err)
+	}
+}
+
+func TestVerifyIdempotencyKey_TamperedBody(t *testing.T) {
+	// given: a DMail marshaled then body tampered before parse
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-tampered",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "tamper check",
+		Body:          "# Original\n\nOriginal content.\n",
+	}
+
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+
+	// tamper: replace body content after the closing frontmatter delimiter
+	raw := string(data)
+	tampered := raw + "EXTRA TAMPERED CONTENT\n"
+
+	parsed, err := domain.ParseDMail([]byte(tampered))
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+
+	// when
+	err = domain.VerifyIdempotencyKey(parsed)
+
+	// then: key mismatch must be returned
+	if err == nil {
+		t.Error("expected ErrIdempotencyMismatch for tampered body, got nil")
+	}
+	if err != domain.ErrIdempotencyMismatch {
+		t.Errorf("expected ErrIdempotencyMismatch, got: %v", err)
+	}
+}

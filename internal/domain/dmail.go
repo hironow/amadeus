@@ -331,6 +331,33 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// ErrIdempotencyMismatch is returned by VerifyIdempotencyKey when the stored
+// idempotency_key in metadata does not match the recomputed key for the DMail.
+var ErrIdempotencyMismatch = fmt.Errorf("idempotency key mismatch")
+
+// VerifyIdempotencyKey checks that the idempotency_key stored in a DMail's
+// metadata matches the key recomputed from its current content.
+// Returns nil when no key is present (nil Metadata or empty string value).
+// Returns ErrIdempotencyMismatch when the keys differ.
+func VerifyIdempotencyKey(dmail DMail) error {
+	if dmail.Metadata == nil {
+		return nil
+	}
+	stored, ok := dmail.Metadata["idempotency_key"]
+	if !ok || stored == "" {
+		return nil
+	}
+	computed := DMailIdempotencyKey(dmail)
+	prefixLen := min(16, len(stored))
+	if stored[:prefixLen] != computed[:prefixLen] {
+		return ErrIdempotencyMismatch
+	}
+	if stored != computed {
+		return ErrIdempotencyMismatch
+	}
+	return nil
+}
+
 // ConsumedRecord tracks a processed inbox D-Mail.
 type ConsumedRecord struct {
 	Name       string    `json:"name"`
