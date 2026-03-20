@@ -139,6 +139,7 @@ func GenerateConvergenceDMails(alerts []ConvergenceAlert) []DMail {
 			Description:   fmt.Sprintf("World line convergence on %s (%d hits)", alert.Target, alert.Count),
 			Targets:       []string{alert.Target},
 			Severity:      SeverityHigh,
+			Action:        ActionEscalate,
 			Metadata: map[string]string{
 				"created_at":      now.Format(time.RFC3339),
 				"convergence_for": strings.Join(alert.DMails, ","),

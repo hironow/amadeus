@@ -207,6 +207,33 @@ func TestGenerateConvergenceDMails_OnlyHigh(t *testing.T) {
 	}
 }
 
+func TestGenerateConvergenceDMails_SetsActionEscalate(t *testing.T) {
+	// given: a high severity alert
+	alerts := []domain.ConvergenceAlert{
+		{Target: "auth/session.go", Count: 6, Window: 14, Severity: domain.SeverityHigh,
+			DMails: []string{"feedback-001", "feedback-002", "feedback-003", "feedback-004", "feedback-005", "feedback-006"}},
+	}
+
+	// when
+	dmails := domain.GenerateConvergenceDMails(alerts)
+
+	// then
+	if len(dmails) != 1 {
+		t.Fatalf("expected 1 D-Mail, got %d", len(dmails))
+	}
+	if dmails[0].Action != domain.ActionEscalate {
+		t.Errorf("expected action %q, got %q", domain.ActionEscalate, dmails[0].Action)
+	}
+}
+
+func TestGenerateConvergenceDMails_ActionMatchesDefaultForHigh(t *testing.T) {
+	// given: DefaultDMailAction for HIGH severity should be escalate
+	expected := domain.DefaultDMailAction(domain.SeverityHigh)
+	if expected != domain.ActionEscalate {
+		t.Fatalf("DefaultDMailAction(HIGH) = %q, expected %q", expected, domain.ActionEscalate)
+	}
+}
+
 func TestGenerateConvergenceDMails_Empty(t *testing.T) {
 	// given: no alerts
 	dmails := domain.GenerateConvergenceDMails(nil)
