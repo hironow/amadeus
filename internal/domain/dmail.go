@@ -154,6 +154,33 @@ func ValidateDMail(dmail DMail) []string {
 	if strings.TrimSpace(dmail.Body) == "" {
 		errs = append(errs, "body is required")
 	}
+	errs = append(errs, validateTargets(dmail.Targets)...)
+	return errs
+}
+
+// validateTargets checks D-Mail targets for path traversal and duplicates.
+func validateTargets(targets []string) []string {
+	var errs []string
+	seen := make(map[string]bool)
+	for _, target := range targets {
+		if strings.TrimSpace(target) == "" {
+			errs = append(errs, "target must not be empty")
+			continue
+		}
+		if strings.Contains(target, "..") {
+			errs = append(errs, fmt.Sprintf("target %q contains path traversal", target))
+			continue
+		}
+		if strings.HasPrefix(target, "/") {
+			errs = append(errs, fmt.Sprintf("target %q must be a relative path", target))
+			continue
+		}
+		if seen[target] {
+			errs = append(errs, fmt.Sprintf("duplicate target %q", target))
+			continue
+		}
+		seen[target] = true
+	}
 	return errs
 }
 

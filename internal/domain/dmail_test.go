@@ -965,6 +965,119 @@ func TestValidateDMail_NonEmptyBody_IsValid(t *testing.T) {
 	}
 }
 
+func TestValidateDMail_PathTraversal_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"../../etc/passwd"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "path traversal") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected path traversal error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_AbsoluteTarget_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"/etc/passwd"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "relative path") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected relative path error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_DuplicateTargets_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"auth/session.go", "auth/session.go"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "duplicate target") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected duplicate target error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_EmptyTarget_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{""},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "target must not be empty") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected empty target error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_ValidTargets(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"auth/session.go", "api/handler.go"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid targets, got %v", errs)
+	}
+}
+
+func TestValidateDMail_NoTargets_IsValid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+	}
+	errs := domain.ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for no targets, got %v", errs)
+	}
+}
+
 func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test", Body: "Content.\n"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
