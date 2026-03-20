@@ -65,6 +65,8 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				span3.End()
 				return nil, fmt.Errorf("phase 3 (dmail name): %w", err)
 			}
+			// #110: Sanitize targets to prevent self-referencing routing loops.
+			sanitized := domain.SanitizeTargets("amadeus", kind, candidate.Targets)
 			dmail := domain.DMail{
 				SchemaVersion: domain.DMailSchemaVersion,
 				Name:          name,
@@ -73,7 +75,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				Issues:        candidate.Issues,
 				Severity:      meterResult.Divergence.Severity,
 				Action:        domain.DMailAction(candidate.Action),
-				Targets:       candidate.Targets,
+				Targets:       sanitized,
 				Metadata: map[string]string{
 					"created_at": now.Format(time.RFC3339),
 				},
