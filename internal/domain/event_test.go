@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -417,6 +418,93 @@ func TestValidateEvent_MultipleErrors(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("expected error for fully invalid event")
+	}
+}
+
+func TestTrimCheckHistory_KeepsRecentChecks(t *testing.T) {
+	// given: 5 check events, keep 3
+	var events []domain.Event
+	for i := 0; i < 5; i++ {
+		e, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
+			Result: domain.CheckResult{Commit: fmt.Sprintf("commit-%d", i)},
+		}, time.Now().Add(time.Duration(i)*time.Minute))
+		events = append(events, e)
+	}
+
+	// when
+	trimmed, dropped := domain.TrimCheckHistory(events, 3)
+
+	// then
+	if dropped != 2 {
+		t.Errorf("expected 2 dropped, got %d", dropped)
+	}
+	if len(trimmed) != 3 {
+		t.Errorf("expected 3 remaining, got %d", len(trimmed))
+	}
+}
+
+func TestTrimCheckHistory_PreservesNonCheckEvents(t *testing.T) {
+	// given: interleaved check and non-check events
+	var events []domain.Event
+	for i := 0; i < 5; i++ {
+		ce, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{}, time.Now())
+		events = append(events, ce)
+	}
+	dmail, _ := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{}, time.Now())
+	events = append(events, dmail)
+
+	// when: keep only 2 check events
+	trimmed, dropped := domain.TrimCheckHistory(events, 2)
+
+	// then: 3 check events dropped, dmail preserved
+	if dropped != 3 {
+		t.Errorf("expected 3 dropped, got %d", dropped)
+	}
+	if len(trimmed) != 3 { // 2 checks + 1 dmail
+		t.Errorf("expected 3 remaining, got %d", len(trimmed))
+	}
+	// dmail should still be present
+	hasDmail := false
+	for _, e := range trimmed {
+		if e.Type == domain.EventDMailGenerated {
+			hasDmail = true
+		}
+	}
+	if !hasDmail {
+		t.Error("expected dmail event to be preserved")
+	}
+}
+
+func TestTrimCheckHistory_BelowLimit_NoOp(t *testing.T) {
+	var events []domain.Event
+	for i := 0; i < 3; i++ {
+		e, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{}, time.Now())
+		events = append(events, e)
+	}
+
+	trimmed, dropped := domain.TrimCheckHistory(events, 5)
+	if dropped != 0 {
+		t.Errorf("expected 0 dropped, got %d", dropped)
+	}
+	if len(trimmed) != 3 {
+		t.Errorf("expected 3 remaining, got %d", len(trimmed))
+	}
+}
+
+func TestTrimCheckHistory_DefaultMaxKeep(t *testing.T) {
+	// given: maxKeep=0 should default to DefaultMaxResultHistory (100)
+	var events []domain.Event
+	for i := 0; i < 5; i++ {
+		e, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{}, time.Now())
+		events = append(events, e)
+	}
+
+	trimmed, dropped := domain.TrimCheckHistory(events, 0)
+	if dropped != 0 {
+		t.Errorf("expected 0 dropped (5 < 100), got %d", dropped)
+	}
+	if len(trimmed) != 5 {
+		t.Errorf("expected 5 remaining, got %d", len(trimmed))
 	}
 }
 

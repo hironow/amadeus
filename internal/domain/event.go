@@ -165,6 +165,41 @@ type PRConvergenceCheckedData struct {
 	DMails            int    `json:"dmails_generated"`
 }
 
+// TrimCheckHistory keeps only the maxKeep most recent EventCheckCompleted events,
+// preserving all other event types. Returns the trimmed event slice and the
+// number of check events removed.
+func TrimCheckHistory(events []Event, maxKeep int) ([]Event, int) {
+	if maxKeep <= 0 {
+		maxKeep = DefaultMaxResultHistory
+	}
+
+	// Count check events
+	var checkIndices []int
+	for i, e := range events {
+		if e.Type == EventCheckCompleted {
+			checkIndices = append(checkIndices, i)
+		}
+	}
+	if len(checkIndices) <= maxKeep {
+		return events, 0
+	}
+
+	// Build set of indices to drop (oldest checks beyond maxKeep)
+	dropCount := len(checkIndices) - maxKeep
+	dropSet := make(map[int]bool, dropCount)
+	for i := 0; i < dropCount; i++ {
+		dropSet[checkIndices[i]] = true
+	}
+
+	result := make([]Event, 0, len(events)-dropCount)
+	for i, e := range events {
+		if !dropSet[i] {
+			result = append(result, e)
+		}
+	}
+	return result, dropCount
+}
+
 // NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.
 func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error) {
 	raw, err := json.Marshal(data)

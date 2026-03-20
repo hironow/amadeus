@@ -66,10 +66,15 @@ type Config struct {
 	Computed        ComputedConfig    `yaml:"computed,omitempty"`
 }
 
+// DefaultMaxResultHistory is the default maximum number of check results to
+// retain during event replay / projection rebuild.
+const DefaultMaxResultHistory = 100
+
 // FullCheckConfig controls the full scan strategy.
 type FullCheckConfig struct {
 	Interval         int     `yaml:"interval"`
 	OnDivergenceJump float64 `yaml:"on_divergence_jump"`
+	MaxResultHistory int     `yaml:"max_result_history,omitempty"`
 }
 
 // DefaultConfig returns a Config populated with architecture-document defaults.
