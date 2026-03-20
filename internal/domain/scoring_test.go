@@ -414,6 +414,84 @@ func TestRequiredAxes_Contains_AllFourAxes(t *testing.T) {
 	}
 }
 
+func TestClampAxisScore(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    int
+		expected int
+	}{
+		{"negative", -10, 0},
+		{"zero", 0, 0},
+		{"normal", 50, 50},
+		{"max", 100, 100},
+		{"over max", 150, 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := domain.ClampAxisScore(tt.input)
+			if got != tt.expected {
+				t.Errorf("ClampAxisScore(%d) = %d, want %d", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestClampAxesMap_ClampsNegativeAndOver(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: -5, Details: "negative"},
+		domain.AxisDoD:        {Score: 50, Details: "ok"},
+		domain.AxisDependency: {Score: 110, Details: "over"},
+		domain.AxisImplicit:   {Score: 0, Details: "zero"},
+	}
+	clamped := domain.ClampAxesMap(axes)
+	if clamped[domain.AxisADR].Score != 0 {
+		t.Errorf("expected clamped ADR=0, got %d", clamped[domain.AxisADR].Score)
+	}
+	if clamped[domain.AxisDoD].Score != 50 {
+		t.Errorf("expected DoD=50, got %d", clamped[domain.AxisDoD].Score)
+	}
+	if clamped[domain.AxisDependency].Score != 100 {
+		t.Errorf("expected clamped Dep=100, got %d", clamped[domain.AxisDependency].Score)
+	}
+	if clamped[domain.AxisImplicit].Score != 0 {
+		t.Errorf("expected Implicit=0, got %d", clamped[domain.AxisImplicit].Score)
+	}
+	// original must not be mutated
+	if axes[domain.AxisADR].Score != -5 {
+		t.Error("original map was mutated")
+	}
+}
+
+func TestClampAxesMap_PreservesDetails(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: -5, Details: "important detail"},
+	}
+	clamped := domain.ClampAxesMap(axes)
+	if clamped[domain.AxisADR].Details != "important detail" {
+		t.Errorf("details lost: %q", clamped[domain.AxisADR].Details)
+	}
+}
+
+func TestCalcDivergence_WithNegativeScores_AfterClamping(t *testing.T) {
+	// given: axes with negative scores, clamped before CalcDivergence
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: -10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 10},
+		domain.AxisImplicit:   {Score: 5},
+	}
+	clamped := domain.ClampAxesMap(axes)
+	result := domain.CalcDivergence(clamped, domain.DefaultWeights())
+
+	// then: ADR=0 after clamping, internal = 0*0.4 + 20*0.3 + 10*0.2 + 5*0.1 = 8.5
+	if !almostEqual(result.Internal, 8.5) {
+		t.Errorf("expected internal 8.5, got %f", result.Internal)
+	}
+	if result.Value < 0 {
+		t.Errorf("divergence value should not be negative, got %f", result.Value)
+	}
+}
+
 func TestDivergenceMeter_ProcessResponse_HighSeverity(t *testing.T) {
 	meter := &domain.DivergenceMeter{
 		Config: domain.DefaultConfig(),

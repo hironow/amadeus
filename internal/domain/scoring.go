@@ -121,6 +121,29 @@ func ValidateAxesPresent(axes map[Axis]AxisScore) []Axis {
 	return missing
 }
 
+// ClampAxisScore clamps a score to the valid range [0, 100].
+func ClampAxisScore(score int) int {
+	if score < 0 {
+		return 0
+	}
+	if score > 100 {
+		return 100
+	}
+	return score
+}
+
+// ClampAxesMap returns a new axes map with all scores clamped to [0, 100].
+func ClampAxesMap(axes map[Axis]AxisScore) map[Axis]AxisScore {
+	clamped := make(map[Axis]AxisScore, len(axes))
+	for axis, as := range axes {
+		clamped[axis] = AxisScore{
+			Score:   ClampAxisScore(as.Score),
+			Details: as.Details,
+		}
+	}
+	return clamped
+}
+
 // CalcDivergence computes the weighted divergence score from axis scores.
 func CalcDivergence(axes map[Axis]AxisScore, weights Weights) DivergenceResult {
 	internal := float64(axes[AxisADR].Score)*weights.ADRIntegrity +
