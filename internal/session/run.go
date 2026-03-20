@@ -61,7 +61,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 	defer func() {
 		if runErr != nil {
 			stopNow := time.Now().UTC()
-			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "error"}, stopNow)
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonError}, stopNow)
 		}
 	}()
 
@@ -108,7 +108,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		select {
 		case <-ctx.Done():
 			stopNow := time.Now().UTC()
-			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "signal"}, stopNow)
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonSignal}, stopNow)
 			if !opts.Quiet {
 				a.Logger.Info("amadeus run: stopped (signal)")
 			}
@@ -118,7 +118,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 			if !ok {
 				// Channel closed
 				stopNow := time.Now().UTC()
-				_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "channel_closed"}, stopNow)
+				_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonChannelClosed}, stopNow)
 				return nil
 			}
 

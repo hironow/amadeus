@@ -151,6 +151,13 @@ type RunStartedData struct {
 	BaseBranch        string `json:"base_branch,omitempty"`
 }
 
+// RunStoppedReason constants for run.stopped event reasons.
+const (
+	RunStoppedReasonError         = "error"
+	RunStoppedReasonSignal        = "signal"
+	RunStoppedReasonChannelClosed = "channel_closed"
+)
+
 // RunStoppedData is the payload for run.stopped events.
 type RunStoppedData struct {
 	Reason string `json:"reason"`
