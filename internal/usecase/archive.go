@@ -85,3 +85,4 @@ func ExecutePrune(ctx context.Context, result *PruneResult, eventStore port.Even
 
 	return totalCount, nil
 }
+
