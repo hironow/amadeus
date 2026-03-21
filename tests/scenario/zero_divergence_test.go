@@ -37,14 +37,14 @@ func TestScenario_ZeroDivergence_NoDMailGenerated(t *testing.T) {
 	// Run amadeus check — exit code 0 expected (no drift)
 	err := ws.RunAmadeusCheck(t, ctx)
 	if err != nil {
-		t.Logf("amadeus check: %v (exit 0 expected for zero divergence)", err)
+		t.Fatalf("amadeus check failed: %v (exit 0 expected for zero divergence)", err)
 	}
 
 	obs.AssertPromptCount(1)
 
 	// Key assertion: no feedback D-Mails should be generated
-	// Wait briefly then verify outboxes remain empty
-	time.Sleep(3 * time.Second)
+	// Poll for outbox to be empty instead of sleeping
+	ws.WaitForAbsent(t, ".gate", "outbox", 10*time.Second)
 	obs.AssertAllOutboxEmpty()
 	obs.AssertDMailCount(".siren", "inbox", 0)
 	obs.AssertDMailCount(".expedition", "inbox", 0)
