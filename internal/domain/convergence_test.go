@@ -420,3 +420,86 @@ func TestAnalyzeConvergence_ExcludesConvergenceDMails(t *testing.T) {
 		t.Errorf("expected 0 alerts (convergence D-Mails excluded), got %d", len(alerts))
 	}
 }
+
+// TestAnalyzeConvergence_TwoHighSeverity_EscalatesToHigh verifies that 2+ HIGH severity
+// D-Mails targeting the same area promote a MEDIUM convergence alert to HIGH,
+// even when the count is below the normal escalation threshold (Threshold * EscalationMultiplier).
+func TestAnalyzeConvergence_TwoHighSeverity_EscalatesToHigh(t *testing.T) {
+	// given: 3 D-Mails (meets threshold=3) but 2 of them are HIGH severity
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []domain.DMail{
+		{Name: "feedback-001", Severity: domain.SeverityHigh, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-002", Severity: domain.SeverityHigh, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+		{Name: "feedback-003", Severity: domain.SeverityLow, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-20T12:00:00Z"}},
+	}
+	// count=3 == threshold=3, normally MEDIUM; but 2 HIGH D-Mails → escalate to HIGH
+	cfg := domain.ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := domain.AnalyzeConvergence(dmails, cfg, now)
+
+	// then: alert exists and is HIGH due to severity escalation
+	if len(alerts) != 1 {
+		t.Fatalf("expected 1 alert, got %d", len(alerts))
+	}
+	if alerts[0].Severity != domain.SeverityHigh {
+		t.Errorf("expected HIGH (2 HIGH D-Mails → escalation), got %s", alerts[0].Severity)
+	}
+}
+
+// TestAnalyzeConvergence_OneHighSeverity_NoEscalation verifies that a single HIGH severity
+// D-Mail does NOT trigger severity escalation (boundary: requires 2+).
+func TestAnalyzeConvergence_OneHighSeverity_NoEscalation(t *testing.T) {
+	// given: 3 D-Mails (meets threshold=3) but only 1 is HIGH severity
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []domain.DMail{
+		{Name: "feedback-001", Severity: domain.SeverityHigh, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-002", Severity: domain.SeverityLow, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+		{Name: "feedback-003", Severity: domain.SeverityLow, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-20T12:00:00Z"}},
+	}
+	cfg := domain.ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := domain.AnalyzeConvergence(dmails, cfg, now)
+
+	// then: alert stays MEDIUM (only 1 HIGH, need 2+ for escalation)
+	if len(alerts) != 1 {
+		t.Fatalf("expected 1 alert, got %d", len(alerts))
+	}
+	if alerts[0].Severity != domain.SeverityMedium {
+		t.Errorf("expected MEDIUM (only 1 HIGH D-Mail, no escalation), got %s", alerts[0].Severity)
+	}
+}
+
+// TestAnalyzeConvergence_TwoHighSeverity_BoundaryExactlyTwo verifies the boundary condition:
+// exactly 2 HIGH D-Mails is sufficient to trigger escalation.
+func TestAnalyzeConvergence_TwoHighSeverity_BoundaryExactlyTwo(t *testing.T) {
+	// given: 3 D-Mails exactly at threshold, exactly 2 are HIGH
+	now := time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)
+	dmails := []domain.DMail{
+		{Name: "feedback-001", Severity: domain.SeverityHigh, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-18T12:00:00Z"}},
+		{Name: "feedback-002", Severity: domain.SeverityHigh, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-19T12:00:00Z"}},
+		{Name: "feedback-003", Severity: domain.SeverityMedium, Targets: []string{"auth/session.go"},
+			Metadata: map[string]string{"created_at": "2026-02-20T12:00:00Z"}},
+	}
+	cfg := domain.ConvergenceConfig{WindowDays: 14, Threshold: 3}
+
+	// when
+	alerts := domain.AnalyzeConvergence(dmails, cfg, now)
+
+	// then
+	if len(alerts) != 1 {
+		t.Fatalf("expected 1 alert, got %d", len(alerts))
+	}
+	if alerts[0].Severity != domain.SeverityHigh {
+		t.Errorf("expected HIGH (exactly 2 HIGH D-Mails = boundary), got %s", alerts[0].Severity)
+	}
+}

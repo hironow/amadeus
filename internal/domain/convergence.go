@@ -26,10 +26,11 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 
 	// Group D-Mails by target within the time window
 	type targetInfo struct {
-		dmailNames []string
-		seen       map[string]bool
-		firstSeen  time.Time
-		lastSeen   time.Time
+		dmailNames   []string
+		seen         map[string]bool
+		highSevCount int
+		firstSeen    time.Time
+		lastSeen     time.Time
 	}
 	targets := make(map[string]*targetInfo)
 
@@ -62,6 +63,9 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 			if !info.seen[d.Name] {
 				info.seen[d.Name] = true
 				info.dmailNames = append(info.dmailNames, d.Name)
+				if d.Severity == SeverityHigh {
+					info.highSevCount++
+				}
 			}
 			if created.Before(info.firstSeen) {
 				info.firstSeen = created
@@ -84,6 +88,11 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 		}
 		severity := SeverityMedium
 		if len(info.dmailNames) >= cfg.Threshold*escalation {
+			severity = SeverityHigh
+		}
+		// Escalation rule: 2+ HIGH severity D-Mails promote the alert to HIGH
+		// regardless of the count-based escalation threshold.
+		if severity != SeverityHigh && info.highSevCount >= 2 {
 			severity = SeverityHigh
 		}
 		alerts = append(alerts, ConvergenceAlert{
