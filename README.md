@@ -90,6 +90,27 @@ high   (score >  0.50) -> Auto-sent (receiver handles approval)
 All D-Mails go directly to `outbox/` + `archive/`. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
 
 - Per-axis overrides can force high severity for critical axes (e.g., ADR integrity > 60 always high)
+- Severity escalation chain: 2+ HIGH-severity D-Mails targeting the same area within the convergence window promote the alert to HIGH regardless of count threshold
+
+### Capability Boundary Detection
+
+Phase 2 evaluates whether changes cross tool capability boundaries. `CapabilityViolation` structs in the Claude response identify when merged code shifts responsibilities beyond the intended scope of a tool (e.g., amadeus performing implementation tasks that belong to paintress).
+
+### Calibration Baseline Staleness
+
+When `baseline_staleness.max_age_days` is set in config, amadeus auto-promotes the next check to full calibration if the baseline is older than the configured threshold. Disabled by default (`max_age_days: 0`).
+
+### D-Mail TTL Expiry
+
+D-Mails older than 7 days are excluded from convergence analysis via `FilterByTTL`. This prevents stale D-Mails from inflating convergence alert counts. D-Mails with missing or unparseable timestamps are conservatively included.
+
+### Divergence Trend Analysis
+
+When check history contains prior results, amadeus computes a `DivergenceTrend` (improving / stable / worsening) based on the score delta. Trend data is included in the diff check prompt to give Claude context about directional movement. Stable threshold: delta <= 5.0.
+
+### RunStopped Reason Classification
+
+The `run.stopped` event includes a `reason` field classified into categories: `graceful`, `user`, `io_error`, `transient`, or `unknown`. Only `io_error` is considered critical for operational alerting.
 
 ## D-Mail Protocol
 
@@ -206,7 +227,7 @@ The auth module violates the JWT requirement specified in ADR-003.
 
 D-Mails may include an optional `context` field (per ADR S0031) containing insight summaries from the Insight Ledger, providing receivers with semantic context about the divergence or convergence state.
 
-D-Mail `.md` files are immutable once written.
+D-Mail `.md` files are immutable once written. Each D-Mail carries a `idempotency_key` (SHA-256 hex hash of name + issues + severity) for deduplication. Validation rejects empty bodies, path traversal in targets, absolute target paths, duplicate targets, and self-referencing targets. `ParseDMailStrict` additionally rejects unknown frontmatter fields.
 
 ## Scope
 
@@ -214,10 +235,16 @@ D-Mail `.md` files are immutable once written.
 
 - Detect structural shifts in merged PRs or full codebase scans (Reading Steiner)
 - Score divergence across four weighted axes using Claude evaluation (Divergence Meter)
+- Detect capability boundary violations when changes cross tool responsibility boundaries
 - Route corrective D-Mails (design-feedback / implementation-feedback) by severity to downstream tools
+- Escalate severity when repeated HIGH D-Mails target the same area (severity escalation chain)
+- Expire stale D-Mails via TTL (7-day default) before convergence analysis
+- Auto-promote to full calibration when baseline age exceeds configurable threshold (staleness detection)
+- Analyze divergence trend direction (improving / stable / worsening) across check history
 - Run PR convergence pipeline: read open PR state, build PRChain, generate convergence reports
 - Monitor inbox via fsnotify for real-time D-Mail reception with archive-based dedup
 - Track check history with append-only event logs
+- Classify run stop reasons for operational alerting (graceful / user / io_error / transient / unknown)
 
 **What Amadeus does NOT do:**
 
@@ -321,10 +348,15 @@ per_axis_override:
   adr_integrity_force_high: 60
   dod_fulfillment_force_high: 70
   dependency_integrity_force_medium: 80
+  implicit_constraints_force_medium: 0  # disabled by default
 
 full_check:
   interval: 10
   on_divergence_jump: 0.15
+  max_result_history: 100  # max check results retained during event replay
+
+baseline_staleness:
+  max_age_days: 0  # 0 = disabled; set to e.g. 7 to auto-promote stale baselines
 ```
 
 ## Tracing (OpenTelemetry)
