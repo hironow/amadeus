@@ -366,6 +366,41 @@ type ConsumedRecord struct {
 	Source     string    `json:"source"`
 }
 
+// dmailTTL is the maximum age of a D-Mail before it is considered stale and excluded from
+// convergence analysis. D-Mails older than this duration accumulate noise that degrades detection accuracy.
+const dmailTTL = 7 * 24 * time.Hour
+
+// DMailAge computes the age of a D-Mail from its Metadata["created_at"] field (RFC3339).
+// Returns (age, true) when the timestamp is present and parseable, or (0, false) otherwise.
+func DMailAge(dmail DMail, now time.Time) (time.Duration, bool) {
+	if dmail.Metadata == nil {
+		return 0, false
+	}
+	raw, ok := dmail.Metadata["created_at"]
+	if !ok || raw == "" {
+		return 0, false
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return 0, false
+	}
+	return now.Sub(t), true
+}
+
+// FilterByTTL excludes D-Mails older than the hardcoded TTL from the given slice.
+// Entries with missing or unparseable created_at timestamps are conservatively included.
+func FilterByTTL(dmails []DMail, now time.Time) []DMail {
+	result := make([]DMail, 0, len(dmails))
+	for _, d := range dmails {
+		age, ok := DMailAge(d, now)
+		if ok && age > dmailTTL {
+			continue
+		}
+		result = append(result, d)
+	}
+	return result
+}
+
 var issueIDPattern = regexp.MustCompile(`[A-Z]+-\d+`)
 
 // ExtractIssueIDs scans texts for Linear Issue IDs (e.g. "MY-302", "AM-123")

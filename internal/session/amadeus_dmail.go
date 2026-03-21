@@ -113,6 +113,7 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 	if convergenceErr != nil {
 		return nil, nil, nil // tolerate load failure
 	}
+	allDMails = domain.FilterByTTL(allDMails, now)
 	convergenceAlerts := a.Config.DetectConvergence(allDMails, now)
 	for _, alert := range convergenceAlerts {
 		if err := a.Emitter.EmitConvergenceDetected(alert, now); err != nil {

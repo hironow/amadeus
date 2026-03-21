@@ -3,6 +3,7 @@ package domain_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
@@ -1390,5 +1391,110 @@ func TestVerifyIdempotencyKey_TamperedBody(t *testing.T) {
 	}
 	if err != domain.ErrIdempotencyMismatch {
 		t.Errorf("expected ErrIdempotencyMismatch, got: %v", err)
+	}
+}
+
+func TestDMailAge_WithValidTimestamp(t *testing.T) {
+	// given: a D-Mail created 3 days ago
+	now := time.Now().UTC()
+	createdAt := now.Add(-3 * 24 * time.Hour)
+	dmail := domain.DMail{
+		Metadata: map[string]string{
+			"created_at": createdAt.Format(time.RFC3339),
+		},
+	}
+
+	// when
+	age, ok := domain.DMailAge(dmail, now)
+
+	// then
+	if !ok {
+		t.Fatal("expected ok=true for valid created_at timestamp")
+	}
+	if age < 2*24*time.Hour || age > 4*24*time.Hour {
+		t.Errorf("expected age ~72h, got %v", age)
+	}
+}
+
+func TestDMailAge_WithMissingTimestamp(t *testing.T) {
+	// given: a D-Mail with no metadata
+	dmail := domain.DMail{}
+
+	// when
+	_, ok := domain.DMailAge(dmail, time.Now().UTC())
+
+	// then: missing timestamp returns ok=false
+	if ok {
+		t.Error("expected ok=false for missing created_at timestamp")
+	}
+}
+
+func TestDMailAge_WithUnparsableTimestamp(t *testing.T) {
+	// given: a D-Mail with a bad timestamp
+	dmail := domain.DMail{
+		Metadata: map[string]string{
+			"created_at": "not-a-timestamp",
+		},
+	}
+
+	// when
+	_, ok := domain.DMailAge(dmail, time.Now().UTC())
+
+	// then: unparsable timestamp returns ok=false
+	if ok {
+		t.Error("expected ok=false for unparsable created_at timestamp")
+	}
+}
+
+func TestFilterByTTL_ExcludesStale(t *testing.T) {
+	// given: a D-Mail created 8 days ago (beyond 7-day TTL)
+	now := time.Now().UTC()
+	stale := domain.DMail{
+		Name: "stale-dmail",
+		Metadata: map[string]string{
+			"created_at": now.Add(-8 * 24 * time.Hour).Format(time.RFC3339),
+		},
+	}
+
+	// when
+	result := domain.FilterByTTL([]domain.DMail{stale}, now)
+
+	// then: stale D-Mail is excluded
+	if len(result) != 0 {
+		t.Errorf("expected 0 D-Mails after TTL filter, got %d", len(result))
+	}
+}
+
+func TestFilterByTTL_IncludesFresh(t *testing.T) {
+	// given: a D-Mail created 2 days ago (within 7-day TTL)
+	now := time.Now().UTC()
+	fresh := domain.DMail{
+		Name: "fresh-dmail",
+		Metadata: map[string]string{
+			"created_at": now.Add(-2 * 24 * time.Hour).Format(time.RFC3339),
+		},
+	}
+
+	// when
+	result := domain.FilterByTTL([]domain.DMail{fresh}, now)
+
+	// then: fresh D-Mail is included
+	if len(result) != 1 {
+		t.Errorf("expected 1 D-Mail after TTL filter, got %d", len(result))
+	}
+}
+
+func TestFilterByTTL_IncludesMissingTimestamp(t *testing.T) {
+	// given: a D-Mail with no created_at (conservatively include)
+	dmail := domain.DMail{
+		Name: "no-timestamp-dmail",
+	}
+
+	// when
+	result := domain.FilterByTTL([]domain.DMail{dmail}, time.Now().UTC())
+
+	// then: missing timestamp D-Mail is conservatively included
+	if len(result) != 1 {
+		t.Errorf("expected 1 D-Mail (conservative include) after TTL filter, got %d", len(result))
 	}
 }
