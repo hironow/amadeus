@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/eventsource"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
@@ -128,6 +129,9 @@ Pass --execute to actually remove the files.`,
 					rebuildIndexAfterPrune(divRoot, logger)
 					out.ArchiveDeleted = len(result.ArchiveCandidates)
 					out.EventDeleted = totalCount - len(result.ArchiveCandidates)
+
+					// Truncate oversized event files
+					truncateOversizedEventFiles(divRoot, logger)
 				}
 				data, jsonErr := json.Marshal(out)
 				if jsonErr != nil {
@@ -144,6 +148,10 @@ Pass --execute to actually remove the files.`,
 					fmt.Fprintf(errW, "No prune directories found under %s\n", divRoot)
 				} else {
 					fmt.Fprintf(errW, "No files older than %d days to prune\n", days)
+				}
+				// Still truncate oversized event files even when no expired files exist
+				if execute {
+					truncateOversizedEventFiles(divRoot, logger)
 				}
 				return nil
 			}
@@ -194,6 +202,9 @@ Pass --execute to actually remove the files.`,
 			}
 			rebuildIndexAfterPrune(divRoot, logger)
 
+			// Truncate oversized event files
+			truncateOversizedEventFiles(divRoot, logger)
+
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)
 			return nil
 		},
@@ -218,6 +229,24 @@ func rebuildIndexAfterPrune(divRoot string, logger domain.Logger) {
 		logger.Warn("index compaction: %v", err)
 	} else {
 		logger.Info("Compacted index: %d entries → %s", n, indexPath)
+	}
+}
+
+// truncateOversizedEventFiles truncates event files that exceed the size threshold,
+// keeping only the most recent EventFileTruncateKeepLines lines in each.
+func truncateOversizedEventFiles(divRoot string, logger domain.Logger) {
+	stateDir := divRoot
+	oversized, err := eventsource.ListOversizedEventFiles(stateDir)
+	if err != nil {
+		logger.Warn("list oversized event files: %v", err)
+		return
+	}
+	for _, name := range oversized {
+		if truncErr := eventsource.TruncateEventFile(stateDir, name, eventsource.EventFileTruncateKeepLines); truncErr != nil {
+			logger.Warn("truncate event file %s: %v", name, truncErr)
+		} else {
+			logger.Info("Truncated oversized event file: %s", name)
+		}
 	}
 }
 
