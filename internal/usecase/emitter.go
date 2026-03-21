@@ -164,8 +164,8 @@ func (m *checkStateProvider) ShouldPromoteToFull(prevDiv, currDiv float64) bool 
 	return m.agg.ShouldPromoteToFull(prevDiv, currDiv)
 }
 
-func (m *checkStateProvider) AdvanceCheckCount(fullCheck bool) {
-	m.agg.AdvanceCheckCount(fullCheck)
+func (m *checkStateProvider) AdvanceCheckCount(fullCheck bool, wasForced bool) {
+	m.agg.AdvanceCheckCount(fullCheck, wasForced)
 }
 
 func (m *checkStateProvider) Restore(result domain.CheckResult) {

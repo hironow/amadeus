@@ -107,10 +107,12 @@ func AnalyzeDivergenceTrend(results []domain.CheckResult) *domain.DivergenceTren
 }
 
 // detectShift runs Phase 1: ReadingSteiner shift detection.
-// Returns the shift report, whether a full check was performed, and any error.
-func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, fullMode bool, quiet bool) (ShiftReport, bool, error) {
+// Returns the shift report, whether a full check was performed, whether it was
+// forced by ForceFullNext, and any error.
+func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, fullMode bool, quiet bool) (ShiftReport, bool, bool, error) {
 	fullCheck := a.State.ShouldFullCheck(fullMode)
-	if a.State.ForceFullNext() {
+	wasForced := a.State.ForceFullNext()
+	if wasForced {
 		if !quiet {
 			a.Logger.Info("Full scan triggered by previous divergence jump")
 		}
@@ -139,7 +141,7 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 		report, err = rs.DetectShiftFull(a.RepoDir)
 		if err != nil {
 			span1.End()
-			return ShiftReport{}, fullCheck, fmt.Errorf("phase 1 (full): %w", err)
+			return ShiftReport{}, fullCheck, wasForced, fmt.Errorf("phase 1 (full): %w", err)
 		}
 	} else {
 		sinceCommit := previous.Commit
@@ -148,13 +150,13 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 			report, err = rs.DetectShiftFull(a.RepoDir)
 			if err != nil {
 				span1.End()
-				return ShiftReport{}, fullCheck, fmt.Errorf("phase 1 (first run): %w", err)
+				return ShiftReport{}, fullCheck, wasForced, fmt.Errorf("phase 1 (first run): %w", err)
 			}
 		} else {
 			report, err = rs.DetectShift(sinceCommit)
 			if err != nil {
 				span1.End()
-				return ShiftReport{}, fullCheck, fmt.Errorf("phase 1 (diff): %w", err)
+				return ShiftReport{}, fullCheck, wasForced, fmt.Errorf("phase 1 (diff): %w", err)
 			}
 		}
 	}
@@ -179,7 +181,7 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 	}
 	span1.End()
 
-	return report, fullCheck, nil
+	return report, fullCheck, wasForced, nil
 }
 
 // buildCheckPrompt runs Phase 2a: collects ADRs, DoDs, and dependency map,

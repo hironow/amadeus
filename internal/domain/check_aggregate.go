@@ -46,13 +46,18 @@ func (a *CheckAggregate) SetForceFullNext(v bool) {
 }
 
 // ShouldFullCheck determines whether the next check should be a full scan.
-// Returns true if forceFlag is set, ForceFullNext is true, or the check count
-// has reached the configured interval. Suppressed during cooldown period.
+// Returns true if forceFlag is set (explicit --full always wins), ForceFullNext
+// is true, or the check count has reached the configured interval.
+// Cooldown suppresses ForceFullNext and interval-based triggers but never
+// overrides an explicit forceFlag.
 func (a *CheckAggregate) ShouldFullCheck(forceFlag bool) bool {
+	if forceFlag {
+		return true
+	}
 	if a.cooldownRemaining > 0 {
 		return false
 	}
-	if forceFlag || a.forceFullNext {
+	if a.forceFullNext {
 		return true
 	}
 	return a.checkCount >= a.config.FullCheck.Interval
@@ -64,12 +69,15 @@ func (a *CheckAggregate) CooldownRemaining() int {
 }
 
 // AdvanceCheckCount updates the internal check counter.
-// If fullCheck is true, the counter resets to 0 and starts cooldown if
-// forceFullNext was active. Otherwise it increments by 1 and decrements cooldown.
-func (a *CheckAggregate) AdvanceCheckCount(fullCheck bool) {
+// If fullCheck is true, the counter resets to 0 and starts cooldown when
+// wasForced is true (indicating the full check was triggered by forceFullNext).
+// Otherwise it increments by 1 and decrements cooldown.
+// The wasForced parameter is necessary because forceFullNext may have been
+// cleared earlier in the pipeline (e.g. by detectShift) before this call.
+func (a *CheckAggregate) AdvanceCheckCount(fullCheck bool, wasForced bool) {
 	if fullCheck {
 		a.checkCount = 0
-		if a.forceFullNext {
+		if wasForced || a.forceFullNext {
 			a.cooldownRemaining = defaultForceFullCooldown
 			a.forceFullNext = false
 		}

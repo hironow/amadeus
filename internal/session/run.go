@@ -175,7 +175,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		return fmt.Errorf("load previous state: %w", err)
 	}
 
-	report, fullCheck, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
+	report, fullCheck, wasForced, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		dmailNames = append(dmailNames, d.Name)
 	}
 
-	a.State.AdvanceCheckCount(fullCheck)
+	a.State.AdvanceCheckCount(fullCheck, wasForced)
 	checkType := domain.CheckTypeDiff
 	if fullCheck {
 		checkType = domain.CheckTypeFull

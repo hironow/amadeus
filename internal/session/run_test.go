@@ -149,7 +149,7 @@ func (s *runState) ShouldFullCheck(_ bool) bool           { return false }
 func (s *runState) ForceFullNext() bool                   { return false }
 func (s *runState) SetForceFullNext(_ bool)               {}
 func (s *runState) ShouldPromoteToFull(_, _ float64) bool { return false }
-func (s *runState) AdvanceCheckCount(_ bool)              {}
+func (s *runState) AdvanceCheckCount(_, _ bool)            {}
 func (s *runState) Restore(_ domain.CheckResult)          {}
 
 // feedInbox creates a buffered channel pre-loaded with the given D-Mails.
