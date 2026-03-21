@@ -26,6 +26,14 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 		a.State.SetForceFullNext(false) // consumed
 	}
 
+	// Auto-promote to full calibration when the baseline is stale.
+	if !fullCheck && a.Config.BaselineStaleness.IsStale(previous.CheckedAt) {
+		if !quiet {
+			a.Logger.Info("Baseline is stale (last check: %v), promoting to full calibration", previous.CheckedAt)
+		}
+		fullCheck = true
+	}
+
 	rs := &ReadingSteiner{Git: a.Git}
 	var report ShiftReport
 	var err error

@@ -53,17 +53,18 @@ func (f FlagApproverConfig) ApproveCmdString() string { return f.ApproveCmd }
 
 // Config holds the complete Amadeus configuration.
 type Config struct {
-	Lang            string            `yaml:"lang"`
-	ClaudeCmd       string            `yaml:"claude_cmd,omitempty"`
-	Model           string            `yaml:"model,omitempty"`
-	TimeoutSec      int               `yaml:"timeout_sec,omitempty"`
-	Weights         Weights           `yaml:"weights"`
-	Thresholds      Thresholds        `yaml:"thresholds"`
-	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
-	FullCheck       FullCheckConfig   `yaml:"full_check"`
-	Convergence     ConvergenceConfig `yaml:"convergence"`
-	WaitTimeout     time.Duration     `yaml:"wait_timeout,omitempty"`
-	Computed        ComputedConfig    `yaml:"computed,omitempty"`
+	Lang               string                  `yaml:"lang"`
+	ClaudeCmd          string                  `yaml:"claude_cmd,omitempty"`
+	Model              string                  `yaml:"model,omitempty"`
+	TimeoutSec         int                     `yaml:"timeout_sec,omitempty"`
+	Weights            Weights                 `yaml:"weights"`
+	Thresholds         Thresholds              `yaml:"thresholds"`
+	PerAxisOverride    PerAxisOverride         `yaml:"per_axis_override"`
+	FullCheck          FullCheckConfig         `yaml:"full_check"`
+	Convergence        ConvergenceConfig       `yaml:"convergence"`
+	BaselineStaleness  BaselineStalenessConfig `yaml:"baseline_staleness,omitempty"`
+	WaitTimeout        time.Duration           `yaml:"wait_timeout,omitempty"`
+	Computed           ComputedConfig          `yaml:"computed,omitempty"`
 }
 
 // DefaultMaxResultHistory is the default maximum number of check results to
@@ -75,6 +76,24 @@ type FullCheckConfig struct {
 	Interval         int     `yaml:"interval"`
 	OnDivergenceJump float64 `yaml:"on_divergence_jump"`
 	MaxResultHistory int     `yaml:"max_result_history,omitempty"`
+}
+
+// BaselineStalenessConfig controls auto-promotion to full calibration when the
+// last check is older than MaxAgeDays. Disabled when MaxAgeDays is 0.
+type BaselineStalenessConfig struct {
+	MaxAgeDays int `yaml:"max_age_days"`
+}
+
+// IsStale reports whether the given checkedAt timestamp is older than MaxAgeDays.
+// Returns false when MaxAgeDays is 0 (disabled) or checkedAt is the zero value.
+func (b BaselineStalenessConfig) IsStale(checkedAt time.Time) bool {
+	if b.MaxAgeDays == 0 {
+		return false
+	}
+	if checkedAt.IsZero() {
+		return false
+	}
+	return time.Since(checkedAt) > time.Duration(b.MaxAgeDays)*24*time.Hour
 }
 
 // DefaultConfig returns a Config populated with architecture-document defaults.
