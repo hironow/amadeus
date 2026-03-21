@@ -3,7 +3,9 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,60 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// repeatedViolationThreshold is the axis score above which a result counts as a violation.
+const repeatedViolationThreshold = 50
+
+// loadRecentCheckResults reads the recent check history from .run/recent_checks.json.
+// Returns nil (no error) if the file does not exist.
+func loadRecentCheckResults(stateDir string) ([]domain.CheckResult, error) {
+	path := filepath.Join(stateDir, ".run", "recent_checks.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read recent checks: %w", err)
+	}
+	var results []domain.CheckResult
+	if err := json.Unmarshal(data, &results); err != nil {
+		return nil, fmt.Errorf("parse recent checks: %w", err)
+	}
+	return results, nil
+}
+
+// CollectRepeatedViolations analyzes a slice of recent check results and returns
+// any integrity axis that exceeded the violation threshold in ALL of the provided results.
+// Returns nil when results is empty or no axis qualifies.
+func CollectRepeatedViolations(results []domain.CheckResult) []domain.RepeatedViolation {
+	if len(results) == 0 {
+		return nil
+	}
+
+	// Count how many results have each axis above threshold
+	countAbove := make(map[domain.Axis]int)
+	latestDetails := make(map[domain.Axis]string)
+	for _, r := range results {
+		for axis, score := range r.Axes {
+			if score.Score > repeatedViolationThreshold {
+				countAbove[axis]++
+				latestDetails[axis] = score.Details
+			}
+		}
+	}
+
+	var violations []domain.RepeatedViolation
+	for axis, count := range countAbove {
+		if count == len(results) {
+			violations = append(violations, domain.RepeatedViolation{
+				Axis:        string(axis),
+				Description: latestDetails[axis],
+				Count:       count,
+			})
+		}
+	}
+	return violations
+}
 
 // detectShift runs Phase 1: ReadingSteiner shift detection.
 // Returns the shift report, whether a full check was performed, and any error.
@@ -181,10 +237,19 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		}
 	}
 
+	// Load recent check history for repeated violation detection
+	stateDir := filepath.Join(repoRoot, domain.StateDir)
+	recentResults, recentErr := loadRecentCheckResults(stateDir)
+	if recentErr != nil && !quiet {
+		a.Logger.Info("Warning: failed to load recent check results: %v", recentErr)
+	}
+	repeatedViolations := CollectRepeatedViolations(recentResults)
+
 	prompt, err := platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
-		EvalDir:        evalDir,
-		HasPRReviews:   hasPRReviews,
-		LinkedIssueIDs: strings.Join(issueIDs, ", "),
+		EvalDir:            evalDir,
+		HasPRReviews:       hasPRReviews,
+		LinkedIssueIDs:     strings.Join(issueIDs, ", "),
+		RepeatedViolations: repeatedViolations,
 	})
 	if err != nil {
 		cleanup()
