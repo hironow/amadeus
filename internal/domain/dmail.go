@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -167,12 +168,12 @@ func validateTargets(targets []string) []string {
 			errs = append(errs, "target must not be empty")
 			continue
 		}
-		if strings.Contains(target, "..") {
-			errs = append(errs, fmt.Sprintf("target %q contains path traversal", target))
+		if filepath.IsAbs(target) {
+			errs = append(errs, fmt.Sprintf("target %q must be a relative path", target))
 			continue
 		}
-		if strings.HasPrefix(target, "/") {
-			errs = append(errs, fmt.Sprintf("target %q must be a relative path", target))
+		if containsDotDotElement(target) {
+			errs = append(errs, fmt.Sprintf("target %q contains path traversal", target))
 			continue
 		}
 		if seen[target] {
@@ -182,6 +183,17 @@ func validateTargets(targets []string) []string {
 		seen[target] = true
 	}
 	return errs
+}
+
+// containsDotDotElement reports whether the path contains ".." as a path element
+// (e.g. "../foo" or "foo/../bar") rather than as a substring (e.g. "foo..bar").
+func containsDotDotElement(path string) bool {
+	for _, elem := range strings.Split(filepath.ToSlash(path), "/") {
+		if elem == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // SanitizeTargets removes self-referencing targets from a D-Mail's target list.
