@@ -186,6 +186,7 @@ func ValidateConfig(cfg Config) []string {
 		{"adr_integrity_force_high", cfg.PerAxisOverride.ADRForceHigh},
 		{"dod_fulfillment_force_high", cfg.PerAxisOverride.DoDForceHigh},
 		{"dependency_integrity_force_medium", cfg.PerAxisOverride.DepForceMedium},
+		{"implicit_constraints_force_medium", cfg.PerAxisOverride.ImplicitForceMedium},
 	}
 	for _, o := range overrides {
 		if o.value < 0 || o.value > 100 {
@@ -215,6 +216,9 @@ func ValidateConfig(cfg Config) []string {
 	}
 	if cfg.FullCheck.OnDivergenceJump < 0 {
 		errs = append(errs, fmt.Sprintf("full_check.on_divergence_jump must be non-negative (got %f)", cfg.FullCheck.OnDivergenceJump))
+	}
+	if cfg.FullCheck.MaxResultHistory < 0 {
+		errs = append(errs, fmt.Sprintf("full_check.max_result_history must be non-negative (got %d)", cfg.FullCheck.MaxResultHistory))
 	}
 
 	// Cross-field semantic constraints
