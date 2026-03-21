@@ -29,7 +29,9 @@ func TestCollectADRs_DirNotExist(t *testing.T) {
 func TestCollectADRs_EmptyDir(t *testing.T) {
 	// given: docs/adr/ exists but has no .md files
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, "docs", "adr"), 0o755)
+	if err := os.MkdirAll(filepath.Join(root, "docs", "adr"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 
 	// when
 	result, err := session.CollectADRs(context.Background(), root)
@@ -47,8 +49,12 @@ func TestCollectADRs_SingleFile(t *testing.T) {
 	// given: one ADR file
 	root := t.TempDir()
 	adrDir := filepath.Join(root, "docs", "adr")
-	os.MkdirAll(adrDir, 0o755)
-	os.WriteFile(filepath.Join(adrDir, "0001-use-jwt.md"), []byte("Use JWT for auth"), 0o644)
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-use-jwt.md"), []byte("Use JWT for auth"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 
 	// when
 	result, err := session.CollectADRs(context.Background(), root)
@@ -69,10 +75,18 @@ func TestCollectADRs_MultipleFilesSorted(t *testing.T) {
 	// given: multiple ADR files (should be sorted alphabetically)
 	root := t.TempDir()
 	adrDir := filepath.Join(root, "docs", "adr")
-	os.MkdirAll(adrDir, 0o755)
-	os.WriteFile(filepath.Join(adrDir, "0002-use-grpc.md"), []byte("gRPC"), 0o644)
-	os.WriteFile(filepath.Join(adrDir, "0001-use-rest.md"), []byte("REST"), 0o644)
-	os.WriteFile(filepath.Join(adrDir, "0003-use-graphql.md"), []byte("GraphQL"), 0o644)
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	for _, f := range []struct{ name, content string }{
+		{"0002-use-grpc.md", "gRPC"},
+		{"0001-use-rest.md", "REST"},
+		{"0003-use-graphql.md", "GraphQL"},
+	} {
+		if err := os.WriteFile(filepath.Join(adrDir, f.name), []byte(f.content), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+	}
 
 	// when
 	result, err := session.CollectADRs(context.Background(), root)
@@ -97,10 +111,18 @@ func TestCollectADRs_IgnoresNonMD(t *testing.T) {
 	// given: mix of .md and non-.md files
 	root := t.TempDir()
 	adrDir := filepath.Join(root, "docs", "adr")
-	os.MkdirAll(adrDir, 0o755)
-	os.WriteFile(filepath.Join(adrDir, "0001-decision.md"), []byte("Decision"), 0o644)
-	os.WriteFile(filepath.Join(adrDir, "README.txt"), []byte("ignore"), 0o644)
-	os.MkdirAll(filepath.Join(adrDir, "subdir"), 0o755) // subdirectories should be ignored
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-decision.md"), []byte("Decision"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "README.txt"), []byte("ignore"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(adrDir, "subdir"), 0o755); err != nil { // subdirectories should be ignored
+		t.Fatalf("setup: %v", err)
+	}
 
 	// when
 	result, err := session.CollectADRs(context.Background(), root)
@@ -124,8 +146,12 @@ func TestCollectADRs_OutputFormat(t *testing.T) {
 	// given: verify the exact output format used by LLM Judge prompt
 	root := t.TempDir()
 	adrDir := filepath.Join(root, "docs", "adr")
-	os.MkdirAll(adrDir, 0o755)
-	os.WriteFile(filepath.Join(adrDir, "0001-test.md"), []byte("content here"), 0o644)
+	if err := os.MkdirAll(adrDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(adrDir, "0001-test.md"), []byte("content here"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 
 	// when
 	result, err := session.CollectADRs(context.Background(), root)
