@@ -50,7 +50,13 @@ Evaluate how recent changes affect the codebase's alignment with its architectur
 - "transitive": さらに下流で影響を受ける可能性のあるファイル/モジュール
 
 Output MUST be valid JSON matching this exact schema:
-{"files_read":["adrs","dods","diff","previous_scores"],"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
+{"files_read":["adrs","dods","diff","previous_scores"],"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"capability_violations":[{"boundary":"boundary_name","description":"explanation","file":"path/to/file.go"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
+
+ケイパビリティ違反について:
+- ケイパビリティ境界を直接越えるコードを報告してください（例: 承認済みアダプターを経由せずに外部APIを直接呼び出す、適切なインターフェースなしに共有状態にアクセスするなど）。
+- 検出されなければ空配列。
+- `boundary`: 違反しているケイパビリティ境界の名前。
+- `file`: 違反が発生しているファイル（特定できる場合）。
 
 D-Mailについて:
 - 実際の問題が見つかった場合のみD-Mailを生成してください。問題がなければ空配列。

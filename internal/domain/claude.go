@@ -13,13 +13,22 @@ type ImpactEntry struct {
 	Detail string `json:"detail"`
 }
 
+// CapabilityViolation represents a detected boundary violation where code exceeds
+// its intended capability scope (e.g., direct external API calls bypassing adapters).
+type CapabilityViolation struct {
+	Boundary    string `json:"boundary"`
+	Description string `json:"description"`
+	File        string `json:"file,omitempty"`
+}
+
 // ClaudeResponse represents the structured JSON output from Claude.
 type ClaudeResponse struct {
-	FilesRead    []string               `json:"files_read,omitempty"`
-	Axes         map[Axis]AxisScore     `json:"axes"`
-	DMails       []ClaudeDMailCandidate `json:"dmails"`
-	Reasoning    string                 `json:"reasoning"`
-	ImpactRadius []ImpactEntry          `json:"impact_radius,omitempty"`
+	FilesRead            []string               `json:"files_read,omitempty"`
+	Axes                 map[Axis]AxisScore     `json:"axes"`
+	DMails               []ClaudeDMailCandidate `json:"dmails"`
+	Reasoning            string                 `json:"reasoning"`
+	ImpactRadius         []ImpactEntry          `json:"impact_radius,omitempty"`
+	CapabilityViolations []CapabilityViolation  `json:"capability_violations,omitempty"`
 }
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.

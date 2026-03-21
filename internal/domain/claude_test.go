@@ -339,3 +339,61 @@ func TestDiffCheckParams_HasRepeatedViolationsField(t *testing.T) {
 		t.Errorf("expected axis %q, got %q", domain.AxisADR, params.RepeatedViolations[0].Axis)
 	}
 }
+
+func TestParseClaudeResponse_WithCapabilityViolations(t *testing.T) {
+	// given: response includes capability_violations field
+	raw := `{
+		"axes": {
+			"adr_integrity": {"score": 10, "details": "ok"},
+			"dod_fulfillment": {"score": 0, "details": "ok"},
+			"dependency_integrity": {"score": 0, "details": "ok"},
+			"implicit_constraints": {"score": 0, "details": "ok"}
+		},
+		"dmails": [],
+		"reasoning": "found capability violation",
+		"capability_violations": [
+			{
+				"boundary": "external_api",
+				"description": "Direct call to external service bypasses approved adapter",
+				"file": "internal/service/payments.go"
+			}
+		]
+	}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.CapabilityViolations) != 1 {
+		t.Fatalf("expected 1 capability violation, got %d", len(resp.CapabilityViolations))
+	}
+	if resp.CapabilityViolations[0].Boundary != "external_api" {
+		t.Errorf("expected boundary 'external_api', got %q", resp.CapabilityViolations[0].Boundary)
+	}
+	if resp.CapabilityViolations[0].File != "internal/service/payments.go" {
+		t.Errorf("expected file path, got %q", resp.CapabilityViolations[0].File)
+	}
+}
+
+func TestParseClaudeResponse_WithoutCapabilityViolations_BackwardCompatible(t *testing.T) {
+	// given: old-style response without capability_violations
+	raw := `{
+		"axes": {"adr_integrity": {"score": 0, "details": "ok"}},
+		"dmails": [],
+		"reasoning": "ok"
+	}`
+
+	// when
+	resp, err := domain.ParseClaudeResponse([]byte(raw))
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.CapabilityViolations != nil {
+		t.Errorf("expected nil CapabilityViolations for old format, got %v", resp.CapabilityViolations)
+	}
+}
