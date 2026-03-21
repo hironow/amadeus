@@ -46,6 +46,7 @@ type DiffCheckParams struct {
 	HasPRReviews       bool
 	LinkedIssueIDs     string
 	RepeatedViolations []RepeatedViolation
+	DivergenceTrend    *DivergenceTrend
 }
 
 // FullCheckParams holds the template parameters for a file-reference full check prompt.

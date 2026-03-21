@@ -34,6 +34,12 @@ Evaluate how recent changes affect the codebase's alignment with its architectur
 
 これらの軸に**特に注意**してください。同じ問題が継続している場合、D-Mailの深刻度をエスカレートしてください。
 {{end}}
+{{- if .DivergenceTrend}}
+## 乖離トレンド
+現在のトレンド: **{{.DivergenceTrend.Class}}** (デルタ: {{printf "%.1f" .DivergenceTrend.Delta}})
+
+{{.DivergenceTrend.Message}}
+{{end}}
 ## タスク
 これらの変更が各整合性軸にどのように影響するかを評価してください。
 各軸を0-100でスコアリング（0 = 完全準拠、100 = 完全乖離）。

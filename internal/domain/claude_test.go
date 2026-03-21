@@ -284,6 +284,32 @@ func TestParseClaudeResponse_WithoutFilesRead_BackwardCompatible(t *testing.T) {
 	}
 }
 
+func TestDiffCheckParams_HasDivergenceTrendField(t *testing.T) {
+	// given
+	trend := domain.DivergenceTrend{
+		Class:   domain.DivergenceTrendWorsening,
+		Delta:   15.5,
+		Message: "Divergence increased from 30 to 45.5 over last 3 checks",
+	}
+
+	// when
+	params := domain.DiffCheckParams{
+		EvalDir:         "/tmp/eval",
+		DivergenceTrend: &trend,
+	}
+
+	// then
+	if params.DivergenceTrend == nil {
+		t.Fatal("expected DivergenceTrend to be set")
+	}
+	if params.DivergenceTrend.Class != domain.DivergenceTrendWorsening {
+		t.Errorf("expected class Worsening, got %q", params.DivergenceTrend.Class)
+	}
+	if params.DivergenceTrend.Delta != 15.5 {
+		t.Errorf("expected delta 15.5, got %f", params.DivergenceTrend.Delta)
+	}
+}
+
 func TestDiffCheckParams_HasRepeatedViolationsField(t *testing.T) {
 	// given
 	violations := []domain.RepeatedViolation{

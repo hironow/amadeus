@@ -71,6 +71,41 @@ func CollectRepeatedViolations(results []domain.CheckResult) []domain.RepeatedVi
 	return violations
 }
 
+// divergenceTrendStableThreshold is the maximum delta considered "stable".
+const divergenceTrendStableThreshold = 5.0
+
+// AnalyzeDivergenceTrend computes the trend direction of divergence scores across
+// recent check results. Returns nil when fewer than 2 results are provided.
+func AnalyzeDivergenceTrend(results []domain.CheckResult) *domain.DivergenceTrend {
+	if len(results) < 2 {
+		return nil
+	}
+
+	first := results[0].Divergence
+	last := results[len(results)-1].Divergence
+	delta := last - first
+
+	var class domain.DivergenceTrendClass
+	var msg string
+	switch {
+	case delta > divergenceTrendStableThreshold:
+		class = domain.DivergenceTrendWorsening
+		msg = fmt.Sprintf("Divergence increased by %.1f over %d checks (%.1f -> %.1f)", delta, len(results), first, last)
+	case delta < -divergenceTrendStableThreshold:
+		class = domain.DivergenceTrendImproving
+		msg = fmt.Sprintf("Divergence decreased by %.1f over %d checks (%.1f -> %.1f)", -delta, len(results), first, last)
+	default:
+		class = domain.DivergenceTrendStable
+		msg = fmt.Sprintf("Divergence stable (delta %.1f) over %d checks", delta, len(results))
+	}
+
+	return &domain.DivergenceTrend{
+		Class:   class,
+		Delta:   delta,
+		Message: msg,
+	}
+}
+
 // detectShift runs Phase 1: ReadingSteiner shift detection.
 // Returns the shift report, whether a full check was performed, and any error.
 func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, fullMode bool, quiet bool) (ShiftReport, bool, error) {
@@ -237,19 +272,21 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		}
 	}
 
-	// Load recent check history for repeated violation detection
+	// Load recent check history for repeated violation detection and trend analysis
 	stateDir := filepath.Join(repoRoot, domain.StateDir)
 	recentResults, recentErr := loadRecentCheckResults(stateDir)
 	if recentErr != nil && !quiet {
 		a.Logger.Info("Warning: failed to load recent check results: %v", recentErr)
 	}
 	repeatedViolations := CollectRepeatedViolations(recentResults)
+	divergenceTrend := AnalyzeDivergenceTrend(recentResults)
 
 	prompt, err := platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
 		EvalDir:            evalDir,
 		HasPRReviews:       hasPRReviews,
 		LinkedIssueIDs:     strings.Join(issueIDs, ", "),
 		RepeatedViolations: repeatedViolations,
+		DivergenceTrend:    divergenceTrend,
 	})
 	if err != nil {
 		cleanup()
