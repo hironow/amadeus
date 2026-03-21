@@ -4,6 +4,25 @@ import (
 	"time"
 )
 
+// DivergenceTrendClass categorizes the direction of divergence change over time.
+type DivergenceTrendClass string
+
+const (
+	// DivergenceTrendWorsening indicates divergence is consistently increasing.
+	DivergenceTrendWorsening DivergenceTrendClass = "worsening"
+	// DivergenceTrendImproving indicates divergence is consistently decreasing.
+	DivergenceTrendImproving DivergenceTrendClass = "improving"
+	// DivergenceTrendStable indicates divergence is not significantly changing.
+	DivergenceTrendStable DivergenceTrendClass = "stable"
+)
+
+// DivergenceTrend holds a trend analysis of divergence scores over recent checks.
+type DivergenceTrend struct {
+	Class   DivergenceTrendClass `json:"class"`
+	Delta   float64              `json:"delta"` // positive = worsening, negative = improving
+	Message string               `json:"message"`
+}
+
 // CheckType represents the type of divergence check performed.
 type CheckType string
 

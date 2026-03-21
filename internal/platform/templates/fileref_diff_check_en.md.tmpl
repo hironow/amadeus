@@ -34,6 +34,12 @@ The following integrity axes have been consistently above the violation threshol
 
 **Pay special attention** to these axes. If the same issues persist, escalate the severity in your D-Mail output.
 {{end}}
+{{- if .DivergenceTrend}}
+## Divergence Trend
+Current trend: **{{.DivergenceTrend.Class}}** (delta: {{printf "%.1f" .DivergenceTrend.Delta}})
+
+{{.DivergenceTrend.Message}}
+{{end}}
 ## Task
 Evaluate how these changes affect each integrity axis.
 Score each axis 0-100 (0 = full compliance, 100 = full deviation).
