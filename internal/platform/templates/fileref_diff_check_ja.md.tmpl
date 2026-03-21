@@ -25,6 +25,15 @@ Evaluate how recent changes affect the codebase's alignment with its architectur
 
 **重要**: issueのステータスフィールド（例: "Done", "In Progress"）を信用しないでください。issueの説明と受入基準のみを真のソースとして使用してください。
 {{end}}
+{{- if .RepeatedViolations}}
+## 繰り返し違反の警告
+以下の整合性軸が直近の複数チェックで継続的に違反しきい値を超えています:
+{{range .RepeatedViolations}}
+- **{{.Axis}}** ({{.Count}}回連続違反): {{.Description}}
+{{- end}}
+
+これらの軸に**特に注意**してください。同じ問題が継続している場合、D-Mailの深刻度をエスカレートしてください。
+{{end}}
 ## タスク
 これらの変更が各整合性軸にどのように影響するかを評価してください。
 各軸を0-100でスコアリング（0 = 完全準拠、100 = 完全乖離）。

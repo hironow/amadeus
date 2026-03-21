@@ -25,6 +25,15 @@ The following Linear Issue IDs were found in the merged commits: {{.LinkedIssueI
 
 **Important**: Do NOT trust the issue's status field (e.g., "Done", "In Progress"). Focus exclusively on the issue description and acceptance criteria as the source of truth.
 {{end}}
+{{- if .RepeatedViolations}}
+## Repeated Violations Warning
+The following integrity axes have been consistently above the violation threshold across recent checks:
+{{range .RepeatedViolations}}
+- **{{.Axis}}** ({{.Count}} consecutive violations): {{.Description}}
+{{- end}}
+
+**Pay special attention** to these axes. If the same issues persist, escalate the severity in your D-Mail output.
+{{end}}
 ## Task
 Evaluate how these changes affect each integrity axis.
 Score each axis 0-100 (0 = full compliance, 100 = full deviation).

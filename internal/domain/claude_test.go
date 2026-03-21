@@ -283,3 +283,33 @@ func TestParseClaudeResponse_WithoutFilesRead_BackwardCompatible(t *testing.T) {
 		t.Errorf("expected nil FilesRead for old format, got %v", resp.FilesRead)
 	}
 }
+
+func TestDiffCheckParams_HasRepeatedViolationsField(t *testing.T) {
+	// given
+	violations := []domain.RepeatedViolation{
+		{
+			Axis:        string(domain.AxisADR),
+			Description: "ADR-003 violated repeatedly",
+			Count:       3,
+		},
+	}
+
+	// when
+	params := domain.DiffCheckParams{
+		EvalDir:            "/tmp/eval",
+		HasPRReviews:       false,
+		LinkedIssueIDs:     "",
+		RepeatedViolations: violations,
+	}
+
+	// then
+	if len(params.RepeatedViolations) != 1 {
+		t.Fatalf("expected 1 repeated violation, got %d", len(params.RepeatedViolations))
+	}
+	if params.RepeatedViolations[0].Count != 3 {
+		t.Errorf("expected count 3, got %d", params.RepeatedViolations[0].Count)
+	}
+	if params.RepeatedViolations[0].Axis != string(domain.AxisADR) {
+		t.Errorf("expected axis %q, got %q", domain.AxisADR, params.RepeatedViolations[0].Axis)
+	}
+}

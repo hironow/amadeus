@@ -32,11 +32,20 @@ type ClaudeDMailCandidate struct {
 	Category    string   `json:"category,omitempty"`
 }
 
+// RepeatedViolation represents an integrity axis that has scored above the
+// violation threshold across multiple consecutive check results.
+type RepeatedViolation struct {
+	Axis        string `json:"axis"`
+	Description string `json:"description"`
+	Count       int    `json:"count"`
+}
+
 // DiffCheckParams holds the template parameters for a file-reference diff check prompt.
 type DiffCheckParams struct {
-	EvalDir        string
-	HasPRReviews   bool
-	LinkedIssueIDs string
+	EvalDir            string
+	HasPRReviews       bool
+	LinkedIssueIDs     string
+	RepeatedViolations []RepeatedViolation
 }
 
 // FullCheckParams holds the template parameters for a file-reference full check prompt.
