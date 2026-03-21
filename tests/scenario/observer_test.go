@@ -144,6 +144,7 @@ func (o *Observer) AssertPromptCount(wantCount int) {
 // AssertPromptContains verifies that at least one logged prompt contains
 // all of the specified substrings. This ensures the LLM Judge received
 // the expected input (e.g., ADR file references, DoD content).
+// All substrings must appear in the same prompt — not spread across different prompts.
 func (o *Observer) AssertPromptContains(wantSubstrings []string) {
 	o.t.Helper()
 	entries, err := os.ReadDir(o.ws.PromptLogDir())
@@ -154,22 +155,24 @@ func (o *Observer) AssertPromptContains(wantSubstrings []string) {
 		o.t.Fatal("no prompt logs found — cannot verify prompt content")
 	}
 
-	for _, substr := range wantSubstrings {
-		found := false
-		for _, entry := range entries {
-			data, err := os.ReadFile(filepath.Join(o.ws.PromptLogDir(), entry.Name()))
-			if err != nil {
-				continue
-			}
-			if strings.Contains(string(data), substr) {
-				found = true
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join(o.ws.PromptLogDir(), entry.Name()))
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		allFound := true
+		for _, substr := range wantSubstrings {
+			if !strings.Contains(content, substr) {
+				allFound = false
 				break
 			}
 		}
-		if !found {
-			o.t.Errorf("prompt content: no logged prompt contains %q", substr)
+		if allFound {
+			return
 		}
 	}
+	o.t.Errorf("prompt content: no single prompt contains all of %v", wantSubstrings)
 }
 
 // AssertPromptQuality is a composite guard that verifies both call count
@@ -334,13 +337,6 @@ func (o *Observer) AssertForceFullNextInJSONL() {
 		}
 	}
 	o.t.Error("no force_full_next event found in .gate/events/*.jsonl")
-}
-
-// AssertAmadeusValidateExitCode runs `amadeus validate` and checks the exit code.
-// exit 0 = valid config, exit 1 = invalid config.
-func (o *Observer) AssertAmadeusValidateExitCode(wantExit int) {
-	o.t.Helper()
-	o.t.Logf("NOTE: amadeus validate scenario test requires OverrideAmadeusConfig helper (not yet implemented)")
 }
 
 // --- Fan-out content parity helpers (proposal 067) ---
