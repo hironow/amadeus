@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -151,28 +152,84 @@ func ValidateDMail(dmail DMail) []string {
 	if dmail.Action != "" && !validActions[dmail.Action] {
 		errs = append(errs, fmt.Sprintf("invalid action %q", dmail.Action))
 	}
+	if strings.TrimSpace(dmail.Body) == "" {
+		errs = append(errs, "body is required")
+	}
+	errs = append(errs, validateTargets(dmail.Targets)...)
 	return errs
 }
 
-// ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
-func ParseDMail(data []byte) (DMail, error) {
+// validateTargets checks D-Mail targets for path traversal and duplicates.
+func validateTargets(targets []string) []string {
+	var errs []string
+	seen := make(map[string]bool)
+	for _, target := range targets {
+		if strings.TrimSpace(target) == "" {
+			errs = append(errs, "target must not be empty")
+			continue
+		}
+		if filepath.IsAbs(target) {
+			errs = append(errs, fmt.Sprintf("target %q must be a relative path", target))
+			continue
+		}
+		if containsDotDotElement(target) {
+			errs = append(errs, fmt.Sprintf("target %q contains path traversal", target))
+			continue
+		}
+		if seen[target] {
+			errs = append(errs, fmt.Sprintf("duplicate target %q", target))
+			continue
+		}
+		seen[target] = true
+	}
+	return errs
+}
+
+// containsDotDotElement reports whether the path contains ".." as a path element
+// (e.g. "../foo" or "foo/../bar") rather than as a substring (e.g. "foo..bar").
+func containsDotDotElement(path string) bool {
+	for _, elem := range strings.Split(filepath.ToSlash(path), "/") {
+		if elem == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+// SanitizeTargets removes self-referencing targets from a D-Mail's target list.
+// It filters out targets that match the sender identity or the kind string prefix,
+// preventing routing loops where a D-Mail targets itself.
+func SanitizeTargets(senderIdentity string, kind DMailKind, targets []string) []string {
+	var result []string
+	for _, target := range targets {
+		if target == senderIdentity {
+			continue
+		}
+		if target == string(kind) {
+			continue
+		}
+		result = append(result, target)
+	}
+	return result
+}
+
+// splitFrontmatter splits raw D-Mail bytes into the YAML frontmatter bytes and Markdown body string.
+// Returns an error if the opening or closing frontmatter delimiters are missing.
+func splitFrontmatter(data []byte) (yamlPart []byte, bodyPart string, err error) {
 	str := string(data)
 	if !strings.HasPrefix(str, "---\n") {
-		return DMail{}, fmt.Errorf("missing opening frontmatter delimiter")
+		return nil, "", fmt.Errorf("missing opening frontmatter delimiter")
 	}
 	rest := str[4:] // skip opening "---\n"
 	idx := strings.Index(rest, "\n---\n")
 	if idx < 0 {
-		return DMail{}, fmt.Errorf("missing closing frontmatter delimiter")
+		return nil, "", fmt.Errorf("missing closing frontmatter delimiter")
 	}
-	yamlPart := rest[:idx]
-	bodyPart := rest[idx+5:] // skip "\n---\n"
+	return []byte(rest[:idx]), rest[idx+5:], nil // skip "\n---\n"
+}
 
-	var fm dmailFrontmatter
-	if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
-		return DMail{}, fmt.Errorf("parse frontmatter: %w", err)
-	}
-
+// fmToDMail converts a parsed dmailFrontmatter and body into a DMail.
+func fmToDMail(fm dmailFrontmatter, bodyPart string) DMail {
 	return DMail{
 		SchemaVersion: fm.SchemaVersion,
 		Name:          fm.Name,
@@ -186,11 +243,45 @@ func ParseDMail(data []byte) (DMail, error) {
 		Metadata:      fm.Metadata,
 		Context:       fm.Context,
 		Body:          strings.TrimLeft(bodyPart, "\n"),
-	}, nil
+	}
+}
+
+// ParseDMail parses a D-Mail from raw bytes in YAML frontmatter + Markdown format.
+func ParseDMail(data []byte) (DMail, error) {
+	yamlPart, bodyPart, err := splitFrontmatter(data)
+	if err != nil {
+		return DMail{}, err
+	}
+
+	var fm dmailFrontmatter
+	if err := yaml.Unmarshal(yamlPart, &fm); err != nil {
+		return DMail{}, fmt.Errorf("parse frontmatter: %w", err)
+	}
+
+	return fmToDMail(fm, bodyPart), nil
+}
+
+// ParseDMailStrict parses a D-Mail from raw bytes like ParseDMail, but rejects unknown frontmatter fields.
+// Use this variant in trusted pipelines where strict schema conformance is required.
+func ParseDMailStrict(data []byte) (DMail, error) {
+	yamlPart, bodyPart, err := splitFrontmatter(data)
+	if err != nil {
+		return DMail{}, err
+	}
+
+	dec := yaml.NewDecoder(bytes.NewReader(yamlPart))
+	dec.KnownFields(true)
+
+	var fm dmailFrontmatter
+	if err := dec.Decode(&fm); err != nil {
+		return DMail{}, fmt.Errorf("parse frontmatter (strict): %w", err)
+	}
+
+	return fmToDMail(fm, bodyPart), nil
 }
 
 // DMailIdempotencyKey computes a SHA256 content-based idempotency key from
-// the core fields of a DMail (name, kind, description, body).
+// the core fields of a DMail (name, kind, description, body, issues, severity).
 func DMailIdempotencyKey(dmail DMail) string {
 	h := sha256.New()
 	h.Write([]byte(dmail.Name))
@@ -200,6 +291,14 @@ func DMailIdempotencyKey(dmail DMail) string {
 	h.Write([]byte(dmail.Description))
 	h.Write([]byte{0})
 	h.Write([]byte(dmail.Body))
+	h.Write([]byte{0})
+	// Include sorted issues to prevent collision when same content has different issues
+	issuesCopy := make([]string, len(dmail.Issues))
+	copy(issuesCopy, dmail.Issues)
+	sort.Strings(issuesCopy)
+	h.Write([]byte(strings.Join(issuesCopy, ",")))
+	h.Write([]byte{0})
+	h.Write([]byte(string(dmail.Severity)))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -244,12 +343,74 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// ErrIdempotencyMismatch is returned by VerifyIdempotencyKey when the stored
+// idempotency_key in metadata does not match the recomputed key for the DMail.
+var ErrIdempotencyMismatch = fmt.Errorf("idempotency key mismatch")
+
+// VerifyIdempotencyKey checks that the idempotency_key stored in a DMail's
+// metadata matches the key recomputed from its current content.
+// Returns nil when no key is present (nil Metadata or empty string value).
+// Returns ErrIdempotencyMismatch when the keys differ.
+func VerifyIdempotencyKey(dmail DMail) error {
+	if dmail.Metadata == nil {
+		return nil
+	}
+	stored, ok := dmail.Metadata["idempotency_key"]
+	if !ok || stored == "" {
+		return nil
+	}
+	computed := DMailIdempotencyKey(dmail)
+	prefixLen := min(16, len(stored))
+	if stored[:prefixLen] != computed[:prefixLen] {
+		return ErrIdempotencyMismatch
+	}
+	if stored != computed {
+		return ErrIdempotencyMismatch
+	}
+	return nil
+}
+
 // ConsumedRecord tracks a processed inbox D-Mail.
 type ConsumedRecord struct {
 	Name       string    `json:"name"`
 	Kind       DMailKind `json:"kind"`
 	ConsumedAt time.Time `json:"consumed_at"`
 	Source     string    `json:"source"`
+}
+
+// dmailTTL is the maximum age of a D-Mail before it is considered stale and excluded from
+// convergence analysis. D-Mails older than this duration accumulate noise that degrades detection accuracy.
+const dmailTTL = 7 * 24 * time.Hour
+
+// DMailAge computes the age of a D-Mail from its Metadata["created_at"] field (RFC3339).
+// Returns (age, true) when the timestamp is present and parseable, or (0, false) otherwise.
+func DMailAge(dmail DMail, now time.Time) (time.Duration, bool) {
+	if dmail.Metadata == nil {
+		return 0, false
+	}
+	raw, ok := dmail.Metadata["created_at"]
+	if !ok || raw == "" {
+		return 0, false
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return 0, false
+	}
+	return now.Sub(t), true
+}
+
+// FilterByTTL excludes D-Mails older than the hardcoded TTL from the given slice.
+// Entries with missing or unparseable created_at timestamps are conservatively included.
+func FilterByTTL(dmails []DMail, now time.Time) []DMail {
+	result := make([]DMail, 0, len(dmails))
+	for _, d := range dmails {
+		age, ok := DMailAge(d, now)
+		if ok && age > dmailTTL {
+			continue
+		}
+		result = append(result, d)
+	}
+	return result
 }
 
 var issueIDPattern = regexp.MustCompile(`[A-Z]+-\d+`)

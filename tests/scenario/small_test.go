@@ -5,6 +5,7 @@ package scenario_test
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -72,4 +73,13 @@ func TestScenario_L2_Small(t *testing.T) {
 
 	// Verify final state
 	obs.AssertAllOutboxEmpty()
+
+	// Verify severity in feedback D-Mail (proposal 004: AssertDMailSeverity integration)
+	// small fixture has ADR=5, DoD=10 -> low total divergence -> severity should be "low"
+	feedbackFiles := ws.ListFiles(t, filepath.Join(ws.RepoPath, ".siren", "inbox"))
+	if len(feedbackFiles) == 0 {
+		t.Fatal("expected at least one feedback D-Mail in .siren/inbox but found none")
+	}
+	feedbackPath := filepath.Join(ws.RepoPath, ".siren", "inbox", feedbackFiles[0])
+	obs.AssertDMailSeverity(feedbackPath, "low")
 }

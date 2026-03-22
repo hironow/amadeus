@@ -1,0 +1,17 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 5, "details": "Minor naming drift"},
+    "dod_fulfillment": {"score": 75, "details": "Critical DoD violation: AUTH-2 acceptance criteria not met"},
+    "dependency_integrity": {"score": 0, "details": "Clean"},
+    "implicit_constraints": {"score": 0, "details": "No issues"}
+  },
+  "dmails": [
+    {
+      "description": "AUTH-2 DoD acceptance criteria violation forces high severity",
+      "detail": "The login flow fails to implement 2FA as required by DoD for AUTH-2. DoD score 75 exceeds force-high threshold of 70.",
+      "issues": ["AUTH-2"],
+      "targets": ["auth/login.go", "auth/2fa.go"]
+    }
+  ],
+  "reasoning": "DoD fulfillment score 75 exceeds force-high threshold of 70, escalating severity regardless of total divergence value."
+}

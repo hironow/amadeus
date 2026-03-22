@@ -451,3 +451,103 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 		t.Errorf("content: got %q, want %q", string(data), "shared-content")
 	}
 }
+
+func TestDeadLetterCount_NoDeadLetters(t *testing.T) {
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+	store := testOutboxStore(t, root)
+
+	ctx := context.Background()
+	count, err := store.DeadLetterCount(ctx)
+	if err != nil {
+		t.Fatalf("DeadLetterCount: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 dead letters, got %d", count)
+	}
+}
+
+func TestDeadLetterCount_AfterMaxRetries(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: running as root")
+	}
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+	store := testOutboxStore(t, root)
+	ctx := context.Background()
+
+	// Stage an item
+	if err := store.Stage(ctx, "dead-letter.md", []byte("content")); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+
+	// Make archive dir unwritable to force flush failures
+	archiveDir := filepath.Join(root, "archive")
+	os.Chmod(archiveDir, 0o555)
+	defer os.Chmod(archiveDir, 0o755)
+
+	// Flush 3 times to exceed maxRetryCount
+	for range 3 {
+		store.Flush(ctx) //nolint:errcheck
+	}
+
+	// Restore permissions
+	os.Chmod(archiveDir, 0o755)
+
+	// Now the item should be a dead letter
+	count, err := store.DeadLetterCount(ctx)
+	if err != nil {
+		t.Fatalf("DeadLetterCount: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 dead letter, got %d", count)
+	}
+
+	// Flush should not pick up dead letters
+	flushed, flushErr := store.Flush(ctx)
+	if flushErr != nil {
+		t.Fatalf("Flush after dead letter: %v", flushErr)
+	}
+	if flushed != 0 {
+		t.Errorf("expected 0 flushed (dead letter skipped), got %d", flushed)
+	}
+}
+
+func TestPurgeDeadLetters(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: running as root")
+	}
+	root := t.TempDir()
+	ensureGateDirs(t, root)
+	store := testOutboxStore(t, root)
+	ctx := context.Background()
+
+	// Stage and create dead letter
+	if err := store.Stage(ctx, "dead-letter.md", []byte("content")); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+	archiveDir := filepath.Join(root, "archive")
+	os.Chmod(archiveDir, 0o555)
+	for range 3 {
+		store.Flush(ctx) //nolint:errcheck
+	}
+	os.Chmod(archiveDir, 0o755)
+
+	// Purge
+	purged, err := store.PurgeDeadLetters(ctx)
+	if err != nil {
+		t.Fatalf("PurgeDeadLetters: %v", err)
+	}
+	if purged != 1 {
+		t.Errorf("expected 1 purged, got %d", purged)
+	}
+
+	// Count should be 0 now
+	count, err := store.DeadLetterCount(ctx)
+	if err != nil {
+		t.Fatalf("DeadLetterCount after purge: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 dead letters after purge, got %d", count)
+	}
+}

@@ -287,6 +287,57 @@ func TestIndexWriter_Append_ConcurrentSafe(t *testing.T) {
 	}
 }
 
+func TestIndexWriter_EntryCount(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.jsonl")
+
+	w := &session.IndexWriter{}
+
+	// empty / non-existent file returns 0
+	count, err := w.EntryCount(indexPath)
+	if err != nil {
+		t.Fatalf("entry count on missing file: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 for missing file, got %d", count)
+	}
+
+	// write 3 entries
+	entries := []domain.IndexEntry{
+		{Timestamp: "t1", Operation: "o1", Tool: "amadeus", Path: "p1", Summary: "s1"},
+		{Timestamp: "t2", Operation: "o2", Tool: "amadeus", Path: "p2", Summary: "s2"},
+		{Timestamp: "t3", Operation: "o3", Tool: "amadeus", Path: "p3", Summary: "s3"},
+	}
+	if err := w.Append(indexPath, entries); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	count, err = w.EntryCount(indexPath)
+	if err != nil {
+		t.Fatalf("entry count: %v", err)
+	}
+	if count != 3 {
+		t.Errorf("expected 3, got %d", count)
+	}
+
+	// append 2 more
+	more := []domain.IndexEntry{
+		{Timestamp: "t4", Operation: "o4", Tool: "amadeus", Path: "p4", Summary: "s4"},
+		{Timestamp: "t5", Operation: "o5", Tool: "amadeus", Path: "p5", Summary: "s5"},
+	}
+	if err := w.Append(indexPath, more); err != nil {
+		t.Fatalf("append more: %v", err)
+	}
+
+	count, err = w.EntryCount(indexPath)
+	if err != nil {
+		t.Fatalf("entry count after append: %v", err)
+	}
+	if count != 5 {
+		t.Errorf("expected 5, got %d", count)
+	}
+}
+
 func TestIndexWriter_Rebuild_ScansAllMd(t *testing.T) {
 	stateDir := t.TempDir()
 	archiveDir := filepath.Join(stateDir, "archive")
@@ -372,5 +423,39 @@ func TestIndexWriter_Rebuild_SkipsIndexFile(t *testing.T) {
 	n, _ := w.Rebuild(indexPath, stateDir, "amadeus")
 	if n != 1 {
 		t.Errorf("expected 1 entry (not including index.jsonl), got %d", n)
+	}
+}
+
+func TestIndexWriter_Rebuild_ReportsWalkErrors(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: running as root")
+	}
+	// given: an archive directory with a readable file and an unreadable subdirectory
+	stateDir := t.TempDir()
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0755)
+	os.WriteFile(filepath.Join(archiveDir, "good.md"), []byte("# Good\n"), 0644)
+
+	unreadableDir := filepath.Join(archiveDir, "restricted")
+	os.MkdirAll(unreadableDir, 0755)
+	os.WriteFile(filepath.Join(unreadableDir, "hidden.md"), []byte("# Hidden\n"), 0644)
+	os.Chmod(unreadableDir, 0000)
+	defer os.Chmod(unreadableDir, 0755)
+
+	indexPath := filepath.Join(stateDir, "index.jsonl")
+	w := &session.IndexWriter{}
+
+	// when
+	n, err := w.Rebuild(indexPath, stateDir, "amadeus")
+
+	// then: should still index the good file but report the walk error
+	if n < 1 {
+		t.Errorf("expected at least 1 entry, got %d", n)
+	}
+	if err == nil {
+		t.Error("expected error for unreadable directory")
+	}
+	if err != nil && !strings.Contains(err.Error(), "walk error") {
+		t.Errorf("expected walk error message, got %v", err)
 	}
 }

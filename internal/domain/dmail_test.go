@@ -3,6 +3,7 @@ package domain_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
@@ -247,6 +248,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 		Kind:          domain.KindDesignFeedback,
 		Description:   "ADR violation detected",
 		Severity:      domain.SeverityHigh,
+		Body:          "Details.\n",
 	}
 	errs := domain.ValidateDMail(dmail)
 	if len(errs) != 0 {
@@ -262,6 +264,7 @@ func TestValidateDMail_AllKinds(t *testing.T) {
 			Kind:          kind,
 			Description:   "test",
 			Severity:      domain.SeverityLow,
+			Body:          "Content.\n",
 		}
 		errs := domain.ValidateDMail(dmail)
 		if len(errs) != 0 {
@@ -326,6 +329,7 @@ func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 		Name:          "feedback-001",
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
+		Body:          "Content.\n",
 	}
 	errs := domain.ValidateDMail(dmail)
 	if len(errs) != 0 {
@@ -616,6 +620,7 @@ func TestValidateDMail_CIResultKind(t *testing.T) {
 		Name:          "ci-result-pr42-run1",
 		Kind:          domain.KindCIResult,
 		Description:   "GitHub Actions CI run for PR #42",
+		Body:          "CI results.\n",
 	}
 
 	// when
@@ -690,6 +695,7 @@ func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
 		Name:          "feedback-001",
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
+		Body:          "Content.\n",
 	}
 
 	// when
@@ -709,6 +715,7 @@ func TestValidateDMail_AllActions(t *testing.T) {
 			Kind:          domain.KindDesignFeedback,
 			Description:   "test",
 			Action:        action,
+			Body:          "Content.\n",
 		}
 		errs := domain.ValidateDMail(dmail)
 		if len(errs) != 0 {
@@ -906,15 +913,282 @@ func TestMarshalDMail_NilContextOmitted(t *testing.T) {
 	}
 }
 
+func TestValidateDMail_EmptyBody_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if e == "body is required" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'body is required' error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_WhitespaceOnlyBody_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "   \n\t  ",
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if e == "body is required" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'body is required' error for whitespace-only body, got %v", errs)
+	}
+}
+
+func TestValidateDMail_NonEmptyBody_IsValid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "# Details\n\nSome content.\n",
+	}
+	errs := domain.ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for non-empty body, got %v", errs)
+	}
+}
+
+func TestValidateDMail_PathTraversal_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"../../etc/passwd"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "path traversal") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected path traversal error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_AbsoluteTarget_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"/etc/passwd"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "relative path") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected relative path error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_DuplicateTargets_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"auth/session.go", "auth/session.go"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "duplicate target") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected duplicate target error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_EmptyTarget_IsInvalid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{""},
+	}
+	errs := domain.ValidateDMail(dmail)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "target must not be empty") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected empty target error, got %v", errs)
+	}
+}
+
+func TestValidateDMail_ValidTargets(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+		Targets:       []string{"auth/session.go", "api/handler.go"},
+	}
+	errs := domain.ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid targets, got %v", errs)
+	}
+}
+
+func TestValidateDMail_NoTargets_IsValid(t *testing.T) {
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-001",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "test",
+		Body:          "Content.\n",
+	}
+	errs := domain.ValidateDMail(dmail)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for no targets, got %v", errs)
+	}
+}
+
+func TestDMailIdempotencyKey_DifferentIssues_DifferentKey(t *testing.T) {
+	dmail1 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Issues: []string{"MY-42"},
+	}
+	dmail2 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Issues: []string{"MY-99"},
+	}
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
+	if key1 == key2 {
+		t.Error("different issues should produce different keys")
+	}
+}
+
+func TestDMailIdempotencyKey_DifferentSeverity_DifferentKey(t *testing.T) {
+	dmail1 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Severity: domain.SeverityLow,
+	}
+	dmail2 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same body.\n",
+		Severity: domain.SeverityHigh,
+	}
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
+	if key1 == key2 {
+		t.Error("different severity should produce different keys")
+	}
+}
+
+func TestDMailIdempotencyKey_IssueOrderIndependent(t *testing.T) {
+	dmail1 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same.\n",
+		Issues: []string{"MY-42", "MY-99"},
+	}
+	dmail2 := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "same.\n",
+		Issues: []string{"MY-99", "MY-42"},
+	}
+	key1 := domain.DMailIdempotencyKey(dmail1)
+	key2 := domain.DMailIdempotencyKey(dmail2)
+	if key1 != key2 {
+		t.Error("same issues in different order should produce same key")
+	}
+}
+
+func TestDMailIdempotencyKey_DoesNotMutateIssues(t *testing.T) {
+	issues := []string{"MY-99", "MY-42"}
+	dmail := domain.DMail{
+		Name: "feedback-001", Kind: domain.KindDesignFeedback,
+		Description: "same", Body: "body.\n",
+		Issues: issues,
+	}
+	domain.DMailIdempotencyKey(dmail)
+	if issues[0] != "MY-99" || issues[1] != "MY-42" {
+		t.Error("original issues slice was mutated")
+	}
+}
+
+func TestSanitizeTargets_RemovesSelfReference(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"auth/session.go", "amadeus", "api/handler.go"})
+	if len(targets) != 2 {
+		t.Fatalf("expected 2 targets, got %d: %v", len(targets), targets)
+	}
+	if targets[0] != "auth/session.go" || targets[1] != "api/handler.go" {
+		t.Errorf("unexpected targets: %v", targets)
+	}
+}
+
+func TestSanitizeTargets_RemovesKindPrefix(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"design-feedback", "auth/session.go"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d: %v", len(targets), targets)
+	}
+	if targets[0] != "auth/session.go" {
+		t.Errorf("unexpected target: %v", targets)
+	}
+}
+
+func TestSanitizeTargets_NothingToRemove(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, []string{"auth/session.go", "api/handler.go"})
+	if len(targets) != 2 {
+		t.Fatalf("expected 2 targets, got %d: %v", len(targets), targets)
+	}
+}
+
+func TestSanitizeTargets_EmptyTargets(t *testing.T) {
+	targets := domain.SanitizeTargets("amadeus", domain.KindDesignFeedback, nil)
+	if targets != nil {
+		t.Errorf("expected nil, got %v", targets)
+	}
+}
+
 func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
-	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test"}
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test", Body: "Content.\n"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 		t.Errorf("expected valid, got: %v", errs)
 	}
 }
 
 func TestValidateDMail_ImplFeedbackKind(t *testing.T) {
-	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindImplFeedback, Description: "test"}
+	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindImplFeedback, Description: "test", Body: "Content.\n"}
 	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
 		t.Errorf("expected valid, got: %v", errs)
 	}
@@ -924,5 +1198,303 @@ func TestValidateDMail_OldFeedbackKind_Invalid(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: "feedback", Description: "test"}
 	if errs := domain.ValidateDMail(dmail); len(errs) == 0 {
 		t.Error("expected validation error for old feedback kind")
+	}
+}
+
+func TestParseDMailStrict_ValidInput(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "ADR-003 violation detected"
+severity: high
+---
+
+# ADR-003 Violation
+
+Body text.
+`
+	// given: valid frontmatter with known fields only
+	// when
+	dmail, err := domain.ParseDMailStrict([]byte(raw))
+	// then
+	if err != nil {
+		t.Fatalf("ParseDMailStrict failed on valid input: %v", err)
+	}
+	if dmail.Name != "feedback-001" {
+		t.Errorf("expected name feedback-001, got %s", dmail.Name)
+	}
+	if dmail.Kind != domain.KindDesignFeedback {
+		t.Errorf("expected kind design-feedback, got %s", dmail.Kind)
+	}
+	if dmail.Severity != domain.SeverityHigh {
+		t.Errorf("expected severity high, got %s", dmail.Severity)
+	}
+}
+
+func TestParseDMailStrict_RejectsUnknownField(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "strict test"
+unknown_field: "this should be rejected"
+---
+
+Body text.
+`
+	// given: frontmatter with an unknown field
+	// when
+	_, err := domain.ParseDMailStrict([]byte(raw))
+	// then: strict parser must return an error
+	if err == nil {
+		t.Error("ParseDMailStrict expected error for unknown frontmatter field, got nil")
+	}
+}
+
+func TestParseDMailStrict_ExistingParseDMailAcceptsUnknownField(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "strict test"
+unknown_field: "silently ignored"
+---
+
+Body text.
+`
+	// given: the lenient parser should still accept unknown fields (backward compat)
+	// when
+	_, err := domain.ParseDMail([]byte(raw))
+	// then
+	if err != nil {
+		t.Errorf("ParseDMail should accept unknown fields, got error: %v", err)
+	}
+}
+
+func TestParseDMailStrict_NestedContextValidation(t *testing.T) {
+	raw := `---
+name: "feedback-001"
+kind: design-feedback
+description: "context validation"
+context:
+  unknown_nested: "should fail"
+---
+
+Body text.
+`
+	// given: frontmatter with unknown nested field in context
+	// when
+	_, err := domain.ParseDMailStrict([]byte(raw))
+	// then: strict parser must reject unknown nested fields
+	if err == nil {
+		t.Error("ParseDMailStrict expected error for unknown nested field in context, got nil")
+	}
+}
+
+func TestVerifyIdempotencyKey_NilMetadata(t *testing.T) {
+	// given: a DMail with no metadata (nil map)
+	dmail := domain.DMail{
+		Name:        "feedback-001",
+		Kind:        domain.KindDesignFeedback,
+		Description: "ADR violation",
+		Body:        "Details.\n",
+		Metadata:    nil,
+	}
+
+	// when
+	err := domain.VerifyIdempotencyKey(dmail)
+
+	// then: lenient - no key present means no mismatch
+	if err != nil {
+		t.Errorf("expected nil error for nil metadata, got: %v", err)
+	}
+}
+
+func TestVerifyIdempotencyKey_EmptyKey(t *testing.T) {
+	// given: a DMail with metadata but empty idempotency_key
+	dmail := domain.DMail{
+		Name:        "feedback-001",
+		Kind:        domain.KindDesignFeedback,
+		Description: "ADR violation",
+		Body:        "Details.\n",
+		Metadata:    map[string]string{"idempotency_key": ""},
+	}
+
+	// when
+	err := domain.VerifyIdempotencyKey(dmail)
+
+	// then: lenient - empty string means no key present
+	if err != nil {
+		t.Errorf("expected nil error for empty idempotency_key, got: %v", err)
+	}
+}
+
+func TestVerifyIdempotencyKey_RoundTrip(t *testing.T) {
+	// given: a DMail marshaled (which injects idempotency_key) then parsed back
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-roundtrip",
+		Kind:          domain.KindImplFeedback,
+		Description:   "roundtrip check",
+		Issues:        []string{"MY-545"},
+		Severity:      domain.SeverityMedium,
+		Body:          "# Roundtrip\n\nContent here.\n",
+	}
+
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+
+	parsed, err := domain.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+
+	// when
+	err = domain.VerifyIdempotencyKey(parsed)
+
+	// then: key in metadata must match recomputed key
+	if err != nil {
+		t.Errorf("expected nil error on valid roundtrip, got: %v", err)
+	}
+}
+
+func TestVerifyIdempotencyKey_TamperedBody(t *testing.T) {
+	// given: a DMail marshaled then body tampered before parse
+	original := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          "feedback-tampered",
+		Kind:          domain.KindDesignFeedback,
+		Description:   "tamper check",
+		Body:          "# Original\n\nOriginal content.\n",
+	}
+
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("MarshalDMail failed: %v", err)
+	}
+
+	// tamper: replace body content after the closing frontmatter delimiter
+	raw := string(data)
+	tampered := raw + "EXTRA TAMPERED CONTENT\n"
+
+	parsed, err := domain.ParseDMail([]byte(tampered))
+	if err != nil {
+		t.Fatalf("ParseDMail failed: %v", err)
+	}
+
+	// when
+	err = domain.VerifyIdempotencyKey(parsed)
+
+	// then: key mismatch must be returned
+	if err == nil {
+		t.Error("expected ErrIdempotencyMismatch for tampered body, got nil")
+	}
+	if err != domain.ErrIdempotencyMismatch {
+		t.Errorf("expected ErrIdempotencyMismatch, got: %v", err)
+	}
+}
+
+func TestDMailAge_WithValidTimestamp(t *testing.T) {
+	// given: a D-Mail created 3 days ago
+	now := time.Now().UTC()
+	createdAt := now.Add(-3 * 24 * time.Hour)
+	dmail := domain.DMail{
+		Metadata: map[string]string{
+			"created_at": createdAt.Format(time.RFC3339),
+		},
+	}
+
+	// when
+	age, ok := domain.DMailAge(dmail, now)
+
+	// then
+	if !ok {
+		t.Fatal("expected ok=true for valid created_at timestamp")
+	}
+	if age < 2*24*time.Hour || age > 4*24*time.Hour {
+		t.Errorf("expected age ~72h, got %v", age)
+	}
+}
+
+func TestDMailAge_WithMissingTimestamp(t *testing.T) {
+	// given: a D-Mail with no metadata
+	dmail := domain.DMail{}
+
+	// when
+	_, ok := domain.DMailAge(dmail, time.Now().UTC())
+
+	// then: missing timestamp returns ok=false
+	if ok {
+		t.Error("expected ok=false for missing created_at timestamp")
+	}
+}
+
+func TestDMailAge_WithUnparsableTimestamp(t *testing.T) {
+	// given: a D-Mail with a bad timestamp
+	dmail := domain.DMail{
+		Metadata: map[string]string{
+			"created_at": "not-a-timestamp",
+		},
+	}
+
+	// when
+	_, ok := domain.DMailAge(dmail, time.Now().UTC())
+
+	// then: unparsable timestamp returns ok=false
+	if ok {
+		t.Error("expected ok=false for unparsable created_at timestamp")
+	}
+}
+
+func TestFilterByTTL_ExcludesStale(t *testing.T) {
+	// given: a D-Mail created 8 days ago (beyond 7-day TTL)
+	now := time.Now().UTC()
+	stale := domain.DMail{
+		Name: "stale-dmail",
+		Metadata: map[string]string{
+			"created_at": now.Add(-8 * 24 * time.Hour).Format(time.RFC3339),
+		},
+	}
+
+	// when
+	result := domain.FilterByTTL([]domain.DMail{stale}, now)
+
+	// then: stale D-Mail is excluded
+	if len(result) != 0 {
+		t.Errorf("expected 0 D-Mails after TTL filter, got %d", len(result))
+	}
+}
+
+func TestFilterByTTL_IncludesFresh(t *testing.T) {
+	// given: a D-Mail created 2 days ago (within 7-day TTL)
+	now := time.Now().UTC()
+	fresh := domain.DMail{
+		Name: "fresh-dmail",
+		Metadata: map[string]string{
+			"created_at": now.Add(-2 * 24 * time.Hour).Format(time.RFC3339),
+		},
+	}
+
+	// when
+	result := domain.FilterByTTL([]domain.DMail{fresh}, now)
+
+	// then: fresh D-Mail is included
+	if len(result) != 1 {
+		t.Errorf("expected 1 D-Mail after TTL filter, got %d", len(result))
+	}
+}
+
+func TestFilterByTTL_IncludesMissingTimestamp(t *testing.T) {
+	// given: a D-Mail with no created_at (conservatively include)
+	dmail := domain.DMail{
+		Name: "no-timestamp-dmail",
+	}
+
+	// when
+	result := domain.FilterByTTL([]domain.DMail{dmail}, time.Now().UTC())
+
+	// then: missing timestamp D-Mail is conservatively included
+	if len(result) != 1 {
+		t.Errorf("expected 1 D-Mail (conservative include) after TTL filter, got %d", len(result))
 	}
 }

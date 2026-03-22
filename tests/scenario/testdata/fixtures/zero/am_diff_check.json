@@ -1,0 +1,10 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 10, "details": "Minor ADR tension"},
+    "dod_fulfillment": {"score": 5, "details": "DoD partially met"},
+    "dependency_integrity": {"score": 0, "details": "No new violations"},
+    "implicit_constraints": {"score": 0, "details": "Clean"}
+  },
+  "dmails": [],
+  "reasoning": "Diff check shows minor tensions but no D-Mails warranted."
+}

@@ -25,6 +25,21 @@ Evaluate how recent changes affect the codebase's alignment with its architectur
 
 **重要**: issueのステータスフィールド（例: "Done", "In Progress"）を信用しないでください。issueの説明と受入基準のみを真のソースとして使用してください。
 {{end}}
+{{- if .RepeatedViolations}}
+## 繰り返し違反の警告
+以下の整合性軸が直近の複数チェックで継続的に違反しきい値を超えています:
+{{range .RepeatedViolations}}
+- **{{.Axis}}** ({{.Count}}回連続違反): {{.Description}}
+{{- end}}
+
+これらの軸に**特に注意**してください。同じ問題が継続している場合、D-Mailの深刻度をエスカレートしてください。
+{{end}}
+{{- if .DivergenceTrend}}
+## 乖離トレンド
+現在のトレンド: **{{.DivergenceTrend.Class}}** (デルタ: {{printf "%.1f" .DivergenceTrend.Delta}})
+
+{{.DivergenceTrend.Message}}
+{{end}}
 ## タスク
 これらの変更が各整合性軸にどのように影響するかを評価してください。
 各軸を0-100でスコアリング（0 = 完全準拠、100 = 完全乖離）。
@@ -35,7 +50,13 @@ Evaluate how recent changes affect the codebase's alignment with its architectur
 - "transitive": さらに下流で影響を受ける可能性のあるファイル/モジュール
 
 Output MUST be valid JSON matching this exact schema:
-{"files_read":["adrs","dods","diff","previous_scores"],"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
+{"files_read":["adrs","dods","diff","previous_scores"],"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"capability_violations":[{"boundary":"boundary_name","description":"explanation","file":"path/to/file.go"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
+
+ケイパビリティ違反について:
+- ケイパビリティ境界を直接越えるコードを報告してください（例: 承認済みアダプターを経由せずに外部APIを直接呼び出す、適切なインターフェースなしに共有状態にアクセスするなど）。
+- 検出されなければ空配列。
+- `boundary`: 違反しているケイパビリティ境界の名前。
+- `file`: 違反が発生しているファイル（特定できる場合）。
 
 D-Mailについて:
 - 実際の問題が見つかった場合のみD-Mailを生成してください。問題がなければ空配列。

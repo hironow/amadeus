@@ -17,9 +17,15 @@ func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain
 		return fmt.Errorf("load events: %w", err)
 	}
 
-	logger.Info("rebuilding projections from %d event(s)", len(allEvents))
+	// #116: Trim check history before event replay to prevent unbounded growth.
+	trimmed, dropped := domain.TrimCheckHistory(allEvents, domain.DefaultMaxResultHistory)
+	if dropped > 0 {
+		logger.Info("trimmed %d old check event(s) before replay", dropped)
+	}
 
-	if err := projector.Rebuild(allEvents); err != nil {
+	logger.Info("rebuilding projections from %d event(s)", len(trimmed))
+
+	if err := projector.Rebuild(trimmed); err != nil {
 		return fmt.Errorf("rebuild: %w", err)
 	}
 

@@ -157,7 +157,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		inboxSpan.End()
 	}
 
-	report, fullCheck, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
+	report, fullCheck, wasForced, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		if err != nil {
 			return fmt.Errorf("get current commit: %w", err)
 		}
-		a.State.AdvanceCheckCount(fullCheck)
+		a.State.AdvanceCheckCount(fullCheck, wasForced)
 		now := time.Now().UTC()
 		noShiftResult := previous
 		noShiftResult.Commit = currentCommit
@@ -245,7 +245,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 	if !gateApproved {
 		// Emit check.completed event to maintain ES invariant.
-		a.State.AdvanceCheckCount(fullCheck)
+		a.State.AdvanceCheckCount(fullCheck, wasForced)
 		checkType := domain.CheckTypeDiff
 		if fullCheck {
 			checkType = domain.CheckTypeFull
@@ -302,7 +302,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		dmailNames = append(dmailNames, d.Name)
 	}
 
-	a.State.AdvanceCheckCount(fullCheck)
+	a.State.AdvanceCheckCount(fullCheck, wasForced)
 	checkType := domain.CheckTypeDiff
 	if fullCheck {
 		checkType = domain.CheckTypeFull

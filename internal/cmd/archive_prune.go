@@ -125,8 +125,12 @@ Pass --execute to actually remove the files.`,
 					if execErr != nil {
 						return execErr
 					}
+					rebuildIndexAfterPrune(divRoot, logger)
 					out.ArchiveDeleted = len(result.ArchiveCandidates)
 					out.EventDeleted = totalCount - len(result.ArchiveCandidates)
+
+					// Truncate oversized event files
+					session.TruncateOversizedEventFiles(divRoot, logger)
 				}
 				data, jsonErr := json.Marshal(out)
 				if jsonErr != nil {
@@ -143,6 +147,10 @@ Pass --execute to actually remove the files.`,
 					fmt.Fprintf(errW, "No prune directories found under %s\n", divRoot)
 				} else {
 					fmt.Fprintf(errW, "No files older than %d days to prune\n", days)
+				}
+				// Still truncate oversized event files even when no expired files exist
+				if execute {
+					session.TruncateOversizedEventFiles(divRoot, logger)
 				}
 				return nil
 			}
@@ -191,6 +199,10 @@ Pass --execute to actually remove the files.`,
 			if err != nil {
 				return err
 			}
+			rebuildIndexAfterPrune(divRoot, logger)
+
+			// Truncate oversized event files
+			session.TruncateOversizedEventFiles(divRoot, logger)
 
 			fmt.Fprintf(errW, "Pruned %d file(s).\n", totalCount)
 			return nil
@@ -205,6 +217,20 @@ Pass --execute to actually remove the files.`,
 
 	return cmd
 }
+
+// rebuildIndexAfterPrune compacts the archive index by rebuilding it,
+// removing entries for files that no longer exist on disk.
+func rebuildIndexAfterPrune(divRoot string, logger domain.Logger) {
+	indexPath := filepath.Join(divRoot, "archive", "index.jsonl")
+	iw := &session.IndexWriter{}
+	n, err := iw.Rebuild(indexPath, divRoot, "amadeus")
+	if err != nil {
+		logger.Warn("index compaction: %v", err)
+	} else {
+		logger.Info("Compacted index: %d entries → %s", n, indexPath)
+	}
+}
+
 
 // indexArchiveCandidates indexes .md archive candidates before deletion.
 func indexArchiveCandidates(candidates []port.PruneCandidate, divRoot string, logger domain.Logger) {

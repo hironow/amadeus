@@ -54,6 +54,17 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		return fmt.Errorf("emit run started: %w", err)
 	}
 
+	// Ensure run.stopped is emitted on any post-started error exit.
+	// The signal and channel_closed paths emit their own run.stopped,
+	// so this defer only fires when runErr is non-nil.
+	var runErr error
+	defer func() {
+		if runErr != nil {
+			stopNow := time.Now().UTC()
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonError}, stopNow)
+		}
+	}()
+
 	if !opts.Quiet {
 		a.Logger.Info("amadeus run: integration point = %s", integrationBranch)
 		if opts.BaseBranch != "" {
@@ -70,7 +81,8 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		var monErr error
 		inboxCh, monErr = MonitorInbox(ctx, stateDir, a.Logger)
 		if monErr != nil {
-			return fmt.Errorf("inbox monitor: %w", monErr)
+			runErr = fmt.Errorf("inbox monitor: %w", monErr)
+			return runErr
 		}
 	}
 
@@ -96,7 +108,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		select {
 		case <-ctx.Done():
 			stopNow := time.Now().UTC()
-			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "signal"}, stopNow)
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonSignal}, stopNow)
 			if !opts.Quiet {
 				a.Logger.Info("amadeus run: stopped (signal)")
 			}
@@ -106,7 +118,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 			if !ok {
 				// Channel closed
 				stopNow := time.Now().UTC()
-				_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: "channel_closed"}, stopNow)
+				_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonChannelClosed}, stopNow)
 				return nil
 			}
 
@@ -163,7 +175,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		return fmt.Errorf("load previous state: %w", err)
 	}
 
-	report, fullCheck, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
+	report, fullCheck, wasForced, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)
 	if err != nil {
 		return err
 	}
@@ -215,7 +227,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		dmailNames = append(dmailNames, d.Name)
 	}
 
-	a.State.AdvanceCheckCount(fullCheck)
+	a.State.AdvanceCheckCount(fullCheck, wasForced)
 	checkType := domain.CheckTypeDiff
 	if fullCheck {
 		checkType = domain.CheckTypeFull

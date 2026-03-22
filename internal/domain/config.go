@@ -53,23 +53,47 @@ func (f FlagApproverConfig) ApproveCmdString() string { return f.ApproveCmd }
 
 // Config holds the complete Amadeus configuration.
 type Config struct {
-	Lang            string            `yaml:"lang"`
-	ClaudeCmd       string            `yaml:"claude_cmd,omitempty"`
-	Model           string            `yaml:"model,omitempty"`
-	TimeoutSec      int               `yaml:"timeout_sec,omitempty"`
-	Weights         Weights           `yaml:"weights"`
-	Thresholds      Thresholds        `yaml:"thresholds"`
-	PerAxisOverride PerAxisOverride   `yaml:"per_axis_override"`
-	FullCheck       FullCheckConfig   `yaml:"full_check"`
-	Convergence     ConvergenceConfig `yaml:"convergence"`
-	WaitTimeout     time.Duration     `yaml:"wait_timeout,omitempty"`
-	Computed        ComputedConfig    `yaml:"computed,omitempty"`
+	Lang               string                  `yaml:"lang"`
+	ClaudeCmd          string                  `yaml:"claude_cmd,omitempty"`
+	Model              string                  `yaml:"model,omitempty"`
+	TimeoutSec         int                     `yaml:"timeout_sec,omitempty"`
+	Weights            Weights                 `yaml:"weights"`
+	Thresholds         Thresholds              `yaml:"thresholds"`
+	PerAxisOverride    PerAxisOverride         `yaml:"per_axis_override"`
+	FullCheck          FullCheckConfig         `yaml:"full_check"`
+	Convergence        ConvergenceConfig       `yaml:"convergence"`
+	BaselineStaleness  BaselineStalenessConfig `yaml:"baseline_staleness,omitempty"`
+	WaitTimeout        time.Duration           `yaml:"wait_timeout,omitempty"`
+	Computed           ComputedConfig          `yaml:"computed,omitempty"`
 }
+
+// DefaultMaxResultHistory is the default maximum number of check results to
+// retain during event replay / projection rebuild.
+const DefaultMaxResultHistory = 100
 
 // FullCheckConfig controls the full scan strategy.
 type FullCheckConfig struct {
 	Interval         int     `yaml:"interval"`
 	OnDivergenceJump float64 `yaml:"on_divergence_jump"`
+	MaxResultHistory int     `yaml:"max_result_history,omitempty"`
+}
+
+// BaselineStalenessConfig controls auto-promotion to full calibration when the
+// last check is older than MaxAgeDays. Disabled when MaxAgeDays is 0.
+type BaselineStalenessConfig struct {
+	MaxAgeDays int `yaml:"max_age_days"`
+}
+
+// IsStale reports whether the given checkedAt timestamp is older than MaxAgeDays.
+// Returns false when MaxAgeDays is 0 (disabled) or checkedAt is the zero value.
+func (b BaselineStalenessConfig) IsStale(checkedAt time.Time) bool {
+	if b.MaxAgeDays == 0 {
+		return false
+	}
+	if checkedAt.IsZero() {
+		return false
+	}
+	return time.Since(checkedAt) > time.Duration(b.MaxAgeDays)*24*time.Hour
 }
 
 // DefaultConfig returns a Config populated with architecture-document defaults.
@@ -162,6 +186,7 @@ func ValidateConfig(cfg Config) []string {
 		{"adr_integrity_force_high", cfg.PerAxisOverride.ADRForceHigh},
 		{"dod_fulfillment_force_high", cfg.PerAxisOverride.DoDForceHigh},
 		{"dependency_integrity_force_medium", cfg.PerAxisOverride.DepForceMedium},
+		{"implicit_constraints_force_medium", cfg.PerAxisOverride.ImplicitForceMedium},
 	}
 	for _, o := range overrides {
 		if o.value < 0 || o.value > 100 {
@@ -191,6 +216,26 @@ func ValidateConfig(cfg Config) []string {
 	}
 	if cfg.FullCheck.OnDivergenceJump < 0 {
 		errs = append(errs, fmt.Sprintf("full_check.on_divergence_jump must be non-negative (got %f)", cfg.FullCheck.OnDivergenceJump))
+	}
+	if cfg.FullCheck.MaxResultHistory < 0 {
+		errs = append(errs, fmt.Sprintf("full_check.max_result_history must be non-negative (got %d)", cfg.FullCheck.MaxResultHistory))
+	}
+
+	// Cross-field semantic constraints
+
+	// Check #1: OnDivergenceJump >= MediumMax skips medium severity entirely
+	if cfg.FullCheck.OnDivergenceJump >= cfg.Thresholds.MediumMax {
+		errs = append(errs, fmt.Sprintf(
+			"full_check.on_divergence_jump (%f) must be less than thresholds.medium_max (%f)",
+			cfg.FullCheck.OnDivergenceJump, cfg.Thresholds.MediumMax))
+	}
+
+	// Check #3: WaitTimeout must not exceed WindowDays * 24h (when WaitTimeout is positive)
+	if cfg.WaitTimeout > 0 && cfg.WaitTimeout > time.Duration(cfg.Convergence.WindowDays)*24*time.Hour {
+		errs = append(errs, fmt.Sprintf(
+			"wait_timeout (%v) must not exceed convergence.window_days (%d) * 24h (%v)",
+			cfg.WaitTimeout, cfg.Convergence.WindowDays,
+			time.Duration(cfg.Convergence.WindowDays)*24*time.Hour))
 	}
 
 	return errs

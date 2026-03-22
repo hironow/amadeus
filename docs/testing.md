@@ -42,6 +42,55 @@
 
 Run: `just test-scenario` (L1+L2) or `just test-scenario-all`
 
+### Observer Pattern
+
+Scenario tests use the `Observer` struct (`tests/scenario/observer_test.go`) for high-level assertion helpers that verify closed-loop behavior without inspecting internal state. The Observer wraps a `Workspace` and `testing.T`.
+
+**Mailbox and D-Mail assertions:**
+
+| Method | Purpose |
+|--------|---------|
+| `AssertMailboxState` | Verify file counts in mailbox directories |
+| `AssertAllOutboxEmpty` | Verify all tool outboxes contain no `.md` files |
+| `AssertArchiveContains` | Check archive for D-Mails with expected kinds |
+| `AssertDMailKind` | Verify D-Mail frontmatter `kind` field |
+| `AssertDMailSeverity` | Verify D-Mail frontmatter `severity` field |
+| `AssertDMailAction` | Verify D-Mail frontmatter `action` field |
+| `AssertDMailCount` | Verify count of `.md` files in a mailbox directory |
+| `AssertIdempotencyKey` | Verify D-Mail contains a 64-char hex idempotency key |
+
+**Prompt quality assertions:**
+
+| Method | Purpose |
+|--------|---------|
+| `AssertPromptCount` | Verify fake-claude call count (detects real API leaks) |
+| `AssertPromptContains` | Verify all substrings appear in a single prompt |
+| `AssertPromptQuality` | Composite: call count + content check |
+
+**Convergence and event assertions:**
+
+| Method | Purpose |
+|--------|---------|
+| `AssertConvergenceDMail` | Verify convergence D-Mail in `.gate` archive |
+| `AssertNoConvergenceDMail` | Verify no convergence D-Mail exists |
+| `WaitForClosedLoop` | Poll all 3 delivery points for complete loop |
+| `AssertWaitingLoopNotActive` | Verify no daemon/waiting mode (no `watch.pid`) |
+| `AssertArchivePruneEvent` | Check for `archive_pruned` event in JSONL |
+| `AssertForceFullNextInJSONL` | Check for `force_full_next` event in JSONL |
+| `AssertFanoutContentParity` | Verify siren/expedition feedback D-Mails match |
+
+### Bug Fix Test Patterns
+
+Bug fix scenario tests follow the "inject fixture, run amadeus, assert boundary behavior" pattern. Each test targets a specific fix with a dedicated fixture level under `tests/scenario/testdata/fixtures/`.
+
+| Test | Fixture Level | What It Verifies |
+|------|---------------|-----------------|
+| `TestScenario_ZeroDivergence_NoDMailGenerated` | `zero` | Zero-score check generates no feedback D-Mails |
+| `TestScenario_ADROverrideForceHigh` | `adr_override` | ADR integrity >= 60 escalates severity to high |
+| `TestScenario_DoDOverrideForceHigh` | `dod_override` | DoD fulfillment >= 70 escalates severity to high |
+| `TestScenario_DepOverrideForceMedium` | `dep_override` | Dependency integrity >= 80 forces medium severity |
+| `TestScenario_FullCalibration_ForceFlag` | `small` | `--full` flag triggers full calibration prompt path |
+
 ## E2E Tests
 
 - Located in `tests/e2e/`

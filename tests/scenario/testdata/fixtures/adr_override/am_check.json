@@ -1,0 +1,17 @@
+{
+  "axes": {
+    "adr_integrity": {"score": 65, "details": "Critical ADR violation: authentication flow deviates from ADR-0003"},
+    "dod_fulfillment": {"score": 5, "details": "Minor DoD gap"},
+    "dependency_integrity": {"score": 0, "details": "Clean"},
+    "implicit_constraints": {"score": 0, "details": "No issues"}
+  },
+  "dmails": [
+    {
+      "description": "ADR-0003 authentication flow violation forces high severity",
+      "detail": "The JWT validation logic bypasses the refresh token rotation specified in ADR-0003. This triggers ADRForceHigh override (score 65 >= threshold 60).",
+      "issues": ["AUTH-3"],
+      "targets": ["auth/jwt.go", "auth/refresh.go"]
+    }
+  ],
+  "reasoning": "ADR integrity score 65 exceeds force-high threshold of 60, escalating severity regardless of total divergence value."
+}

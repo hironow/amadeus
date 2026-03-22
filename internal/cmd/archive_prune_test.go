@@ -374,3 +374,52 @@ func TestArchivePrune_RebuildIndex_CreatesIndex(t *testing.T) {
 		t.Error("expected index.jsonl to be created by --rebuild-index")
 	}
 }
+
+func TestArchivePrune_TruncatesOversizedEventFiles(t *testing.T) {
+	// given — an oversized event file from yesterday (not today)
+	tmpDir := t.TempDir()
+	eventsDir := filepath.Join(tmpDir, ".gate", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an oversized file dated yesterday
+	yesterday := time.Now().Add(-24 * time.Hour).Format("2006-01-02")
+	bigFile := filepath.Join(eventsDir, yesterday+".jsonl")
+	// Write enough lines to be over 10MiB
+	var content strings.Builder
+	line := `{"id":"x","type":"check.completed","timestamp":"2026-01-01T00:00:00Z"}` + "\n"
+	targetSize := 10*1024*1024 + 1
+	for content.Len() < targetSize {
+		content.WriteString(line)
+	}
+	if err := os.WriteFile(bigFile, []byte(content.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalSize := int64(content.Len())
+
+	t.Chdir(tmpDir)
+
+	root := cmd.NewRootCommand()
+	var stderr bytes.Buffer
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"archive-prune", "--execute", "--yes"})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Oversized file should be truncated (smaller than original)
+	info, statErr := os.Stat(bigFile)
+	if statErr != nil {
+		t.Fatalf("expected big file to still exist (truncated), got: %v", statErr)
+	}
+	if info.Size() >= originalSize {
+		t.Errorf("expected file to be truncated: original=%d, current=%d", originalSize, info.Size())
+	}
+}

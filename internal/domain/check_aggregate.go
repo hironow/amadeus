@@ -4,13 +4,18 @@ import (
 	"time"
 )
 
+// defaultForceFullCooldown is the number of check cycles to skip after a
+// force-full-next check completes, preventing rapid consecutive full checks.
+const defaultForceFullCooldown = 3
+
 // CheckAggregate encapsulates the domain logic for amadeus check operations.
 // It owns the check count, force-full-next flag, and previous result state,
 // enforcing invariants and producing events as return values (no side effects).
 type CheckAggregate struct {
-	config        Config
-	checkCount    int
-	forceFullNext bool
+	config            Config
+	checkCount        int
+	forceFullNext     bool
+	cooldownRemaining int
 }
 
 // NewCheckAggregate creates a new CheckAggregate with the given config.
@@ -22,6 +27,7 @@ func NewCheckAggregate(cfg Config) *CheckAggregate {
 func (a *CheckAggregate) Restore(result CheckResult) {
 	a.checkCount = result.CheckCountSinceFull
 	a.forceFullNext = result.ForceFullNext
+	a.cooldownRemaining = result.CooldownRemaining
 }
 
 // CheckCount returns the current check count since last full check.
@@ -40,22 +46,46 @@ func (a *CheckAggregate) SetForceFullNext(v bool) {
 }
 
 // ShouldFullCheck determines whether the next check should be a full scan.
-// Returns true if forceFlag is set, ForceFullNext is true, or the check count
-// has reached the configured interval.
+// Returns true if forceFlag is set (explicit --full always wins), ForceFullNext
+// is true, or the check count has reached the configured interval.
+// Cooldown suppresses ForceFullNext and interval-based triggers but never
+// overrides an explicit forceFlag.
 func (a *CheckAggregate) ShouldFullCheck(forceFlag bool) bool {
-	if forceFlag || a.forceFullNext {
+	if forceFlag {
+		return true
+	}
+	if a.cooldownRemaining > 0 {
+		return false
+	}
+	if a.forceFullNext {
 		return true
 	}
 	return a.checkCount >= a.config.FullCheck.Interval
 }
 
+// CooldownRemaining returns the remaining cooldown cycles.
+func (a *CheckAggregate) CooldownRemaining() int {
+	return a.cooldownRemaining
+}
+
 // AdvanceCheckCount updates the internal check counter.
-// If fullCheck is true, the counter resets to 0; otherwise it increments by 1.
-func (a *CheckAggregate) AdvanceCheckCount(fullCheck bool) {
+// If fullCheck is true, the counter resets to 0 and starts cooldown when
+// wasForced is true (indicating the full check was triggered by forceFullNext).
+// Otherwise it increments by 1 and decrements cooldown.
+// The wasForced parameter is necessary because forceFullNext may have been
+// cleared earlier in the pipeline (e.g. by detectShift) before this call.
+func (a *CheckAggregate) AdvanceCheckCount(fullCheck bool, wasForced bool) {
 	if fullCheck {
 		a.checkCount = 0
+		if wasForced || a.forceFullNext {
+			a.cooldownRemaining = defaultForceFullCooldown
+			a.forceFullNext = false
+		}
 	} else {
 		a.checkCount++
+		if a.cooldownRemaining > 0 {
+			a.cooldownRemaining--
+		}
 	}
 }
 
@@ -121,6 +151,8 @@ func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedDat
 func (a *CheckAggregate) RecordCheck(result CheckResult, now time.Time) ([]Event, error) {
 	result.CheckCountSinceFull = a.checkCount
 	result.ForceFullNext = a.forceFullNext
+	result.CooldownRemaining = a.cooldownRemaining
+	a.forceFullNext = false
 
 	checkEv, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: result}, now)
 	if err != nil {

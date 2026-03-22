@@ -159,7 +159,7 @@ type CheckStateProvider interface {
 	ForceFullNext() bool
 	SetForceFullNext(v bool)
 	ShouldPromoteToFull(prevDiv, currDiv float64) bool
-	AdvanceCheckCount(fullCheck bool)
+	AdvanceCheckCount(fullCheck bool, wasForced bool)
 	Restore(result domain.CheckResult)
 }
 

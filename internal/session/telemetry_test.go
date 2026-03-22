@@ -88,8 +88,8 @@ func (m *testInternalCheckStateProvider) SetForceFullNext(v bool) { m.agg.SetFor
 func (m *testInternalCheckStateProvider) ShouldPromoteToFull(prev, curr float64) bool {
 	return m.agg.ShouldPromoteToFull(prev, curr)
 }
-func (m *testInternalCheckStateProvider) AdvanceCheckCount(fullCheck bool) {
-	m.agg.AdvanceCheckCount(fullCheck)
+func (m *testInternalCheckStateProvider) AdvanceCheckCount(fullCheck bool, wasForced bool) {
+	m.agg.AdvanceCheckCount(fullCheck, wasForced)
 }
 func (m *testInternalCheckStateProvider) Restore(result domain.CheckResult) { m.agg.Restore(result) }
 

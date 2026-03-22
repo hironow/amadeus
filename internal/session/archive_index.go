@@ -3,7 +3,9 @@ package session
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -235,6 +237,31 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 	return nil
 }
 
+// EntryCount returns the number of entries (non-empty lines) in the index file.
+// Returns 0 if the file does not exist.
+func (w *IndexWriter) EntryCount(indexPath string) (int, error) {
+	f, err := os.Open(indexPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("open index: %w", err)
+	}
+	defer f.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
+			count++
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return count, fmt.Errorf("scan index: %w", err)
+	}
+	return count, nil
+}
+
 var indexDirs = []string{"archive", "journal", "journals", "insights"}
 
 // Rebuild scans known subdirectories for .md files, extracts metadata, and
@@ -258,13 +285,18 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) {
 	defer flockUnlock(lockFile.Fd())
 
 	var entries []domain.IndexEntry
+	var walkErrors []error
 	for _, sub := range indexDirs {
 		dir := filepath.Join(stateDir, sub)
 		if _, statErr := os.Stat(dir); statErr != nil {
 			continue
 		}
-		filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
-			if walkErr != nil || d.IsDir() {
+		walkRetErr := filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				walkErrors = append(walkErrors, walkErr)
+				return nil
+			}
+			if d.IsDir() {
 				return nil
 			}
 			if filepath.Ext(path) != ".md" {
@@ -273,6 +305,9 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) {
 			entries = append(entries, ExtractMeta(path, stateDir, tool))
 			return nil
 		})
+		if walkRetErr != nil {
+			walkErrors = append(walkErrors, walkRetErr)
+		}
 	}
 
 	tmpPath := indexPath + ".tmp"
@@ -293,5 +328,8 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) {
 		return 0, fmt.Errorf("rename: %w", err)
 	}
 
+	if len(walkErrors) > 0 {
+		return len(entries), fmt.Errorf("rebuild completed with %d walk error(s): %w", len(walkErrors), walkErrors[0])
+	}
 	return len(entries), nil
 }

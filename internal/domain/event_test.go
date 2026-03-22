@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -56,6 +57,9 @@ func TestEventTypeConstants(t *testing.T) {
 		domain.EventDMailCommented,
 		domain.EventConvergenceDetected,
 		domain.EventArchivePruned,
+		domain.EventRunStarted,
+		domain.EventRunStopped,
+		domain.EventPRConvergenceChecked,
 	}
 
 	seen := make(map[domain.EventType]bool)
@@ -359,6 +363,51 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 	}
 }
 
+func TestValidateEvent_UnknownType(t *testing.T) {
+	// given: event with a typo in the type
+	event := domain.Event{
+		ID:        "test-001",
+		Type:      domain.EventType("check.complete"), // typo: missing 'd'
+		Timestamp: time.Now(),
+		Data:      json.RawMessage(`{"result":{}}`),
+	}
+
+	// when
+	err := domain.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for unknown event type")
+	}
+}
+
+func TestValidEventType_AllConstants(t *testing.T) {
+	allTypes := []domain.EventType{
+		domain.EventCheckCompleted,
+		domain.EventBaselineUpdated,
+		domain.EventForceFullNextSet,
+		domain.EventDMailGenerated,
+		domain.EventInboxConsumed,
+		domain.EventDMailCommented,
+		domain.EventConvergenceDetected,
+		domain.EventArchivePruned,
+		domain.EventRunStarted,
+		domain.EventRunStopped,
+		domain.EventPRConvergenceChecked,
+	}
+	for _, et := range allTypes {
+		if !domain.ValidEventType(et) {
+			t.Errorf("ValidEventType(%q) = false, expected true", et)
+		}
+	}
+}
+
+func TestValidEventType_UnknownReturnsFalse(t *testing.T) {
+	if domain.ValidEventType("totally.unknown") {
+		t.Error("expected false for unknown event type")
+	}
+}
+
 func TestValidateEvent_MultipleErrors(t *testing.T) {
 	// given: everything is invalid
 	event := domain.Event{}
@@ -369,6 +418,179 @@ func TestValidateEvent_MultipleErrors(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("expected error for fully invalid event")
+	}
+}
+
+func TestTrimCheckHistory_KeepsRecentChecks(t *testing.T) {
+	// given: 5 check events, keep 3
+	var events []domain.Event
+	for i := 0; i < 5; i++ {
+		e, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
+			Result: domain.CheckResult{Commit: fmt.Sprintf("commit-%d", i)},
+		}, time.Now().Add(time.Duration(i)*time.Minute))
+		events = append(events, e)
+	}
+
+	// when
+	trimmed, dropped := domain.TrimCheckHistory(events, 3)
+
+	// then
+	if dropped != 2 {
+		t.Errorf("expected 2 dropped, got %d", dropped)
+	}
+	if len(trimmed) != 3 {
+		t.Errorf("expected 3 remaining, got %d", len(trimmed))
+	}
+}
+
+func TestTrimCheckHistory_PreservesNonCheckEvents(t *testing.T) {
+	// given: interleaved check and non-check events
+	var events []domain.Event
+	for i := 0; i < 5; i++ {
+		ce, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{}, time.Now())
+		events = append(events, ce)
+	}
+	dmail, _ := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{}, time.Now())
+	events = append(events, dmail)
+
+	// when: keep only 2 check events
+	trimmed, dropped := domain.TrimCheckHistory(events, 2)
+
+	// then: 3 check events dropped, dmail preserved
+	if dropped != 3 {
+		t.Errorf("expected 3 dropped, got %d", dropped)
+	}
+	if len(trimmed) != 3 { // 2 checks + 1 dmail
+		t.Errorf("expected 3 remaining, got %d", len(trimmed))
+	}
+	// dmail should still be present
+	hasDmail := false
+	for _, e := range trimmed {
+		if e.Type == domain.EventDMailGenerated {
+			hasDmail = true
+		}
+	}
+	if !hasDmail {
+		t.Error("expected dmail event to be preserved")
+	}
+}
+
+func TestTrimCheckHistory_BelowLimit_NoOp(t *testing.T) {
+	var events []domain.Event
+	for i := 0; i < 3; i++ {
+		e, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{}, time.Now())
+		events = append(events, e)
+	}
+
+	trimmed, dropped := domain.TrimCheckHistory(events, 5)
+	if dropped != 0 {
+		t.Errorf("expected 0 dropped, got %d", dropped)
+	}
+	if len(trimmed) != 3 {
+		t.Errorf("expected 3 remaining, got %d", len(trimmed))
+	}
+}
+
+func TestTrimCheckHistory_DefaultMaxKeep(t *testing.T) {
+	// given: maxKeep=0 should default to DefaultMaxResultHistory (100)
+	var events []domain.Event
+	for i := 0; i < 5; i++ {
+		e, _ := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{}, time.Now())
+		events = append(events, e)
+	}
+
+	trimmed, dropped := domain.TrimCheckHistory(events, 0)
+	if dropped != 0 {
+		t.Errorf("expected 0 dropped (5 < 100), got %d", dropped)
+	}
+	if len(trimmed) != 5 {
+		t.Errorf("expected 5 remaining, got %d", len(trimmed))
+	}
+}
+
+func TestClassifyStopReason_TableDriven(t *testing.T) {
+	cases := []struct {
+		reason   string
+		expected domain.StopCategory
+	}{
+		// Graceful patterns
+		{"", domain.StopGraceful},
+		{"normal exit", domain.StopGraceful},
+		{"context canceled", domain.StopGraceful},
+		{"context deadline exceeded", domain.StopGraceful}, // must NOT match transient
+		// User patterns
+		{"signal", domain.StopUser},
+		{"SIGTERM received", domain.StopUser},
+		{"user requested shutdown", domain.StopUser},
+		// IO error patterns
+		{"read error", domain.StopIOError},
+		{"write failed", domain.StopIOError},
+		{"EOF encountered", domain.StopIOError},
+		// Transient patterns
+		{"timeout", domain.StopTransient},
+		{"connection refused", domain.StopTransient},
+		{"temporary failure", domain.StopTransient},
+		// Unknown fallback
+		{"unexpected panic xyz", domain.StopUnknown},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.reason, func(t *testing.T) {
+			// when
+			got := domain.ClassifyStopReason(tc.reason)
+
+			// then
+			if got != tc.expected {
+				t.Errorf("ClassifyStopReason(%q) = %q, want %q", tc.reason, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestIsCriticalStop_OnlyIOErrorIsCritical(t *testing.T) {
+	cases := []struct {
+		cat      domain.StopCategory
+		critical bool
+	}{
+		{domain.StopGraceful, false},
+		{domain.StopUser, false},
+		{domain.StopIOError, true},
+		{domain.StopTransient, false},
+		{domain.StopUnknown, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.cat), func(t *testing.T) {
+			// when
+			got := domain.IsCriticalStop(tc.cat)
+
+			// then
+			if got != tc.critical {
+				t.Errorf("IsCriticalStop(%q) = %v, want %v", tc.cat, got, tc.critical)
+			}
+		})
+	}
+}
+
+func TestStopCategoryConstants(t *testing.T) {
+	// given: all stop category constants must be distinct non-empty strings
+	cats := []domain.StopCategory{
+		domain.StopGraceful,
+		domain.StopUser,
+		domain.StopIOError,
+		domain.StopTransient,
+		domain.StopUnknown,
+	}
+
+	seen := make(map[domain.StopCategory]bool)
+	for _, c := range cats {
+		if c == "" {
+			t.Error("found empty StopCategory constant")
+		}
+		if seen[c] {
+			t.Errorf("duplicate StopCategory: %q", c)
+		}
+		seen[c] = true
 	}
 }
 

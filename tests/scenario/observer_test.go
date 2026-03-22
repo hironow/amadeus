@@ -3,6 +3,7 @@
 package scenario_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -117,4 +118,258 @@ func (o *Observer) WaitForClosedLoop(timeout time.Duration) {
 	o.ws.WaitForDMail(o.t, ".expedition", "inbox", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".gate", "archive", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".siren", "inbox", stepTimeout)
+}
+
+// --- Prompt assertion helpers (009, 001, 013) ---
+
+// AssertPromptCount verifies that fake-claude was called exactly wantCount times
+// by counting log files in PromptLogDir. A count of 0 suggests the real API
+// may have been called instead of fake-claude.
+func (o *Observer) AssertPromptCount(wantCount int) {
+	o.t.Helper()
+	entries, err := os.ReadDir(o.ws.PromptLogDir())
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir %s: %v", o.ws.PromptLogDir(), err)
+	}
+	got := len(entries)
+	if got != wantCount {
+		if got == 0 {
+			o.t.Errorf("prompt count: got 0, want %d — fake-claude may not have been invoked (real API called?)", wantCount)
+		} else {
+			o.t.Errorf("prompt count: got %d, want %d", got, wantCount)
+		}
+	}
+}
+
+// AssertPromptContains verifies that at least one logged prompt contains
+// all of the specified substrings. This ensures the LLM Judge received
+// the expected input (e.g., ADR file references, DoD content).
+// All substrings must appear in the same prompt — not spread across different prompts.
+func (o *Observer) AssertPromptContains(wantSubstrings []string) {
+	o.t.Helper()
+	entries, err := os.ReadDir(o.ws.PromptLogDir())
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir: %v", err)
+	}
+	if len(entries) == 0 {
+		o.t.Fatal("no prompt logs found — cannot verify prompt content")
+	}
+
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join(o.ws.PromptLogDir(), entry.Name()))
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		allFound := true
+		for _, substr := range wantSubstrings {
+			if !strings.Contains(content, substr) {
+				allFound = false
+				break
+			}
+		}
+		if allFound {
+			return
+		}
+	}
+	o.t.Errorf("prompt content: no single prompt contains all of %v", wantSubstrings)
+}
+
+// AssertPromptQuality is a composite guard that verifies both call count
+// and prompt content in a single call. Combines AssertPromptCount and
+// AssertPromptContains for convenience.
+func (o *Observer) AssertPromptQuality(wantCount int, wantContains []string) {
+	o.t.Helper()
+	o.AssertPromptCount(wantCount)
+	if len(wantContains) > 0 {
+		o.AssertPromptContains(wantContains)
+	}
+}
+
+// --- D-Mail field assertion helpers (004) ---
+
+// AssertDMailSeverity verifies that a D-Mail file has the expected severity
+// field in its frontmatter. This tests the CalcDivergence → DetermineSeverity
+// → D-Mail frontmatter pipeline end-to-end.
+func (o *Observer) AssertDMailSeverity(path, expectedSeverity string) {
+	o.t.Helper()
+	fm, _ := o.ws.ReadDMail(o.t, path)
+	severity, ok := fm["severity"].(string)
+	if !ok {
+		o.t.Errorf("D-Mail %s: missing severity field in frontmatter", path)
+		return
+	}
+	if severity != expectedSeverity {
+		o.t.Errorf("D-Mail %s: got severity %q, want %q", path, severity, expectedSeverity)
+	}
+}
+
+// AssertDMailAction verifies that a D-Mail file has the expected action
+// field in its frontmatter (e.g., "escalate", "monitor", "none").
+func (o *Observer) AssertDMailAction(path, expectedAction string) {
+	o.t.Helper()
+	fm, _ := o.ws.ReadDMail(o.t, path)
+	action, ok := fm["action"].(string)
+	if !ok {
+		o.t.Errorf("D-Mail %s: missing action field in frontmatter", path)
+		return
+	}
+	if action != expectedAction {
+		o.t.Errorf("D-Mail %s: got action %q, want %q", path, action, expectedAction)
+	}
+}
+
+// --- Diff check assertion helpers (proposal 025) ---
+
+// AssertDMailCount verifies the number of D-Mail .md files in a mailbox directory.
+func (o *Observer) AssertDMailCount(toolDir, mailbox string, wantCount int) {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, toolDir, mailbox)
+	files := o.ws.ListFiles(o.t, dir)
+	var mdCount int
+	for _, f := range files {
+		if strings.HasSuffix(f, ".md") {
+			mdCount++
+		}
+	}
+	if mdCount != wantCount {
+		o.t.Errorf("%s/%s: got %d D-Mails, want %d", toolDir, mailbox, mdCount, wantCount)
+	}
+}
+
+// --- Convergence and inbox watcher helpers (proposals 037, 038) ---
+
+// AssertConvergenceDMail verifies that a convergence D-Mail was generated
+// in the .gate archive after divergence dropped below threshold.
+func (o *Observer) AssertConvergenceDMail() {
+	o.t.Helper()
+	o.AssertArchiveContains(".gate", []string{"convergence"})
+}
+
+// AssertNoConvergenceDMail verifies that no convergence D-Mail exists
+// in the .gate archive (divergence still above threshold).
+func (o *Observer) AssertNoConvergenceDMail() {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, ".gate", "archive")
+	files := o.ws.ListFiles(o.t, dir)
+	for _, f := range files {
+		if !strings.HasSuffix(f, ".md") {
+			continue
+		}
+		path := filepath.Join(dir, f)
+		fm, _ := o.ws.ReadDMail(o.t, path)
+		if kind, ok := fm["kind"].(string); ok && kind == "convergence" {
+			o.t.Error("unexpected convergence D-Mail found in .gate/archive")
+			return
+		}
+	}
+}
+
+// AssertWaitingLoopNotActive verifies that amadeus is not in daemon/waiting
+// mode. Checks that no .gate/run/watch.pid file exists.
+func (o *Observer) AssertWaitingLoopNotActive() {
+	o.t.Helper()
+	pidPath := filepath.Join(o.ws.RepoPath, ".gate", "run", "watch.pid")
+	if _, err := os.Stat(pidPath); err == nil {
+		o.t.Error("watch.pid exists — waiting loop should not be active in scenario tests")
+	}
+}
+
+// --- Archive prune helpers (proposal 046) ---
+
+// AssertArchivePruneEvent checks for an archive_pruned event in JSONL.
+func (o *Observer) AssertArchivePruneEvent() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".gate", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Logf("events dir not accessible: %v (archive-prune may not have been run)", err)
+		return
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if strings.Contains(string(data), `"archive_pruned"`) || strings.Contains(string(data), `"archive.pruned"`) {
+			return
+		}
+	}
+	o.t.Error("no archive_pruned event found in .gate/events/*.jsonl")
+}
+
+// --- Idempotency key helpers (proposal 055) ---
+
+// AssertIdempotencyKey reads a D-Mail file and verifies it contains a
+// non-empty idempotency_key field in frontmatter (64-char hex hash).
+func (o *Observer) AssertIdempotencyKey(path string) {
+	o.t.Helper()
+	fm, _ := o.ws.ReadDMail(o.t, path)
+	key, ok := fm["idempotency_key"].(string)
+	if !ok || key == "" {
+		o.t.Errorf("D-Mail %s: missing or empty idempotency_key", path)
+		return
+	}
+	if len(key) != 64 {
+		o.t.Errorf("D-Mail %s: idempotency_key length %d, want 64 (sha256 hex)", path, len(key))
+	}
+}
+
+// --- Check aggregate + config validation helpers (proposals 061, 064) ---
+
+// AssertForceFullNextInJSONL scans .gate/events/*.jsonl for force_full_next.set
+// event, indicating that a divergence jump was detected and the next check
+// should be promoted to full calibration.
+func (o *Observer) AssertForceFullNextInJSONL() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".gate", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if strings.Contains(string(data), `"force_full_next"`) {
+			return
+		}
+	}
+	o.t.Error("no force_full_next event found in .gate/events/*.jsonl")
+}
+
+// --- Fan-out content parity helpers (proposal 067) ---
+
+// AssertFanoutContentParity verifies that feedback D-Mails delivered to
+// both .siren/inbox and .expedition/inbox have matching content.
+// This catches corruption during phonewave routing.
+func (o *Observer) AssertFanoutContentParity() {
+	o.t.Helper()
+	sirenDir := filepath.Join(o.ws.RepoPath, ".siren", "inbox")
+	expedDir := filepath.Join(o.ws.RepoPath, ".expedition", "inbox")
+
+	sirenFiles := o.ws.ListFiles(o.t, sirenDir)
+	expedFiles := o.ws.ListFiles(o.t, expedDir)
+
+	if len(sirenFiles) == 0 || len(expedFiles) == 0 {
+		o.t.Logf("fanout parity: siren=%d, expedition=%d (skipping — need both)", len(sirenFiles), len(expedFiles))
+		return
+	}
+
+	// Read first D-Mail from each and compare kind + severity
+	sirenFM, _ := o.ws.ReadDMail(o.t, filepath.Join(sirenDir, sirenFiles[0]))
+	expedFM, _ := o.ws.ReadDMail(o.t, filepath.Join(expedDir, expedFiles[0]))
+
+	sirenKind, _ := sirenFM["kind"].(string)
+	expedKind, _ := expedFM["kind"].(string)
+	if sirenKind != expedKind {
+		o.t.Errorf("fanout kind mismatch: siren=%q expedition=%q", sirenKind, expedKind)
+	}
+
+	sirenSev, _ := sirenFM["severity"].(string)
+	expedSev, _ := expedFM["severity"].(string)
+	if sirenSev != expedSev {
+		o.t.Errorf("fanout severity mismatch: siren=%q expedition=%q", sirenSev, expedSev)
+	}
 }

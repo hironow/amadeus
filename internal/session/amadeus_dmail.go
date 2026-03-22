@@ -65,6 +65,8 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				span3.End()
 				return nil, fmt.Errorf("phase 3 (dmail name): %w", err)
 			}
+			// #110: Sanitize targets to prevent self-referencing routing loops.
+			sanitized := domain.SanitizeTargets("amadeus", kind, candidate.Targets)
 			dmail := domain.DMail{
 				SchemaVersion: domain.DMailSchemaVersion,
 				Name:          name,
@@ -73,7 +75,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				Issues:        candidate.Issues,
 				Severity:      meterResult.Divergence.Severity,
 				Action:        domain.DMailAction(candidate.Action),
-				Targets:       candidate.Targets,
+				Targets:       sanitized,
 				Metadata: map[string]string{
 					"created_at": now.Format(time.RFC3339),
 				},
@@ -111,6 +113,7 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 	if convergenceErr != nil {
 		return nil, nil, nil // tolerate load failure
 	}
+	allDMails = domain.FilterByTTL(allDMails, now)
 	convergenceAlerts := a.Config.DetectConvergence(allDMails, now)
 	for _, alert := range convergenceAlerts {
 		if err := a.Emitter.EmitConvergenceDetected(alert, now); err != nil {

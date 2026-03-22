@@ -207,6 +207,14 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		flushed++
 	}
 
+	// #213: Count dead-letter items before committing (while we hold the conn).
+	var deadCount int
+	if scanErr := conn.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount).Scan(&deadCount); scanErr != nil {
+		span.RecordError(scanErr)
+		span.SetAttributes(attribute.String("error.stage", "outbox.dead_letter_count"))
+	}
+
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
@@ -215,6 +223,10 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 	committed = true
 	span.SetAttributes(attribute.Int("flush.retry.count", retryCount))
 	span.SetAttributes(attribute.Int("flush.success.count", flushed))
+	if deadCount > 0 {
+		span.SetAttributes(attribute.Int("flush.dead_letter.count", deadCount))
+	}
+
 	return flushed, nil
 }
 
@@ -245,6 +257,33 @@ func (s *SQLiteOutboxStore) PruneFlushed(ctx context.Context) (int, error) {
 		}
 	}
 	span.SetAttributes(attribute.Int("prune.count", int(deleted)))
+	return int(deleted), nil
+}
+
+// DeadLetterCount returns the number of items that have exceeded maxRetryCount
+// and are permanently stuck in the staging table.
+func (s *SQLiteOutboxStore) DeadLetterCount(ctx context.Context) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: dead letter count: %w", err)
+	}
+	return count, nil
+}
+
+// PurgeDeadLetters deletes items that have exceeded maxRetryCount.
+// Returns the number of purged items.
+func (s *SQLiteOutboxStore) PurgeDeadLetters(ctx context.Context) (int, error) {
+	result, err := s.db.ExecContext(ctx,
+		`DELETE FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount)
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: purge dead letters: %w", err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: rows affected: %w", err)
+	}
 	return int(deleted), nil
 }
 

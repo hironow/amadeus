@@ -26,9 +26,11 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 
 	// Group D-Mails by target within the time window
 	type targetInfo struct {
-		dmailNames []string
-		firstSeen  time.Time
-		lastSeen   time.Time
+		dmailNames   []string
+		seen         map[string]bool
+		highSevCount int
+		firstSeen    time.Time
+		lastSeen     time.Time
 	}
 	targets := make(map[string]*targetInfo)
 
@@ -51,10 +53,20 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 		for _, target := range d.Targets {
 			info, exists := targets[target]
 			if !exists {
-				info = &targetInfo{firstSeen: created, lastSeen: created}
+				info = &targetInfo{
+					firstSeen: created,
+					lastSeen:  created,
+					seen:      make(map[string]bool),
+				}
 				targets[target] = info
 			}
-			info.dmailNames = append(info.dmailNames, d.Name)
+			if !info.seen[d.Name] {
+				info.seen[d.Name] = true
+				info.dmailNames = append(info.dmailNames, d.Name)
+				if d.Severity == SeverityHigh {
+					info.highSevCount++
+				}
+			}
 			if created.Before(info.firstSeen) {
 				info.firstSeen = created
 			}
@@ -76,6 +88,11 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 		}
 		severity := SeverityMedium
 		if len(info.dmailNames) >= cfg.Threshold*escalation {
+			severity = SeverityHigh
+		}
+		// Escalation rule: 2+ HIGH severity D-Mails promote the alert to HIGH
+		// regardless of the count-based escalation threshold.
+		if severity != SeverityHigh && info.highSevCount >= 2 {
 			severity = SeverityHigh
 		}
 		alerts = append(alerts, ConvergenceAlert{
@@ -139,6 +156,7 @@ func GenerateConvergenceDMails(alerts []ConvergenceAlert) []DMail {
 			Description:   fmt.Sprintf("World line convergence on %s (%d hits)", alert.Target, alert.Count),
 			Targets:       []string{alert.Target},
 			Severity:      SeverityHigh,
+			Action:        ActionEscalate,
 			Metadata: map[string]string{
 				"created_at":      now.Format(time.RFC3339),
 				"convergence_for": strings.Join(alert.DMails, ","),

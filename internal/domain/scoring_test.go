@@ -62,6 +62,39 @@ func TestCalcDivergence_WeightedSum(t *testing.T) {
 	}
 }
 
+func TestCalcDivergence_MissingAxis_ReportsMissing(t *testing.T) {
+	// given: axes map missing AxisImplicit
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+	}
+
+	// when
+	result := domain.CalcDivergence(axes, domain.DefaultWeights())
+
+	// then: MissingAxes should list the missing axis
+	if len(result.MissingAxes) != 1 {
+		t.Fatalf("expected 1 missing axis, got %d: %v", len(result.MissingAxes), result.MissingAxes)
+	}
+	if result.MissingAxes[0] != domain.AxisImplicit {
+		t.Errorf("expected missing %q, got %q", domain.AxisImplicit, result.MissingAxes[0])
+	}
+}
+
+func TestCalcDivergence_AllPresent_NoMissing(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+		domain.AxisImplicit:   {Score: 40},
+	}
+	result := domain.CalcDivergence(axes, domain.DefaultWeights())
+	if len(result.MissingAxes) != 0 {
+		t.Errorf("expected no missing axes, got %v", result.MissingAxes)
+	}
+}
+
 func TestDetermineSeverity_Low(t *testing.T) {
 	result := domain.DivergenceResult{Internal: 10.0, Value: 0.10, Axes: map[domain.Axis]domain.AxisScore{
 		domain.AxisADR: {Score: 10}, domain.AxisDoD: {Score: 10}, domain.AxisDependency: {Score: 10}, domain.AxisImplicit: {Score: 10},
@@ -132,6 +165,60 @@ func TestDetermineSeverity_DepOverrideForceMedium(t *testing.T) {
 	}
 	if !sev.Overridden {
 		t.Error("expected override flag to be true")
+	}
+}
+
+func TestDetermineSeverity_ImplicitOverrideForceMedium(t *testing.T) {
+	// given: low divergence but high implicit_constraints score with override configured
+	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 90},
+	}}
+	cfg := domain.DefaultThresholds()
+	cfg.PerAxisOverride.ImplicitForceMedium = 80
+
+	// when
+	sev := domain.DetermineSeverity(result, cfg)
+
+	// then
+	if sev.Severity != domain.SeverityMedium {
+		t.Errorf("expected medium (implicit override), got %s", sev.Severity)
+	}
+	if !sev.Overridden {
+		t.Error("expected override flag to be true")
+	}
+}
+
+func TestDetermineSeverity_ImplicitOverrideBelowThreshold(t *testing.T) {
+	// given: implicit score below override threshold
+	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 50},
+	}}
+	cfg := domain.DefaultThresholds()
+	cfg.PerAxisOverride.ImplicitForceMedium = 80
+
+	// when
+	sev := domain.DetermineSeverity(result, cfg)
+
+	// then
+	if sev.Severity != domain.SeverityLow {
+		t.Errorf("expected low (below threshold), got %s", sev.Severity)
+	}
+}
+
+func TestDetermineSeverity_ImplicitOverrideZeroDisabled(t *testing.T) {
+	// given: ImplicitForceMedium=0 (explicitly disabled) should not trigger
+	result := domain.DivergenceResult{Internal: 5.0, Value: 0.05, Axes: map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: 0}, domain.AxisDoD: {Score: 0}, domain.AxisDependency: {Score: 0}, domain.AxisImplicit: {Score: 90},
+	}}
+	cfg := domain.DefaultThresholds()
+	cfg.PerAxisOverride.ImplicitForceMedium = 0 // explicitly disable
+
+	// when
+	sev := domain.DetermineSeverity(result, cfg)
+
+	// then: should remain low since override is disabled
+	if sev.Severity != domain.SeverityLow {
+		t.Errorf("expected low (override disabled), got %s", sev.Severity)
 	}
 }
 
@@ -352,6 +439,143 @@ func TestResolveFeedbackKinds_Disagreement(t *testing.T) {
 	kinds := domain.ResolveFeedbackKinds("design", "implementation")
 	if len(kinds) != 2 {
 		t.Fatalf("expected 2 kinds on disagreement, got %d", len(kinds))
+	}
+}
+
+func TestValidateAxesPresent_AllPresent(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+		domain.AxisImplicit:   {Score: 40},
+	}
+	missing := domain.ValidateAxesPresent(axes)
+	if len(missing) != 0 {
+		t.Errorf("expected no missing axes, got %v", missing)
+	}
+}
+
+func TestValidateAxesPresent_MissingOne(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: 10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 30},
+	}
+	missing := domain.ValidateAxesPresent(axes)
+	if len(missing) != 1 {
+		t.Fatalf("expected 1 missing axis, got %d: %v", len(missing), missing)
+	}
+	if missing[0] != domain.AxisImplicit {
+		t.Errorf("expected missing axis %q, got %q", domain.AxisImplicit, missing[0])
+	}
+}
+
+func TestValidateAxesPresent_EmptyMap(t *testing.T) {
+	missing := domain.ValidateAxesPresent(map[domain.Axis]domain.AxisScore{})
+	if len(missing) != 4 {
+		t.Errorf("expected 4 missing axes, got %d", len(missing))
+	}
+}
+
+func TestValidateAxesPresent_NilMap(t *testing.T) {
+	missing := domain.ValidateAxesPresent(nil)
+	if len(missing) != 4 {
+		t.Errorf("expected 4 missing axes, got %d", len(missing))
+	}
+}
+
+func TestRequiredAxes_Contains_AllFourAxes(t *testing.T) {
+	expected := map[domain.Axis]bool{
+		domain.AxisADR:        true,
+		domain.AxisDoD:        true,
+		domain.AxisDependency: true,
+		domain.AxisImplicit:   true,
+	}
+	if len(domain.RequiredAxes) != 4 {
+		t.Fatalf("expected 4 required axes, got %d", len(domain.RequiredAxes))
+	}
+	for _, axis := range domain.RequiredAxes {
+		if !expected[axis] {
+			t.Errorf("unexpected required axis: %q", axis)
+		}
+	}
+}
+
+func TestClampAxisScore(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    int
+		expected int
+	}{
+		{"negative", -10, 0},
+		{"zero", 0, 0},
+		{"normal", 50, 50},
+		{"max", 100, 100},
+		{"over max", 150, 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := domain.ClampAxisScore(tt.input)
+			if got != tt.expected {
+				t.Errorf("ClampAxisScore(%d) = %d, want %d", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestClampAxesMap_ClampsNegativeAndOver(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: -5, Details: "negative"},
+		domain.AxisDoD:        {Score: 50, Details: "ok"},
+		domain.AxisDependency: {Score: 110, Details: "over"},
+		domain.AxisImplicit:   {Score: 0, Details: "zero"},
+	}
+	clamped := domain.ClampAxesMap(axes)
+	if clamped[domain.AxisADR].Score != 0 {
+		t.Errorf("expected clamped ADR=0, got %d", clamped[domain.AxisADR].Score)
+	}
+	if clamped[domain.AxisDoD].Score != 50 {
+		t.Errorf("expected DoD=50, got %d", clamped[domain.AxisDoD].Score)
+	}
+	if clamped[domain.AxisDependency].Score != 100 {
+		t.Errorf("expected clamped Dep=100, got %d", clamped[domain.AxisDependency].Score)
+	}
+	if clamped[domain.AxisImplicit].Score != 0 {
+		t.Errorf("expected Implicit=0, got %d", clamped[domain.AxisImplicit].Score)
+	}
+	// original must not be mutated
+	if axes[domain.AxisADR].Score != -5 {
+		t.Error("original map was mutated")
+	}
+}
+
+func TestClampAxesMap_PreservesDetails(t *testing.T) {
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR: {Score: -5, Details: "important detail"},
+	}
+	clamped := domain.ClampAxesMap(axes)
+	if clamped[domain.AxisADR].Details != "important detail" {
+		t.Errorf("details lost: %q", clamped[domain.AxisADR].Details)
+	}
+}
+
+func TestCalcDivergence_WithNegativeScores_AfterClamping(t *testing.T) {
+	// given: axes with negative scores, clamped before CalcDivergence
+	axes := map[domain.Axis]domain.AxisScore{
+		domain.AxisADR:        {Score: -10},
+		domain.AxisDoD:        {Score: 20},
+		domain.AxisDependency: {Score: 10},
+		domain.AxisImplicit:   {Score: 5},
+	}
+	clamped := domain.ClampAxesMap(axes)
+	result := domain.CalcDivergence(clamped, domain.DefaultWeights())
+
+	// then: ADR=0 after clamping, internal = 0*0.4 + 20*0.3 + 10*0.2 + 5*0.1 = 8.5
+	if !almostEqual(result.Internal, 8.5) {
+		t.Errorf("expected internal 8.5, got %f", result.Internal)
+	}
+	if result.Value < 0 {
+		t.Errorf("divergence value should not be negative, got %f", result.Value)
 	}
 }
 

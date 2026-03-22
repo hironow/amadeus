@@ -41,11 +41,12 @@ func DefaultWeights() Weights {
 
 // DivergenceResult holds the complete result of a divergence calculation.
 type DivergenceResult struct {
-	Value      float64            `json:"divergence"`
-	Internal   float64            `json:"internal"`
-	Axes       map[Axis]AxisScore `json:"axes"`
-	Severity   Severity           `json:"severity"`
-	Overridden bool               `json:"overridden"`
+	Value       float64            `json:"divergence"`
+	Internal    float64            `json:"internal"`
+	Axes        map[Axis]AxisScore `json:"axes"`
+	Severity    Severity           `json:"severity"`
+	Overridden  bool               `json:"overridden"`
+	MissingAxes []Axis             `json:"missing_axes,omitempty"`
 }
 
 // Severity represents the D-Mail severity tier.
@@ -80,9 +81,10 @@ type Thresholds struct {
 
 // PerAxisOverride holds per-axis critical thresholds that escalate severity.
 type PerAxisOverride struct {
-	ADRForceHigh   int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
-	DoDForceHigh   int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
-	DepForceMedium int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
+	ADRForceHigh       int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
+	DoDForceHigh       int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
+	DepForceMedium     int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
+	ImplicitForceMedium int `yaml:"implicit_constraints_force_medium" json:"implicit_constraints_force_medium"`
 }
 
 // SeverityConfig combines thresholds and per-axis overrides.
@@ -99,25 +101,67 @@ func DefaultThresholds() SeverityConfig {
 			MediumMax: 0.500000,
 		},
 		PerAxisOverride: PerAxisOverride{
-			ADRForceHigh:   60,
-			DoDForceHigh:   70,
-			DepForceMedium: 80,
+			ADRForceHigh:        60,
+			DoDForceHigh:        70,
+			DepForceMedium:      80,
+			ImplicitForceMedium: 80,
 		},
 	}
 }
 
+// RequiredAxes lists the axes that must be present for a valid divergence calculation.
+var RequiredAxes = []Axis{AxisADR, AxisDoD, AxisDependency, AxisImplicit}
+
+// ValidateAxesPresent checks that all required axes are present in the map.
+// Returns a list of missing axis names, or nil if all are present.
+func ValidateAxesPresent(axes map[Axis]AxisScore) []Axis {
+	var missing []Axis
+	for _, axis := range RequiredAxes {
+		if _, ok := axes[axis]; !ok {
+			missing = append(missing, axis)
+		}
+	}
+	return missing
+}
+
+// ClampAxisScore clamps a score to the valid range [0, 100].
+func ClampAxisScore(score int) int {
+	if score < 0 {
+		return 0
+	}
+	if score > 100 {
+		return 100
+	}
+	return score
+}
+
+// ClampAxesMap returns a new axes map with all scores clamped to [0, 100].
+func ClampAxesMap(axes map[Axis]AxisScore) map[Axis]AxisScore {
+	clamped := make(map[Axis]AxisScore, len(axes))
+	for axis, as := range axes {
+		clamped[axis] = AxisScore{
+			Score:   ClampAxisScore(as.Score),
+			Details: as.Details,
+		}
+	}
+	return clamped
+}
+
 // CalcDivergence computes the weighted divergence score from axis scores.
+// If required axes are missing, it returns a result with MissingAxes populated.
 func CalcDivergence(axes map[Axis]AxisScore, weights Weights) DivergenceResult {
 	internal := float64(axes[AxisADR].Score)*weights.ADRIntegrity +
 		float64(axes[AxisDoD].Score)*weights.DoDFulfillment +
 		float64(axes[AxisDependency].Score)*weights.DependencyIntegrity +
 		float64(axes[AxisImplicit].Score)*weights.ImplicitConstraints
 
-	return DivergenceResult{
+	result := DivergenceResult{
 		Value:    internal / 100.0,
 		Internal: internal,
 		Axes:     axes,
 	}
+	result.MissingAxes = ValidateAxesPresent(axes)
+	return result
 }
 
 // DetermineSeverity applies threshold and per-axis override rules.
@@ -143,6 +187,12 @@ func DetermineSeverity(result DivergenceResult, config SeverityConfig) Divergenc
 		severity = SeverityHigh
 	}
 	if result.Axes[AxisDependency].Score >= config.PerAxisOverride.DepForceMedium {
+		if severity == SeverityLow {
+			overridden = true
+			severity = SeverityMedium
+		}
+	}
+	if config.PerAxisOverride.ImplicitForceMedium > 0 && result.Axes[AxisImplicit].Score >= config.PerAxisOverride.ImplicitForceMedium {
 		if severity == SeverityLow {
 			overridden = true
 			severity = SeverityMedium
@@ -229,7 +279,16 @@ type DivergenceMeter struct {
 // ProcessResponse takes a ClaudeResponse, runs CalcDivergence and
 // DetermineSeverity, and returns a MeterResult.
 func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
-	divergence := CalcDivergence(resp.Axes, dm.Config.Weights)
+	// #089: Clamp axes to [0,100] before scoring to handle out-of-range LLM outputs.
+	clamped := ClampAxesMap(resp.Axes)
+
+	// #123: Validate all required axes are present and record any missing.
+	missing := ValidateAxesPresent(clamped)
+
+	divergence := CalcDivergence(clamped, dm.Config.Weights)
+	// #124: Populate MissingAxes from validation result.
+	divergence.MissingAxes = missing
+
 	severityCfg := SeverityConfig{
 		Thresholds:      dm.Config.Thresholds,
 		PerAxisOverride: dm.Config.PerAxisOverride,

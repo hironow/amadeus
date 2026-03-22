@@ -400,6 +400,89 @@ func TestConfig_NegativeWaitTimeout_DisablesWaiting(t *testing.T) {
 	}
 }
 
+// Cross-field semantic constraint tests
+
+func TestValidateConfig_OnDivergenceJumpGeMediumMax_EmitsError(t *testing.T) {
+	// given: OnDivergenceJump equals MediumMax (0.50), skipping medium severity entirely
+	cfg := domain.DefaultConfig()
+	cfg.FullCheck.OnDivergenceJump = cfg.Thresholds.MediumMax // 0.50 >= 0.50
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "on_divergence_jump") && strings.Contains(e, "medium_max") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected cross-field error for on_divergence_jump >= medium_max, got: %v", errs)
+	}
+}
+
+func TestValidateConfig_OnDivergenceJumpGtMediumMax_EmitsError(t *testing.T) {
+	// given: OnDivergenceJump greater than MediumMax
+	cfg := domain.DefaultConfig()
+	cfg.FullCheck.OnDivergenceJump = cfg.Thresholds.MediumMax + 0.1 // 0.60 >= 0.50
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "on_divergence_jump") && strings.Contains(e, "medium_max") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected cross-field error for on_divergence_jump > medium_max, got: %v", errs)
+	}
+}
+
+func TestValidateConfig_WaitTimeoutGtWindowDays24h_EmitsError(t *testing.T) {
+	// given: WaitTimeout exceeds WindowDays * 24h
+	cfg := domain.DefaultConfig()
+	cfg.Convergence.WindowDays = 1
+	cfg.WaitTimeout = 25 * time.Hour // 25h > 1 * 24h
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "wait_timeout") && strings.Contains(e, "window_days") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected cross-field error for wait_timeout > window_days*24h, got: %v", errs)
+	}
+}
+
+func TestValidateConfig_WaitTimeoutNegative_SkipsWindowDaysCheck(t *testing.T) {
+	// given: negative WaitTimeout disables waiting, should not trigger window_days check
+	cfg := domain.DefaultConfig()
+	cfg.WaitTimeout = -1
+	cfg.Convergence.WindowDays = 1 // would fail if check applied to negative
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then: no wait_timeout/window_days cross-field error
+	for _, e := range errs {
+		if strings.Contains(e, "wait_timeout") && strings.Contains(e, "window_days") {
+			t.Errorf("negative WaitTimeout should skip window_days check, got error: %s", e)
+		}
+	}
+}
+
 func TestValidateConfig_InvalidLang(t *testing.T) {
 	// given
 	cfg := domain.DefaultConfig()
