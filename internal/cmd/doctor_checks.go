@@ -738,12 +738,25 @@ func checkFsnotify() domain.DoctorCheck {
 	}
 }
 
+// skillsRefBinNames lists possible binary names for the skills-ref package.
+// "uv tool install skills-ref" installs as "agentskills", not "skills-ref".
+var skillsRefBinNames = []string{"skills-ref", "agentskills"}
+
+func findSkillsRefBin() (string, error) {
+	for _, name := range skillsRefBinNames {
+		if path, err := lookPathShell(name); err == nil {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("none of %v found on PATH", skillsRefBinNames)
+}
+
 // checkSkillsRefToolchain verifies that the skills-ref tool is available.
 func checkSkillsRefToolchain(repoRoot string, repair bool) []domain.DoctorCheck {
-	if _, err := lookPathShell("skills-ref"); err == nil {
+	if path, err := findSkillsRefBin(); err == nil {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
-			Message: "skills-ref found on PATH",
+			Message: fmt.Sprintf("skills-ref found on PATH (%s)", filepath.Base(path)),
 		}}
 	}
 	_, uvErr := lookPathShell("uv")
