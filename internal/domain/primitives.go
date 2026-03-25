@@ -2,6 +2,25 @@ package domain
 
 import "fmt"
 
+// TrackingMode determines the issue tracking backend.
+type TrackingMode string
+
+const (
+	ModeWave   TrackingMode = "wave"
+	ModeLinear TrackingMode = "linear"
+)
+
+func NewTrackingMode(linear bool) TrackingMode {
+	if linear {
+		return ModeLinear
+	}
+	return ModeWave
+}
+
+func (m TrackingMode) IsLinear() bool { return m == ModeLinear }
+func (m TrackingMode) IsWave() bool   { return m == ModeWave }
+func (m TrackingMode) String() string { return string(m) }
+
 // RepoPath is an always-valid non-empty repository path.
 type RepoPath struct{ v string }
 
