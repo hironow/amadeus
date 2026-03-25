@@ -4,7 +4,7 @@
 
 | Range | Scope | Description |
 |-------|-------|-------------|
-| S0001-S0029 | Shared | Cross-tool decisions. All 4 tools follow these. |
+| S0001-S0034 | Shared | Cross-tool decisions. All 4 tools follow these. |
 | 0001+ (per tool) | Tool-specific | Each tool numbers its own ADRs independently. |
 
 - **Shared ADRs** are maintained in `docs/shared-adr/` within each tool repository. All four tools keep identical copies.
@@ -44,6 +44,11 @@
 | S0027 | OTel env-file backend configuration | Accepted |
 | S0028 | Usecase-adapter dependency inversion | Accepted |
 | S0029 | Parse-don't-validate commands | Accepted |
+| S0030 | Insight Data Persistence | Accepted |
+| S0031 | D-Mail Context Extension | Accepted |
+| S0032 | CVD-Friendly Signal Color Palette | Accepted |
+| S0033 | Loop Safety Audit (2026-03) | Accepted |
+| S0034 | Session-Usecase Boundary Clarification | Accepted |
 
 ## amadeus-specific ADRs
 
