@@ -49,6 +49,7 @@
 | S0032 | CVD-Friendly Signal Color Palette | Accepted |
 | S0033 | Loop Safety Audit (2026-03) | Accepted |
 | S0034 | Session-Usecase Boundary Clarification | Accepted |
+| S0035 | D-Mail Wave Field Extension | Accepted |
 
 ## amadeus-specific ADRs
 
