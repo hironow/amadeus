@@ -25,6 +25,7 @@ View or update the .gate/config.yaml configuration file.
 ```
   -c, --config string   config file path
   -l, --lang string     output language (ja, en)
+      --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -q, --quiet           Suppress all stderr output
