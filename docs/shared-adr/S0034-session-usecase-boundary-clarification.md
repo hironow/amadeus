@@ -55,14 +55,6 @@ When session logic must move to usecase:
 4. Session method becomes thin delegation to injected port (nil-safe fallback)
 5. `cmd/` composition root wires usecase implementation into session
 
-### Exceptions
-
-- `RunReviewGate` (sightjack): Retained in session because its review-fix cycle is
-  tightly coupled with exec.Command I/O (shell script execution, git subprocess).
-  Extracting would require mocking all I/O, losing the integration test value.
-  The 8 existing tests exercise real shell scripts — this coverage would be lost
-  if moved to usecase with port mocks.
-
 ### Enforcement
 
 - Semgrep rule `session-no-action-dispatch` (ERROR) prevents `switch dm.Action` in session
