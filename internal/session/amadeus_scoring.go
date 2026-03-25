@@ -17,9 +17,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// repeatedViolationThreshold is the axis score above which a result counts as a violation.
-const repeatedViolationThreshold = 50
-
 // loadRecentCheckResults reads the recent check history from .run/recent_checks.json.
 // Returns nil (no error) if the file does not exist.
 func loadRecentCheckResults(stateDir string) ([]domain.CheckResult, error) {
@@ -36,74 +33,6 @@ func loadRecentCheckResults(stateDir string) ([]domain.CheckResult, error) {
 		return nil, fmt.Errorf("parse recent checks: %w", err)
 	}
 	return results, nil
-}
-
-// CollectRepeatedViolations analyzes a slice of recent check results and returns
-// any integrity axis that exceeded the violation threshold in ALL of the provided results.
-// Returns nil when results is empty or no axis qualifies.
-func CollectRepeatedViolations(results []domain.CheckResult) []domain.RepeatedViolation {
-	if len(results) == 0 {
-		return nil
-	}
-
-	// Count how many results have each axis above threshold
-	countAbove := make(map[domain.Axis]int)
-	latestDetails := make(map[domain.Axis]string)
-	for _, r := range results {
-		for axis, score := range r.Axes {
-			if score.Score > repeatedViolationThreshold {
-				countAbove[axis]++
-				latestDetails[axis] = score.Details
-			}
-		}
-	}
-
-	var violations []domain.RepeatedViolation
-	for axis, count := range countAbove {
-		if count == len(results) {
-			violations = append(violations, domain.RepeatedViolation{
-				Axis:        string(axis),
-				Description: latestDetails[axis],
-				Count:       count,
-			})
-		}
-	}
-	return violations
-}
-
-// divergenceTrendStableThreshold is the maximum delta considered "stable".
-const divergenceTrendStableThreshold = 5.0
-
-// AnalyzeDivergenceTrend computes the trend direction of divergence scores across
-// recent check results. Returns nil when fewer than 2 results are provided.
-func AnalyzeDivergenceTrend(results []domain.CheckResult) *domain.DivergenceTrend {
-	if len(results) < 2 {
-		return nil
-	}
-
-	first := results[0].Divergence
-	last := results[len(results)-1].Divergence
-	delta := last - first
-
-	var class domain.DivergenceTrendClass
-	var msg string
-	switch {
-	case delta > divergenceTrendStableThreshold:
-		class = domain.DivergenceTrendWorsening
-		msg = fmt.Sprintf("Divergence increased by %.1f over %d checks (%.1f -> %.1f)", delta, len(results), first, last)
-	case delta < -divergenceTrendStableThreshold:
-		class = domain.DivergenceTrendImproving
-		msg = fmt.Sprintf("Divergence decreased by %.1f over %d checks (%.1f -> %.1f)", -delta, len(results), first, last)
-	default:
-		class = domain.DivergenceTrendStable
-		msg = fmt.Sprintf("Divergence stable (delta %.1f) over %d checks", delta, len(results))
-	}
-
-	return &domain.DivergenceTrend{
-		Class:   class,
-		Delta:   delta,
-		Message: msg,
-	}
 }
 
 // detectShift runs Phase 1: ReadingSteiner shift detection.
@@ -281,8 +210,8 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 	if recentErr != nil && !quiet {
 		a.Logger.Info("Warning: failed to load recent check results: %v", recentErr)
 	}
-	repeatedViolations := CollectRepeatedViolations(recentResults)
-	divergenceTrend := AnalyzeDivergenceTrend(recentResults)
+	repeatedViolations := domain.CollectRepeatedViolations(recentResults)
+	divergenceTrend := domain.AnalyzeDivergenceTrend(recentResults)
 
 	prompt, err := platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
 		EvalDir:            evalDir,

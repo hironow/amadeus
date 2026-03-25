@@ -43,3 +43,5 @@ Each tool maintains its own copy in `docs/shared-adr/`. ADR IDs are referenced i
 | [S0030](S0030-insight-data-persistence.md) | Insight Data Persistence — supersedes S0017 | Accepted |
 | [S0031](S0031-dmail-context-extension.md) | D-Mail Context Extension — amends S0005 | Accepted |
 | [S0032](S0032-cvd-friendly-signal-color-palette.md) | CVD-Friendly Signal Color Palette | Accepted |
+| [S0033](S0033-loop-safety-audit-2026-03.md) | Loop Safety Audit (2026-03) | Accepted |
+| [S0034](S0034-session-usecase-boundary-clarification.md) | Session-Usecase Boundary Clarification | Accepted |

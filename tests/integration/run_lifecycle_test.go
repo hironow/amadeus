@@ -163,7 +163,7 @@ func TestRunLifecycle_StartAndStop(t *testing.T) {
 
 	// when: run the daemon loop (exits when context is cancelled)
 	err = usecase.Run(ctx, cmd, opts, a, domain.DefaultConfig(),
-		&domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+		&domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, nil, nil)
 
 	// then: no error
 	if err != nil {
@@ -243,7 +243,7 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 
 	// when: run the daemon loop
 	err = usecase.Run(ctx, cmd, opts, a, domain.DefaultConfig(),
-		&domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+		&domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, prReader, store)
 
 	// then: no error
 	if err != nil {
