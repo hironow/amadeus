@@ -13,6 +13,88 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
+// --- PR test doubles (shared with pr_convergence tests) ---
+
+type mockPRReader struct {
+	prs []domain.PRState
+	err error
+}
+
+func (m *mockPRReader) ListOpenPRs(_ context.Context, _ string) ([]domain.PRState, error) {
+	return m.prs, m.err
+}
+
+func mustPRState(t *testing.T, number, title, base, head string, mergeable bool, behindBy int, conflicts []string) domain.PRState {
+	t.Helper()
+	pr, err := domain.NewPRState(number, title, base, head, mergeable, behindBy, conflicts)
+	if err != nil {
+		t.Fatalf("NewPRState: %v", err)
+	}
+	return pr
+}
+
+// testPRPipeline wraps a mockPRReader+emitter+store into a port.PRPipelineRunner for Run tests.
+type testPRPipeline struct {
+	reader  port.GitHubPRReader
+	store   port.StateReader
+	emitter port.CheckEventEmitter
+	logger  domain.Logger
+}
+
+func (p *testPRPipeline) RunPreMergePipeline(ctx context.Context, integrationBranch string) ([]domain.DMail, error) {
+	if p.reader == nil {
+		return nil, nil
+	}
+	// Inline simplified pipeline for session-level tests.
+	// Full business logic is tested in usecase/pr_convergence_test.go.
+	prs, err := p.reader.ListOpenPRs(ctx, integrationBranch)
+	if err != nil {
+		return nil, err
+	}
+	if len(prs) == 0 {
+		return nil, nil
+	}
+	report := domain.BuildPRConvergenceReport(integrationBranch, prs)
+	var dmails []domain.DMail
+	var conflictCount int
+	now := time.Now().UTC()
+	for _, chain := range report.Chains {
+		needsAction := len(chain.PRs) > 1 || chain.HasConflict
+		if !needsAction && len(chain.PRs) == 1 && chain.PRs[0].BehindBy() > 0 {
+			needsAction = true
+		}
+		if !needsAction {
+			continue
+		}
+		if chain.HasConflict {
+			conflictCount++
+		}
+		name, nameErr := p.store.NextDMailName(domain.KindImplFeedback)
+		if nameErr != nil {
+			return dmails, nameErr
+		}
+		singleReport := domain.PRConvergenceReport{
+			IntegrationBranch: integrationBranch,
+			Chains:            []domain.PRChain{chain},
+			TotalOpenPRs:      report.TotalOpenPRs,
+		}
+		dmail := domain.BuildConvergenceDMail(name, singleReport)
+		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+			continue
+		}
+		_ = p.emitter.EmitDMailGenerated(dmail, now)
+		dmails = append(dmails, dmail)
+	}
+	_ = p.emitter.EmitPRConvergenceChecked(domain.PRConvergenceCheckedData{
+		IntegrationBranch: integrationBranch,
+		TotalOpenPRs:      report.TotalOpenPRs,
+		Chains:            len(report.Chains),
+		ConflictPRs:       conflictCount,
+		DMails:            len(dmails),
+	}, now)
+	return dmails, nil
+}
+
 // --- Test doubles for Run tests ---
 
 // runEmitter records Run lifecycle events for assertion.
@@ -229,11 +311,12 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 	store := &runStore{}
 
 	a := &Amadeus{
-		Git:      git,
-		Store:    store,
-		PRReader: prReader,
-		Logger:   &domain.NopLogger{},
-		InboxCh:  feedInbox(reportDMail),
+		Git:        git,
+		Store:      store,
+		PRReader:   prReader,
+		PRPipeline: &testPRPipeline{reader: prReader, store: store, emitter: emitter, logger: &domain.NopLogger{}},
+		Logger:     &domain.NopLogger{},
+		InboxCh:    feedInbox(reportDMail),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -299,11 +382,12 @@ func TestRun_baseBranchOverridesCurrentBranch(t *testing.T) {
 	store := &runStore{}
 
 	a := &Amadeus{
-		Git:      git,
-		Store:    store,
-		PRReader: prReader,
-		Logger:   &domain.NopLogger{},
-		InboxCh:  feedInbox(reportDMail),
+		Git:        git,
+		Store:      store,
+		PRReader:   prReader,
+		PRPipeline: &testPRPipeline{reader: prReader, store: store, emitter: emitter, logger: &domain.NopLogger{}},
+		Logger:     &domain.NopLogger{},
+		InboxCh:    feedInbox(reportDMail),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

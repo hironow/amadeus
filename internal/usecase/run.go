@@ -12,12 +12,15 @@ import (
 // This follows the same COMMAND -> Aggregate -> EVENT pattern as RunCheck:
 //  1. Create CheckAggregate, wrap in EventEmitter + StateProvider
 //  2. Wire policy engine (WHEN [EVENT] THEN [handler])
-//  3. Delegate I/O loop to session via port.Orchestrator
+//  3. Wire PRPipelineRunner if prReader is non-nil
+//  4. Delegate I/O loop to session via port.Orchestrator
 //
 // The ExecuteRunCommand is already valid by construction (parse-don't-validate).
 func Run(ctx context.Context, _ domain.ExecuteRunCommand, opts domain.RunOptions,
 	pipeline port.Orchestrator, cfg domain.Config, logger domain.Logger,
-	notifier port.Notifier, metrics port.PolicyMetrics) error {
+	notifier port.Notifier, metrics port.PolicyMetrics,
+	prReader port.GitHubPRReader, stateReader port.StateReader,
+) error {
 	// Validate event store availability
 	store := pipeline.EventStore()
 	if store == nil {
@@ -40,6 +43,11 @@ func Run(ctx context.Context, _ domain.ExecuteRunCommand, opts domain.RunOptions
 	// Create EventEmitter + StateProvider wrapping the aggregate
 	emitter := NewCheckEventEmitter(agg, store, pipeline.EventApplier(), engine, logger)
 	state := NewCheckStateProvider(agg)
+
+	// Wire PRPipelineRunner if prReader is available
+	if prReader != nil {
+		pipeline.SetPRPipeline(NewPRPipelineRunner(prReader, stateReader, emitter, logger))
+	}
 
 	// Delegate to session I/O loop via Orchestrator interface
 	return pipeline.Run(ctx, opts, emitter, state)

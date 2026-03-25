@@ -87,7 +87,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 	}
 
 	// Initial pre-merge check on startup (don't wait for first D-Mail)
-	if a.PRReader != nil {
+	if a.PRPipeline != nil {
 		if !opts.Quiet {
 			a.Logger.Info("amadeus run: running initial PR convergence check...")
 		}

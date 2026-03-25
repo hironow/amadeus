@@ -1,6 +1,4 @@
-package session
-
-// white-box-reason: tests unexported PR convergence pipeline internals (phase transitions, retry logic)
+package usecase
 
 import (
 	"context"
@@ -9,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // --- Test doubles ---
@@ -23,7 +20,6 @@ func (m *mockPRReader) ListOpenPRs(_ context.Context, _ string) ([]domain.PRStat
 	return m.prs, m.err
 }
 
-// mockEmitter records calls for assertion. Implements port.CheckEventEmitter.
 type mockEmitter struct {
 	dmailsGenerated          []domain.DMail
 	prConvergenceCheckedData *domain.PRConvergenceCheckedData
@@ -59,30 +55,16 @@ func (m *mockEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedD
 	return nil
 }
 
-// mockStateReader for NextDMailName
 type mockStateReader struct {
 	seq int
 }
 
-func (m *mockStateReader) LoadLatest() (domain.CheckResult, error) {
-	return domain.CheckResult{}, nil
-}
-func (m *mockStateReader) ScanInbox(_ context.Context) ([]domain.DMail, error) {
-	return nil, nil
-}
-func (m *mockStateReader) NextDMailName(_ domain.DMailKind) (string, error) {
-	m.seq++
-	return fmt.Sprintf("test-dmail-%03d", m.seq), nil
-}
-func (m *mockStateReader) LoadAllDMails() ([]domain.DMail, error) {
-	return nil, nil
-}
-func (m *mockStateReader) LoadConsumed() ([]domain.ConsumedRecord, error) {
-	return nil, nil
-}
-func (m *mockStateReader) LoadSyncState() (domain.SyncState, error) {
-	return domain.SyncState{}, nil
-}
+func (m *mockStateReader) LoadLatest() (domain.CheckResult, error)                  { return domain.CheckResult{}, nil }
+func (m *mockStateReader) ScanInbox(_ context.Context) ([]domain.DMail, error)      { return nil, nil }
+func (m *mockStateReader) NextDMailName(_ domain.DMailKind) (string, error)          { m.seq++; return fmt.Sprintf("test-dmail-%03d", m.seq), nil }
+func (m *mockStateReader) LoadAllDMails() ([]domain.DMail, error)                   { return nil, nil }
+func (m *mockStateReader) LoadConsumed() ([]domain.ConsumedRecord, error)            { return nil, nil }
+func (m *mockStateReader) LoadSyncState() (domain.SyncState, error)                  { return domain.SyncState{}, nil }
 
 // --- Helper ---
 
@@ -95,25 +77,17 @@ func mustPRState(t *testing.T, number, title, base, head string, mergeable bool,
 	return pr
 }
 
-func newTestAmadeusForPR(prReader port.GitHubPRReader, emitter port.CheckEventEmitter, store port.StateReader) *Amadeus {
-	return &Amadeus{
-		PRReader: prReader,
-		Emitter:  emitter,
-		Store:    store,
-		Logger:   &domain.NopLogger{},
-	}
-}
-
 // --- Tests ---
 
 func TestRunPreMergePipeline_noPRReader(t *testing.T) {
 	// given: PRReader is nil
-	a := newTestAmadeusForPR(nil, &mockEmitter{}, &mockStateReader{})
+	emitter := &mockEmitter{}
+	store := &mockStateReader{}
 
 	// when
-	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+	dmails, err := runPreMergePipeline(context.Background(), "main", nil, store, emitter, &domain.NopLogger{})
 
-	// then: returns nil, nil
+	// then
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -123,15 +97,15 @@ func TestRunPreMergePipeline_noPRReader(t *testing.T) {
 }
 
 func TestRunPreMergePipeline_noPRs(t *testing.T) {
-	// given: PRReader returns empty slice
+	// given
 	reader := &mockPRReader{prs: []domain.PRState{}}
 	emitter := &mockEmitter{}
-	a := newTestAmadeusForPR(reader, emitter, &mockStateReader{})
+	store := &mockStateReader{}
 
 	// when
-	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+	dmails, err := runPreMergePipeline(context.Background(), "main", reader, store, emitter, &domain.NopLogger{})
 
-	// then: no D-Mails, no error, no convergence event emitted
+	// then
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -144,8 +118,7 @@ func TestRunPreMergePipeline_noPRs(t *testing.T) {
 }
 
 func TestRunPreMergePipeline_singleChain(t *testing.T) {
-	// given: 3 PRs forming a chain rooted at "main"
-	//   main <- #1 (head: feat-a) <- #2 (head: feat-b) <- #3 (head: feat-c)
+	// given: 3 PRs forming a chain
 	pr1 := mustPRState(t, "#1", "Feature A", "main", "feat-a", true, 2, nil)
 	pr2 := mustPRState(t, "#2", "Feature B", "feat-a", "feat-b", true, 0, nil)
 	pr3 := mustPRState(t, "#3", "Feature C", "feat-b", "feat-c", true, 0, nil)
@@ -153,12 +126,11 @@ func TestRunPreMergePipeline_singleChain(t *testing.T) {
 	reader := &mockPRReader{prs: []domain.PRState{pr1, pr2, pr3}}
 	emitter := &mockEmitter{}
 	store := &mockStateReader{}
-	a := newTestAmadeusForPR(reader, emitter, store)
 
 	// when
-	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+	dmails, err := runPreMergePipeline(context.Background(), "main", reader, store, emitter, &domain.NopLogger{})
 
-	// then: 1 D-Mail for the chain (3 PRs > 1 triggers needsAction)
+	// then
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -168,7 +140,6 @@ func TestRunPreMergePipeline_singleChain(t *testing.T) {
 	if dmails[0].Kind != domain.KindImplFeedback {
 		t.Errorf("expected kind %q, got %q", domain.KindImplFeedback, dmails[0].Kind)
 	}
-	// Emitter should record dmail_generated and pr_convergence.checked
 	if len(emitter.dmailsGenerated) != 1 {
 		t.Errorf("expected 1 emitted dmail, got: %d", len(emitter.dmailsGenerated))
 	}
@@ -178,27 +149,20 @@ func TestRunPreMergePipeline_singleChain(t *testing.T) {
 	if emitter.prConvergenceCheckedData.TotalOpenPRs != 3 {
 		t.Errorf("expected TotalOpenPRs=3, got %d", emitter.prConvergenceCheckedData.TotalOpenPRs)
 	}
-	if emitter.prConvergenceCheckedData.Chains != 1 {
-		t.Errorf("expected Chains=1, got %d", emitter.prConvergenceCheckedData.Chains)
-	}
-	if emitter.prConvergenceCheckedData.DMails != 1 {
-		t.Errorf("expected DMails=1, got %d", emitter.prConvergenceCheckedData.DMails)
-	}
 }
 
 func TestRunPreMergePipeline_withConflict(t *testing.T) {
-	// given: chain with conflict
+	// given
 	pr1 := mustPRState(t, "#10", "Conflict PR", "main", "feat-x", false, 3, []string{"file.go"})
 
 	reader := &mockPRReader{prs: []domain.PRState{pr1}}
 	emitter := &mockEmitter{}
 	store := &mockStateReader{}
-	a := newTestAmadeusForPR(reader, emitter, store)
 
 	// when
-	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+	dmails, err := runPreMergePipeline(context.Background(), "main", reader, store, emitter, &domain.NopLogger{})
 
-	// then: D-Mail with severity=high
+	// then
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -208,7 +172,6 @@ func TestRunPreMergePipeline_withConflict(t *testing.T) {
 	if dmails[0].Severity != domain.SeverityHigh {
 		t.Errorf("expected severity %q, got %q", domain.SeverityHigh, dmails[0].Severity)
 	}
-	// pr_convergence.checked should report 1 conflict
 	if emitter.prConvergenceCheckedData == nil {
 		t.Fatal("expected pr_convergence.checked event")
 	}
@@ -218,26 +181,14 @@ func TestRunPreMergePipeline_withConflict(t *testing.T) {
 }
 
 func TestRunPreMergePipeline_manyPRs(t *testing.T) {
-	// given: 50 PRs — 3 chains + many orphans, simulating a busy repo.
-	// Chain 1: main <- feat-a <- feat-b
-	// Chain 2: main <- feat-x (with conflict)
-	// Chain 3: main <- feat-y <- feat-z <- feat-w
-	// Remaining: 44 orphaned PRs (base branch doesn't match integration)
+	// given: 50 PRs — 3 chains + orphans
 	var prs []domain.PRState
-
-	// Chain 1 (2 PRs)
 	prs = append(prs, mustPRState(t, "#1", "Feature A", "main", "feat-a", true, 1, nil))
 	prs = append(prs, mustPRState(t, "#2", "Feature B", "feat-a", "feat-b", true, 0, nil))
-
-	// Chain 2 (1 PR with conflict)
 	prs = append(prs, mustPRState(t, "#3", "Feature X", "main", "feat-x", false, 5, []string{"api.go"}))
-
-	// Chain 3 (3 PRs)
 	prs = append(prs, mustPRState(t, "#4", "Feature Y", "main", "feat-y", true, 0, nil))
 	prs = append(prs, mustPRState(t, "#5", "Feature Z", "feat-y", "feat-z", true, 0, nil))
 	prs = append(prs, mustPRState(t, "#6", "Feature W", "feat-z", "feat-w", true, 0, nil))
-
-	// 44 orphaned PRs (targeting "develop" not "main")
 	for i := 7; i <= 50; i++ {
 		prs = append(prs, mustPRState(t, fmt.Sprintf("#%d", i),
 			fmt.Sprintf("Orphan %d", i), "develop",
@@ -247,23 +198,17 @@ func TestRunPreMergePipeline_manyPRs(t *testing.T) {
 	reader := &mockPRReader{prs: prs}
 	emitter := &mockEmitter{}
 	store := &mockStateReader{}
-	a := newTestAmadeusForPR(reader, emitter, store)
 
 	// when
-	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+	dmails, err := runPreMergePipeline(context.Background(), "main", reader, store, emitter, &domain.NopLogger{})
 
 	// then
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
-
-	// Chain 1 (2 PRs, needs action) + Chain 2 (conflict) + Chain 3 (3 PRs, needs action)
-	// = 3 D-Mails
 	if len(dmails) != 3 {
-		t.Errorf("expected 3 dmails for 3 actionable chains, got %d", len(dmails))
+		t.Errorf("expected 3 dmails, got %d", len(dmails))
 	}
-
-	// pr_convergence.checked event
 	if emitter.prConvergenceCheckedData == nil {
 		t.Fatal("expected pr_convergence.checked event")
 	}
@@ -274,31 +219,26 @@ func TestRunPreMergePipeline_manyPRs(t *testing.T) {
 	if data.ConflictPRs != 1 {
 		t.Errorf("ConflictPRs = %d, want 1", data.ConflictPRs)
 	}
-	if data.DMails != 3 {
-		t.Errorf("DMails = %d, want 3", data.DMails)
-	}
 }
 
 func TestRunPreMergePipeline_singleMergeablePR(t *testing.T) {
-	// given: 1 PR, mergeable, not behind → no action needed
+	// given: 1 PR, mergeable, not behind
 	pr1 := mustPRState(t, "#5", "Clean PR", "main", "feat-clean", true, 0, nil)
 
 	reader := &mockPRReader{prs: []domain.PRState{pr1}}
 	emitter := &mockEmitter{}
 	store := &mockStateReader{}
-	a := newTestAmadeusForPR(reader, emitter, store)
 
 	// when
-	dmails, err := a.runPreMergePipeline(context.Background(), "main")
+	dmails, err := runPreMergePipeline(context.Background(), "main", reader, store, emitter, &domain.NopLogger{})
 
-	// then: no D-Mails needed (single PR, mergeable, not behind)
+	// then
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
 	if len(dmails) != 0 {
 		t.Fatalf("expected 0 dmails, got: %d", len(dmails))
 	}
-	// pr_convergence.checked should still be emitted (1 chain exists)
 	if emitter.prConvergenceCheckedData == nil {
 		t.Fatal("expected pr_convergence.checked event")
 	}

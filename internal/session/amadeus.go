@@ -33,6 +33,7 @@ type Amadeus struct {
 	ClaudeCmd   string                  // Claude CLI command (set by cmd layer from config)
 	ClaudeModel string                  // Claude model for review fix (set by cmd layer from config)
 	PRReader    port.GitHubPRReader     // nil = skip PR convergence
+	PRPipeline  port.PRPipelineRunner  // nil = skip PR convergence (usecase-injected)
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
 	Insights    *InsightWriter          // nil = skip insight generation
@@ -48,6 +49,20 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 		return a.Claude
 	}
 	return DefaultClaudeRunner(a.ClaudeCmd, a.ClaudeModel, a.Logger)
+}
+
+// runPreMergePipeline delegates to the PRPipeline port (usecase-injected).
+// Returns nil when PRPipeline is nil (PR convergence disabled).
+func (a *Amadeus) runPreMergePipeline(ctx context.Context, integrationBranch string) ([]domain.DMail, error) {
+	if a.PRPipeline == nil {
+		return nil, nil
+	}
+	return a.PRPipeline.RunPreMergePipeline(ctx, integrationBranch)
+}
+
+// SetPRPipeline injects the PR convergence pipeline runner.
+func (a *Amadeus) SetPRPipeline(runner port.PRPipelineRunner) {
+	a.PRPipeline = runner
 }
 
 // EventStore returns the event persistence store.

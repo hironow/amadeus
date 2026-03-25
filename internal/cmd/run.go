@@ -187,7 +187,7 @@ If [path] is omitted, the current working directory is used. Requires
 				runErr := usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
 					CheckOptions: checkOpts,
 					BaseBranch:   baseBranch,
-				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{})
+				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{}, prReader, store)
 				return tryWriteHandover(cmd.Context(), runErr, repoRoot, domain.HandoverState{
 					Tool:       "amadeus",
 					Operation:  "divergence",

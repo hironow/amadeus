@@ -121,6 +121,12 @@ type GitHubPRReader interface {
 	ListOpenPRs(ctx context.Context, targetBranch string) ([]domain.PRState, error)
 }
 
+// PRPipelineRunner executes the pre-merge PR convergence pipeline.
+// Implemented in usecase layer, injected into session by cmd (composition root).
+type PRPipelineRunner interface {
+	RunPreMergePipeline(ctx context.Context, integrationBranch string) ([]domain.DMail, error)
+}
+
 // PruneCandidate represents a file eligible for pruning.
 type PruneCandidate struct {
 	Path    string
@@ -168,6 +174,8 @@ type CheckStateProvider interface {
 type Orchestrator interface {
 	RunCheck(ctx context.Context, opts domain.CheckOptions, emitter CheckEventEmitter, state CheckStateProvider) error
 	Run(ctx context.Context, opts domain.RunOptions, emitter CheckEventEmitter, state CheckStateProvider) error
+	// SetPRPipeline injects the PR convergence pipeline runner.
+	SetPRPipeline(runner PRPipelineRunner)
 	PrintSync() error
 	PrintLog() error
 	PrintLogJSON() error
