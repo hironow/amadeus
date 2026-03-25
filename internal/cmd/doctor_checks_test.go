@@ -353,7 +353,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false)
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: should have 17 results
 	if len(results) != 17 {
@@ -395,7 +395,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir, &domain.NopLogger{}, false)
+	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: domain.doctor span should exist
 	spans := exp.GetSpans()
@@ -523,7 +523,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false)
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: should have 17 results
 	if len(results) != 17 {
@@ -566,7 +566,7 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when: pass a nonexistent claude command
-	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false)
+	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: claude-auth, Linear MCP, and claude-inference should be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -636,7 +636,7 @@ func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false)
+	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: claude-auth should WARN, linear-mcp should SKIP, but inference should NOT be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -874,7 +874,7 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, repoRoot, &domain.NopLogger{}, false)
+	results := runDoctor(ctx, configPath, repoRoot, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: success-rate check should be present
 	var found bool
@@ -908,7 +908,7 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false)
+	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: claude-auth, linear-mcp, and claude-inference should be OK
 	var authResult, mcpResult, inferResult domain.DoctorCheck

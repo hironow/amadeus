@@ -395,16 +395,16 @@ func checkSkillMD(repoRoot string) domain.DoctorCheck {
 
 // runDoctor executes all health checks and returns the results.
 // Reads claude_cmd from the config file; falls back to domain.DefaultClaudeCmd on load error.
-func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger, repair bool) []domain.DoctorCheck {
+func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
 	claudeCmd := domain.DefaultClaudeCmd
 	if cfg, err := loadConfig(configPath); err == nil {
 		claudeCmd = cfg.ClaudeCmd
 	}
-	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger, repair)
+	return runDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger, repair, mode)
 }
 
 // runDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger, repair bool) []domain.DoctorCheck {
+func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
 	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 
@@ -503,8 +503,14 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 				Status:  domain.CheckSkip,
 				Message: "skipped (auth failed)",
 			})
-		} else {
+		} else if mode.IsLinear() {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+		} else {
+			results = append(results, domain.DoctorCheck{
+				Name:    "linear-mcp",
+				Status:  domain.CheckSkip,
+				Message: "skipped (wave mode)",
+			})
 		}
 
 		// Inference: run independently of mcp list result (only needs claude binary)
