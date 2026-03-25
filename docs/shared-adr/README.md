@@ -45,3 +45,4 @@ Each tool maintains its own copy in `docs/shared-adr/`. ADR IDs are referenced i
 | [S0032](S0032-cvd-friendly-signal-color-palette.md) | CVD-Friendly Signal Color Palette | Accepted |
 | [S0033](S0033-loop-safety-audit-2026-03.md) | Loop Safety Audit (2026-03) | Accepted |
 | [S0034](S0034-session-usecase-boundary-clarification.md) | Session-Usecase Boundary Clarification | Accepted |
+| [S0035](S0035-dmail-wave-field-extension.md) | D-Mail Wave Field Extension | Accepted |
