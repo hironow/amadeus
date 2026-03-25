@@ -22,3 +22,27 @@ rules:
       filepath.Join での state dir literal ".gate" 直書きは禁止です。
       Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
       How: domain.StateDir 定数を使用してください
+
+  # --- Rule: No action dispatch in session ---
+
+  - id: session-no-action-dispatch
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern: |
+          switch $X.Action {
+          ...
+          }
+      - pattern-inside: |
+          func ($SELF *$TYPE) $METHOD(...) {
+          ...
+          }
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層での D-Mail action dispatch (switch dm.Action) は禁止です。
+      Why: action dispatch は POLICY logic であり usecase 層の責務 (ADR S0034)
+      How: usecase 層に FeedbackActionHandler/PreFlightTriager を実装し port 経由で委譲してください
