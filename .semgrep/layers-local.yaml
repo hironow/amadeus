@@ -28,15 +28,7 @@ rules:
   - id: session-no-action-dispatch
     languages: [go]
     severity: ERROR
-    patterns:
-      - pattern: |
-          switch $X.Action {
-          ...
-          }
-      - pattern-inside: |
-          func ($SELF *$TYPE) $METHOD(...) {
-          ...
-          }
+    pattern-regex: 'switch\s+\w+\.Action\s*\{'
     paths:
       include:
         - "/internal/session/**"
