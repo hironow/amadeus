@@ -4,7 +4,7 @@
 
 | Range | Scope | Description |
 |-------|-------|-------------|
-| S0001-S0034 | Shared | Cross-tool decisions. All 4 tools follow these. |
+| S0001-S0035 | Shared | Cross-tool decisions. All 4 tools follow these. |
 | 0001+ (per tool) | Tool-specific | Each tool numbers its own ADRs independently. |
 
 - **Shared ADRs** are maintained in `docs/shared-adr/` within each tool repository. All four tools keep identical copies.
@@ -49,6 +49,7 @@
 | S0032 | CVD-Friendly Signal Color Palette | Accepted |
 | S0033 | Loop Safety Audit (2026-03) | Accepted |
 | S0034 | Session-Usecase Boundary Clarification | Accepted |
+| S0035 | D-Mail Wave Field Extension | Accepted |
 
 ## amadeus-specific ADRs
 

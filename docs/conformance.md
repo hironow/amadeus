@@ -50,6 +50,14 @@ Domain command types use the Parse-Don't-Validate pattern:
 
 Ref: `.semgrep/layers.yaml`, ADR S0029
 
+## Tracking Mode (Wave vs Linear)
+
+- **Wave mode** (default, `--linear` not set): `checkLinearMCP` in doctor is skipped (status: SKIP, "wave mode"). D-Mail wave field is accepted but not yet used for divergence scoring.
+- **Linear mode** (`--linear`): Existing behavior — `checkLinearMCP` validates Linear MCP connection.
+- `runDoctor` receives `TrackingMode` parameter to conditionally run mode-specific checks.
+
+Ref: ADR S0035, `internal/cmd/doctor_checks.go`
+
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.
