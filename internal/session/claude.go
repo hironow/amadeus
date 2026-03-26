@@ -61,11 +61,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 	}
 
 	// Enforce MCP allowlist when mcp-config.json exists
-	workDir := cfg.WorkDir
-	if workDir == "" {
-		workDir = "."
-	}
-	if mcpPath := MCPConfigPath(workDir); mcpPath != "" {
+	if mcpPath := MCPConfigPath(effectiveDir(cfg.WorkDir)); mcpPath != "" {
 		if _, statErr := os.Stat(mcpPath); statErr == nil {
 			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 		}
@@ -165,4 +161,12 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 // Both claudeCmd and model are expected to be set by the caller (from config).
 func DefaultClaudeRunner(claudeCmd string, model string, logger domain.Logger) port.ClaudeRunner {
 	return &ClaudeAdapter{ClaudeCmd: claudeCmd, Model: model, Logger: logger}
+}
+
+// effectiveDir returns dir if non-empty, otherwise ".".
+func effectiveDir(dir string) string {
+	if dir != "" {
+		return dir
+	}
+	return "."
 }
