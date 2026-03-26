@@ -4,7 +4,7 @@
 
 | Range | Scope | Description |
 |-------|-------|-------------|
-| S0001-S0034 | Shared | Cross-tool decisions. All 4 tools follow these. |
+| S0001-S0035 | Shared | Cross-tool decisions. All 4 tools follow these. |
 | 0001+ (per tool) | Tool-specific | Each tool numbers its own ADRs independently. |
 
 - **Shared ADRs** are maintained in `docs/shared-adr/` within each tool repository. All four tools keep identical copies.
