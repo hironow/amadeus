@@ -34,6 +34,7 @@ View or update the .gate/config.yaml configuration file.
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
-* [amadeus config set](amadeus_config_set.md)  - Update a configuration value
-* [amadeus config show](amadeus_config_show.md)  - Display effective configuration
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+* [amadeus config set](amadeus_config_set.md)	 - Update a configuration value
+* [amadeus config show](amadeus_config_show.md)	 - Display effective configuration
+

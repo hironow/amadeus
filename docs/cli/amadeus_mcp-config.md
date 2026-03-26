@@ -39,5 +39,6 @@ this allowlist when the file exists.
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)  - Divergence meter for your codebase
-* [amadeus mcp-config generate](amadeus_mcp-config_generate.md)  - Generate mcp-config.json for --strict-mcp-config isolation
+* [amadeus](amadeus.md)	 - Divergence meter for your codebase
+* [amadeus mcp-config generate](amadeus_mcp-config_generate.md)	 - Generate mcp-config.json for --strict-mcp-config isolation
+

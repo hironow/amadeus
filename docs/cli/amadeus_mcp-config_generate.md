@@ -38,4 +38,5 @@ amadeus mcp-config generate [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus mcp-config](amadeus_mcp-config.md)  - Manage MCP configuration for Claude subprocess isolation
+* [amadeus mcp-config](amadeus_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
+

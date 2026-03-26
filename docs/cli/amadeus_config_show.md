@@ -30,4 +30,5 @@ amadeus config show [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus config](amadeus_config.md)  - View or update amadeus configuration
+* [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
+
