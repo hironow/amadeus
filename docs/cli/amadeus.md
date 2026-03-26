@@ -29,6 +29,7 @@ amadeus [flags]
 * [amadeus install-hook](amadeus_install-hook.md)	 - Install post-merge git hook
 * [amadeus log](amadeus_log.md)	 - Show divergence log
 * [amadeus mark-commented](amadeus_mark-commented.md)	 - Record that a D-Mail has been posted as a comment
+* [amadeus mcp-config](amadeus_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [amadeus rebuild](amadeus_rebuild.md)	 - Rebuild projections from event store
 * [amadeus run](amadeus_run.md)	 - Run continuous divergence check and PR convergence
 * [amadeus status](amadeus_status.md)	 - Show amadeus operational status
