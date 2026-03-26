@@ -61,12 +61,15 @@ type mockStateReader struct {
 	seq int
 }
 
-func (m *mockStateReader) LoadLatest() (domain.CheckResult, error)                  { return domain.CheckResult{}, nil }
-func (m *mockStateReader) ScanInbox(_ context.Context) ([]domain.DMail, error)      { return nil, nil }
-func (m *mockStateReader) NextDMailName(_ domain.DMailKind) (string, error)          { m.seq++; return fmt.Sprintf("test-dmail-%03d", m.seq), nil }
-func (m *mockStateReader) LoadAllDMails() ([]domain.DMail, error)                   { return nil, nil }
-func (m *mockStateReader) LoadConsumed() ([]domain.ConsumedRecord, error)            { return nil, nil }
-func (m *mockStateReader) LoadSyncState() (domain.SyncState, error)                  { return domain.SyncState{}, nil }
+func (m *mockStateReader) LoadLatest() (domain.CheckResult, error)             { return domain.CheckResult{}, nil }
+func (m *mockStateReader) ScanInbox(_ context.Context) ([]domain.DMail, error) { return nil, nil }
+func (m *mockStateReader) NextDMailName(_ domain.DMailKind) (string, error) {
+	m.seq++
+	return fmt.Sprintf("test-dmail-%03d", m.seq), nil
+}
+func (m *mockStateReader) LoadAllDMails() ([]domain.DMail, error)         { return nil, nil }
+func (m *mockStateReader) LoadConsumed() ([]domain.ConsumedRecord, error) { return nil, nil }
+func (m *mockStateReader) LoadSyncState() (domain.SyncState, error)       { return domain.SyncState{}, nil }
 
 // --- Helper ---
 

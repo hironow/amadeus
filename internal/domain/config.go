@@ -53,18 +53,18 @@ func (f FlagApproverConfig) ApproveCmdString() string { return f.ApproveCmd }
 
 // Config holds the complete Amadeus configuration.
 type Config struct {
-	Lang               string                  `yaml:"lang"`
-	ClaudeCmd          string                  `yaml:"claude_cmd,omitempty"`
-	Model              string                  `yaml:"model,omitempty"`
-	TimeoutSec         int                     `yaml:"timeout_sec,omitempty"`
-	Weights            Weights                 `yaml:"weights"`
-	Thresholds         Thresholds              `yaml:"thresholds"`
-	PerAxisOverride    PerAxisOverride         `yaml:"per_axis_override"`
-	FullCheck          FullCheckConfig         `yaml:"full_check"`
-	Convergence        ConvergenceConfig       `yaml:"convergence"`
-	BaselineStaleness  BaselineStalenessConfig `yaml:"baseline_staleness,omitempty"`
-	WaitTimeout        time.Duration           `yaml:"wait_timeout,omitempty"`
-	Computed           ComputedConfig          `yaml:"computed,omitempty"`
+	Lang              string                  `yaml:"lang"`
+	ClaudeCmd         string                  `yaml:"claude_cmd,omitempty"`
+	Model             string                  `yaml:"model,omitempty"`
+	TimeoutSec        int                     `yaml:"timeout_sec,omitempty"`
+	Weights           Weights                 `yaml:"weights"`
+	Thresholds        Thresholds              `yaml:"thresholds"`
+	PerAxisOverride   PerAxisOverride         `yaml:"per_axis_override"`
+	FullCheck         FullCheckConfig         `yaml:"full_check"`
+	Convergence       ConvergenceConfig       `yaml:"convergence"`
+	BaselineStaleness BaselineStalenessConfig `yaml:"baseline_staleness,omitempty"`
+	WaitTimeout       time.Duration           `yaml:"wait_timeout,omitempty"`
+	Computed          ComputedConfig          `yaml:"computed,omitempty"`
 }
 
 // DefaultMaxResultHistory is the default maximum number of check results to

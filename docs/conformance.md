@@ -59,7 +59,6 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 - `--strict-mcp-config --mcp-config` enforced when mcp-config.json exists
 - User can edit mcp-config.json to add custom MCP servers
 
-
 - **Wave mode** (default, `--linear` not set): `checkLinearMCP` in doctor is skipped (status: SKIP, "wave mode"). D-Mail wave field is accepted but not yet used for divergence scoring.
 - **Linear mode** (`--linear`): Existing behavior — `checkLinearMCP` validates Linear MCP connection.
 - `runDoctor` receives `TrackingMode` parameter to conditionally run mode-specific checks.
