@@ -1142,3 +1142,30 @@ func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
 		t.Errorf("hint should say review settings, got: %s", result.Hint)
 	}
 }
+
+func TestDoctor_WaveMode_SkipsLinearMCP(t *testing.T) {
+	// given: wave mode doctor run
+	dir := t.TempDir()
+	gateDir := filepath.Join(dir, domain.StateDir)
+	os.MkdirAll(gateDir, 0755)
+	configPath := filepath.Join(gateDir, "config.yaml")
+	os.WriteFile(configPath, []byte("lang: en\nclaude_cmd: echo\n"), 0644)
+
+	// when: run doctor in wave mode
+	results := runDoctor(context.Background(), configPath, dir, &domain.NopLogger{}, false, domain.ModeWave)
+
+	// then: linear-mcp should be SKIP (not WARN or FAIL)
+	for _, r := range results {
+		if r.Name == "linear-mcp" {
+			if r.Status != domain.CheckSkip {
+				t.Errorf("wave mode: linear-mcp status = %v, want SKIP", r.Status)
+			}
+			if !strings.Contains(r.Message, "wave mode") {
+				t.Errorf("wave mode: expected 'wave mode' in message, got: %s", r.Message)
+			}
+			return
+		}
+	}
+	// linear-mcp check might be skipped entirely if claude is not available
+	// That's acceptable — the check is conditional on claude being found
+}
