@@ -18,6 +18,7 @@ type checkEventEmitter struct {
 	projector  domain.EventApplier
 	dispatcher port.EventDispatcher
 	logger     domain.Logger
+	seqNr      uint64
 }
 
 // NewCheckEventEmitter creates a CheckEventEmitter that wraps the aggregate event chain.
@@ -42,6 +43,12 @@ func NewCheckEventEmitter(
 func (e *checkEventEmitter) emit(events ...domain.Event) error {
 	if e.store == nil && e.projector == nil {
 		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
+	}
+	// Tag events with aggregate identity
+	for i := range events {
+		e.seqNr++
+		events[i].AggregateType = domain.AggregateTypeCheck
+		events[i].SeqNr = e.seqNr
 	}
 	if e.store != nil {
 		if _, err := e.store.Append(events...); err != nil {

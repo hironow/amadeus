@@ -8,6 +8,9 @@ import (
 // force-full-next check completes, preventing rapid consecutive full checks.
 const defaultForceFullCooldown = 3
 
+// AggregateTypeCheck is the aggregate type for integrity check events.
+const AggregateTypeCheck = "check"
+
 // CheckAggregate encapsulates the domain logic for amadeus check operations.
 // It owns the check count, force-full-next flag, and previous result state,
 // enforcing invariants and producing events as return values (no side effects).
