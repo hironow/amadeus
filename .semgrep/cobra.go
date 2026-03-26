@@ -70,4 +70,3 @@ func badOnFinalize() {
 	// ruleid: cobra-onfinalize-needs-once
 	cobra.OnFinalize(func() {})
 }
-

@@ -12,6 +12,7 @@ logic that belongs in the usecase layer. The root cause was that session structs
 business logic alongside I/O adaptation.
 
 Specific violations found and migrated:
+
 - amadeus: `CollectRepeatedViolations`, `AnalyzeDivergenceTrend` (pure domain logic in session)
 - amadeus: `runPreMergePipeline` (COMMAND orchestration in session)
 - sightjack: `StructuralErrors`, `StallEscalationBody` (pure domain logic in session)
@@ -23,6 +24,7 @@ Specific violations found and migrated:
 ### Session Layer Responsibilities (MUST)
 
 Session layer is **strictly I/O adaptation**:
+
 - Filesystem operations (read, write, rename, mkdir)
 - Subprocess execution (Claude CLI, git, shell commands)
 - Network I/O (HTTP, fsnotify)
@@ -32,6 +34,7 @@ Session layer is **strictly I/O adaptation**:
 ### Session Layer Prohibitions (MUST NOT)
 
 Session layer MUST NOT contain:
+
 - COMMAND dispatch logic (switch on action types, kind-based routing)
 - POLICY evaluation (retry counting, escalation thresholds, max retries)
 - Pure domain computation (scoring, trend analysis, string formatting)
@@ -40,6 +43,7 @@ Session layer MUST NOT contain:
 ### Usecase Layer Responsibilities
 
 Usecase layer owns:
+
 - COMMAND → Aggregate → EVENT orchestration
 - POLICY registration and dispatch (PolicyEngine)
 - Business logic that coordinates domain types with port interfaces

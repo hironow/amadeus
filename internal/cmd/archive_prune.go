@@ -231,7 +231,6 @@ func rebuildIndexAfterPrune(divRoot string, logger domain.Logger) {
 	}
 }
 
-
 // indexArchiveCandidates indexes .md archive candidates before deletion.
 func indexArchiveCandidates(candidates []port.PruneCandidate, divRoot string, logger domain.Logger) {
 	var indexEntries []domain.IndexEntry

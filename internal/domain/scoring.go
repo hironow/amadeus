@@ -81,9 +81,9 @@ type Thresholds struct {
 
 // PerAxisOverride holds per-axis critical thresholds that escalate severity.
 type PerAxisOverride struct {
-	ADRForceHigh       int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
-	DoDForceHigh       int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
-	DepForceMedium     int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
+	ADRForceHigh        int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
+	DoDForceHigh        int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
+	DepForceMedium      int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
 	ImplicitForceMedium int `yaml:"implicit_constraints_force_medium" json:"implicit_constraints_force_medium"`
 }
 
