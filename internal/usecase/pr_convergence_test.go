@@ -1,5 +1,7 @@
 package usecase
 
+// white-box-reason: tests unexported runPreMergePipeline with mock port implementations
+
 import (
 	"context"
 	"fmt"

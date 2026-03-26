@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests CollectRepeatedViolations and AnalyzeDivergenceTrend pure functions
+
 import (
 	"testing"
 	"time"
