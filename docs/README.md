@@ -6,6 +6,9 @@
 - [gate-directory.md](gate-directory.md) — `.gate/` directory structure specification
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
+- Claude subprocess isolation: `mcp-config generate` creates MCP allowlist, `--strict-mcp-config` enforces it
+- Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation
+
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
 - [stdio-convention.md](stdio-convention.md) — stdin/stdout/stderr convention
 - [testing.md](testing.md) — Test strategy, conventions, and scenario test observer pattern
