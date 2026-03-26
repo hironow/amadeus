@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -57,6 +58,17 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 
 	if cfg.Continue {
 		args = append(args, "--continue")
+	}
+
+	// Enforce MCP allowlist when mcp-config.json exists
+	workDir := cfg.WorkDir
+	if workDir == "" {
+		workDir = "."
+	}
+	if mcpPath := MCPConfigPath(workDir); mcpPath != "" {
+		if _, statErr := os.Stat(mcpPath); statErr == nil {
+			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
+		}
 	}
 
 	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)
