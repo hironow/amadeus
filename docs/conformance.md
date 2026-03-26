@@ -54,6 +54,13 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ### Claude Subprocess Isolation
 
+### Claude Log Persistence
+
+- `WriteClaudeLog` saves raw NDJSON to `.run/claude-logs/{timestamp}.jsonl` after each invocation
+- Enables post-hoc debugging and audit of Claude subprocess interactions
+- Managed by archive-prune lifecycle
+
+
 - `--disable-slash-commands` prevents user skills from inflating context
 - `mcp-config generate` creates `.run/mcp-config.json` (wave: empty, linear: Linear MCP)
 - `--strict-mcp-config --mcp-config` enforced when mcp-config.json exists
