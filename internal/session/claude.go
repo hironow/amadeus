@@ -43,6 +43,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--model", model,
 		"--verbose",
 		"--output-format", "stream-json",
+		"--disable-slash-commands",
 		"--dangerously-skip-permissions",
 		"--print",
 	}
