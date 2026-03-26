@@ -58,10 +58,13 @@ func ValidEventType(t EventType) bool {
 
 // Event is the envelope for all domain events in the event store.
 type Event struct {
-	ID        string          `json:"id"`
-	Type      EventType       `json:"type"`
-	Timestamp time.Time       `json:"timestamp"`
-	Data      json.RawMessage `json:"data"`
+	ID            string          `json:"id"`
+	Type          EventType       `json:"type"`
+	Timestamp     time.Time       `json:"timestamp"`
+	Data          json.RawMessage `json:"data"`
+	AggregateID   string          `json:"aggregate_id,omitempty"`
+	AggregateType string          `json:"aggregate_type,omitempty"`
+	SeqNr         uint64          `json:"seq_nr,omitempty"`
 }
 
 // ValidateEvent checks that an Event has all required fields populated.
