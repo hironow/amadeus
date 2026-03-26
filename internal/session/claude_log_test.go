@@ -1,6 +1,8 @@
 package session_test
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,7 +49,7 @@ func TestWriteClaudeLog_EmptyEvents_NoOp(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	logDir := filepath.Join(dir, ".gate", ".run", "claude-logs")
-	if _, statErr := os.Stat(logDir); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(logDir); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected no directory for empty events")
 	}
 }
