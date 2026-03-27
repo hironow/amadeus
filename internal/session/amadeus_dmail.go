@@ -214,7 +214,7 @@ func formatADRViolations(meterResult domain.MeterResult) string {
 	if len(meterResult.Divergence.ADRAlignment) == 0 {
 		return ""
 	}
-	section := domain.FormatViolatedADRsSection(meterResult.Divergence.ADRAlignment, nil, 50)
+	section := domain.FormatViolatedADRsSection(meterResult.Divergence.ADRAlignment, nil, 70)
 	if section == "" {
 		return ""
 	}

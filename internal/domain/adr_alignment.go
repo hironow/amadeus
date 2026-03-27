@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,7 +17,31 @@ type ADRAlignmentScore struct {
 }
 
 // ADRAlignmentMap is keyed by ADR number string ("0001", "0002", ...).
+// Supports JSON unmarshaling from both array (Claude output) and map (stored events).
 type ADRAlignmentMap map[string]ADRAlignmentScore
+
+// UnmarshalJSON handles both array and map JSON representations.
+// Claude returns an array: [{"number":"0001",...}]
+// Event store persists a map: {"0001":{...}}
+func (m *ADRAlignmentMap) UnmarshalJSON(data []byte) error {
+	// Try map first (event store format)
+	var asMap map[string]ADRAlignmentScore
+	if err := json.Unmarshal(data, &asMap); err == nil {
+		*m = asMap
+		return nil
+	}
+	// Try array (Claude output format)
+	var asArray []ADRAlignmentScore
+	if err := json.Unmarshal(data, &asArray); err != nil {
+		return err
+	}
+	result := make(ADRAlignmentMap, len(asArray))
+	for _, a := range asArray {
+		result[a.Number] = a
+	}
+	*m = result
+	return nil
+}
 
 // DeriveADRIntegrityScore computes the aggregate adr_integrity axis score
 // from per-ADR alignment scores. Returns 0 for nil/empty map.

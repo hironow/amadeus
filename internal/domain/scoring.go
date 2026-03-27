@@ -303,6 +303,7 @@ func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
 	divergence.MissingAxes = missing
 
 	// E19: Attach per-ADR alignment and override adr_integrity axis when available.
+	// Recompute divergence after axis replacement to keep Value/Internal consistent.
 	if len(resp.ADRAlignment) > 0 {
 		divergence.ADRAlignment = resp.ADRAlignment
 		derivedADR := DeriveADRIntegrityScore(resp.ADRAlignment)
@@ -310,6 +311,10 @@ func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
 			axis.Score = derivedADR
 			divergence.Axes[AxisADR] = axis
 		}
+		// Recompute weighted divergence with updated axis score
+		recomputed := CalcDivergence(divergence.Axes, dm.Config.Weights)
+		divergence.Value = recomputed.Value
+		divergence.Internal = recomputed.Internal
 	}
 
 	severityCfg := SeverityConfig{
