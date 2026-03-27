@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/eventsource"
@@ -55,18 +54,15 @@ func (r *FileCrossRepoReader) ReadToolSnapshot(tool domain.ToolName, stateDir st
 	// For amadeus, read the event store to find the latest check.completed event.
 	eventsDir := eventsource.EventsDir(stateDir)
 	if _, err := os.Stat(eventsDir); errors.Is(err, fs.ErrNotExist) {
-		snap.Severity = domain.SeverityLow
 		return snap, nil
 	}
 
 	store := eventsource.NewFileEventStore(eventsDir, r.logger)
 
-	// Load events from the last 7 days to find the latest check.
-	since := time.Now().AddDate(0, 0, -7)
-	events, _, err := store.LoadSince(since)
+	// Load all events to find the latest check (not limited to 7 days).
+	events, _, err := store.LoadAll()
 	if err != nil {
 		r.logger.Warn("failed to load events for %s: %v", tool, err)
-		snap.Severity = domain.SeverityLow
 		return snap, nil
 	}
 
@@ -81,29 +77,24 @@ func (r *FileCrossRepoReader) ReadToolSnapshot(tool domain.ToolName, stateDir st
 			r.logger.Warn("failed to unmarshal check.completed event: %v", err)
 			continue
 		}
+		snap.Measured = true
 		snap.Divergence = data.Result.Divergence
-		snap.Severity = deriveSeverityFromResult(data.Result)
 		snap.LastCheck = data.Result.CheckedAt
+		// Use DetermineSeverity for consistent severity calculation including per-axis overrides.
+		divResult := domain.DivergenceResult{
+			Value: data.Result.Divergence,
+			Axes:  data.Result.Axes,
+		}
+		if data.Result.ADRAlignment != nil {
+			divResult.ADRAlignment = data.Result.ADRAlignment
+		}
+		divResult = domain.DetermineSeverity(divResult, domain.DefaultThresholds())
+		snap.Severity = divResult.Severity
 		return snap, nil
 	}
 
-	// No check.completed events found — available but no divergence data
-	snap.Severity = domain.SeverityLow
+	// No check.completed events found — available but unmeasured
 	return snap, nil
-}
-
-// deriveSeverityFromResult determines severity from a CheckResult's divergence value
-// using default thresholds.
-func deriveSeverityFromResult(result domain.CheckResult) domain.Severity {
-	cfg := domain.DefaultThresholds()
-	div := result.Divergence
-	if div >= cfg.Thresholds.MediumMax {
-		return domain.SeverityHigh
-	}
-	if div >= cfg.Thresholds.LowMax {
-		return domain.SeverityMedium
-	}
-	return domain.SeverityLow
 }
 
 // ResolveToolStateDirs builds the map of tool -> absolute state dir path.

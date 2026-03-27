@@ -35,37 +35,53 @@ func TestComputeEcosystemScore_AllUnavailable(t *testing.T) {
 }
 
 func TestComputeEcosystemScore_PartialAvailability(t *testing.T) {
-	// given
+	// given — only measured tools count
 	snapshots := []ToolSnapshot{
-		{Tool: ToolPhonewave, Divergence: 0.0, Available: true},
-		{Tool: ToolSightjack, Divergence: 0.0, Available: false},
-		{Tool: ToolAmadeus, Divergence: 0.4, Available: true},
+		{Tool: ToolPhonewave, Available: true, Measured: false}, // available but unmeasured
+		{Tool: ToolSightjack, Available: false},                 // unavailable
+		{Tool: ToolAmadeus, Divergence: 0.4, Available: true, Measured: true},
 	}
 
 	// when
 	score := ComputeEcosystemScore(snapshots)
 
-	// then — average of available: (0.0 + 0.4) / 2 = 0.2
-	if score != 0.2 {
-		t.Errorf("expected 0.2, got %f", score)
+	// then — only amadeus measured: 0.4 / 1 = 0.4
+	if score != 0.4 {
+		t.Errorf("expected 0.4, got %f", score)
 	}
 }
 
-func TestComputeEcosystemScore_AllAvailable(t *testing.T) {
-	// given
+func TestComputeEcosystemScore_AllMeasured(t *testing.T) {
+	// given — all tools have measurements
 	snapshots := []ToolSnapshot{
-		{Tool: ToolPhonewave, Divergence: 0.0, Available: true},
-		{Tool: ToolSightjack, Divergence: 0.0, Available: true},
-		{Tool: ToolPaintress, Divergence: 0.0, Available: true},
-		{Tool: ToolAmadeus, Divergence: 0.4, Available: true},
+		{Tool: ToolPhonewave, Divergence: 0.1, Available: true, Measured: true},
+		{Tool: ToolSightjack, Divergence: 0.2, Available: true, Measured: true},
+		{Tool: ToolPaintress, Divergence: 0.0, Available: true, Measured: true},
+		{Tool: ToolAmadeus, Divergence: 0.4, Available: true, Measured: true},
 	}
 
 	// when
 	score := ComputeEcosystemScore(snapshots)
 
-	// then — (0.0 + 0.0 + 0.0 + 0.4) / 4 = 0.1
-	if score != 0.1 {
-		t.Errorf("expected 0.1, got %f", score)
+	// then — (0.1 + 0.2 + 0.0 + 0.4) / 4 = 0.175
+	if score < 0.174 || score > 0.176 {
+		t.Errorf("expected ~0.175, got %f", score)
+	}
+}
+
+func TestComputeEcosystemScore_UnmeasuredExcluded(t *testing.T) {
+	// given — available but unmeasured tools excluded from average
+	snapshots := []ToolSnapshot{
+		{Tool: ToolPhonewave, Available: true, Measured: false},
+		{Tool: ToolAmadeus, Divergence: 0.3, Available: true, Measured: true},
+	}
+
+	// when
+	score := ComputeEcosystemScore(snapshots)
+
+	// then — only amadeus: 0.3
+	if score != 0.3 {
+		t.Errorf("expected 0.3, got %f", score)
 	}
 }
 
@@ -183,8 +199,8 @@ func TestNewCrossRepoSnapshot(t *testing.T) {
 	// given
 	now := time.Date(2026, 3, 27, 12, 0, 0, 0, time.UTC)
 	snapshots := []ToolSnapshot{
-		{Tool: ToolPhonewave, Divergence: 0.0, Severity: SeverityLow, Available: true},
-		{Tool: ToolAmadeus, Divergence: 0.22, Severity: SeverityLow, Available: true},
+		{Tool: ToolPhonewave, Divergence: 0.0, Severity: SeverityLow, Available: true, Measured: true},
+		{Tool: ToolAmadeus, Divergence: 0.22, Severity: SeverityLow, Available: true, Measured: true},
 	}
 
 	// when

@@ -35,7 +35,8 @@ type ToolSnapshot struct {
 	Divergence float64   `json:"divergence"`
 	Severity   Severity  `json:"severity"`
 	LastCheck  time.Time `json:"last_check"`
-	Available  bool      `json:"available"`
+	Available  bool      `json:"available"` // state dir exists
+	Measured   bool      `json:"measured"`  // has divergence data (check.completed events)
 }
 
 // CrossRepoSnapshot aggregates divergence data across all tools.
@@ -56,13 +57,14 @@ func NewCrossRepoSnapshot(snapshots []ToolSnapshot, generatedAt time.Time) Cross
 	}
 }
 
-// ComputeEcosystemScore returns the average divergence across available tools.
-// Returns 0.0 if no tools are available.
+// ComputeEcosystemScore returns the average divergence across measured tools.
+// Only includes tools that have actual divergence data (Measured=true).
+// Returns 0.0 if no tools have measurements.
 func ComputeEcosystemScore(snapshots []ToolSnapshot) float64 {
 	var sum float64
 	var count int
 	for _, s := range snapshots {
-		if s.Available {
+		if s.Available && s.Measured {
 			sum += s.Divergence
 			count++
 		}
