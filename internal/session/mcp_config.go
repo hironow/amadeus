@@ -110,6 +110,8 @@ func MCPConfigExists(baseDir string) (bool, error) {
 
 // GenerateMCPConfig creates a .mcp.json file.
 // Linear mode includes Linear MCP server. Wave mode produces empty config.
+// If a legacy .run/mcp-config.json exists and the new file does not, the
+// legacy content is migrated forward to preserve custom MCP server entries.
 func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (string, error) {
 	path := MCPConfigPath(baseDir)
 
@@ -119,8 +121,15 @@ func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (st
 		}
 	}
 
+	// Migrate legacy config if it exists and new file doesn't
 	cfg := MCPConfig{
 		MCPServers: make(map[string]MCPServerEntry),
+	}
+	legacyPath := legacyMCPConfigPath(baseDir)
+	if legacyData, err := os.ReadFile(legacyPath); err == nil {
+		if jsonErr := json.Unmarshal(legacyData, &cfg); jsonErr != nil {
+			cfg.MCPServers = make(map[string]MCPServerEntry)
+		}
 	}
 
 	if mode.IsLinear() {

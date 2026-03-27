@@ -57,14 +57,19 @@ Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
 
 			path, genErr := session.GenerateMCPConfig(baseDir, mode, force)
 			if genErr != nil {
-				return genErr
-			}
-
-			logger.OK("Generated %s (mode: %s)", path, mode)
-			if mode.IsWave() {
-				logger.Info("Empty config — no MCP servers. Edit to add custom servers.")
+				if strings.Contains(genErr.Error(), "already exists") {
+					logger.Warn("mcp: %v", genErr)
+					path = session.MCPConfigPath(baseDir)
+				} else {
+					return genErr
+				}
 			} else {
-				logger.Info("Linear MCP server included. Edit to add/remove servers.")
+				logger.OK("Generated %s (mode: %s)", path, mode)
+				if mode.IsWave() {
+					logger.Info("Empty config — no MCP servers. Edit to add custom servers.")
+				} else {
+					logger.Info("Linear MCP server included. Edit to add/remove servers.")
+				}
 			}
 
 			settingsPath, settingsErr := session.GenerateClaudeSettings(baseDir, force)
