@@ -50,13 +50,20 @@ Also produce an **impact_radius** map: identify which areas of the codebase are 
 - "transitive": Files/modules further downstream that may be affected
 
 Output MUST be valid JSON matching this exact schema:
-{"files_read":["adrs","dods","diff","previous_scores"],"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"capability_violations":[{"boundary":"boundary_name","description":"explanation","file":"path/to/file.go"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
+{"files_read":["adrs","dods","diff","previous_scores"],"axes":{"adr_integrity":{"score":0,"details":""},"dod_fulfillment":{"score":0,"details":""},"dependency_integrity":{"score":0,"details":""},"implicit_constraints":{"score":0,"details":""}},"adr_alignment":[{"number":"0001","title":"ADR Title","score":0,"verdict":"compliant","reason":"one sentence"}],"impact_radius":[{"area":"path/to/file_or_module","impact":"direct|indirect|transitive","detail":"explanation"}],"capability_violations":[{"boundary":"boundary_name","description":"explanation","file":"path/to/file.go"}],"dmails":[{"description":"","detail":"","issues":[],"targets":[],"category":"design|implementation"}],"reasoning":""}
 
 For Capability Violations:
 - Report any code that directly crosses a capability boundary (e.g., calling external APIs without approved adapters, accessing shared state without proper interfaces).
 - Empty array if none detected.
 - `boundary`: the name of the capability boundary being violated.
 - `file`: the file where the violation occurs (if identifiable).
+
+For ADR Alignment:
+- Score each ADR in docs/adr/ individually against the diff.
+- Score 0 means the change is fully compliant with this ADR.
+- Score 100 means the change directly and fully violates the core decision.
+- verdict: "compliant" (score < 30), "partial" (30-69), "violated" (>= 70).
+- Empty array if no ADRs are available.
 
 For D-Mails:
 - Only generate D-Mails for actual issues found. Empty array if none.
