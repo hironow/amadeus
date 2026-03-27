@@ -51,7 +51,8 @@ func TestSessionRecorder_ResumesPrevID(t *testing.T) {
 	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
 	rec1.Record(ev1)
 
-	rec2, _ := NewSessionRecorder(store, "s2")
+	// Same session ID should resume CausationID chain
+	rec2, _ := NewSessionRecorder(store, "s1")
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
 	rec2.Record(ev2)
 
@@ -59,5 +60,24 @@ func TestSessionRecorder_ResumesPrevID(t *testing.T) {
 	if events[1].CausationID != events[0].ID {
 		t.Errorf("resumed recorder should chain: CausationID = %q, want %q",
 			events[1].CausationID, events[0].ID)
+	}
+}
+
+func TestSessionRecorder_DifferentSession_NoCausation(t *testing.T) {
+	dir := t.TempDir()
+	store := NewFileEventStore(dir, &domain.NopLogger{})
+
+	rec1, _ := NewSessionRecorder(store, "s1")
+	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
+	rec1.Record(ev1)
+
+	// Different session should NOT chain to s1's event
+	rec2, _ := NewSessionRecorder(store, "s2")
+	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
+	rec2.Record(ev2)
+
+	events, _, _ := store.LoadAll()
+	if events[1].CausationID != "" {
+		t.Errorf("different session should have empty CausationID, got %q", events[1].CausationID)
 	}
 }

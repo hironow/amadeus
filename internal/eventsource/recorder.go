@@ -29,9 +29,15 @@ func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, e
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
 	}
+	// Resume CausationID chain from the last event of the SAME session only.
+	// Without this filter, a new session's first event would incorrectly
+	// point its CausationID at the previous session's last event.
 	var prevID string
-	if len(events) > 0 {
-		prevID = events[len(events)-1].ID
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].CorrelationID == sessionID {
+			prevID = events[i].ID
+			break
+		}
 	}
 	return &SessionRecorder{
 		store:     store,
