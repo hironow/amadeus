@@ -1550,3 +1550,39 @@ func TestWithFeedbackRound(t *testing.T) {
 		t.Error("original DMail metadata was mutated")
 	}
 }
+
+func TestWaveReference_ParseMarshalRoundtrip(t *testing.T) {
+	// given: D-Mail with Wave reference
+	original := domain.DMail{
+		SchemaVersion: "1",
+		Name:          "wave-test",
+		Kind:          domain.KindReport,
+		Description:   "test",
+		Wave: &domain.WaveReference{
+			ID:   "auth-w1",
+			Step: "s1",
+		},
+		Body: "body",
+	}
+	data, err := domain.MarshalDMail(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when: parse it back
+	parsed, err := domain.ParseDMail(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// then: Wave survives roundtrip
+	if parsed.Wave == nil {
+		t.Fatal("Wave lost during roundtrip")
+	}
+	if parsed.Wave.ID != "auth-w1" {
+		t.Errorf("Wave.ID = %q, want auth-w1", parsed.Wave.ID)
+	}
+	if parsed.Wave.Step != "s1" {
+		t.Errorf("Wave.Step = %q, want s1", parsed.Wave.Step)
+	}
+}

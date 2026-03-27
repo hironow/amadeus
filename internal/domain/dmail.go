@@ -77,6 +77,7 @@ type dmailFrontmatter struct {
 	Action        DMailAction       `yaml:"action,omitempty"`
 	Priority      int               `yaml:"priority,omitempty"`
 	Targets       []string          `yaml:"targets,omitempty"`
+	Wave          *WaveReference    `yaml:"wave,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 }
@@ -299,6 +300,7 @@ func fmToDMail(fm dmailFrontmatter, bodyPart string) DMail {
 		Action:        fm.Action,
 		Priority:      fm.Priority,
 		Targets:       fm.Targets,
+		Wave:          fm.Wave,
 		Metadata:      fm.Metadata,
 		Context:       fm.Context,
 		Body:          strings.TrimLeft(bodyPart, "\n"),
@@ -358,6 +360,21 @@ func DMailIdempotencyKey(dmail DMail) string {
 	h.Write([]byte(strings.Join(issuesCopy, ",")))
 	h.Write([]byte{0})
 	h.Write([]byte(string(dmail.Severity)))
+	h.Write([]byte{0})
+	// Include wave reference to distinguish D-Mails targeting different waves
+	if dmail.Wave != nil {
+		h.Write([]byte(dmail.Wave.ID))
+		h.Write([]byte{0})
+		h.Write([]byte(dmail.Wave.Step))
+		for _, step := range dmail.Wave.Steps {
+			h.Write([]byte{0})
+			h.Write([]byte(step.ID))
+			h.Write([]byte{0})
+			h.Write([]byte(step.Title))
+			h.Write([]byte{0})
+			h.Write([]byte(step.Acceptance))
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -380,6 +397,7 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 		Action:        dmail.Action,
 		Priority:      dmail.Priority,
 		Targets:       dmail.Targets,
+		Wave:          dmail.Wave,
 		Metadata:      meta,
 		Context:       dmail.Context,
 	}
