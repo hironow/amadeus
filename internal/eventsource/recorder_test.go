@@ -1,5 +1,7 @@
 package eventsource
 
+// white-box-reason: tests SessionRecorder internals (prevID chaining, session-scoped causation) that require access to unexported eventStore interface
+
 import (
 	"testing"
 	"time"
