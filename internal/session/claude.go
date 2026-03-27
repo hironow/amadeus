@@ -53,8 +53,16 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--print",
 	}
 
+	// Settings and MCP config live under the tool's stateDir (e.g. .gate/).
+	// ConfigBase is the repo root where stateDir was initialized.
+	// When ConfigBase is unset, fall back to WorkDir, then CWD.
+	configBase := cfg.ConfigBase
+	if configBase == "" {
+		configBase = effectiveDir(cfg.WorkDir)
+	}
+
 	// Load tool-specific settings when available; warn if missing
-	if settingsPath := ClaudeSettingsPath(effectiveDir(cfg.WorkDir)); ClaudeSettingsExists(effectiveDir(cfg.WorkDir)) {
+	if settingsPath := ClaudeSettingsPath(configBase); ClaudeSettingsExists(configBase) {
 		args = append(args, "--settings", settingsPath)
 	} else if a.Logger != nil {
 		a.Logger.Warn("Claude subprocess settings not found at %s", settingsPath)
@@ -73,7 +81,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 	}
 
 	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
-	if mcpPath := ResolveMCPConfigPath(effectiveDir(cfg.WorkDir)); mcpPath != "" {
+	if mcpPath := ResolveMCPConfigPath(configBase); mcpPath != "" {
 		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 
