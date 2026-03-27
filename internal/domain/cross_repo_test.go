@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests ComputeEcosystemScore and MaxSeverityAcrossTools which access ToolSnapshot.Measured field logic
+
 import (
 	"testing"
 	"time"
