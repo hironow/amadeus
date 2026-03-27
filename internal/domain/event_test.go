@@ -3,6 +3,7 @@ package domain_test
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -622,5 +623,86 @@ func TestConvergenceDetectedDataMarshalRoundTrip(t *testing.T) {
 	}
 	if got.Alert.Count != data.Alert.Count {
 		t.Errorf("Count = %d, want %d", got.Alert.Count, data.Alert.Count)
+	}
+}
+
+func TestEvent_CorrelationFields_Serialize(t *testing.T) {
+	// given
+	ev, err := domain.NewEvent(domain.EventRunStarted, map[string]string{"k": "v"}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev.CorrelationID = "corr-123"
+	ev.CausationID = "cause-456"
+
+	// when
+	data, err := json.Marshal(ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+
+	// then
+	if !strings.Contains(s, `"correlation_id":"corr-123"`) {
+		t.Errorf("missing correlation_id: %s", s)
+	}
+	if !strings.Contains(s, `"causation_id":"cause-456"`) {
+		t.Errorf("missing causation_id: %s", s)
+	}
+}
+
+func TestEvent_CorrelationFields_OmitEmpty(t *testing.T) {
+	// given
+	ev, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{"k": "v"}, time.Now())
+
+	// when
+	data, _ := json.Marshal(ev)
+
+	// then
+	if strings.Contains(string(data), "correlation_id") {
+		t.Errorf("empty CorrelationID should be omitted")
+	}
+}
+
+func TestEvent_SchemaVersion_SetByNewEvent(t *testing.T) {
+	// given / when
+	ev, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{"k": "v"}, time.Now())
+
+	// then
+	if ev.SchemaVersion != domain.CurrentEventSchemaVersion {
+		t.Errorf("got %d, want %d", ev.SchemaVersion, domain.CurrentEventSchemaVersion)
+	}
+}
+
+func TestEvent_SchemaVersion_ZeroIsLegacy(t *testing.T) {
+	// given
+	raw := `{"id":"abc","type":"run.started","timestamp":"2026-01-01T00:00:00Z","data":{}}`
+
+	// when
+	var ev domain.Event
+	if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	if ev.SchemaVersion != 0 {
+		t.Errorf("legacy event should have SchemaVersion 0, got %d", ev.SchemaVersion)
+	}
+}
+
+func TestValidateEvent_RejectsFutureSchema(t *testing.T) {
+	// given
+	ev, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{"k": "v"}, time.Now())
+	ev.SchemaVersion = domain.CurrentEventSchemaVersion + 1
+
+	// when
+	err := domain.ValidateEvent(ev)
+
+	// then
+	if err == nil {
+		t.Error("expected error for future schema version")
+	}
+	if err != nil && !strings.Contains(err.Error(), "schema_version") {
+		t.Errorf("error should mention schema_version, got: %v", err)
 	}
 }
