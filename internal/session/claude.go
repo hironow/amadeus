@@ -50,9 +50,11 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--print",
 	}
 
-	// Warn when Claude subprocess settings are missing
-	if !ClaudeSettingsExists(effectiveDir(cfg.WorkDir)) && a.Logger != nil {
-		a.Logger.Warn("Claude subprocess settings not found at %s", ClaudeSettingsPath(effectiveDir(cfg.WorkDir)))
+	// Load tool-specific settings when available; warn if missing
+	if settingsPath := ClaudeSettingsPath(effectiveDir(cfg.WorkDir)); ClaudeSettingsExists(effectiveDir(cfg.WorkDir)) {
+		args = append(args, "--settings", settingsPath)
+	} else if a.Logger != nil {
+		a.Logger.Warn("Claude subprocess settings not found at %s", settingsPath)
 		a.Logger.Warn("Run 'amadeus mcp-config generate' to create settings.")
 	}
 
