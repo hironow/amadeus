@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
@@ -68,7 +69,11 @@ Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
 
 			settingsPath, settingsErr := session.GenerateClaudeSettings(baseDir, force)
 			if settingsErr != nil {
-				logger.Warn("settings: %v", settingsErr)
+				if strings.Contains(settingsErr.Error(), "already exists") {
+					logger.Warn("settings: %v", settingsErr)
+				} else {
+					return fmt.Errorf("settings: %w", settingsErr)
+				}
 			} else {
 				logger.OK("Generated %s", settingsPath)
 			}

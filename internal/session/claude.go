@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -44,6 +43,10 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--model", model,
 		"--verbose",
 		"--output-format", "stream-json",
+		// NOTE: --setting-sources "" skips settings loading but does NOT suppress CLAUDE.md auto-discovery.
+		// --bare would suppress it but also disables OAuth. No individual flag exists to disable CLAUDE.md
+		// discovery without disabling OAuth. Acceptable tradeoff: CLAUDE.md adds context but doesn't
+		// cause context budget issues in practice.
 		"--setting-sources", "", // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 		"--disable-slash-commands",
 		"--dangerously-skip-permissions",
@@ -69,11 +72,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		args = append(args, "--continue")
 	}
 
-	// Enforce MCP allowlist when .mcp.json exists
-	if mcpPath := MCPConfigPath(effectiveDir(cfg.WorkDir)); mcpPath != "" {
-		if _, statErr := os.Stat(mcpPath); statErr == nil {
-			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
-		}
+	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
+	if mcpPath := ResolveMCPConfigPath(effectiveDir(cfg.WorkDir)); mcpPath != "" {
+		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 
 	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)

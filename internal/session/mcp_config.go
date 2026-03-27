@@ -71,6 +71,26 @@ func MCPConfigPath(baseDir string) string {
 	return filepath.Join(baseDir, domain.StateDir, ".mcp.json")
 }
 
+// legacyMCPConfigPath returns the pre-rename path (.run/mcp-config.json)
+// for backward compatibility during migration.
+func legacyMCPConfigPath(baseDir string) string {
+	return filepath.Join(baseDir, domain.StateDir, ".run", "mcp-config.json")
+}
+
+// ResolveMCPConfigPath returns the active MCP config path, preferring the
+// new .mcp.json location and falling back to the legacy .run/mcp-config.json.
+func ResolveMCPConfigPath(baseDir string) string {
+	newPath := MCPConfigPath(baseDir)
+	if _, err := os.Stat(newPath); err == nil {
+		return newPath
+	}
+	legacyPath := legacyMCPConfigPath(baseDir)
+	if _, err := os.Stat(legacyPath); err == nil {
+		return legacyPath
+	}
+	return ""
+}
+
 // MCPConfigExists reports whether the .mcp.json file exists and is valid JSON.
 func MCPConfigExists(baseDir string) (bool, error) {
 	path := MCPConfigPath(baseDir)
