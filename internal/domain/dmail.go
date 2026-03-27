@@ -366,6 +366,12 @@ func DMailIdempotencyKey(dmail DMail) string {
 		h.Write([]byte(dmail.Wave.ID))
 		h.Write([]byte{0})
 		h.Write([]byte(dmail.Wave.Step))
+		for _, step := range dmail.Wave.Steps {
+			h.Write([]byte{0})
+			h.Write([]byte(step.ID))
+			h.Write([]byte(step.Title))
+			h.Write([]byte(step.Acceptance))
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

@@ -68,20 +68,21 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 	// mis-threading feedback across different waves.
 	triggerRound := 0
 	var triggerWave *domain.WaveReference
-	reportCount := 0
+	waveIDs := make(map[string]bool)
 	for _, d := range inboxDMails {
 		if d.Kind == domain.KindReport {
-			reportCount++
 			if r := domain.FeedbackRound(d); r > triggerRound {
 				triggerRound = r
 			}
 			if d.Wave != nil {
+				waveIDs[d.Wave.ID] = true
 				triggerWave = d.Wave
 			}
 		}
 	}
-	// Multiple reports may carry different waves; only propagate when unambiguous.
-	if reportCount > 1 {
+	// Only propagate wave when all reports agree on the same wave ID.
+	// Multiple distinct waves = ambiguous, so drop to avoid mis-threading.
+	if len(waveIDs) > 1 {
 		triggerWave = nil
 	}
 	nextRound := triggerRound + 1
