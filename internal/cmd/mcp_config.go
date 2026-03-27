@@ -13,7 +13,7 @@ func newMCPConfigCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp-config",
 		Short: "Manage MCP configuration for Claude subprocess isolation",
-		Long: `Manage the mcp-config.json file that controls which MCP servers
+		Long: `Manage the .mcp.json file that controls which MCP servers
 are available to Claude subprocess invocations.
 
 Use 'generate' to create the initial config, then edit it to add or remove
@@ -33,8 +33,8 @@ func newMCPConfigGenerateCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "generate [path]",
-		Short: "Generate mcp-config.json for --strict-mcp-config isolation",
-		Long: `Generate a mcp-config.json file that controls which MCP servers
+		Short: "Generate .mcp.json for --strict-mcp-config isolation",
+		Long: `Generate a .mcp.json file that controls which MCP servers
 are available to Claude subprocess invocations.
 
 In wave mode (default): generates empty config (no MCP servers).
@@ -69,6 +69,6 @@ Claude subprocess uses --strict-mcp-config to enforce this allowlist.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing mcp-config.json")
+	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing .mcp.json")
 	return cmd
 }

@@ -44,7 +44,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--model", model,
 		"--verbose",
 		"--output-format", "stream-json",
-		"--bare",
+		"--setting-sources", "", // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 		"--disable-slash-commands",
 		"--dangerously-skip-permissions",
 		"--print",
@@ -61,7 +61,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		args = append(args, "--continue")
 	}
 
-	// Enforce MCP allowlist when mcp-config.json exists
+	// Enforce MCP allowlist when .mcp.json exists
 	if mcpPath := MCPConfigPath(effectiveDir(cfg.WorkDir)); mcpPath != "" {
 		if _, statErr := os.Stat(mcpPath); statErr == nil {
 			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)

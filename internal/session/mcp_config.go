@@ -22,12 +22,12 @@ type MCPServerEntry struct {
 	Args    []string `json:"args"`
 }
 
-// MCPConfigPath returns the path to the mcp-config.json file.
+// MCPConfigPath returns the path to the .mcp.json file.
 func MCPConfigPath(baseDir string) string {
-	return filepath.Join(baseDir, domain.StateDir, ".run", "mcp-config.json")
+	return filepath.Join(baseDir, domain.StateDir, ".mcp.json")
 }
 
-// MCPConfigExists reports whether the mcp-config.json file exists and is valid JSON.
+// MCPConfigExists reports whether the .mcp.json file exists and is valid JSON.
 func MCPConfigExists(baseDir string) (bool, error) {
 	path := MCPConfigPath(baseDir)
 	data, err := os.ReadFile(path)
@@ -39,19 +39,19 @@ func MCPConfigExists(baseDir string) (bool, error) {
 	}
 	var cfg MCPConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return false, fmt.Errorf("mcp-config.json invalid JSON: %w", err)
+		return false, fmt.Errorf(".mcp.json invalid JSON: %w", err)
 	}
 	return true, nil
 }
 
-// GenerateMCPConfig creates a mcp-config.json file.
+// GenerateMCPConfig creates a .mcp.json file.
 // Linear mode includes Linear MCP server. Wave mode produces empty config.
 func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (string, error) {
 	path := MCPConfigPath(baseDir)
 
 	if !force {
 		if _, err := os.Stat(path); err == nil {
-			return path, fmt.Errorf("mcp-config.json already exists (use --force to overwrite)")
+			return path, fmt.Errorf(".mcp.json already exists (use --force to overwrite)")
 		}
 	}
 
