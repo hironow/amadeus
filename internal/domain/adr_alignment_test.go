@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests DeriveADRIntegrityScore, PerADRViolationFrequency, TopViolatedADRs which access unexported ClampAxisScore and internal ADRAlignmentMap behavior
+
 import (
 	"strings"
 	"testing"
