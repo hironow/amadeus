@@ -77,6 +77,7 @@ type dmailFrontmatter struct {
 	Action        DMailAction       `yaml:"action,omitempty"`
 	Priority      int               `yaml:"priority,omitempty"`
 	Targets       []string          `yaml:"targets,omitempty"`
+	Wave          *WaveReference    `yaml:"wave,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 }
@@ -299,6 +300,7 @@ func fmToDMail(fm dmailFrontmatter, bodyPart string) DMail {
 		Action:        fm.Action,
 		Priority:      fm.Priority,
 		Targets:       fm.Targets,
+		Wave:          fm.Wave,
 		Metadata:      fm.Metadata,
 		Context:       fm.Context,
 		Body:          strings.TrimLeft(bodyPart, "\n"),
@@ -380,6 +382,7 @@ func MarshalDMail(dmail DMail) ([]byte, error) {
 		Action:        dmail.Action,
 		Priority:      dmail.Priority,
 		Targets:       dmail.Targets,
+		Wave:          dmail.Wave,
 		Metadata:      meta,
 		Context:       dmail.Context,
 	}
