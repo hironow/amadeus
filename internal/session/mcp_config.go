@@ -22,6 +22,50 @@ type MCPServerEntry struct {
 	Args    []string `json:"args"`
 }
 
+// ClaudeSettingsPath returns the path to the .claude/settings.json file
+// under the tool state directory.
+func ClaudeSettingsPath(baseDir string) string {
+	return filepath.Join(baseDir, domain.StateDir, ".claude", "settings.json")
+}
+
+// ClaudeSettingsExists reports whether .claude/settings.json exists.
+func ClaudeSettingsExists(baseDir string) bool {
+	_, err := os.Stat(ClaudeSettingsPath(baseDir))
+	return err == nil
+}
+
+// GenerateClaudeSettings creates a minimal .claude/settings.json that
+// disables all plugins for Claude subprocess isolation.
+func GenerateClaudeSettings(baseDir string, force bool) (string, error) {
+	path := ClaudeSettingsPath(baseDir)
+
+	if !force {
+		if _, err := os.Stat(path); err == nil {
+			return path, fmt.Errorf(".claude/settings.json already exists (use --force to overwrite)")
+		}
+	}
+
+	settings := map[string]any{
+		"enabledPlugins": map[string]any{},
+	}
+
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal settings: %w", err)
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("mkdir: %w", err)
+	}
+
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		return "", fmt.Errorf("write settings: %w", err)
+	}
+
+	return path, nil
+}
+
 // MCPConfigPath returns the path to the .mcp.json file.
 func MCPConfigPath(baseDir string) string {
 	return filepath.Join(baseDir, domain.StateDir, ".mcp.json")

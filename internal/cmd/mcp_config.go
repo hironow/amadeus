@@ -33,15 +33,16 @@ func newMCPConfigGenerateCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "generate [path]",
-		Short: "Generate .mcp.json for --strict-mcp-config isolation",
-		Long: `Generate a .mcp.json file that controls which MCP servers
-are available to Claude subprocess invocations.
+		Short: "Generate .mcp.json and .claude/settings.json for subprocess isolation",
+		Long: `Generate .mcp.json and .claude/settings.json for Claude subprocess isolation.
 
-In wave mode (default): generates empty config (no MCP servers).
-In linear mode (--linear): includes Linear MCP server.
+.mcp.json controls which MCP servers are available:
+  - wave mode (default): empty config (no MCP servers)
+  - linear mode (--linear): includes Linear MCP server
 
-The generated file can be freely edited to add custom MCP servers.
-Claude subprocess uses --strict-mcp-config to enforce this allowlist.`,
+.claude/settings.json disables all plugins for the subprocess.
+
+Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir := "."
@@ -64,6 +65,14 @@ Claude subprocess uses --strict-mcp-config to enforce this allowlist.`,
 			} else {
 				logger.Info("Linear MCP server included. Edit to add/remove servers.")
 			}
+
+			settingsPath, settingsErr := session.GenerateClaudeSettings(baseDir, force)
+			if settingsErr != nil {
+				logger.Warn("settings: %v", settingsErr)
+			} else {
+				logger.OK("Generated %s", settingsPath)
+			}
+
 			fmt.Fprintln(cmd.OutOrStdout(), path)
 			return nil
 		},

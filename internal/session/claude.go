@@ -50,6 +50,12 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--print",
 	}
 
+	// Warn when Claude subprocess settings are missing
+	if !ClaudeSettingsExists(effectiveDir(cfg.WorkDir)) && a.Logger != nil {
+		a.Logger.Warn("Claude subprocess settings not found at %s", ClaudeSettingsPath(effectiveDir(cfg.WorkDir)))
+		a.Logger.Warn("Run 'amadeus mcp-config generate' to create settings.")
+	}
+
 	// --allowedTools: use caller-specified tools, or default to DivergenceMeterAllowedTools.
 	allowedTools := DivergenceMeterAllowedTools
 	if len(cfg.AllowedTools) > 0 {
