@@ -126,7 +126,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 					"created_at":     now.Format(time.RFC3339),
 					"feedback_round": strconv.Itoa(nextRound),
 				},
-				Body: candidate.Detail,
+				Body: candidate.Detail + formatADRViolations(meterResult),
 			}
 			if dmail.Action == "" {
 				dmail.Action = domain.DefaultDMailAction(meterResult.Divergence.Severity)
@@ -206,4 +206,17 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 		saved = append(saved, cd)
 	}
 	return saved, nil
+}
+
+// formatADRViolations appends a "Violated ADRs" section to D-Mail body
+// when per-ADR alignment data is available and has violations.
+func formatADRViolations(meterResult domain.MeterResult) string {
+	if len(meterResult.Divergence.ADRAlignment) == 0 {
+		return ""
+	}
+	section := domain.FormatViolatedADRsSection(meterResult.Divergence.ADRAlignment, nil, 70)
+	if section == "" {
+		return ""
+	}
+	return "\n\n" + section
 }

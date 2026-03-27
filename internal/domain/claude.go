@@ -29,6 +29,7 @@ type ClaudeResponse struct {
 	Reasoning            string                 `json:"reasoning"`
 	ImpactRadius         []ImpactEntry          `json:"impact_radius,omitempty"`
 	CapabilityViolations []CapabilityViolation  `json:"capability_violations,omitempty"`
+	ADRAlignment         ADRAlignmentMap        `json:"adr_alignment,omitempty"` // E19: per-ADR compliance scores
 }
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.

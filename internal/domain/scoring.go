@@ -41,12 +41,13 @@ func DefaultWeights() Weights {
 
 // DivergenceResult holds the complete result of a divergence calculation.
 type DivergenceResult struct {
-	Value       float64            `json:"divergence"`
-	Internal    float64            `json:"internal"`
-	Axes        map[Axis]AxisScore `json:"axes"`
-	Severity    Severity           `json:"severity"`
-	Overridden  bool               `json:"overridden"`
-	MissingAxes []Axis             `json:"missing_axes,omitempty"`
+	Value        float64            `json:"divergence"`
+	Internal     float64            `json:"internal"`
+	Axes         map[Axis]AxisScore `json:"axes"`
+	Severity     Severity           `json:"severity"`
+	Overridden   bool               `json:"overridden"`
+	MissingAxes  []Axis             `json:"missing_axes,omitempty"`
+	ADRAlignment ADRAlignmentMap    `json:"adr_alignment,omitempty"` // E19: per-ADR scores
 }
 
 // Severity represents the D-Mail severity tier.
@@ -81,10 +82,11 @@ type Thresholds struct {
 
 // PerAxisOverride holds per-axis critical thresholds that escalate severity.
 type PerAxisOverride struct {
-	ADRForceHigh        int `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
-	DoDForceHigh        int `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
-	DepForceMedium      int `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
-	ImplicitForceMedium int `yaml:"implicit_constraints_force_medium" json:"implicit_constraints_force_medium"`
+	ADRForceHigh        int      `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
+	DoDForceHigh        int      `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
+	DepForceMedium      int      `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
+	ImplicitForceMedium int      `yaml:"implicit_constraints_force_medium" json:"implicit_constraints_force_medium"`
+	ADRCritical         []string `yaml:"adr_critical,omitempty" json:"adr_critical,omitempty"` // E19: ADR numbers that force HIGH when violated
 }
 
 // SeverityConfig combines thresholds and per-axis overrides.
@@ -199,6 +201,17 @@ func DetermineSeverity(result DivergenceResult, config SeverityConfig) Divergenc
 		}
 	}
 
+	// E19: Per-ADR critical override — specific ADRs force HIGH when violated
+	for _, criticalNum := range config.PerAxisOverride.ADRCritical {
+		if a, ok := result.ADRAlignment[criticalNum]; ok && a.Verdict == "violated" {
+			if severity != SeverityHigh {
+				overridden = true
+			}
+			severity = SeverityHigh
+			break
+		}
+	}
+
 	result.Severity = severity
 	result.Overridden = overridden
 	return result
@@ -288,6 +301,21 @@ func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
 	divergence := CalcDivergence(clamped, dm.Config.Weights)
 	// #124: Populate MissingAxes from validation result.
 	divergence.MissingAxes = missing
+
+	// E19: Attach per-ADR alignment and override adr_integrity axis when available.
+	// Recompute divergence after axis replacement to keep Value/Internal consistent.
+	if len(resp.ADRAlignment) > 0 {
+		divergence.ADRAlignment = resp.ADRAlignment
+		derivedADR := DeriveADRIntegrityScore(resp.ADRAlignment)
+		if axis, ok := divergence.Axes[AxisADR]; ok {
+			axis.Score = derivedADR
+			divergence.Axes[AxisADR] = axis
+		}
+		// Recompute weighted divergence with updated axis score
+		recomputed := CalcDivergence(divergence.Axes, dm.Config.Weights)
+		divergence.Value = recomputed.Value
+		divergence.Internal = recomputed.Internal
+	}
 
 	severityCfg := SeverityConfig{
 		Thresholds:      dm.Config.Thresholds,
