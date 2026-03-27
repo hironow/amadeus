@@ -369,7 +369,9 @@ func DMailIdempotencyKey(dmail DMail) string {
 		for _, step := range dmail.Wave.Steps {
 			h.Write([]byte{0})
 			h.Write([]byte(step.ID))
+			h.Write([]byte{0})
 			h.Write([]byte(step.Title))
+			h.Write([]byte{0})
 			h.Write([]byte(step.Acceptance))
 		}
 	}
