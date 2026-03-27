@@ -61,21 +61,24 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 	var dmails []domain.DMail
 	quantitative := domain.ClassifyByAxes(meterResult.Divergence.Axes, a.Config.Weights)
 
-	// S02: Extract max feedback_round from consumed inbox D-Mails for circuit-breaker.
-	inboxMaxRound := 0
+	// S02: Extract feedback_round from the triggering report D-Mail (not all inbox D-Mails).
+	// This scopes the round counter to the causal thread, not the entire inbox batch.
+	triggerRound := 0
 	for _, d := range inboxDMails {
-		if r := domain.FeedbackRound(d); r > inboxMaxRound {
-			inboxMaxRound = r
+		if d.Kind == domain.KindReport {
+			if r := domain.FeedbackRound(d); r > triggerRound {
+				triggerRound = r
+			}
 		}
 	}
-	nextRound := inboxMaxRound + 1
+	nextRound := triggerRound + 1
 
-	// S02: Circuit-breaker — if feedback rounds exhausted, skip feedback generation.
-	// Convergence detection (Phase 4) will handle the escalation.
-	if inboxMaxRound >= domain.MaxFeedbackRounds {
-		a.Logger.Warn("feedback round %d >= max %d — skipping feedback D-Mail generation (convergence will handle)", inboxMaxRound, domain.MaxFeedbackRounds)
+	// S02: Circuit-breaker — if feedback rounds exhausted, generate convergence instead.
+	if triggerRound >= domain.MaxFeedbackRounds {
+		a.Logger.Warn("feedback round %d >= max %d — suppressing feedback, convergence detection (Phase 4) will escalate", triggerRound, domain.MaxFeedbackRounds)
 		span3.End()
-		return nil, nil
+		// Return empty (not nil) so Phase 4 convergence detection still runs.
+		return dmails, nil
 	}
 
 	for _, candidate := range meterResult.DMailCandidates {
