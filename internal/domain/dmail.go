@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -229,6 +230,46 @@ func SanitizeTargets(senderIdentity string, kind DMailKind, targets []string) []
 		result = append(result, target)
 	}
 	return result
+}
+
+// RequiredTargets returns the mandatory delivery targets for a given D-Mail kind.
+// design-feedback MUST reach sightjack; implementation-feedback MUST reach paintress.
+// This enforces the feedback loop wiring regardless of AI-generated target fields.
+func RequiredTargets(kind DMailKind) []string {
+	switch kind {
+	case KindDesignFeedback:
+		return []string{"sightjack"}
+	case KindImplFeedback:
+		return []string{"paintress"}
+	default:
+		return nil
+	}
+}
+
+// MaxFeedbackRounds is the maximum number of feedback loop iterations before
+// amadeus generates a convergence D-Mail instead of another feedback round.
+const MaxFeedbackRounds = 3
+
+// FeedbackRound extracts the feedback_round counter from D-Mail metadata.
+// Returns 0 when absent (first generation).
+func FeedbackRound(d DMail) int {
+	if d.Metadata == nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(d.Metadata["feedback_round"])
+	return n
+}
+
+// WithFeedbackRound returns a copy of the D-Mail metadata with feedback_round set.
+// Does not mutate the original.
+func WithFeedbackRound(d DMail, round int) DMail {
+	meta := make(map[string]string, len(d.Metadata)+1)
+	for k, v := range d.Metadata {
+		meta[k] = v
+	}
+	meta["feedback_round"] = strconv.Itoa(round)
+	d.Metadata = meta
+	return d
 }
 
 // splitFrontmatter splits raw D-Mail bytes into the YAML frontmatter bytes and Markdown body string.

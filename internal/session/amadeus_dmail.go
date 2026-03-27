@@ -3,6 +3,8 @@ package session
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -12,16 +14,17 @@ import (
 )
 
 // consumeInbox runs Phase 0: scans the inbox for inbound D-Mails and emits
-// inbox-consumed events. Returns nil when there are no D-Mails to consume.
-func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
+// inbox-consumed events. Returns the consumed D-Mails for downstream use
+// (e.g., extracting feedback_round for circuit-breaker in generateDMails).
+func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) ([]domain.DMail, error) {
 	span := trace.SpanFromContext(ctx)
 
 	consumed, scanErr := a.Store.ScanInbox(ctx)
 	if scanErr != nil {
-		return fmt.Errorf("scan inbox: %w", scanErr)
+		return nil, fmt.Errorf("scan inbox: %w", scanErr)
 	}
 	if len(consumed) == 0 {
-		return nil
+		return nil, nil
 	}
 	if !quiet {
 		a.Logger.Info("Consumed %d report(s) from inbox", len(consumed))
@@ -37,17 +40,18 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) error {
 			Kind:   d.Kind,
 			Source: d.Name + ".md",
 		}, now); err != nil {
-			return fmt.Errorf("emit inbox consumed: %w", err)
+			return nil, fmt.Errorf("emit inbox consumed: %w", err)
 		}
 	}
-	return nil
+	return consumed, nil
 }
 
 // generateDMails runs Phase 3: creates D-Mail entities from meter candidates,
 // validates them, and emits dmail-generated events.
 // This produces KindImplFeedback and/or KindDesignFeedback based on divergence
 // scoring (ClassifyByAxes + ResolveFeedbackKinds). Works with or without --base.
-func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterResult, now time.Time) ([]domain.DMail, error) {
+// inboxDMails carries consumed inbox D-Mails for feedback_round propagation (may be nil).
+func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterResult, inboxDMails []domain.DMail, now time.Time) ([]domain.DMail, error) {
 	_, span3 := platform.Tracer.Start(ctx, "phase.dmail_generation", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 		trace.WithAttributes(
 			attribute.Int("phase.number", 3),
@@ -56,6 +60,26 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 	)
 	var dmails []domain.DMail
 	quantitative := domain.ClassifyByAxes(meterResult.Divergence.Axes, a.Config.Weights)
+
+	// S02: Extract feedback_round from the triggering report D-Mail (not all inbox D-Mails).
+	// This scopes the round counter to the causal thread, not the entire inbox batch.
+	triggerRound := 0
+	for _, d := range inboxDMails {
+		if d.Kind == domain.KindReport {
+			if r := domain.FeedbackRound(d); r > triggerRound {
+				triggerRound = r
+			}
+		}
+	}
+	nextRound := triggerRound + 1
+
+	// S02: Circuit-breaker — if feedback rounds exhausted, generate convergence instead.
+	if triggerRound >= domain.MaxFeedbackRounds {
+		a.Logger.Warn("feedback round %d >= max %d — suppressing feedback, convergence detection (Phase 4) will escalate", triggerRound, domain.MaxFeedbackRounds)
+		span3.End()
+		// Return empty (not nil) so Phase 4 convergence detection still runs.
+		return dmails, nil
+	}
 
 	for _, candidate := range meterResult.DMailCandidates {
 		kinds := domain.ResolveFeedbackKinds(candidate.Category, quantitative)
@@ -67,6 +91,12 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 			}
 			// #110: Sanitize targets to prevent self-referencing routing loops.
 			sanitized := domain.SanitizeTargets("amadeus", kind, candidate.Targets)
+			// S02: Enforce required targets (design-feedback → sightjack, impl-feedback → paintress).
+			for _, req := range domain.RequiredTargets(kind) {
+				if !slices.Contains(sanitized, req) {
+					sanitized = append(sanitized, req)
+				}
+			}
 			dmail := domain.DMail{
 				SchemaVersion: domain.DMailSchemaVersion,
 				Name:          name,
@@ -77,7 +107,8 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				Action:        domain.DMailAction(candidate.Action),
 				Targets:       sanitized,
 				Metadata: map[string]string{
-					"created_at": now.Format(time.RFC3339),
+					"created_at":     now.Format(time.RFC3339),
+					"feedback_round": strconv.Itoa(nextRound),
 				},
 				Body: candidate.Detail,
 			}

@@ -155,7 +155,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 							Quiet: opts.Quiet,
 							JSON:  opts.JSON,
 						}
-						if checkErr := a.runPostMergeCheck(ctx, checkOpts); checkErr != nil {
+						if checkErr := a.runPostMergeCheck(ctx, checkOpts, []domain.DMail{dmail}); checkErr != nil {
 							if _, ok := checkErr.(*domain.DriftError); !ok {
 								a.Logger.Warn("post-merge check error: %v", checkErr)
 							}
@@ -169,7 +169,8 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 
 // runPostMergeCheck runs the existing 5-phase divergence check pipeline (Phases 1-4).
 // Phase 0 (inbox) is handled by the daemon loop, so this skips it.
-func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOptions) error {
+// inboxDMails carries the D-Mails that triggered this check (for feedback_round propagation).
+func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOptions, inboxDMails []domain.DMail) error {
 	previous, err := a.Store.LoadLatest()
 	if err != nil {
 		return fmt.Errorf("load previous state: %w", err)
@@ -202,7 +203,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 	}
 
 	now := time.Now().UTC()
-	dmails, err := a.generateDMails(ctx, meterResult, now)
+	dmails, err := a.generateDMails(ctx, meterResult, inboxDMails, now)
 	if err != nil {
 		return err
 	}
