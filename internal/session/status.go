@@ -36,16 +36,28 @@ func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.St
 	var lastCheck time.Time
 	var lastDivergence float64
 	var convergences int
+	var checkResults []domain.CheckResult
+	var baselineHistory []domain.BaselinePoint
 	for _, ev := range allEvents {
 		switch ev.Type {
 		case domain.EventCheckCompleted:
 			checkCount++
 			var data domain.CheckCompletedData
 			if err := json.Unmarshal(ev.Data, &data); err == nil {
+				checkResults = append(checkResults, data.Result)
 				if data.Result.CheckedAt.After(lastCheck) { // nosemgrep: lod-excessive-dot-chain [permanent]
 					lastCheck = data.Result.CheckedAt
 					lastDivergence = data.Result.Divergence
 				}
+			}
+		case domain.EventBaselineUpdated:
+			var data domain.BaselineUpdatedData
+			if err := json.Unmarshal(ev.Data, &data); err == nil {
+				baselineHistory = append(baselineHistory, domain.BaselinePoint{
+					Commit:     data.Commit,
+					Divergence: data.Divergence,
+					At:         ev.Timestamp,
+				})
 			}
 		case domain.EventConvergenceDetected:
 			convergences++
@@ -56,6 +68,8 @@ func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.St
 	report.LastCheck = lastCheck
 	report.Divergence = lastDivergence
 	report.Convergences = convergences
+	report.BaselineHistory = baselineHistory
+	report.Trend = domain.AnalyzeDivergenceTrend(checkResults)
 
 	return report
 }
