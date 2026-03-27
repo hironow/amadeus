@@ -1498,3 +1498,55 @@ func TestFilterByTTL_IncludesMissingTimestamp(t *testing.T) {
 		t.Errorf("expected 1 D-Mail (conservative include) after TTL filter, got %d", len(result))
 	}
 }
+
+// --- S02: Feedback Loop ---
+
+func TestRequiredTargets_DesignFeedback(t *testing.T) {
+	got := domain.RequiredTargets(domain.KindDesignFeedback)
+	if len(got) != 1 || got[0] != "sightjack" {
+		t.Errorf("RequiredTargets(design-feedback) = %v, want [sightjack]", got)
+	}
+}
+
+func TestRequiredTargets_ImplFeedback(t *testing.T) {
+	got := domain.RequiredTargets(domain.KindImplFeedback)
+	if len(got) != 1 || got[0] != "paintress" {
+		t.Errorf("RequiredTargets(impl-feedback) = %v, want [paintress]", got)
+	}
+}
+
+func TestRequiredTargets_Other_ReturnsNil(t *testing.T) {
+	got := domain.RequiredTargets(domain.KindReport)
+	if got != nil {
+		t.Errorf("RequiredTargets(report) = %v, want nil", got)
+	}
+}
+
+func TestFeedbackRound_Absent(t *testing.T) {
+	d := domain.DMail{Metadata: nil}
+	if got := domain.FeedbackRound(d); got != 0 {
+		t.Errorf("FeedbackRound(nil metadata) = %d, want 0", got)
+	}
+}
+
+func TestFeedbackRound_Present(t *testing.T) {
+	d := domain.DMail{Metadata: map[string]string{"feedback_round": "2"}}
+	if got := domain.FeedbackRound(d); got != 2 {
+		t.Errorf("FeedbackRound = %d, want 2", got)
+	}
+}
+
+func TestWithFeedbackRound(t *testing.T) {
+	d := domain.DMail{Metadata: map[string]string{"existing": "val"}}
+	d2 := domain.WithFeedbackRound(d, 3)
+	if d2.Metadata["feedback_round"] != "3" {
+		t.Errorf("feedback_round = %q, want 3", d2.Metadata["feedback_round"])
+	}
+	if d2.Metadata["existing"] != "val" {
+		t.Error("existing metadata lost")
+	}
+	// Original should not be mutated
+	if _, ok := d.Metadata["feedback_round"]; ok {
+		t.Error("original DMail metadata was mutated")
+	}
+}
