@@ -64,17 +64,25 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 	// S02: Extract feedback_round from the triggering report D-Mail (not all inbox D-Mails).
 	// This scopes the round counter to the causal thread, not the entire inbox batch.
 	// S01: Also extract Wave reference for propagation to feedback D-Mails.
+	// Only propagate Wave when exactly one report is in the batch to avoid
+	// mis-threading feedback across different waves.
 	triggerRound := 0
 	var triggerWave *domain.WaveReference
+	reportCount := 0
 	for _, d := range inboxDMails {
 		if d.Kind == domain.KindReport {
+			reportCount++
 			if r := domain.FeedbackRound(d); r > triggerRound {
 				triggerRound = r
 			}
-			if d.Wave != nil && triggerWave == nil {
+			if d.Wave != nil {
 				triggerWave = d.Wave
 			}
 		}
+	}
+	// Multiple reports may carry different waves; only propagate when unambiguous.
+	if reportCount > 1 {
+		triggerWave = nil
 	}
 	nextRound := triggerRound + 1
 

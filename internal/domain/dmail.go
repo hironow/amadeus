@@ -360,6 +360,13 @@ func DMailIdempotencyKey(dmail DMail) string {
 	h.Write([]byte(strings.Join(issuesCopy, ",")))
 	h.Write([]byte{0})
 	h.Write([]byte(string(dmail.Severity)))
+	h.Write([]byte{0})
+	// Include wave reference to distinguish D-Mails targeting different waves
+	if dmail.Wave != nil {
+		h.Write([]byte(dmail.Wave.ID))
+		h.Write([]byte{0})
+		h.Write([]byte(dmail.Wave.Step))
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 
