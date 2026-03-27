@@ -119,6 +119,7 @@ func NewRootCommand() *cobra.Command {
 		newUpdateCmd(),
 		newConfigCommand(),
 		newMCPConfigCommand(),
+		newDashboardCommand(),
 	)
 
 	return cmd

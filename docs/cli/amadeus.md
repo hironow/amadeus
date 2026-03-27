@@ -24,6 +24,7 @@ amadeus [flags]
 * [amadeus archive-prune](amadeus_archive-prune.md)	 - Prune old archived files
 * [amadeus clean](amadeus_clean.md)	 - Remove state directory (.gate/)
 * [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
+* [amadeus dashboard](amadeus_dashboard.md)	 - Show TAP ecosystem divergence dashboard
 * [amadeus doctor](amadeus_doctor.md)	 - Run health checks
 * [amadeus init](amadeus_init.md)	 - Initialize .gate directory
 * [amadeus install-hook](amadeus_install-hook.md)	 - Install post-merge git hook
