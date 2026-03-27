@@ -48,4 +48,5 @@ type CheckResult struct {
 	ForceFullNext       bool               `json:"force_full_next,omitempty"`
 	GateDenied          bool               `json:"gate_denied,omitempty"`
 	CooldownRemaining   int                `json:"cooldown_remaining,omitempty"`
+	ADRAlignment        ADRAlignmentMap    `json:"adr_alignment,omitempty"` // E19: per-ADR compliance scores
 }
