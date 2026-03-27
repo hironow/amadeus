@@ -9,6 +9,7 @@ success rate, and pending d-mail counts.
 
 Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.
+Use --history N to show a sparkline of the last N baseline divergence points.
 
 ```
 amadeus status [path] [flags]
@@ -25,12 +26,16 @@ amadeus status [path] [flags]
 
   # JSON output for scripting
   amadeus status -o json
+
+  # Show sparkline of last 20 baseline points
+  amadeus status --history 20
 ```
 
 ### Options
 
 ```
-  -h, --help   help for status
+  -h, --help          help for status
+      --history int   show sparkline of last N baseline divergence points
 ```
 
 ### Options inherited from parent commands
