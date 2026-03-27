@@ -202,7 +202,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 	}
 
 	now := time.Now().UTC()
-	dmails, err := a.generateDMails(ctx, meterResult, now)
+	dmails, err := a.generateDMails(ctx, meterResult, nil, now) // run mode: no inbox D-Mails
 	if err != nil {
 		return err
 	}

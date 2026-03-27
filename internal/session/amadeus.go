@@ -156,7 +156,9 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	// Restore aggregate state from persisted projection
 	a.State.Restore(previous)
 
-	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state)
+	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state).
+	// Consumed D-Mails are passed to generateDMails for feedback_round propagation.
+	var inboxDMails []domain.DMail
 	if !opts.DryRun {
 		// nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 		_, inboxSpan := platform.Tracer.Start(ctx, "phase.inbox_drain",
@@ -165,9 +167,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 				attribute.String("phase.name", "inbox_drain"),
 			),
 		)
-		if err := a.consumeInbox(ctx, opts.Quiet); err != nil {
+		var consumeErr error
+		inboxDMails, consumeErr = a.consumeInbox(ctx, opts.Quiet)
+		if consumeErr != nil {
 			inboxSpan.End()
-			return err
+			return consumeErr
 		}
 		inboxSpan.End()
 	}
@@ -283,7 +287,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		return nil
 	}
 
-	dmails, err := a.generateDMails(ctx, meterResult, now)
+	dmails, err := a.generateDMails(ctx, meterResult, inboxDMails, now)
 	if err != nil {
 		return err
 	}
