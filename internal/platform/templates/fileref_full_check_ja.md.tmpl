@@ -33,6 +33,13 @@ Output MUST be valid JSON matching this exact schema:
 - `boundary`: 違反しているケイパビリティ境界の名前。
 - `file`: 違反が発生しているファイル（特定できる場合）。
 
+ADR Alignmentについて:
+- docs/adr/の各ADRを個別にコードベースに対して評価してください。
+- スコア0はコードベースがこのADRに完全準拠していることを意味します。
+- スコア100はコードベースがこのADRの核心的決定を直接的かつ完全に違反していることを意味します。
+- verdict: "compliant" (スコア < 30), "partial" (30-69), "violated" (>= 70)。
+- ADRが利用できない場合は空配列。
+
 D-Mailについて:
 - 実際の問題が見つかった場合のみD-Mailを生成してください。問題がなければ空配列。
 - `targets`: 各D-Mail issueの影響を受けるファイル/モジュールパスを含めてください。
