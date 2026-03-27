@@ -121,14 +121,17 @@ func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (st
 		}
 	}
 
-	// Migrate legacy config if it exists and new file doesn't
+	// Migrate legacy config if it exists and new file doesn't.
+	// Skip migration on --force to allow clean regeneration from defaults.
 	cfg := MCPConfig{
 		MCPServers: make(map[string]MCPServerEntry),
 	}
-	legacyPath := legacyMCPConfigPath(baseDir)
-	if legacyData, err := os.ReadFile(legacyPath); err == nil {
-		if jsonErr := json.Unmarshal(legacyData, &cfg); jsonErr != nil {
-			cfg.MCPServers = make(map[string]MCPServerEntry)
+	if !force {
+		legacyPath := legacyMCPConfigPath(baseDir)
+		if legacyData, err := os.ReadFile(legacyPath); err == nil {
+			if jsonErr := json.Unmarshal(legacyData, &cfg); jsonErr != nil {
+				cfg.MCPServers = make(map[string]MCPServerEntry)
+			}
 		}
 	}
 
