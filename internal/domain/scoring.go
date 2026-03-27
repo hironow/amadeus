@@ -302,6 +302,16 @@ func (dm *DivergenceMeter) ProcessResponse(resp ClaudeResponse) MeterResult {
 	// #124: Populate MissingAxes from validation result.
 	divergence.MissingAxes = missing
 
+	// E19: Attach per-ADR alignment and override adr_integrity axis when available.
+	if len(resp.ADRAlignment) > 0 {
+		divergence.ADRAlignment = resp.ADRAlignment
+		derivedADR := DeriveADRIntegrityScore(resp.ADRAlignment)
+		if axis, ok := divergence.Axes[AxisADR]; ok {
+			axis.Score = derivedADR
+			divergence.Axes[AxisADR] = axis
+		}
+	}
+
 	severityCfg := SeverityConfig{
 		Thresholds:      dm.Config.Thresholds,
 		PerAxisOverride: dm.Config.PerAxisOverride,

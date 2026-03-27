@@ -337,6 +337,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		PRsEvaluated:      prNumbers,
 		DMails:            dmailNames,
 		ConvergenceAlerts: convergenceAlerts,
+		ADRAlignment:      meterResult.Divergence.ADRAlignment, // E19: per-ADR scores
 	}
 
 	if err := a.Emitter.EmitCheck(result, now); err != nil {
