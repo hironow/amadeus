@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -44,10 +43,30 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		"--model", model,
 		"--verbose",
 		"--output-format", "stream-json",
-		"--bare",
+		// NOTE: --setting-sources "" skips settings loading but does NOT suppress CLAUDE.md auto-discovery.
+		// --bare would suppress it but also disables OAuth. No individual flag exists to disable CLAUDE.md
+		// discovery without disabling OAuth. Acceptable tradeoff: CLAUDE.md adds context but doesn't
+		// cause context budget issues in practice.
+		"--setting-sources", "", // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 		"--disable-slash-commands",
 		"--dangerously-skip-permissions",
 		"--print",
+	}
+
+	// Settings and MCP config live under the tool's stateDir (e.g. .gate/).
+	// ConfigBase is the repo root where stateDir was initialized.
+	// When ConfigBase is unset, fall back to WorkDir, then CWD.
+	configBase := cfg.ConfigBase
+	if configBase == "" {
+		configBase = effectiveDir(cfg.WorkDir)
+	}
+
+	// Load tool-specific settings when available; warn if missing
+	if settingsPath := ClaudeSettingsPath(configBase); ClaudeSettingsExists(configBase) {
+		args = append(args, "--settings", settingsPath)
+	} else if a.Logger != nil {
+		a.Logger.Warn("Claude subprocess settings not found at %s", settingsPath)
+		a.Logger.Warn("Run 'amadeus mcp-config generate' to create settings.")
 	}
 
 	// --allowedTools: use caller-specified tools, or default to DivergenceMeterAllowedTools.
@@ -61,11 +80,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		args = append(args, "--continue")
 	}
 
-	// Enforce MCP allowlist when mcp-config.json exists
-	if mcpPath := MCPConfigPath(effectiveDir(cfg.WorkDir)); mcpPath != "" {
-		if _, statErr := os.Stat(mcpPath); statErr == nil {
-			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
-		}
+	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
+	if mcpPath := ResolveMCPConfigPath(configBase); mcpPath != "" {
+		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 
 	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)

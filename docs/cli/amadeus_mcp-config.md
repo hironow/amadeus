@@ -4,7 +4,7 @@ Manage MCP configuration for Claude subprocess isolation
 
 ### Synopsis
 
-Manage the mcp-config.json file that controls which MCP servers
+Manage the .mcp.json file that controls which MCP servers
 are available to Claude subprocess invocations.
 
 Use 'generate' to create the initial config, then edit it to add or remove
@@ -40,5 +40,5 @@ this allowlist when the file exists.
 ### SEE ALSO
 
 * [amadeus](amadeus.md)	 - Divergence meter for your codebase
-* [amadeus mcp-config generate](amadeus_mcp-config_generate.md)	 - Generate mcp-config.json for --strict-mcp-config isolation
+* [amadeus mcp-config generate](amadeus_mcp-config_generate.md)	 - Generate .mcp.json and .claude/settings.json for subprocess isolation
 

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
@@ -13,7 +14,7 @@ func newMCPConfigCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp-config",
 		Short: "Manage MCP configuration for Claude subprocess isolation",
-		Long: `Manage the mcp-config.json file that controls which MCP servers
+		Long: `Manage the .mcp.json file that controls which MCP servers
 are available to Claude subprocess invocations.
 
 Use 'generate' to create the initial config, then edit it to add or remove
@@ -33,15 +34,16 @@ func newMCPConfigGenerateCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "generate [path]",
-		Short: "Generate mcp-config.json for --strict-mcp-config isolation",
-		Long: `Generate a mcp-config.json file that controls which MCP servers
-are available to Claude subprocess invocations.
+		Short: "Generate .mcp.json and .claude/settings.json for subprocess isolation",
+		Long: `Generate .mcp.json and .claude/settings.json for Claude subprocess isolation.
 
-In wave mode (default): generates empty config (no MCP servers).
-In linear mode (--linear): includes Linear MCP server.
+.mcp.json controls which MCP servers are available:
+  - wave mode (default): empty config (no MCP servers)
+  - linear mode (--linear): includes Linear MCP server
 
-The generated file can be freely edited to add custom MCP servers.
-Claude subprocess uses --strict-mcp-config to enforce this allowlist.`,
+.claude/settings.json disables all plugins for the subprocess.
+
+Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir := "."
@@ -55,20 +57,37 @@ Claude subprocess uses --strict-mcp-config to enforce this allowlist.`,
 
 			path, genErr := session.GenerateMCPConfig(baseDir, mode, force)
 			if genErr != nil {
-				return genErr
+				if strings.Contains(genErr.Error(), "already exists") {
+					logger.Warn("mcp: %v", genErr)
+					path = session.MCPConfigPath(baseDir)
+				} else {
+					return genErr
+				}
+			} else {
+				logger.OK("Generated %s (mode: %s)", path, mode)
+				if mode.IsWave() {
+					logger.Info("Empty config — no MCP servers. Edit to add custom servers.")
+				} else {
+					logger.Info("Linear MCP server included. Edit to add/remove servers.")
+				}
 			}
 
-			logger.OK("Generated %s (mode: %s)", path, mode)
-			if mode.IsWave() {
-				logger.Info("Empty config — no MCP servers. Edit to add custom servers.")
+			settingsPath, settingsErr := session.GenerateClaudeSettings(baseDir, force)
+			if settingsErr != nil {
+				if strings.Contains(settingsErr.Error(), "already exists") {
+					logger.Warn("settings: %v", settingsErr)
+				} else {
+					return fmt.Errorf("settings: %w", settingsErr)
+				}
 			} else {
-				logger.Info("Linear MCP server included. Edit to add/remove servers.")
+				logger.OK("Generated %s", settingsPath)
 			}
+
 			fmt.Fprintln(cmd.OutOrStdout(), path)
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing mcp-config.json")
+	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing .mcp.json")
 	return cmd
 }

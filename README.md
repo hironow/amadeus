@@ -265,6 +265,9 @@ just install
 # Initialize .gate/ with default config
 amadeus init
 
+# Generate Claude subprocess isolation settings
+amadeus mcp-config generate
+
 # Upgrade existing installation (regenerate SKILL.md, .gitignore)
 amadeus init --force
 
@@ -293,6 +296,8 @@ Running `amadeus` without a subcommand defaults to `run` (divergence check + D-M
 | `rebuild` | Rebuild projections from event store |
 | `archive-prune` | Prune old archived D-Mail files |
 | `install-hook` / `uninstall-hook` | Manage git post-merge hook |
+| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
+| `dashboard` | Cross-repo divergence dashboard |
 | `version` | Print version info |
 | `update` | Self-update to the latest release |
 
@@ -301,10 +306,11 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 ## Quick Start
 
 ```bash
-amadeus init            # set up .gate/
-amadeus run             # divergence check + D-Mail loop
-amadeus run -n          # dry run
-amadeus run --base main # PR convergence daemon
+amadeus init                    # set up .gate/
+amadeus mcp-config generate     # Claude subprocess isolation settings
+amadeus run                     # divergence check + D-Mail loop
+amadeus run -n                  # dry run
+amadeus run --base main         # PR convergence daemon
 ```
 
 ## Exit Codes
