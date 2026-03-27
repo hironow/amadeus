@@ -17,14 +17,15 @@ import (
 
 // newStatusCommand creates the status subcommand that displays operational status.
 func newStatusCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "status [path]",
 		Short: "Show amadeus operational status",
 		Long: `Display operational status including check history, divergence,
 success rate, and pending d-mail counts.
 
 Output goes to stdout by default (human-readable text).
-Use -o json for machine-readable JSON output to stdout.`,
+Use -o json for machine-readable JSON output to stdout.
+Use --history N to show a sparkline of the last N baseline divergence points.`,
 		Example: `  # Show status for current directory
   amadeus status
 
@@ -32,7 +33,10 @@ Use -o json for machine-readable JSON output to stdout.`,
   amadeus status /path/to/project
 
   # JSON output for scripting
-  amadeus status -o json`,
+  amadeus status -o json
+
+  # Show sparkline of last 20 baseline points
+  amadeus status --history 20`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot, err := resolveTargetDir(args)
@@ -60,7 +64,24 @@ Use -o json for machine-readable JSON output to stdout.`,
 
 			// Text output to stdout (human-readable, per S0027)
 			fmt.Fprint(cmd.OutOrStdout(), report.FormatText())
+
+			// Sparkline history display
+			historyN, _ := cmd.Flags().GetInt("history")
+			if historyN > 0 && len(report.BaselineHistory) > 0 {
+				points := report.BaselineHistory
+				if len(points) > historyN {
+					points = points[len(points)-historyN:]
+				}
+				values := make([]float64, len(points))
+				for i, p := range points {
+					values[i] = p.Divergence
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n  Baseline history (%d points):\n  %s\n", len(points), domain.Sparkline(values))
+			}
+
 			return nil
 		},
 	}
+	cmd.Flags().Int("history", 0, "show sparkline of last N baseline divergence points")
+	return cmd
 }

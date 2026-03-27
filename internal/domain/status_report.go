@@ -7,15 +7,24 @@ import (
 	"time"
 )
 
+// BaselinePoint records a single baseline update event for historical tracking.
+type BaselinePoint struct {
+	Commit     string    `json:"commit"`
+	Divergence float64   `json:"divergence"`
+	At         time.Time `json:"at"`
+}
+
 // StatusReport holds operational status information for the amadeus tool.
 type StatusReport struct {
-	LastCheck    time.Time `json:"last_check"`
-	Divergence   float64   `json:"divergence"`
-	CheckCount   int       `json:"check_count"`
-	InboxCount   int       `json:"inbox_count"`
-	ArchiveCount int       `json:"archive_count"`
-	SuccessRate  float64   `json:"success_rate"`
-	Convergences int       `json:"convergences"`
+	LastCheck       time.Time        `json:"last_check"`
+	Divergence      float64          `json:"divergence"`
+	CheckCount      int              `json:"check_count"`
+	InboxCount      int              `json:"inbox_count"`
+	ArchiveCount    int              `json:"archive_count"`
+	SuccessRate     float64          `json:"success_rate"`
+	Convergences    int              `json:"convergences"`
+	BaselineHistory []BaselinePoint  `json:"baseline_history,omitempty"`
+	Trend           *DivergenceTrend `json:"trend,omitempty"`
 }
 
 // FormatText returns a human-readable status report string suitable for stdout.
@@ -43,6 +52,10 @@ func (r StatusReport) FormatText() string {
 	fmt.Fprintf(&b, "  %-16s %d pending\n", "Inbox:", r.InboxCount)
 	fmt.Fprintf(&b, "  %-16s %d processed\n", "Archive:", r.ArchiveCount)
 	fmt.Fprintf(&b, "  %-16s %d active\n", "Convergences:", r.Convergences)
+
+	if r.Trend != nil {
+		fmt.Fprintf(&b, "  %-16s %s\n", "Trend:", r.Trend.Message)
+	}
 
 	return b.String()
 }
