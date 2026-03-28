@@ -955,7 +955,7 @@ func checkContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 // checkGHAuth verifies that the GitHub CLI is authenticated by running
 // `gh auth status`. Returns OK if authenticated, WARN if not.
 func checkGHAuth(ctx context.Context) domain.DoctorCheck {
-	cmd := exec.CommandContext(ctx, "gh", "auth", "status")
+	cmd := exec.CommandContext(ctx, "gh", "auth", "status", "--active")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return domain.DoctorCheck{

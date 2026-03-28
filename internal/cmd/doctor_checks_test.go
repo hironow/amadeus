@@ -356,15 +356,15 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: should have 17 results
-	if len(results) != 17 {
+	if len(results) != 18 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 17 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 18 results, got %d: %v", len(results), names)
 	}
 	// Verify names in order
-	expectedNames := []string{"git", "claude", "gh", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "linear-mcp", "claude-inference", "context-budget", "skills-ref", "success-rate"}
+	expectedNames := []string{"git", "claude", "gh", "gh-auth", "Git Repository", "Git Remote", ".gate/", "Config", "SKILL.md", "Event Store", "D-Mail Schema", "fsnotify", "claude-auth", "linear-mcp", "claude-inference", "context-budget", "skills-ref", "success-rate"}
 	for i, name := range expectedNames {
 		if results[i].Name != name {
 			t.Errorf("result[%d]: expected name %q, got %q", i, name, results[i].Name)
@@ -410,8 +410,8 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 					eventCount++
 				}
 			}
-			if eventCount != 17 {
-				t.Errorf("expected 17 doctor.check events, got %d", eventCount)
+			if eventCount != 18 {
+				t.Errorf("expected 18 doctor.check events, got %d", eventCount)
 			}
 		}
 	}
@@ -526,12 +526,12 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
 
 	// then: should have 17 results
-	if len(results) != 17 {
+	if len(results) != 18 {
 		names := make([]string, len(results))
 		for i, r := range results {
 			names[i] = r.Name
 		}
-		t.Fatalf("expected 17 results, got %d: %v", len(results), names)
+		t.Fatalf("expected 18 results, got %d: %v", len(results), names)
 	}
 
 	// then: SKILL.md check should be present and OK
