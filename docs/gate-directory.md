@@ -15,8 +15,8 @@ This document describes what each directory/file does, who creates it, and how i
   history/              # legacy (no longer written to; see ADR-0011)
   archive/              # permanent immutable D-Mail records
     index.jsonl         # archive index (metadata of pruned/existing .md files)
-    feedback-001.md
-    feedback-002.md
+    am-feedback-001_c5b8e2a1.md
+    am-feedback-002_d6f9a3b7.md
     ...
   insights/             # git-tracked insight ledger (per ADR S0030)
     divergence.md       # divergence insights from check results
@@ -201,7 +201,7 @@ In daemon mode (`amadeus run`), inbox is monitored via fsnotify for real-time D-
 
 ```yaml
 ---
-name: design-feedback-001
+name: am-feedback-001_c5b8e2a1
 kind: design-feedback
 description: ADR-003 auth dependency violation
 issues:

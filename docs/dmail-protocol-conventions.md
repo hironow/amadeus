@@ -25,7 +25,7 @@ D-Mail envelopes support an optional `context` field for cross-tool insight prop
 ```yaml
 ---
 dmail-schema-version: "1"
-name: spec-auth-w1
+name: sj-spec-auth-w1_a3f2b7c4
 kind: specification
 description: Auth wave 1 specification
 context:
