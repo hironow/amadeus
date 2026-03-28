@@ -43,29 +43,33 @@ context:
 - Receivers MUST NOT reject unknown context fields (Postel's Law, S0019)
 - phonewave relays context without interpretation
 
-### 2. Namespace Separation (Kind Prefix)
+### 2. Collision-Safe Filenames (Tool Prefix + UUID)
 
-Each tool uses a prefix derived from the d-mail kind it produces.
-SKILL.md routing tables ensure most prefixes are exclusive per tool.
+Each D-Mail filename includes a **tool short-name prefix** and a **UUID v4 suffix** (first 8 hex chars) to prevent both single-tool and cross-tool collisions.
 
-| Tool | Kind | Prefix | Identifier | Example |
-|------|------|--------|------------|---------|
-| sightjack | specification | `spec` | sanitized wave key | `spec-auth-w1.md` |
-| sightjack | report | `report` | sanitized wave key | `report-auth-w1.md` |
-| paintress | report | `report` | lowercase issue ID | `report-my-42.md` |
-| amadeus | design-feedback | `feedback` | sequential number (zero-padded) | `feedback-001.md` |
-| amadeus | implementation-feedback | `feedback` | sequential number (zero-padded) | `feedback-002.md` |
-| amadeus | convergence | `conv` | sequential number (zero-padded) | `conv-001.md` |
+Format: `{tool}-{kind}-{sanitized-key}_{uuid8}.md`
 
-### 2-bis. Shared Kind Prefix
+| Tool | Prefix | Kind | Identifier | Example |
+|------|--------|------|------------|---------|
+| sightjack | `sj` | specification | sanitized wave key (English slug) | `sj-spec-error-handling-w1_a3f2b7c4.md` |
+| sightjack | `sj` | report | sanitized wave key | `sj-report-error-handling-w1_b7c4d8e9.md` |
+| paintress | `pt` | report | sanitized issue/wave ID | `pt-report-my-42_9e1d4f8a.md` |
+| amadeus | `am` | design-feedback | sequential number | `am-feedback-001_c5b8e2a1.md` |
+| amadeus | `am` | implementation-feedback | sequential number | `am-feedback-002_d6f9a3b7.md` |
+| amadeus | `am` | convergence | sequential number | `am-conv-001_e8c2f5a4.md` |
 
-When multiple tools produce the same kind (e.g. sightjack and paintress both produce `report`),
-prefix alone does not guarantee cross-tool uniqueness.
+Sanitization rules for the key portion:
+- Keeps: `a-z`, `0-9`, `-`
+- Converts `:`, space, `_` to `-`
+- Compresses consecutive `-`
+- Strips non-ASCII characters (Japanese, emoji, etc.)
+- Trims leading/trailing `-`
 
-In such cases, each tool MUST ensure **structural divergence in the identifier**:
+### 2-bis. Cross-Tool Safety
 
-- sightjack: `report-{cluster}-w{N}` — wave key derived (always contains `-w` + digit)
-- paintress: `report-{team}-{issue_number}` — Linear issue ID derived
+The tool prefix (`sj-`, `pt-`, `am-`) guarantees cross-tool uniqueness.
+The UUID suffix guarantees single-tool uniqueness across invocations.
+Combined, filename collision is statistically impossible (16^8 = 4.3 billion combinations per unique key).
 
 Each tool is responsible for ensuring its identifier pattern does not overlap with other tools
 sharing the same prefix.
