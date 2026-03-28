@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -25,18 +27,28 @@ func (s *ProjectionStore) NextDMailName(kind domain.DMailKind) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	prefix := string(kind) + "-"
+	// Scan both legacy (kind-NNN) and new (am-kind-NNN_uuid) formats
+	legacyPrefix := string(kind) + "-"
+	newPrefix := "am-" + string(kind) + "-"
 	maxNum := 0
 	for _, e := range entries {
 		name := strings.TrimSuffix(e.Name(), ".md")
-		if strings.HasPrefix(name, prefix) {
-			var num int
-			if _, err := fmt.Sscanf(name, prefix+"%d", &num); err == nil && num > maxNum {
+		// Strip UUID suffix for new format: am-kind-NNN_xxxxxxxx → am-kind-NNN
+		if idx := strings.LastIndex(name, "_"); idx > 0 {
+			name = name[:idx]
+		}
+		var num int
+		if strings.HasPrefix(name, newPrefix) {
+			if _, err := fmt.Sscanf(name, newPrefix+"%d", &num); err == nil && num > maxNum {
+				maxNum = num
+			}
+		} else if strings.HasPrefix(name, legacyPrefix) {
+			if _, err := fmt.Sscanf(name, legacyPrefix+"%d", &num); err == nil && num > maxNum {
 				maxNum = num
 			}
 		}
 	}
-	return fmt.Sprintf("%s-%03d", kind, maxNum+1), nil
+	return fmt.Sprintf("am-%s-%03d_%s", kind, maxNum+1, shortDMailUUID()), nil
 }
 
 // SaveDMailToArchive writes a D-Mail to archive/ only, skipping outbox/.
@@ -222,4 +234,14 @@ func (s *ProjectionStore) ScanInbox(ctx context.Context) ([]domain.DMail, error)
 		attribute.Int("archive.write.count", archiveCount),
 	)
 	return dmails, nil
+}
+
+func shortDMailUUID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+	}
+	buf[6] = (buf[6] & 0x0f) | 0x40
+	buf[8] = (buf[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x", buf[:4])
 }
