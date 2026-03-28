@@ -414,7 +414,17 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	results = append(results, checkTool(ctx, "git"))
 	claudeResult := checkTool(ctx, claudeCmd)
 	results = append(results, claudeResult)
-	results = append(results, checkTool(ctx, "gh"))
+	ghResult := checkTool(ctx, "gh")
+	results = append(results, ghResult)
+	if ghResult.Status == domain.CheckOK {
+		results = append(results, checkGHAuth(ctx))
+	} else {
+		results = append(results, domain.DoctorCheck{
+			Name:    "gh-auth",
+			Status:  domain.CheckSkip,
+			Message: "skipped (gh not available)",
+		})
+	}
 
 	// --- Repository ---
 	results = append(results, checkGitRepo(repoRoot))
@@ -940,4 +950,33 @@ func checkContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 	}
 
 	return result
+}
+
+// checkGHAuth verifies that the GitHub CLI is authenticated by running
+// `gh auth status`. Returns OK if authenticated, WARN if not.
+func checkGHAuth(ctx context.Context) domain.DoctorCheck {
+	cmd := exec.CommandContext(ctx, "gh", "auth", "status", "--active")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "gh-auth",
+			Status:  domain.CheckWarn,
+			Message: "gh not authenticated",
+			Hint:    "run 'gh auth login' to authenticate",
+		}
+	}
+	output := string(out)
+	if strings.Contains(output, "Logged in") || strings.Contains(output, "✓") {
+		return domain.DoctorCheck{
+			Name:    "gh-auth",
+			Status:  domain.CheckOK,
+			Message: "gh authenticated",
+		}
+	}
+	return domain.DoctorCheck{
+		Name:    "gh-auth",
+		Status:  domain.CheckWarn,
+		Message: "gh auth status unclear: " + output,
+		Hint:    "run 'gh auth login' to authenticate",
+	}
 }
