@@ -1,0 +1,31 @@
+rules:
+  # ==========================================================================
+  # Archive read prohibition (CANONICAL — identical across all tools)
+  #
+  # Archive is a write-only store for processed D-Mails. Reading archive
+  # for target selection or state computation causes:
+  #   1. Unbounded growth: archive accumulates all processed D-Mails
+  #   2. Stale reads: report D-Mails in outbox are not reflected in archive
+  #      until phonewave delivers them
+  #
+  # Use event-sourced Read Model (StepProgressReader) instead.
+  # See ADR for details.
+  # ==========================================================================
+
+  - id: no-archive-read-funcs
+    patterns:
+      - pattern-either:
+          - pattern: ReadArchiveDMails(...)
+          - pattern: NewArchiveReader(...)
+    message: >-
+      Archive is a write-only store for processed D-Mails.
+      Do not read from archive for target selection or state computation.
+      Use event-sourced Read Model (StepProgressReader) instead.
+      If this is a legitimate use (e.g. migration, tooling), add nosemgrep
+      with justification.
+    severity: ERROR
+    languages: [go]
+    paths:
+      exclude:
+        - "*_test.go"
+        - "internal/session/archive_reader.go"

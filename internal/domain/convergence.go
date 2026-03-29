@@ -10,13 +10,14 @@ import (
 // ConvergenceAlert represents a detected world-line convergence:
 // multiple D-Mails targeting the same area within a time window.
 type ConvergenceAlert struct {
-	Target    string    `json:"target"`
-	Count     int       `json:"count"`
-	Window    int       `json:"window_days"`
-	DMails    []string  `json:"dmails"`
-	Severity  Severity  `json:"severity"`
-	FirstSeen time.Time `json:"first_seen"`
-	LastSeen  time.Time `json:"last_seen"`
+	Target       string            `json:"target"`
+	Count        int               `json:"count"`
+	Window       int               `json:"window_days"`
+	DMails       []string          `json:"dmails"`
+	Descriptions map[string]string `json:"descriptions,omitempty"` // dmail name → description
+	Severity     Severity          `json:"severity"`
+	FirstSeen    time.Time         `json:"first_seen"`
+	LastSeen     time.Time         `json:"last_seen"`
 }
 
 // AnalyzeConvergence detects targets referenced by multiple D-Mails within
@@ -27,6 +28,7 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 	// Group D-Mails by target within the time window
 	type targetInfo struct {
 		dmailNames   []string
+		descriptions map[string]string // dmail name → description
 		seen         map[string]bool
 		highSevCount int
 		firstSeen    time.Time
@@ -54,15 +56,19 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 			info, exists := targets[target]
 			if !exists {
 				info = &targetInfo{
-					firstSeen: created,
-					lastSeen:  created,
-					seen:      make(map[string]bool),
+					firstSeen:    created,
+					lastSeen:     created,
+					seen:         make(map[string]bool),
+					descriptions: make(map[string]string),
 				}
 				targets[target] = info
 			}
 			if !info.seen[d.Name] {
 				info.seen[d.Name] = true
 				info.dmailNames = append(info.dmailNames, d.Name)
+				if d.Description != "" {
+					info.descriptions[d.Name] = d.Description
+				}
 				if d.Severity == SeverityHigh {
 					info.highSevCount++
 				}
@@ -96,13 +102,14 @@ func AnalyzeConvergence(dmails []DMail, cfg ConvergenceConfig, now time.Time) []
 			severity = SeverityHigh
 		}
 		alerts = append(alerts, ConvergenceAlert{
-			Target:    target,
-			Count:     len(info.dmailNames),
-			Window:    cfg.WindowDays,
-			DMails:    info.dmailNames,
-			Severity:  severity,
-			FirstSeen: info.firstSeen,
-			LastSeen:  info.lastSeen,
+			Target:       target,
+			Count:        len(info.dmailNames),
+			Window:       cfg.WindowDays,
+			DMails:       info.dmailNames,
+			Descriptions: info.descriptions,
+			Severity:     severity,
+			FirstSeen:    info.firstSeen,
+			LastSeen:     info.lastSeen,
 		})
 	}
 

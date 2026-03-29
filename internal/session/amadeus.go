@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -307,9 +306,8 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	dmails = append(dmails, convergenceDMails...)
 
 	// Write convergence insights for HIGH severity alerts (best-effort)
-	archiveDir := filepath.Join(a.RepoDir, domain.StateDir, "archive")
 	for _, alert := range convergenceAlerts {
-		a.writeConvergenceInsight(alert, currentCommit, archiveDir)
+		a.writeConvergenceInsight(alert, currentCommit)
 	}
 
 	var prNumbers []string

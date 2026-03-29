@@ -51,8 +51,8 @@ func ExportWriteDivergenceInsight(a *Amadeus, result domain.DivergenceResult, se
 }
 
 // ExportWriteConvergenceInsight exposes writeConvergenceInsight for external tests.
-func ExportWriteConvergenceInsight(a *Amadeus, alert domain.ConvergenceAlert, sessionID string, archiveDir string) {
-	a.writeConvergenceInsight(alert, sessionID, archiveDir)
+func ExportWriteConvergenceInsight(a *Amadeus, alert domain.ConvergenceAlert, sessionID string) {
+	a.writeConvergenceInsight(alert, sessionID)
 }
 
 // ExportHighScoringAxisDetails exposes highScoringAxisDetails for external tests.
