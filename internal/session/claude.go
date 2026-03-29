@@ -31,10 +31,15 @@ type ClaudeAdapter struct {
 	Logger     domain.Logger // nil-safe; warnings are sent here instead of raw stderr
 }
 
-// Run executes the Claude CLI with the given prompt via stdin and returns raw output.
-// Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
-// The writer parameter is accepted for interface compatibility and ignored; opts are applied via port.ApplyOptions and control allowed tools, working directory, and continuation behavior.
-func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
+// Run executes the Claude CLI, returning only the result text.
+func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
+	result, err := a.RunDetailed(ctx, prompt, w, opts...)
+	return result.Text, err
+}
+
+// RunDetailed executes the Claude CLI with the given prompt via stdin and returns
+// result text plus provider session ID.
+func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (port.RunResult, error) {
 	cfg := port.ApplyOptions(opts...)
 	claudeCmd := a.ClaudeCmd
 	model := a.Model
@@ -76,7 +81,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 	}
 	args = append(args, "--allowedTools", strings.Join(allowedTools, ","))
 
-	if cfg.Continue {
+	if cfg.ResumeSessionID != "" {
+		args = append(args, "--resume", cfg.ResumeSessionID)
+	} else if cfg.Continue {
 		args = append(args, "--continue")
 	}
 
@@ -109,7 +116,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 			}
 			diagnostic = platform.SummarizeNDJSON(diagnostic)
 		}
-		return "", fmt.Errorf("claude: %w\n%s", err, diagnostic)
+		return port.RunResult{}, fmt.Errorf("claude: %w\n%s", err, diagnostic)
 	}
 
 	// Parse stream-json with span-emitting reader for OTel + Weave integration
@@ -119,10 +126,10 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 
 	result, messages, err := emitter.CollectAll()
 	if err != nil {
-		return "", fmt.Errorf("stream-json parse: %w", err)
+		return port.RunResult{}, fmt.Errorf("stream-json parse: %w", err)
 	}
 	if result == nil {
-		return "", fmt.Errorf("no result message in stream-json output")
+		return port.RunResult{}, fmt.Errorf("no result message in stream-json output")
 	}
 
 	// Set GenAI and Weave attributes on the parent invoke span
@@ -179,7 +186,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		}
 	}
 
-	return result.Result, nil
+	return port.RunResult{Text: result.Result, ProviderSessionID: result.SessionID}, nil
 }
 
 // DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.
