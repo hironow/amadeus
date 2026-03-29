@@ -199,7 +199,7 @@ D-Mails use YAML frontmatter + Markdown body, stored as `.md` files:
 
 ```yaml
 ---
-name: design-feedback-001
+name: am-feedback-001_c5b8e2a1
 kind: design-feedback
 description: "ADR-003 violation detected"
 issues:

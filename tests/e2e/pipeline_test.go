@@ -80,7 +80,7 @@ func TestE2E_Pipeline_Convergence(t *testing.T) {
 	archiveFiles := listDir(t, filepath.Join(dir, ".gate", "archive"))
 	convergenceFound := false
 	for _, f := range archiveFiles {
-		if strings.HasPrefix(f, "convergence-") {
+		if strings.HasPrefix(f, "am-convergence-") || strings.HasPrefix(f, "convergence-") {
 			convergenceFound = true
 		}
 	}
