@@ -187,6 +187,123 @@ func TestEvaluatePRDiffs_NoPRWriter_SkipsLabel(t *testing.T) {
 	_ = dmails
 }
 
+func TestEvaluatePRDiffs_GoTaskboardScenario(t *testing.T) {
+	// given: 7 open PRs targeting main, no review labels (first run)
+	// This mirrors the real go-taskboard state as of 2026-03-29.
+	prs := []domain.PRState{
+		mustPRStateWithSHA(t, "#14", "feat(#5): add ErrInvalidStatus validation", "main", "feat/input-validation-cluster-w2-5", "a9c5e6e3"),
+		mustPRStateWithSHA(t, "#15", "test: pagination boundary tests", "main", "feat/pagination-w1-s1-reproduction-test", "e6a3617a"),
+		mustPRStateWithSHA(t, "#16", "fix: validate offset/limit query params", "main", "feat/cluster-w2-1-handler-validation", "411f4200"),
+		mustPRStateWithSHA(t, "#17", "fix(#5): validate status string", "main", "feat/input-validation-cluster-w3-5", "0ba57d71"),
+		mustPRStateWithSHA(t, "#18", "test: pagination bug cluster reproduction", "main", "feat/pagination-cluster-w1-1-investigation", "e6b39c3a"),
+		mustPRStateWithSHA(t, "#19", "fix: add pagination input validation", "main", "feat/pagination-w2-1-input-validation", "b04b4e5c"),
+		mustPRStateWithSHA(t, "#20", "feat(#12, #13): TaskRepository filter/aggregation", "main", "feat/task-api-cluster-w2-12-sqlite", "457e717f"),
+	}
+
+	diffs := make(map[string]string)
+	for _, pr := range prs {
+		diffs[pr.Number()] = "diff --git a/main.go b/main.go\n+// changes for " + pr.Title()
+	}
+
+	reader := &fakePRReaderForReview{prs: prs, diffs: diffs}
+	writer := newFakePRWriter()
+
+	claudeResponse := `{"axes": {"structural": {"score": 5}}, "reasoning": "Minor deviations", "dmails": []}`
+	evalCount := 0
+	countingClaude := &countingClaudeRunner{
+		response: claudeResponse,
+		count:    &evalCount,
+	}
+
+	a := &Amadeus{
+		PRReader:    reader,
+		PRWriter:    writer,
+		Logger:      &domain.NopLogger{},
+		Claude:      countingClaude,
+		ClaudeModel: "test-model",
+		Config:      domain.Config{Lang: "en"},
+		Emitter:     &nopReviewEmitter{},
+	}
+
+	// when: first run — all 7 PRs should be evaluated
+	dmails, err := a.evaluatePRDiffs(context.Background(), "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then
+	if evalCount != 7 {
+		t.Errorf("expected 7 Claude evaluations, got %d", evalCount)
+	}
+	if len(writer.appliedLabels) != 7 {
+		t.Errorf("expected 7 PRs labeled, got %d", len(writer.appliedLabels))
+	}
+	// Each PR should have exactly one label: amadeus:reviewed-{sha8}
+	for _, pr := range prs {
+		labels, ok := writer.appliedLabels[pr.Number()]
+		if !ok {
+			t.Errorf("PR %s: expected label applied", pr.Number())
+			continue
+		}
+		expectedLabel := PRReviewLabelPrefix + pr.HeadSHAShort()
+		if len(labels) != 1 || labels[0] != expectedLabel {
+			t.Errorf("PR %s: expected label %q, got %v", pr.Number(), expectedLabel, labels)
+		}
+	}
+
+	// when: second run — all 7 should be SKIPPED (already labeled)
+	// Simulate labeled state by recreating PRs with labels
+	var labeledPRs []domain.PRState
+	for _, pr := range prs {
+		lbl := PRReviewLabelPrefix + pr.HeadSHAShort()
+		lp, _ := domain.NewPRState(pr.Number(), pr.Title(), pr.BaseBranch(), pr.HeadBranch(),
+			pr.Mergeable(), pr.BehindBy(), pr.ConflictFiles(), []string{lbl}, pr.HeadSHA())
+		labeledPRs = append(labeledPRs, lp)
+	}
+	reader2 := &fakePRReaderForReview{prs: labeledPRs, diffs: diffs}
+	evalCount2 := 0
+	a2 := &Amadeus{
+		PRReader:    reader2,
+		PRWriter:    newFakePRWriter(),
+		Logger:      &domain.NopLogger{},
+		Claude:      &countingClaudeRunner{response: claudeResponse, count: &evalCount2},
+		ClaudeModel: "test-model",
+		Config:      domain.Config{Lang: "en"},
+		Emitter:     &nopReviewEmitter{},
+	}
+	dmails2, err2 := a2.evaluatePRDiffs(context.Background(), "main")
+	if err2 != nil {
+		t.Fatalf("second run error: %v", err2)
+	}
+	if evalCount2 != 0 {
+		t.Errorf("second run: expected 0 evaluations (all skipped), got %d", evalCount2)
+	}
+	if len(dmails2) != 0 {
+		t.Errorf("second run: expected 0 D-Mails, got %d", len(dmails2))
+	}
+	_ = dmails
+}
+
+func mustPRStateWithSHA(t *testing.T, number, title, base, head, sha string) domain.PRState {
+	t.Helper()
+	ps, err := domain.NewPRState(number, title, base, head, true, 0, nil, nil, sha)
+	if err != nil {
+		t.Fatalf("mustPRStateWithSHA: %v", err)
+	}
+	return ps
+}
+
+// countingClaudeRunner counts invocations.
+type countingClaudeRunner struct {
+	response string
+	count    *int
+}
+
+func (c *countingClaudeRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	*c.count++
+	return c.response, nil
+}
+
 // nopReviewEmitter is a minimal CheckEventEmitter for PR review tests.
 type nopReviewEmitter struct{}
 
