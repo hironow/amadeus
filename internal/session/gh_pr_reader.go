@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/usecase/port"
@@ -25,26 +26,47 @@ func NewGhPRReader(repoDir string) *GhPRReader {
 
 // ghPRListEntry is the JSON structure returned by `gh pr list --json`.
 type ghPRListEntry struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	BaseRefName string `json:"baseRefName"`
-	HeadRefName string `json:"headRefName"`
-	Mergeable   string `json:"mergeable"` // "MERGEABLE", "CONFLICTING", "UNKNOWN"
+	Number      int            `json:"number"`
+	Title       string         `json:"title"`
+	BaseRefName string         `json:"baseRefName"`
+	HeadRefName string         `json:"headRefName"`
+	Mergeable   string         `json:"mergeable"` // "MERGEABLE", "CONFLICTING", "UNKNOWN"
+	Labels      []ghLabelEntry `json:"labels"`
+	HeadRefOid  string         `json:"headRefOid"`
 }
 
-// ListOpenPRs returns all open PRs. The caller handles chain building and filtering.
-func (g *GhPRReader) ListOpenPRs(ctx context.Context, _ string) ([]domain.PRState, error) {
+// ghLabelEntry is the JSON structure for a label in `gh pr list --json`.
+type ghLabelEntry struct {
+	Name string `json:"name"`
+}
+
+// ListOpenPRs returns all open PRs targeting the given branch.
+func (g *GhPRReader) ListOpenPRs(_ context.Context, targetBranch string) ([]domain.PRState, error) {
 	ghClient := &GHClient{Dir: g.RepoDir}
-	data, err := ghClient.runGH(
+	args := []string{
 		"pr", "list",
 		"--state", "open",
-		"--json", "number,title,baseRefName,headRefName,mergeable",
+		"--json", "number,title,baseRefName,headRefName,mergeable,labels,headRefOid",
 		"--limit", "100",
-	)
+	}
+	if targetBranch != "" {
+		args = append(args, "--base", targetBranch)
+	}
+	data, err := ghClient.runGH(args...)
 	if err != nil {
 		return nil, fmt.Errorf("list open PRs: %w", err)
 	}
 	return parseGhPRListOutput(data)
+}
+
+// GetPRDiff returns the unified diff for the given PR number.
+func (g *GhPRReader) GetPRDiff(_ context.Context, prNumber string) (string, error) {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	data, err := ghClient.runGH("pr", "diff", strings.TrimPrefix(prNumber, "#"))
+	if err != nil {
+		return "", fmt.Errorf("get PR diff for %s: %w", prNumber, err)
+	}
+	return string(data), nil
 }
 
 // parseGhPRListOutput parses the JSON output from `gh pr list --json` into domain PRState slice.
@@ -59,7 +81,12 @@ func parseGhPRListOutput(data []byte) ([]domain.PRState, error) {
 		number := "#" + strconv.Itoa(e.Number)
 		mergeable := e.Mergeable == "MERGEABLE"
 
-		ps, err := domain.NewPRState(number, e.Title, e.BaseRefName, e.HeadRefName, mergeable, 0, nil)
+		var labels []string
+		for _, l := range e.Labels {
+			labels = append(labels, l.Name)
+		}
+
+		ps, err := domain.NewPRState(number, e.Title, e.BaseRefName, e.HeadRefName, mergeable, 0, nil, labels, e.HeadRefOid)
 		if err != nil {
 			return nil, fmt.Errorf("construct PRState for %s: %w", number, err)
 		}

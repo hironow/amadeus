@@ -12,7 +12,7 @@ import (
 
 func TestNewPRState_valid(t *testing.T) {
 	// given
-	ps, err := domain.NewPRState("#42", "Fix bug", "main", "feature/fix", true, 3, []string{"file.go"})
+	ps, err := domain.NewPRState("#42", "Fix bug", "main", "feature/fix", true, 3, []string{"file.go"}, nil, "")
 
 	// then
 	if err != nil {
@@ -46,7 +46,7 @@ func TestNewPRState_valid(t *testing.T) {
 
 func TestNewPRState_emptyNumber_fails(t *testing.T) {
 	// when
-	_, err := domain.NewPRState("", "title", "main", "feat", true, 0, nil)
+	_, err := domain.NewPRState("", "title", "main", "feat", true, 0, nil, nil, "")
 
 	// then
 	if err == nil {
@@ -56,7 +56,7 @@ func TestNewPRState_emptyNumber_fails(t *testing.T) {
 
 func TestNewPRState_emptyBaseBranch_fails(t *testing.T) {
 	// when
-	_, err := domain.NewPRState("#1", "title", "", "feat", true, 0, nil)
+	_, err := domain.NewPRState("#1", "title", "", "feat", true, 0, nil, nil, "")
 
 	// then
 	if err == nil {
@@ -66,7 +66,7 @@ func TestNewPRState_emptyBaseBranch_fails(t *testing.T) {
 
 func TestNewPRState_emptyHeadBranch_fails(t *testing.T) {
 	// when
-	_, err := domain.NewPRState("#1", "title", "main", "", true, 0, nil)
+	_, err := domain.NewPRState("#1", "title", "main", "", true, 0, nil, nil, "")
 
 	// then
 	if err == nil {
@@ -76,7 +76,7 @@ func TestNewPRState_emptyHeadBranch_fails(t *testing.T) {
 
 func TestNewPRState_noConflict(t *testing.T) {
 	// given
-	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil)
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil, nil, "")
 
 	// then
 	if err != nil {
@@ -245,7 +245,7 @@ func TestBuildPRChains_emptyPRs(t *testing.T) {
 func TestBuildPRChains_manyPRsMixedChainsAndOrphans(t *testing.T) {
 	// given: 30 PRs — some forming chains off "main", rest orphaned (targeting "develop")
 	mustPR := func(num int, base, head string) domain.PRState {
-		ps, err := domain.NewPRState(fmt.Sprintf("#%d", num), fmt.Sprintf("PR %d", num), base, head, true, 0, nil)
+		ps, err := domain.NewPRState(fmt.Sprintf("#%d", num), fmt.Sprintf("PR %d", num), base, head, true, 0, nil, nil, "")
 		if err != nil {
 			t.Fatalf("NewPRState #%d: %v", num, err)
 		}
@@ -473,10 +473,115 @@ func TestBuildPRChains_cycleWithConflict(t *testing.T) {
 	}
 }
 
+// --- PRState labels and headSHA tests ---
+
+func TestPRState_HasLabel_exactMatch(t *testing.T) {
+	// given
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil,
+		[]string{"amadeus:reviewed-abc12345", "bug"}, "abc12345def")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ps.HasLabel("bug") {
+		t.Error("expected HasLabel(bug) = true")
+	}
+	if !ps.HasLabel("amadeus:reviewed-abc12345") {
+		t.Error("expected HasLabel(amadeus:reviewed-abc12345) = true")
+	}
+	if ps.HasLabel("nonexistent") {
+		t.Error("expected HasLabel(nonexistent) = false")
+	}
+}
+
+func TestPRState_HasLabelPrefix(t *testing.T) {
+	// given
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil,
+		[]string{"amadeus:reviewed-abc12345", "amadeus:reviewed-old1234"}, "abc12345def")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ps.HasLabelPrefix("amadeus:reviewed-") {
+		t.Error("expected HasLabelPrefix(amadeus:reviewed-) = true")
+	}
+	if ps.HasLabelPrefix("sightjack:") {
+		t.Error("expected HasLabelPrefix(sightjack:) = false")
+	}
+}
+
+func TestPRState_HeadSHA(t *testing.T) {
+	// given
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil,
+		nil, "abc12345def67890")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ps.HeadSHA() != "abc12345def67890" {
+		t.Errorf("HeadSHA = %q, want abc12345def67890", ps.HeadSHA())
+	}
+}
+
+func TestPRState_HeadSHAShort(t *testing.T) {
+	// given
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil,
+		nil, "abc12345def67890")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ps.HeadSHAShort() != "abc12345" {
+		t.Errorf("HeadSHAShort = %q, want abc12345", ps.HeadSHAShort())
+	}
+}
+
+func TestPRState_ReviewLabel(t *testing.T) {
+	// given: PR with head SHA and existing review label for OLD commit
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil,
+		[]string{"amadeus:reviewed-old12345"}, "newsha123abcdef")
+
+	// then: not reviewed for current commit
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	currentLabel := "amadeus:reviewed-" + ps.HeadSHAShort()
+	if ps.HasLabel(currentLabel) {
+		t.Error("expected not to have review label for current commit")
+	}
+	// but has old label
+	if !ps.HasLabel("amadeus:reviewed-old12345") {
+		t.Error("expected to have old review label")
+	}
+}
+
+func TestPRState_EmptyLabels(t *testing.T) {
+	// given
+	ps, err := domain.NewPRState("#1", "title", "main", "feat", true, 0, nil, nil, "")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ps.Labels()) != 0 {
+		t.Errorf("expected 0 labels, got %d", len(ps.Labels()))
+	}
+	if ps.HeadSHA() != "" {
+		t.Errorf("expected empty headSHA, got %q", ps.HeadSHA())
+	}
+	if ps.HeadSHAShort() != "" {
+		t.Errorf("expected empty headSHAShort, got %q", ps.HeadSHAShort())
+	}
+}
+
 // mustPRState is a test helper that creates a PRState or fails the test.
 func mustPRState(t *testing.T, number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles []string) domain.PRState {
 	t.Helper()
-	ps, err := domain.NewPRState(number, title, baseBranch, headBranch, mergeable, behindBy, conflictFiles)
+	ps, err := domain.NewPRState(number, title, baseBranch, headBranch, mergeable, behindBy, conflictFiles, nil, "")
 	if err != nil {
 		t.Fatalf("mustPRState: %v", err)
 	}

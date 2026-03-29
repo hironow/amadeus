@@ -119,6 +119,15 @@ type Git interface {
 type GitHubPRReader interface {
 	// ListOpenPRs returns all open PRs targeting the given branch.
 	ListOpenPRs(ctx context.Context, targetBranch string) ([]domain.PRState, error)
+	// GetPRDiff returns the unified diff for the given PR number.
+	GetPRDiff(ctx context.Context, prNumber string) (string, error)
+}
+
+// GitHubPRWriter writes labels to PRs on GitHub.
+// Implemented by session-layer adapter using `gh` CLI.
+type GitHubPRWriter interface {
+	// ApplyLabel adds a label to the given PR. Creates the label if it doesn't exist.
+	ApplyLabel(ctx context.Context, prNumber, label string) error
 }
 
 // PRPipelineRunner executes the pre-merge PR convergence pipeline.

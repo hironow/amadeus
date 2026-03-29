@@ -32,6 +32,7 @@ type Amadeus struct {
 	ClaudeCmd   string                  // Claude CLI command (set by cmd layer from config)
 	ClaudeModel string                  // Claude model for review fix (set by cmd layer from config)
 	PRReader    port.GitHubPRReader     // nil = skip PR convergence
+	PRWriter    port.GitHubPRWriter    // nil = skip PR label writes
 	PRPipeline  port.PRPipelineRunner   // nil = skip PR convergence (usecase-injected)
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)

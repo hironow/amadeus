@@ -38,6 +38,10 @@ func (r *lifecyclePRReader) ListOpenPRs(_ context.Context, _ string) ([]domain.P
 	return r.prs, nil
 }
 
+func (r *lifecyclePRReader) GetPRDiff(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
 var _ port.GitHubPRReader = (*lifecyclePRReader)(nil)
 
 // --- Helpers ---
@@ -211,15 +215,15 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 	git := &lifecycleGit{branch: "develop", commit: "def5678"}
 
 	// PRReader with 3 PRs forming a chain (triggers pre-merge pipeline)
-	pr1, err := domain.NewPRState("#1", "Feature A", "develop", "feat-a", true, 2, nil)
+	pr1, err := domain.NewPRState("#1", "Feature A", "develop", "feat-a", true, 2, nil, nil, "")
 	if err != nil {
 		t.Fatalf("NewPRState: %v", err)
 	}
-	pr2, err := domain.NewPRState("#2", "Feature B", "feat-a", "feat-b", true, 0, nil)
+	pr2, err := domain.NewPRState("#2", "Feature B", "feat-a", "feat-b", true, 0, nil, nil, "")
 	if err != nil {
 		t.Fatalf("NewPRState: %v", err)
 	}
-	pr3, err := domain.NewPRState("#3", "Feature C", "feat-b", "feat-c", true, 0, nil)
+	pr3, err := domain.NewPRState("#3", "Feature C", "feat-b", "feat-c", true, 0, nil, nil, "")
 	if err != nil {
 		t.Fatalf("NewPRState: %v", err)
 	}

@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // PRState represents an open PR's convergence-relevant state.
 // All fields are unexported; use NewPRState to construct with validation.
@@ -12,11 +15,13 @@ type PRState struct {
 	mergeable     bool
 	behindBy      int
 	conflictFiles []string
+	labels        []string
+	headSHA       string
 }
 
 // NewPRState creates a validated PRState. Returns an error if required fields
 // (number, baseBranch, headBranch) are empty.
-func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles []string) (PRState, error) {
+func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles, labels []string, headSHA string) (PRState, error) {
 	if number == "" {
 		return PRState{}, fmt.Errorf("PRState number is required")
 	}
@@ -32,6 +37,12 @@ func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, be
 		files = make([]string, len(conflictFiles))
 		copy(files, conflictFiles)
 	}
+	// Defensive copy of labels.
+	var lbls []string
+	if len(labels) > 0 {
+		lbls = make([]string, len(labels))
+		copy(lbls, labels)
+	}
 	return PRState{
 		number:        number,
 		title:         title,
@@ -40,6 +51,8 @@ func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, be
 		mergeable:     mergeable,
 		behindBy:      behindBy,
 		conflictFiles: files,
+		labels:        lbls,
+		headSHA:       headSHA,
 	}, nil
 }
 
@@ -66,6 +79,40 @@ func (p PRState) ConflictFiles() []string { return p.conflictFiles }
 
 // HasConflict reports whether the PR has any merge conflict files.
 func (p PRState) HasConflict() bool { return len(p.conflictFiles) > 0 }
+
+// Labels returns the labels applied to the PR.
+func (p PRState) Labels() []string { return p.labels }
+
+// HasLabel reports whether the PR has the given label (exact match).
+func (p PRState) HasLabel(label string) bool {
+	for _, l := range p.labels {
+		if l == label {
+			return true
+		}
+	}
+	return false
+}
+
+// HasLabelPrefix reports whether the PR has any label starting with the given prefix.
+func (p PRState) HasLabelPrefix(prefix string) bool {
+	for _, l := range p.labels {
+		if strings.HasPrefix(l, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// HeadSHA returns the full HEAD commit SHA of the PR.
+func (p PRState) HeadSHA() string { return p.headSHA }
+
+// HeadSHAShort returns the first 8 characters of the HEAD commit SHA.
+func (p PRState) HeadSHAShort() string {
+	if len(p.headSHA) >= 8 {
+		return p.headSHA[:8]
+	}
+	return p.headSHA
+}
 
 // PRChain represents a dependency chain of PRs ordered root to leaf.
 type PRChain struct {

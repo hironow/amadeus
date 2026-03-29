@@ -22,6 +22,10 @@ func (m *mockPRReader) ListOpenPRs(_ context.Context, _ string) ([]domain.PRStat
 	return m.prs, m.err
 }
 
+func (m *mockPRReader) GetPRDiff(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
 type mockEmitter struct {
 	dmailsGenerated          []domain.DMail
 	prConvergenceCheckedData *domain.PRConvergenceCheckedData
@@ -75,7 +79,7 @@ func (m *mockStateReader) LoadSyncState() (domain.SyncState, error)       { retu
 
 func mustPRState(t *testing.T, number, title, base, head string, mergeable bool, behindBy int, conflicts []string) domain.PRState {
 	t.Helper()
-	pr, err := domain.NewPRState(number, title, base, head, mergeable, behindBy, conflicts)
+	pr, err := domain.NewPRState(number, title, base, head, mergeable, behindBy, conflicts, nil, "")
 	if err != nil {
 		t.Fatalf("NewPRState: %v", err)
 	}
