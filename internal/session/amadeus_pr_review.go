@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -46,9 +47,22 @@ func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string)
 		}
 		allDMails = append(allDMails, dmails...)
 
+		// Remove stale review labels before applying the new one.
+		// This prevents unbounded label accumulation across force-pushes.
+		if a.PRWriter != nil {
+			for _, label := range pr.Labels() {
+				if strings.HasPrefix(label, PRReviewLabelPrefix) && label != reviewLabel {
+					if rmErr := a.PRWriter.RemoveLabel(ctx, pr.Number(), label); rmErr != nil {
+						a.Logger.Warn("PR %s: remove stale label %s: %v", pr.Number(), label, rmErr)
+					}
+					if delErr := a.PRWriter.DeleteLabel(ctx, label); delErr != nil {
+						a.Logger.Warn("PR %s: delete stale label %s: %v", pr.Number(), label, delErr)
+					}
+				}
+			}
+		}
+
 		// Apply review label ONLY after successful D-Mail emission.
-		// If evaluateSinglePR returned an error, we already continued above,
-		// so we never reach here for a failed evaluation.
 		if a.PRWriter != nil {
 			if labelErr := a.PRWriter.ApplyLabel(ctx, pr.Number(), reviewLabel); labelErr != nil {
 				a.Logger.Warn("PR %s: failed to apply label: %v", pr.Number(), labelErr)

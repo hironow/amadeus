@@ -32,14 +32,29 @@ func (f *fakePRReaderForReview) GetPRDiff(_ context.Context, prNumber string) (s
 
 type fakePRWriterForReview struct {
 	appliedLabels map[string][]string // prNumber -> []label
+	removedLabels map[string][]string // prNumber -> []label
+	deletedLabels []string
 }
 
 func newFakePRWriter() *fakePRWriterForReview {
-	return &fakePRWriterForReview{appliedLabels: make(map[string][]string)}
+	return &fakePRWriterForReview{
+		appliedLabels: make(map[string][]string),
+		removedLabels: make(map[string][]string),
+	}
 }
 
 func (f *fakePRWriterForReview) ApplyLabel(_ context.Context, prNumber, label string) error {
 	f.appliedLabels[prNumber] = append(f.appliedLabels[prNumber], label)
+	return nil
+}
+
+func (f *fakePRWriterForReview) RemoveLabel(_ context.Context, prNumber, label string) error {
+	f.removedLabels[prNumber] = append(f.removedLabels[prNumber], label)
+	return nil
+}
+
+func (f *fakePRWriterForReview) DeleteLabel(_ context.Context, label string) error {
+	f.deletedLabels = append(f.deletedLabels, label)
 	return nil
 }
 
@@ -124,6 +139,32 @@ func TestEvaluatePRDiffs_ReEvaluatesAfterPush(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected label %q in %v", expectedLabel, labels)
+	}
+
+	// then: old label should have been removed from PR
+	removed, ok := writer.removedLabels["#1"]
+	if !ok || len(removed) == 0 {
+		t.Fatal("expected old label removed from #1")
+	}
+	oldLabelRemoved := false
+	for _, l := range removed {
+		if l == "amadeus:reviewed-old12345" {
+			oldLabelRemoved = true
+		}
+	}
+	if !oldLabelRemoved {
+		t.Errorf("expected old label 'amadeus:reviewed-old12345' in removed list %v", removed)
+	}
+
+	// then: old label definition should have been deleted from repo
+	oldLabelDeleted := false
+	for _, l := range writer.deletedLabels {
+		if l == "amadeus:reviewed-old12345" {
+			oldLabelDeleted = true
+		}
+	}
+	if !oldLabelDeleted {
+		t.Errorf("expected old label 'amadeus:reviewed-old12345' in deleted list %v", writer.deletedLabels)
 	}
 	_ = dmails
 }

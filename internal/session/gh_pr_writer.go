@@ -33,3 +33,23 @@ func (g *GhPRWriter) ApplyLabel(_ context.Context, prNumber, label string) error
 	}
 	return nil
 }
+
+// RemoveLabel removes a label from the given PR.
+func (g *GhPRWriter) RemoveLabel(_ context.Context, prNumber, label string) error {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	_, err := ghClient.runGH("pr", "edit", strings.TrimPrefix(prNumber, "#"), "--remove-label", label)
+	if err != nil {
+		return fmt.Errorf("remove label %q from PR %s: %w", label, prNumber, err)
+	}
+	return nil
+}
+
+// DeleteLabel deletes a label definition from the repository.
+func (g *GhPRWriter) DeleteLabel(_ context.Context, label string) error {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	_, err := ghClient.runGH("label", "delete", label, "--yes")
+	if err != nil {
+		return fmt.Errorf("delete label %q: %w", label, err)
+	}
+	return nil
+}
