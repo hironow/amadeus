@@ -1,7 +1,7 @@
 # 0015. PR Convergence — Conductor Role
 
 **Date:** 2026-03-09
-**Status:** Accepted
+**Status:** Superseded by [0024](0024-pr-diff-review-role.md)
 
 ## Context
 

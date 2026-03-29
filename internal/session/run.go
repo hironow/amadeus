@@ -99,6 +99,19 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		}
 	}
 
+	// Initial PR diff review on startup (ADR-0024)
+	if a.PRReader != nil {
+		if !opts.Quiet {
+			a.Logger.Info("amadeus run: running initial PR diff review...")
+		}
+		reviewDMails, reviewErr := a.evaluatePRDiffs(ctx, integrationBranch)
+		if reviewErr != nil {
+			a.Logger.Warn("initial PR diff review error: %v", reviewErr)
+		} else if len(reviewDMails) > 0 && !opts.Quiet {
+			a.Logger.OK("initial review: generated %d PR review D-Mail(s)", len(reviewDMails))
+		}
+	}
+
 	if !opts.Quiet {
 		a.Logger.Info("amadeus run: waiting for inbox D-Mails...")
 	}
@@ -142,6 +155,16 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 					a.Logger.Warn("pre-merge pipeline error: %v", prErr)
 				} else if len(dmails) > 0 && !opts.Quiet {
 					a.Logger.OK("generated %d implementation-feedback D-Mail(s)", len(dmails))
+				}
+
+				// Re-evaluate PR diffs (new PRs may have arrived) — ADR-0024
+				if a.PRReader != nil {
+					reviewDMails, reviewErr := a.evaluatePRDiffs(ctx, integrationBranch)
+					if reviewErr != nil {
+						a.Logger.Warn("PR diff review error: %v", reviewErr)
+					} else if len(reviewDMails) > 0 && !opts.Quiet {
+						a.Logger.OK("generated %d PR review D-Mail(s)", len(reviewDMails))
+					}
 				}
 
 				if opts.BaseBranch != "" {
