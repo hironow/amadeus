@@ -155,11 +155,6 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 
 // buildPRReviewPrompt constructs the evaluation prompt for a single PR.
 func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
-	lang := a.Config.Lang
-	if lang == "" {
-		lang = "en"
-	}
-
 	return fmt.Sprintf(`You are amadeus, a post-merge integrity verifier. You are evaluating a pull request diff against the project's Architecture Decision Records (ADRs) and Definitions of Done (DoDs).
 
 ## PR Information
@@ -198,5 +193,5 @@ func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
   "reasoning": "Overall assessment in %s"
 }
 
-Only report genuine ADR/DoD violations. Do not flag stylistic preferences or minor formatting issues.`, pr.Number(), pr.Title(), pr.BaseBranch(), pr.HeadBranch(), diff, lang)
+Only report genuine ADR/DoD violations. Do not flag stylistic preferences or minor formatting issues.`, pr.Number(), pr.Title(), pr.BaseBranch(), pr.HeadBranch(), diff, a.Config.Lang)
 }
