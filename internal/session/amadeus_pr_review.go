@@ -19,6 +19,7 @@ const PRReviewLabelPrefix = "amadeus:reviewed-"
 //   - PRReader is nil (PR reading disabled)
 //   - PR already has label `amadeus:reviewed-{current_head_sha8}`
 //
+// Label is applied ONLY after all D-Mails are successfully emitted.
 // Each PR is evaluated independently: one PR failure does not block others.
 func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string) ([]domain.DMail, error) {
 	if a.PRReader == nil {
@@ -45,7 +46,9 @@ func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string)
 		}
 		allDMails = append(allDMails, dmails...)
 
-		// Apply review label (best-effort)
+		// Apply review label ONLY after successful D-Mail emission.
+		// If evaluateSinglePR returned an error, we already continued above,
+		// so we never reach here for a failed evaluation.
 		if a.PRWriter != nil {
 			if labelErr := a.PRWriter.ApplyLabel(ctx, pr.Number(), reviewLabel); labelErr != nil {
 				a.Logger.Warn("PR %s: failed to apply label: %v", pr.Number(), labelErr)
@@ -59,6 +62,7 @@ func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string)
 }
 
 // evaluateSinglePR evaluates a single PR's diff against ADRs/DoDs using Claude.
+// Returns error if D-Mail emission fails (prevents label from being applied).
 func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]domain.DMail, error) {
 	diff, err := a.PRReader.GetPRDiff(ctx, pr.Number())
 	if err != nil {
@@ -85,26 +89,37 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 	// Generate D-Mails from evaluation results
 	now := time.Now().UTC()
 	var dmails []domain.DMail
-	for _, candidate := range claudeResp.DMails {
+	for i, candidate := range claudeResp.DMails {
 		kind := domain.KindDesignFeedback
 		if candidate.Category == "implementation" {
 			kind = domain.KindImplFeedback
 		}
 
 		severity := domain.SeverityMedium
-		if candidate.Action == "investigate" {
+		action := domain.ActionRetry
+		switch domain.DMailAction(candidate.Action) {
+		case domain.ActionRetry:
+			action = domain.ActionRetry
+			severity = domain.SeverityMedium
+		case domain.ActionEscalate:
+			action = domain.ActionEscalate
 			severity = domain.SeverityHigh
-		} else if candidate.Action == "acknowledge" {
+		case domain.ActionResolve:
+			action = domain.ActionResolve
 			severity = domain.SeverityLow
 		}
 
+		// Unique name per candidate: include index to prevent D-Mail name collisions
+		// when Claude produces multiple findings for the same PR.
 		dmail := domain.DMail{
-			Name:        fmt.Sprintf("am-pr-review-%s-%s", pr.Number(), pr.HeadSHAShort()),
-			Kind:        kind,
-			Description: candidate.Description,
-			Severity:    severity,
-			Targets:     candidate.Targets,
-			Action:      domain.DMailAction(candidate.Action),
+			SchemaVersion: domain.DMailSchemaVersion,
+			Name:          fmt.Sprintf("am-pr-review-%s-%s-%d", pr.Number(), pr.HeadSHAShort(), i),
+			Kind:          kind,
+			Description:   candidate.Description,
+			Severity:      severity,
+			Targets:       candidate.Targets,
+			Action:        action,
+			Body:          candidate.Detail,
 			Metadata: map[string]string{
 				"pr_number":   pr.Number(),
 				"pr_title":    pr.Title(),
@@ -113,9 +128,16 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 			},
 		}
 
+		// Validate before emitting — reject protocol-violating D-Mails
+		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+			a.Logger.Warn("PR %s: invalid D-Mail %s: %v", pr.Number(), dmail.Name, errs)
+			continue
+		}
+
 		if a.Emitter != nil {
 			if emitErr := a.Emitter.EmitDMailGenerated(dmail, now); emitErr != nil {
-				a.Logger.Warn("emit D-Mail for PR %s: %v", pr.Number(), emitErr)
+				// Emit failure is fatal for this PR — prevents label from being applied
+				return nil, fmt.Errorf("emit D-Mail for PR %s: %w", pr.Number(), emitErr)
 			}
 		}
 
@@ -153,23 +175,23 @@ func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
 1. Read all ADR files in docs/adr/ and DoD files if they exist
 2. Evaluate whether this PR's changes comply with established ADRs and DoDs
 3. Identify any violations, deviations, or areas of concern
-4. Score the overall divergence (0.0 = fully compliant, 1.0 = completely divergent)
+4. Score the overall divergence (0 = fully compliant, 100 = completely divergent)
 
 ## Response Format (JSON)
 {
   "files_read": ["docs/adr/...", ...],
   "axes": {
-    "structural": {"score": 0.0, "details": "..."},
-    "behavioral": {"score": 0.0, "details": "..."},
-    "convention": {"score": 0.0, "details": "..."},
-    "dependency": {"score": 0.0, "details": "..."}
+    "structural": {"score": 0, "details": "..."},
+    "behavioral": {"score": 0, "details": "..."},
+    "convention": {"score": 0, "details": "..."},
+    "dependency": {"score": 0, "details": "..."}
   },
   "dmails": [
     {
       "description": "Brief description of the issue",
       "detail": "Detailed explanation",
       "targets": ["file.go"],
-      "action": "investigate|retry|acknowledge",
+      "action": "retry|escalate|resolve",
       "category": "design|implementation"
     }
   ],
