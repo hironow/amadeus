@@ -111,7 +111,6 @@ func TestWriteConvergenceInsight_HighSeverity(t *testing.T) {
 	dir := t.TempDir()
 	insightsDir := filepath.Join(dir, "insights")
 	runDir := filepath.Join(dir, ".run")
-	archiveDir := t.TempDir() // empty archive dir
 	os.MkdirAll(insightsDir, 0o755)
 	os.MkdirAll(runDir, 0o755)
 
@@ -131,7 +130,7 @@ func TestWriteConvergenceInsight_HighSeverity(t *testing.T) {
 	}
 
 	// when
-	session.ExportWriteConvergenceInsight(a, alert, "def456", archiveDir)
+	session.ExportWriteConvergenceInsight(a, alert, "def456")
 
 	// then
 	data, err := os.ReadFile(filepath.Join(insightsDir, "convergence.md"))
@@ -191,7 +190,7 @@ func TestWriteConvergenceInsight_MediumSeveritySkipped(t *testing.T) {
 	}
 
 	// when
-	session.ExportWriteConvergenceInsight(a, alert, "abc123", t.TempDir())
+	session.ExportWriteConvergenceInsight(a, alert, "abc123")
 
 	// then: no file should be created
 	_, err := os.Stat(filepath.Join(insightsDir, "convergence.md"))
@@ -205,32 +204,8 @@ func TestWriteConvergenceInsight_IncludesDMailDescriptions(t *testing.T) {
 	dir := t.TempDir()
 	insightsDir := filepath.Join(dir, "insights")
 	runDir := filepath.Join(dir, ".run")
-	archiveDir := filepath.Join(dir, "archive")
 	os.MkdirAll(insightsDir, 0o755)
 	os.MkdirAll(runDir, 0o755)
-	os.MkdirAll(archiveDir, 0o755)
-
-	// Create D-Mail archive files with description frontmatter
-	dmail1 := `---
-name: "dmail-001"
-kind: design-feedback
-description: "ADR-003 violation in auth module"
-severity: high
----
-
-Details about the violation.
-`
-	dmail2 := `---
-name: "dmail-002"
-kind: design-feedback
-description: "Dependency drift in logging subsystem"
-severity: medium
----
-
-Logging deps need update.
-`
-	os.WriteFile(filepath.Join(archiveDir, "dmail-001.md"), []byte(dmail1), 0o644)
-	os.WriteFile(filepath.Join(archiveDir, "dmail-002.md"), []byte(dmail2), 0o644)
 
 	writer := session.NewInsightWriter(insightsDir, runDir)
 
@@ -244,11 +219,15 @@ Logging deps need update.
 		Count:    3,
 		Window:   7,
 		DMails:   []string{"dmail-001", "dmail-002"},
+		Descriptions: map[string]string{
+			"dmail-001": "ADR-003 violation in auth module",
+			"dmail-002": "Dependency drift in logging subsystem",
+		},
 		Severity: domain.SeverityHigh,
 	}
 
 	// when
-	session.ExportWriteConvergenceInsight(a, alert, "xyz789", archiveDir)
+	session.ExportWriteConvergenceInsight(a, alert, "xyz789")
 
 	// then
 	data, err := os.ReadFile(filepath.Join(insightsDir, "convergence.md"))
@@ -277,15 +256,13 @@ Logging deps need update.
 	}
 }
 
-func TestWriteConvergenceInsight_EmptyArchiveFallsBackToDefault(t *testing.T) {
+func TestWriteConvergenceInsight_NoDescriptionsFallsBackToDefault(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	insightsDir := filepath.Join(dir, "insights")
 	runDir := filepath.Join(dir, ".run")
-	archiveDir := filepath.Join(dir, "archive")
 	os.MkdirAll(insightsDir, 0o755)
 	os.MkdirAll(runDir, 0o755)
-	os.MkdirAll(archiveDir, 0o755)
 
 	writer := session.NewInsightWriter(insightsDir, runDir)
 
@@ -298,12 +275,12 @@ func TestWriteConvergenceInsight_EmptyArchiveFallsBackToDefault(t *testing.T) {
 		Target:   "internal/domain/scoring.go",
 		Count:    3,
 		Window:   7,
-		DMails:   []string{"nonexistent-dmail"},
+		DMails:   []string{"dmail-without-desc"},
 		Severity: domain.SeverityHigh,
 	}
 
 	// when
-	session.ExportWriteConvergenceInsight(a, alert, "abc123", archiveDir)
+	session.ExportWriteConvergenceInsight(a, alert, "abc123")
 
 	// then
 	data, err := os.ReadFile(filepath.Join(insightsDir, "convergence.md"))

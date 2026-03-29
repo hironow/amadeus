@@ -2,8 +2,6 @@ package session
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -47,7 +45,7 @@ func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, session
 
 // writeConvergenceInsight writes a convergence insight entry for a HIGH severity alert.
 // Fails silently (log warning) to avoid breaking the check pipeline.
-func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, sessionID string, archiveDir string) {
+func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, sessionID string) {
 	if a.Insights == nil {
 		return
 	}
@@ -57,8 +55,16 @@ func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, session
 	}
 
 	why := "Multiple feedback signals targeting same area indicates structural issue"
-	if descs := collectDMailDescriptions(archiveDir, alert.DMails); len(descs) > 0 {
-		why = fmt.Sprintf("Converging feedback: %s", strings.Join(descs, "; "))
+	if len(alert.Descriptions) > 0 {
+		var descs []string
+		for _, name := range alert.DMails {
+			if desc, ok := alert.Descriptions[name]; ok {
+				descs = append(descs, desc)
+			}
+		}
+		if len(descs) > 0 {
+			why = fmt.Sprintf("Converging feedback: %s", strings.Join(descs, "; "))
+		}
 	}
 
 	entry := domain.InsightEntry{
@@ -79,26 +85,6 @@ func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, session
 	}
 }
 
-// collectDMailDescriptions reads D-Mail files from the archive directory
-// and extracts their description frontmatter fields.
-func collectDMailDescriptions(archiveDir string, names []string) []string {
-	var descs []string
-	for _, name := range names {
-		path := filepath.Join(archiveDir, name+".md")
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		dmail, err := domain.ParseDMail(data)
-		if err != nil {
-			continue
-		}
-		if dmail.Description != "" {
-			descs = append(descs, dmail.Description)
-		}
-	}
-	return descs
-}
 
 // highScoringAxisDetails returns detail strings for axes with score >= 50.
 func highScoringAxisDetails(axes map[domain.Axis]domain.AxisScore) []string {
