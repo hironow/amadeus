@@ -133,6 +133,9 @@ func newSessionsEnterCmd() *cobra.Command {
 				ProviderSessionID: rec.ProviderSessionID,
 				WorkDir:           rec.WorkDir,
 				ConfigBase:        repoRoot,
+				Stdin:             os.Stdin,
+				Stdout:            os.Stdout,
+				Stderr:            os.Stderr,
 			}
 			return session.EnterSession(cmd.Context(), enterCfg)
 		},
