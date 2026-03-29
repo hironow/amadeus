@@ -138,10 +138,12 @@ If [path] is omitted, the current working directory is used. Requires
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 			git := session.NewGitClient(repoRoot)
 
-			// PRReader requires gh CLI — only create when --base is set
+			// PRReader/PRWriter require gh CLI — only create when --base is set
 			var prReader *session.GhPRReader
+			var prWriter *session.GhPRWriter
 			if baseBranch != "" {
 				prReader = session.NewGhPRReader(repoRoot)
+				prWriter = session.NewGhPRWriter(repoRoot)
 			}
 
 			insightWriter := session.NewInsightWriter(
@@ -165,6 +167,7 @@ If [path] is omitted, the current working directory is used. Requires
 				ClaudeCmd:   cfg.ClaudeCmd,
 				ClaudeModel: cfg.Model,
 				PRReader:    prReader,
+				PRWriter:    prWriter,
 				Insights:    insightWriter,
 			}
 
