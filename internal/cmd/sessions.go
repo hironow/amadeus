@@ -17,6 +17,11 @@ func newSessionsCmd() *cobra.Command {
 	sessCmd := &cobra.Command{
 		Use:   "sessions",
 		Short: "Manage AI coding sessions",
+		Long:  "Manage AI coding session records. Sessions are tracked in SQLite\nand can be listed, filtered, and re-entered interactively.",
+		Example: `  amadeus sessions list
+  amadeus sessions list --status completed --limit 5
+  amadeus sessions enter <session-record-id>
+  amadeus sessions enter --provider-id <claude-session-id>`,
 	}
 	sessCmd.AddCommand(
 		newSessionsListCmd(),
@@ -135,7 +140,7 @@ func newSessionsEnterCmd() *cobra.Command {
 				ConfigBase:        repoRoot,
 				Stdin:             os.Stdin,
 				Stdout:            os.Stdout,
-				Stderr:            os.Stderr,
+				Stderr:            cmd.ErrOrStderr(),
 			}
 			return session.EnterSession(cmd.Context(), enterCfg)
 		},
