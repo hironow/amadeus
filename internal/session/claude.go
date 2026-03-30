@@ -127,8 +127,9 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, _ io.Wri
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 	emitter.SetInput(prompt)
 
+	var normalizer *platform.StreamNormalizer
 	if a.StreamBus != nil && a.ToolName != "" {
-		normalizer := platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
 		emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 			if ev := normalizer.Normalize(msg, raw); ev != nil {
 				a.StreamBus.Publish(ctx, *ev)
@@ -136,12 +137,23 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, _ io.Wri
 		})
 	}
 
+	// Emit session_end on all exit paths.
+	var runResultErr error
+	if normalizer != nil {
+		defer func() {
+			endEvent := normalizer.SessionEnd("", runResultErr)
+			a.StreamBus.Publish(ctx, endEvent)
+		}()
+	}
+
 	result, messages, err := emitter.CollectAll()
 	if err != nil {
-		return port.RunResult{}, fmt.Errorf("stream-json parse: %w", err)
+		runResultErr = fmt.Errorf("stream-json parse: %w", err)
+		return port.RunResult{}, runResultErr
 	}
 	if result == nil {
-		return port.RunResult{}, fmt.Errorf("no result message in stream-json output")
+		runResultErr = fmt.Errorf("no result message in stream-json output")
+		return port.RunResult{}, runResultErr
 	}
 
 	// Set GenAI and Weave attributes on the parent invoke span
