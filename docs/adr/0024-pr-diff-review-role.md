@@ -1,7 +1,7 @@
 # 0024. PR Diff Review — Reviewer Role Extension
 
 **Date:** 2026-03-29
-**Status:** Accepted
+**Status:** Accepted — Superseded by [0025](0025-auto-merge-capability.md) (Decision item 2: write access extended to merge)
 **Supersedes:** [0015](0015-pr-convergence-conductor-role.md) (Decision items 1 and 2)
 
 ## Context

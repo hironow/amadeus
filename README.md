@@ -17,7 +17,7 @@ This command runs the five-phase divergence check pipeline, then enters a D-Mail
 5. **Phase 4 (Convergence)** — World Line Convergence detection
 6. **Waiting Loop** — Monitor inbox/ via fsnotify; on D-Mail arrival, re-run Phases 0-4 (timeout configurable via `--idle-timeout`, default 30m)
 
-With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails). Both modes generate `implementation-feedback` D-Mails from divergence scoring.
+With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails) and auto-merges eligible PRs when no world-line divergence is detected. Auto-merge uses squash for standalone/leaf PRs and regular merge for chain PRs with dependents (preserves commit hash). Disable with `--no-merge`. Both modes generate `implementation-feedback` D-Mails from divergence scoring.
 
 ## Why "Amadeus"?
 
@@ -158,6 +158,7 @@ amadeus run [--base main]
     |  +-- GhPRReader: read open PR state via gh CLI
     |  +-- Build PRChain from PRState list
     |  +-- Generate PRConvergenceReport
+    |  +-- Auto-merge eligible PRs (no drift + CI clean + reviewed)
     |  +-- Emit convergence D-Mail to outbox/
     |
     |  Waiting Loop / Inbox Watcher (fsnotify)
@@ -242,6 +243,7 @@ D-Mail `.md` files are immutable once written. Each D-Mail carries a `idempotenc
 - Auto-promote to full calibration when baseline age exceeds configurable threshold (staleness detection)
 - Analyze divergence trend direction (improving / stable / worsening) across check history
 - Run PR convergence pipeline: read open PR state, build PRChain, generate convergence reports
+- Auto-merge eligible PRs when no world-line divergence detected (`--base` mode, ADR-0025)
 - Monitor inbox via fsnotify for real-time D-Mail reception with archive-based dedup
 - Track check history with append-only event logs
 - Classify run stop reasons for operational alerting (graceful / user / io_error / transient / unknown)
@@ -249,7 +251,6 @@ D-Mail `.md` files are immutable once written. Each D-Mail carries a `idempotenc
 **What Amadeus does NOT do:**
 
 - Implement fixes automatically (only detects drift and routes D-Mails)
-- Approve or merge PRs (uses external approval gates)
 - Store full PR content (stores references, diffs, and scores only)
 - Modify `.gate/` state externally (all operations are idempotent and local)
 
@@ -310,7 +311,8 @@ amadeus init                    # set up .gate/
 amadeus mcp-config generate     # Claude subprocess isolation settings
 amadeus run                     # divergence check + D-Mail loop
 amadeus run -n                  # dry run
-amadeus run --base main         # PR convergence daemon
+amadeus run --base main         # PR convergence daemon (auto-merge enabled)
+amadeus run --base main --no-merge  # PR convergence without auto-merge
 ```
 
 ## Exit Codes
