@@ -17,7 +17,7 @@ This command runs the five-phase divergence check pipeline, then enters a D-Mail
 5. **Phase 4 (Convergence)** — World Line Convergence detection
 6. **Waiting Loop** — Monitor inbox/ via fsnotify; on D-Mail arrival, re-run Phases 0-4 (timeout configurable via `--idle-timeout`, default 30m)
 
-With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails) and auto-merges eligible PRs when no world-line divergence is detected. Auto-merge uses squash for standalone/leaf PRs and regular merge for chain PRs with dependents (preserves commit hash). Disable with `--no-merge`. Both modes generate `implementation-feedback` D-Mails from divergence scoring.
+With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails) and auto-merges eligible PRs when no world-line divergence is detected. Auto-merge runs both on startup (if last check was clean) and after each successful post-merge check. Auto-merge uses squash for standalone/leaf PRs and regular merge for chain PRs with dependents (preserves commit hash). Disable with `--no-merge`. Both modes generate `implementation-feedback` D-Mails from divergence scoring.
 
 ## Why "Amadeus"?
 
