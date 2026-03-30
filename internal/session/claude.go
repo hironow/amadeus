@@ -3,6 +3,7 @@ package session
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -29,12 +30,19 @@ type ClaudeAdapter struct {
 	Model      string        // Claude model name (from config)
 	TimeoutSec int           // per-invocation timeout in seconds (reserved for future use)
 	Logger     domain.Logger // nil-safe; warnings are sent here instead of raw stderr
+	ToolName   string                    // CLI tool name for stream events (e.g. "amadeus")
+	StreamBus  port.SessionStreamPublisher // optional: live session event streaming
 }
 
-// Run executes the Claude CLI with the given prompt via stdin and returns raw output.
-// Uses --dangerously-skip-permissions because amadeus runs non-interactively with --print.
-// The writer parameter is accepted for interface compatibility and ignored; opts are applied via port.ApplyOptions and control allowed tools, working directory, and continuation behavior.
-func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
+// Run executes the Claude CLI, returning only the result text.
+func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
+	result, err := a.RunDetailed(ctx, prompt, w, opts...)
+	return result.Text, err
+}
+
+// RunDetailed executes the Claude CLI with the given prompt via stdin and returns
+// result text plus provider session ID.
+func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (port.RunResult, error) {
 	cfg := port.ApplyOptions(opts...)
 	claudeCmd := a.ClaudeCmd
 	model := a.Model
@@ -76,7 +84,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 	}
 	args = append(args, "--allowedTools", strings.Join(allowedTools, ","))
 
-	if cfg.Continue {
+	if cfg.ResumeSessionID != "" {
+		args = append(args, "--resume", cfg.ResumeSessionID)
+	} else if cfg.Continue {
 		args = append(args, "--continue")
 	}
 
@@ -109,7 +119,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 			}
 			diagnostic = platform.SummarizeNDJSON(diagnostic)
 		}
-		return "", fmt.Errorf("claude: %w\n%s", err, diagnostic)
+		return port.RunResult{}, fmt.Errorf("claude: %w\n%s", err, diagnostic)
 	}
 
 	// Parse stream-json with span-emitting reader for OTel + Weave integration
@@ -117,12 +127,33 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 	emitter.SetInput(prompt)
 
+	var normalizer *platform.StreamNormalizer
+	if a.StreamBus != nil && a.ToolName != "" {
+		normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
+			if ev := normalizer.Normalize(msg, raw); ev != nil {
+				a.StreamBus.Publish(ctx, *ev)
+			}
+		})
+	}
+
+	// Emit session_end on all exit paths.
+	var runResultErr error
+	if normalizer != nil {
+		defer func() {
+			endEvent := normalizer.SessionEnd("", runResultErr)
+			a.StreamBus.Publish(ctx, endEvent)
+		}()
+	}
+
 	result, messages, err := emitter.CollectAll()
 	if err != nil {
-		return "", fmt.Errorf("stream-json parse: %w", err)
+		runResultErr = fmt.Errorf("stream-json parse: %w", err)
+		return port.RunResult{}, runResultErr
 	}
 	if result == nil {
-		return "", fmt.Errorf("no result message in stream-json output")
+		runResultErr = fmt.Errorf("no result message in stream-json output")
+		return port.RunResult{}, runResultErr
 	}
 
 	// Set GenAI and Weave attributes on the parent invoke span
@@ -179,7 +210,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, _ io.Writer, opt
 		}
 	}
 
-	return result.Result, nil
+	return port.RunResult{Text: result.Result, ProviderSessionID: result.SessionID}, nil
 }
 
 // DefaultClaudeRunner returns a ClaudeRunner that invokes the given Claude CLI command.

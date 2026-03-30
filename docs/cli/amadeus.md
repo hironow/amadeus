@@ -33,6 +33,7 @@ amadeus [flags]
 * [amadeus mcp-config](amadeus_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [amadeus rebuild](amadeus_rebuild.md)	 - Rebuild projections from event store
 * [amadeus run](amadeus_run.md)	 - Run continuous divergence check and PR convergence
+* [amadeus sessions](amadeus_sessions.md)	 - Manage AI coding sessions
 * [amadeus status](amadeus_status.md)	 - Show amadeus operational status
 * [amadeus sync](amadeus_sync.md)	 - Show D-Mail sync status (JSON)
 * [amadeus uninstall-hook](amadeus_uninstall-hook.md)	 - Remove post-merge git hook
