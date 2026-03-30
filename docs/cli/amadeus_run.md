@@ -48,11 +48,11 @@ amadeus run [path] [flags]
   -n, --dry-run                 generate prompt only (post-merge)
   -f, --full                    force full calibration check
   -h, --help                    help for run
+      --idle-timeout duration   D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
   -j, --json                    output as JSON
       --notify-cmd string       external command for notifications ({title} and {message} placeholders)
   -q, --quiet                   summary-only output
       --review-cmd string       code review command after check (exit 0=pass, non-zero=comments)
-      --idle-timeout duration   D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
 ```
 
 ### Options inherited from parent commands
