@@ -22,6 +22,12 @@ func NewSessionTrackingAdapter(inner port.DetailedRunner, store port.CodingSessi
 	return &SessionTrackingAdapter{inner: inner, store: store, provider: provider}
 }
 
+// Run implements port.ClaudeRunner, enabling drop-in replacement of plain adapters.
+func (a *SessionTrackingAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
+	_, text, err := a.RunSession(ctx, prompt, w, opts...)
+	return text, err
+}
+
 // RunSession executes the inner runner and persists session metadata.
 func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (domain.CodingSessionRecord, string, error) {
 	rc := port.ApplyOptions(opts...)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -44,11 +45,22 @@ type Amadeus struct {
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
+// When using the default, wraps with SessionTrackingAdapter for session persistence.
 func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
-	return DefaultClaudeRunner(a.ClaudeCmd, a.ClaudeModel, a.Logger)
+	adapter := &ClaudeAdapter{ClaudeCmd: a.ClaudeCmd, Model: a.ClaudeModel, Logger: a.Logger}
+	dbPath := filepath.Join(a.RepoDir, domain.StateDir, ".run", "sessions.db")
+	store, err := NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		if a.Logger != nil {
+			a.Logger.Debug("session tracking unavailable: %v", err)
+		}
+		return adapter
+	}
+	// Store lives for the duration of this Run; closed when amadeus exits.
+	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
 }
 
 // runPreMergePipeline delegates to the PRPipeline port (usecase-injected).
