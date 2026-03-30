@@ -68,11 +68,12 @@ func (m *mergeMockPRWriter) MergePR(_ context.Context, prNumber string, method d
 }
 
 type mergeEmitter struct {
-	mu          sync.Mutex
-	merged      []domain.PRMergedData
-	skipped     []domain.PRMergeSkippedData
-	runStarted  bool
-	runStopped  bool
+	mu              sync.Mutex
+	merged          []domain.PRMergedData
+	skipped         []domain.PRMergeSkippedData
+	dmailsGenerated []domain.DMail
+	runStarted      bool
+	runStopped      bool
 }
 
 func (e *mergeEmitter) EmitRunStarted(_ domain.RunStartedData, _ time.Time) error {
@@ -85,7 +86,12 @@ func (e *mergeEmitter) EmitRunStopped(_ domain.RunStoppedData, _ time.Time) erro
 }
 func (e *mergeEmitter) EmitInboxConsumed(_ domain.InboxConsumedData, _ time.Time) error { return nil }
 func (e *mergeEmitter) EmitForceFullNextSet(_, _ float64, _ time.Time) error             { return nil }
-func (e *mergeEmitter) EmitDMailGenerated(_ domain.DMail, _ time.Time) error              { return nil }
+func (e *mergeEmitter) EmitDMailGenerated(dmail domain.DMail, _ time.Time) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.dmailsGenerated = append(e.dmailsGenerated, dmail)
+	return nil
+}
 func (e *mergeEmitter) EmitConvergenceDetected(_ domain.ConvergenceAlert, _ time.Time) error {
 	return nil
 }
@@ -777,5 +783,70 @@ func TestGoTaskboardScenario_PostMergeRerunTriggered(t *testing.T) {
 	// then: #30 was skipped (failed)
 	if len(emitter.skipped) != 1 || emitter.skipped[0].PRNumber != "#30" {
 		t.Errorf("expected #30 skipped, got %v", emitter.skipped)
+	}
+}
+
+// TestGoTaskboardScenario_ConflictingPRs_GeneratesDMails verifies that
+// when all PRs are CONFLICTING (as happened in go-taskboard after 4 merges),
+// conflict D-Mails are generated for each conflicting PR and routed to paintress.
+func TestGoTaskboardScenario_ConflictingPRs_GeneratesDMails(t *testing.T) {
+	// given: 3 PRs all CONFLICTING (simulates go-taskboard post-merge state)
+	prs := []domain.PRState{
+		mustPR(t, "#30", "stats", "main", "feat/stats", []string{"amadeus:reviewed-3fad"}, "3fad"),
+		mustPR(t, "#29", "status-filter", "main", "feat/filter", []string{"amadeus:reviewed-56cb"}, "56cb"),
+		mustPR(t, "#16", "handler-validation", "main", "feat/handler", []string{"amadeus:reviewed-4112"}, "4112"),
+	}
+
+	conflictingReadiness := func(number string) *domain.PRMergeReadiness {
+		r := domain.EvaluateMergeReadiness(number, "DIRTY", "", "CONFLICTING", true)
+		return &r
+	}
+
+	reader := &mergeMockPRReader{
+		prs: prs,
+		readiness: map[string]*domain.PRMergeReadiness{
+			"#30": conflictingReadiness("#30"),
+			"#29": conflictingReadiness("#29"),
+			"#16": conflictingReadiness("#16"),
+		},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	merged := a.attemptAutoMerge(context.Background(), "main")
+
+	// then: 0 merged (all conflicting)
+	if merged != 0 {
+		t.Errorf("expected 0 merged, got %d", merged)
+	}
+
+	// then: no merge calls
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls, got %d", len(writer.calls))
+	}
+
+	// then: 3 conflict D-Mails generated (one per conflicting PR)
+	if len(emitter.dmailsGenerated) != 3 {
+		t.Fatalf("expected 3 conflict D-Mails, got %d", len(emitter.dmailsGenerated))
+	}
+
+	// then: all D-Mails are KindImplFeedback targeting paintress
+	for _, dmail := range emitter.dmailsGenerated {
+		if dmail.Kind != domain.KindImplFeedback {
+			t.Errorf("expected KindImplFeedback, got %s", dmail.Kind)
+		}
+		if len(dmail.Targets) == 0 || dmail.Targets[0] != "paintress" {
+			t.Errorf("expected target paintress, got %v", dmail.Targets)
+		}
+		if dmail.Metadata["type"] != "merge-conflict" {
+			t.Errorf("expected metadata type=merge-conflict, got %s", dmail.Metadata["type"])
+		}
+	}
+
+	// then: 3 skipped events
+	if len(emitter.skipped) != 3 {
+		t.Errorf("expected 3 skipped events, got %d", len(emitter.skipped))
 	}
 }
