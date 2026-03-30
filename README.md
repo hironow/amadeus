@@ -159,7 +159,8 @@ amadeus run [--base main]
     |  +-- Build PRChain from PRState list
     |  +-- Generate PRConvergenceReport
     |  +-- Auto-merge eligible PRs (no drift + CI clean + reviewed)
-    |  +-- Emit convergence D-Mail to outbox/
+    |  +-- After merge: re-run pipelines to detect new conflicts
+    |  +-- Emit convergence D-Mail to outbox/ (conflict PRs → paintress)
     |
     |  Waiting Loop / Inbox Watcher (fsnotify)
     |  +-- MonitorInbox: watch inbox/ for new files
