@@ -101,8 +101,8 @@ If [path] is omitted, the current working directory is used. Requires
 				return preErr
 			}
 
-			if cmd.Flags().Changed("wait-timeout") {
-				cfg.WaitTimeout, _ = cmd.Flags().GetDuration("wait-timeout")
+			if cmd.Flags().Changed("idle-timeout") {
+				cfg.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
 			}
 
 			if lang != "" {
@@ -234,7 +234,7 @@ If [path] is omitted, the current working directory is used. Requires
 			}
 
 			// Skip waiting in dry-run, one-shot (--full/--json), or when explicitly disabled
-			if dryRun || full || jsonOut || cfg.WaitTimeout < 0 {
+			if dryRun || full || jsonOut || cfg.IdleTimeout < 0 {
 				return checkErr
 			}
 
@@ -254,7 +254,7 @@ If [path] is omitted, the current working directory is used. Requires
 						a, cfg, logger, notifier, metrics)
 				},
 				func(ctx context.Context) (bool, error) {
-					return session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
+					return session.WaitForDMail(ctx, inboxCh, cfg.IdleTimeout, logger)
 				},
 				logger,
 			)
@@ -291,7 +291,7 @@ If [path] is omitted, the current working directory is used. Requires
 	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
 	// New flag for run
 	cmd.Flags().String("base", "", "upstream branch for post-merge divergence check")
-	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
+	cmd.Flags().Duration("idle-timeout", domain.DefaultIdleTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
 
 	return cmd
 }

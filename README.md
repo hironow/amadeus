@@ -15,7 +15,7 @@ This command runs the five-phase divergence check pipeline, then enters a D-Mail
 3. **Phase 2 (Divergence Meter)** — Measure divergence: Claude evaluates the changes against ADRs and DoDs, scoring four axes 0-100
 4. **Phase 3 (D-Mail)** — Route corrections: generate `design-feedback` / `implementation-feedback` D-Mails based on divergence scoring
 5. **Phase 4 (Convergence)** — World Line Convergence detection
-6. **Waiting Loop** — Monitor inbox/ via fsnotify; on D-Mail arrival, re-run Phases 0-4 (timeout configurable via `--wait-timeout`, default 30m)
+6. **Waiting Loop** — Monitor inbox/ via fsnotify; on D-Mail arrival, re-run Phases 0-4 (timeout configurable via `--idle-timeout`, default 30m)
 
 With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails). Both modes generate `implementation-feedback` D-Mails from divergence scoring.
 
@@ -163,7 +163,7 @@ amadeus run [--base main]
     |  Waiting Loop / Inbox Watcher (fsnotify)
     |  +-- MonitorInbox: watch inbox/ for new files
     |  +-- On D-Mail arrival: re-run check pipeline
-    |  +-- Timeout: configurable via --wait-timeout (default 30m)
+    |  +-- Timeout: configurable via --idle-timeout (default 30m)
     |
     v
 .gate/                  <- Persistent state
@@ -338,7 +338,7 @@ lang: ja
 claude_cmd: claude
 model: opus
 timeout_sec: 1980
-wait_timeout: 30m  # D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable)
+idle_timeout: 30m  # D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable)
 
 weights:
   adr_integrity: 0.4

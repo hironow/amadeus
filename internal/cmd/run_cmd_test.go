@@ -28,7 +28,7 @@ func TestRunCmd_FlagsExist(t *testing.T) {
 		name     string
 		defValue string
 	}{
-		{"wait-timeout", "30m0s"},
+		{"idle-timeout", "30m0s"},
 		{"auto-approve", "false"},
 		{"approve-cmd", ""},
 		{"notify-cmd", ""},

@@ -369,33 +369,33 @@ func TestConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
 	}
 }
 
-func TestDefaultConfig_WaitTimeout(t *testing.T) {
+func TestDefaultConfig_IdleTimeout(t *testing.T) {
 	// when
 	cfg := domain.DefaultConfig()
 
 	// then
-	if cfg.WaitTimeout != domain.DefaultWaitTimeout {
-		t.Errorf("expected WaitTimeout=%v, got %v", domain.DefaultWaitTimeout, cfg.WaitTimeout)
+	if cfg.IdleTimeout != domain.DefaultIdleTimeout {
+		t.Errorf("expected IdleTimeout=%v, got %v", domain.DefaultIdleTimeout, cfg.IdleTimeout)
 	}
 }
 
-func TestDefaultWaitTimeout_Is30Minutes(t *testing.T) {
+func TestDefaultIdleTimeout_Is30Minutes(t *testing.T) {
 	// then
-	if domain.DefaultWaitTimeout != 30*time.Minute {
-		t.Errorf("expected 30m, got %v", domain.DefaultWaitTimeout)
+	if domain.DefaultIdleTimeout != 30*time.Minute {
+		t.Errorf("expected 30m, got %v", domain.DefaultIdleTimeout)
 	}
 }
 
-func TestConfig_NegativeWaitTimeout_DisablesWaiting(t *testing.T) {
+func TestConfig_NegativeIdleTimeout_DisablesWaiting(t *testing.T) {
 	// given
 	cfg := domain.DefaultConfig()
-	cfg.WaitTimeout = -1
+	cfg.IdleTimeout = -1
 
-	// then: negative WaitTimeout disables waiting mode (no validation error)
+	// then: negative IdleTimeout disables waiting mode (no validation error)
 	errs := domain.ValidateConfig(cfg)
 	for _, e := range errs {
-		if strings.Contains(e, "wait_timeout") {
-			t.Errorf("negative WaitTimeout should be valid (disables waiting), got error: %s", e)
+		if strings.Contains(e, "idle_timeout") {
+			t.Errorf("negative IdleTimeout should be valid (disables waiting), got error: %s", e)
 		}
 	}
 }
@@ -444,11 +444,11 @@ func TestValidateConfig_OnDivergenceJumpGtMediumMax_EmitsError(t *testing.T) {
 	}
 }
 
-func TestValidateConfig_WaitTimeoutGtWindowDays24h_EmitsError(t *testing.T) {
-	// given: WaitTimeout exceeds WindowDays * 24h
+func TestValidateConfig_IdleTimeoutGtWindowDays24h_EmitsError(t *testing.T) {
+	// given: IdleTimeout exceeds WindowDays * 24h
 	cfg := domain.DefaultConfig()
 	cfg.Convergence.WindowDays = 1
-	cfg.WaitTimeout = 25 * time.Hour // 25h > 1 * 24h
+	cfg.IdleTimeout = 25 * time.Hour // 25h > 1 * 24h
 
 	// when
 	errs := domain.ValidateConfig(cfg)
@@ -456,29 +456,29 @@ func TestValidateConfig_WaitTimeoutGtWindowDays24h_EmitsError(t *testing.T) {
 	// then
 	found := false
 	for _, e := range errs {
-		if strings.Contains(e, "wait_timeout") && strings.Contains(e, "window_days") {
+		if strings.Contains(e, "idle_timeout") && strings.Contains(e, "window_days") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("expected cross-field error for wait_timeout > window_days*24h, got: %v", errs)
+		t.Errorf("expected cross-field error for idle_timeout > window_days*24h, got: %v", errs)
 	}
 }
 
-func TestValidateConfig_WaitTimeoutNegative_SkipsWindowDaysCheck(t *testing.T) {
-	// given: negative WaitTimeout disables waiting, should not trigger window_days check
+func TestValidateConfig_IdleTimeoutNegative_SkipsWindowDaysCheck(t *testing.T) {
+	// given: negative IdleTimeout disables waiting, should not trigger window_days check
 	cfg := domain.DefaultConfig()
-	cfg.WaitTimeout = -1
+	cfg.IdleTimeout = -1
 	cfg.Convergence.WindowDays = 1 // would fail if check applied to negative
 
 	// when
 	errs := domain.ValidateConfig(cfg)
 
-	// then: no wait_timeout/window_days cross-field error
+	// then: no idle_timeout/window_days cross-field error
 	for _, e := range errs {
-		if strings.Contains(e, "wait_timeout") && strings.Contains(e, "window_days") {
-			t.Errorf("negative WaitTimeout should skip window_days check, got error: %s", e)
+		if strings.Contains(e, "idle_timeout") && strings.Contains(e, "window_days") {
+			t.Errorf("negative IdleTimeout should skip window_days check, got error: %s", e)
 		}
 	}
 }

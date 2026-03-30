@@ -256,12 +256,12 @@ func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 		}
 		cfg.TimeoutSec = n
 
-	case "wait_timeout":
+	case "idle_timeout":
 		d, err := time.ParseDuration(value)
 		if err != nil {
-			return fmt.Errorf("invalid wait_timeout %q: %w", value, err)
+			return fmt.Errorf("invalid idle_timeout %q: %w", value, err)
 		}
-		cfg.WaitTimeout = d
+		cfg.IdleTimeout = d
 
 	default:
 		return fmt.Errorf("unknown config key %q", key)
