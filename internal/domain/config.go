@@ -29,8 +29,8 @@ const (
 	DefaultTimeoutSec = 1980
 )
 
-// DefaultWaitTimeout is the default D-Mail waiting phase timeout.
-const DefaultWaitTimeout = 30 * time.Minute
+// DefaultIdleTimeout is the default D-Mail waiting phase timeout.
+const DefaultIdleTimeout = 30 * time.Minute
 
 // ApproverConfig describes how approval behavior is configured.
 // Implemented by FlagApproverConfig. Used by session.BuildApprover.
@@ -63,7 +63,7 @@ type Config struct {
 	FullCheck         FullCheckConfig         `yaml:"full_check"`
 	Convergence       ConvergenceConfig       `yaml:"convergence"`
 	BaselineStaleness BaselineStalenessConfig `yaml:"baseline_staleness,omitempty"`
-	WaitTimeout       time.Duration           `yaml:"wait_timeout,omitempty"`
+	IdleTimeout       time.Duration           `yaml:"idle_timeout,omitempty"`
 	Computed          ComputedConfig          `yaml:"computed,omitempty"`
 }
 
@@ -116,7 +116,7 @@ func DefaultConfig() Config {
 			Threshold:            3,
 			EscalationMultiplier: 2,
 		},
-		WaitTimeout: DefaultWaitTimeout,
+		IdleTimeout: DefaultIdleTimeout,
 	}
 }
 
@@ -230,11 +230,11 @@ func ValidateConfig(cfg Config) []string {
 			cfg.FullCheck.OnDivergenceJump, cfg.Thresholds.MediumMax))
 	}
 
-	// Check #3: WaitTimeout must not exceed WindowDays * 24h (when WaitTimeout is positive)
-	if cfg.WaitTimeout > 0 && cfg.WaitTimeout > time.Duration(cfg.Convergence.WindowDays)*24*time.Hour {
+	// Check #3: IdleTimeout must not exceed WindowDays * 24h (when IdleTimeout is positive)
+	if cfg.IdleTimeout > 0 && cfg.IdleTimeout > time.Duration(cfg.Convergence.WindowDays)*24*time.Hour {
 		errs = append(errs, fmt.Sprintf(
-			"wait_timeout (%v) must not exceed convergence.window_days (%d) * 24h (%v)",
-			cfg.WaitTimeout, cfg.Convergence.WindowDays,
+			"idle_timeout (%v) must not exceed convergence.window_days (%d) * 24h (%v)",
+			cfg.IdleTimeout, cfg.Convergence.WindowDays,
 			time.Duration(cfg.Convergence.WindowDays)*24*time.Hour))
 	}
 

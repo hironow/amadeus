@@ -438,9 +438,9 @@ func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 		t.Errorf("Convergence.EscalationMultiplier: expected 2, got %d", loaded.Convergence.EscalationMultiplier)
 	}
 
-	// WaitTimeout
-	if loaded.WaitTimeout != domain.DefaultWaitTimeout {
-		t.Errorf("WaitTimeout: expected %v, got %v", domain.DefaultWaitTimeout, loaded.WaitTimeout)
+	// IdleTimeout
+	if loaded.IdleTimeout != domain.DefaultIdleTimeout {
+		t.Errorf("IdleTimeout: expected %v, got %v", domain.DefaultIdleTimeout, loaded.IdleTimeout)
 	}
 
 	// verify Computed is zero-value after round-trip of defaults
@@ -449,67 +449,67 @@ func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 	}
 }
 
-func TestConfigSet_WaitTimeout_Valid(t *testing.T) {
+func TestConfigSet_IdleTimeout_Valid(t *testing.T) {
 	// given
 	cfg := domain.DefaultConfig()
 
 	// when
-	err := setAmadeusConfigField(&cfg, "wait_timeout", "10m")
+	err := setAmadeusConfigField(&cfg, "idle_timeout", "10m")
 
 	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.WaitTimeout != 10*time.Minute {
-		t.Errorf("WaitTimeout = %v, want 10m", cfg.WaitTimeout)
+	if cfg.IdleTimeout != 10*time.Minute {
+		t.Errorf("IdleTimeout = %v, want 10m", cfg.IdleTimeout)
 	}
 }
 
-func TestConfigSet_WaitTimeout_Zero(t *testing.T) {
+func TestConfigSet_IdleTimeout_Zero(t *testing.T) {
 	// given: zero disables timeout (infinite wait)
 	cfg := domain.DefaultConfig()
 
 	// when
-	err := setAmadeusConfigField(&cfg, "wait_timeout", "0s")
+	err := setAmadeusConfigField(&cfg, "idle_timeout", "0s")
 
 	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.WaitTimeout != 0 {
-		t.Errorf("WaitTimeout = %v, want 0", cfg.WaitTimeout)
+	if cfg.IdleTimeout != 0 {
+		t.Errorf("IdleTimeout = %v, want 0", cfg.IdleTimeout)
 	}
 }
 
-func TestConfigSet_WaitTimeout_Negative(t *testing.T) {
+func TestConfigSet_IdleTimeout_Negative(t *testing.T) {
 	// given: negative disables waiting mode
 	cfg := domain.DefaultConfig()
 
 	// when
-	err := setAmadeusConfigField(&cfg, "wait_timeout", "-1s")
+	err := setAmadeusConfigField(&cfg, "idle_timeout", "-1s")
 
 	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.WaitTimeout != -1*time.Second {
-		t.Errorf("WaitTimeout = %v, want -1s", cfg.WaitTimeout)
+	if cfg.IdleTimeout != -1*time.Second {
+		t.Errorf("IdleTimeout = %v, want -1s", cfg.IdleTimeout)
 	}
 }
 
-func TestConfigSet_WaitTimeout_Invalid(t *testing.T) {
+func TestConfigSet_IdleTimeout_Invalid(t *testing.T) {
 	// given
 	cfg := domain.DefaultConfig()
 
 	// when
-	err := setAmadeusConfigField(&cfg, "wait_timeout", "not-a-duration")
+	err := setAmadeusConfigField(&cfg, "idle_timeout", "not-a-duration")
 
 	// then
 	if err == nil {
-		t.Error("expected error for invalid wait_timeout")
+		t.Error("expected error for invalid idle_timeout")
 	}
-	if !strings.Contains(err.Error(), "invalid wait_timeout") {
-		t.Errorf("expected 'invalid wait_timeout' in error, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid idle_timeout") {
+		t.Errorf("expected 'invalid idle_timeout' in error, got: %v", err)
 	}
 }
 
