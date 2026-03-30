@@ -703,3 +703,79 @@ func TestGoTaskboardScenario_StartupMerge_Divergence021_NoDMails(t *testing.T) {
 		t.Errorf("expected #23 skipped, got %v", emitter.skipped)
 	}
 }
+
+// TestAttemptAutoMerge_ReturnsCount verifies that attemptAutoMerge returns the
+// number of merged PRs, enabling callers to decide whether to re-run pipelines.
+func TestAttemptAutoMerge_ReturnsCount(t *testing.T) {
+	// given: 3 PRs, 1 fails
+	prs := []domain.PRState{
+		mustPR(t, "#1", "a", "main", "feat-a", []string{"amadeus:reviewed-a"}, "a"),
+		mustPR(t, "#2", "b", "main", "feat-b", []string{"amadeus:reviewed-b"}, "b"),
+		mustPR(t, "#3", "c", "main", "feat-c", []string{"amadeus:reviewed-c"}, "c"),
+	}
+	reader := &mergeMockPRReader{
+		prs: prs,
+		readiness: map[string]*domain.PRMergeReadiness{
+			"#1": readyPR("#1"),
+			"#2": readyPR("#2"),
+			"#3": readyPR("#3"),
+		},
+	}
+	writer := &mergeMockPRWriter{failOn: map[string]bool{"#2": true}}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	merged := a.attemptAutoMerge(context.Background(), "main")
+
+	// then: 2 merged (1 failed)
+	if merged != 2 {
+		t.Errorf("expected merged=2, got %d", merged)
+	}
+}
+
+// TestGoTaskboardScenario_PostMergeRerunTriggered verifies that after
+// successful merges, the caller can detect merged > 0 and trigger
+// re-pipeline (rerunPipelinesAfterMerge). This test simulates the
+// go-taskboard flow where 4 PRs merge and remaining PRs need
+// conflict detection.
+func TestGoTaskboardScenario_PostMergeRerunTriggered(t *testing.T) {
+	// given: 5 PRs, 4 are ready, 1 fails to merge (simulates conflict)
+	prs := []domain.PRState{
+		mustPR(t, "#31", "errors-is", "main", "expedition/052", []string{"amadeus:reviewed-33f5"}, "33f5"),
+		mustPR(t, "#28", "export-set", "main", "feat/export-set", []string{"amadeus:reviewed-5735"}, "5735"),
+		mustPR(t, "#27", "export", "main", "feat/export", []string{"amadeus:reviewed-3e84"}, "3e84"),
+		mustPR(t, "#15", "pagination", "main", "feat/pagination", []string{"amadeus:reviewed-e6a3"}, "e6a3"),
+		mustPR(t, "#30", "stats", "main", "feat/stats", []string{"amadeus:reviewed-3fad"}, "3fad"),
+	}
+
+	allReady := map[string]*domain.PRMergeReadiness{}
+	for _, pr := range prs {
+		allReady[pr.Number()] = readyPR(pr.Number())
+	}
+
+	// #30 fails (simulates conflict after other PRs merge)
+	writer := &mergeMockPRWriter{failOn: map[string]bool{"#30": true}}
+	reader := &mergeMockPRReader{prs: prs, readiness: allReady}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	merged := a.attemptAutoMerge(context.Background(), "main")
+
+	// then: 4 merged, 1 failed
+	if merged != 4 {
+		t.Errorf("expected 4 merged, got %d", merged)
+	}
+
+	// then: caller should detect merged > 0 and trigger re-pipeline
+	rerunTriggered := merged > 0
+	if !rerunTriggered {
+		t.Error("expected rerun to be triggered after merges")
+	}
+
+	// then: #30 was skipped (failed)
+	if len(emitter.skipped) != 1 || emitter.skipped[0].PRNumber != "#30" {
+		t.Errorf("expected #30 skipped, got %v", emitter.skipped)
+	}
+}
