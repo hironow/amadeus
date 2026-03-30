@@ -597,6 +597,39 @@ func TestStartupAutoMerge_NoPriorCheck_SkipsMerge(t *testing.T) {
 	}
 }
 
+// TestStartupAutoMerge_ZeroDivergenceButDMails_SkipsMerge verifies that
+// even with Divergence=0.0, if D-Mails were generated (e.g. from convergence
+// alerts), merge is still blocked. The guard is D-Mail count, not score.
+func TestStartupAutoMerge_ZeroDivergenceButDMails_SkipsMerge(t *testing.T) {
+	// given: divergence is 0.0 but D-Mails were generated
+	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{pr},
+		readiness: map[string]*domain.PRMergeReadiness{"#1": readyPR("#1")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	store := &mockMergeStateReader{latest: domain.CheckResult{
+		CheckedAt:  time.Now(),
+		Divergence: 0.0,
+		DMails:     []string{"convergence-alert-1"}, // D-Mail from convergence, not divergence
+	}}
+
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.Store = store
+
+	// Simulate startup auto-merge guard
+	previous, _ := a.Store.LoadLatest()
+	if !previous.CheckedAt.IsZero() && len(previous.DMails) == 0 {
+		a.attemptAutoMerge(context.Background(), "main")
+	}
+
+	// then: no merge (D-Mails exist even though divergence is 0)
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls when D-Mails exist, got %d", len(writer.calls))
+	}
+}
+
 // TestGoTaskboardScenario_StartupMerge_Divergence021_NoDMails reproduces the
 // exact go-taskboard state (2026-03-30): Divergence=0.208, DMails=nil.
 // This verifies that LOW divergence with no D-Mails allows startup merge.
