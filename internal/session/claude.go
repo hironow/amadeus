@@ -3,6 +3,7 @@ package session
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -29,6 +30,8 @@ type ClaudeAdapter struct {
 	Model      string        // Claude model name (from config)
 	TimeoutSec int           // per-invocation timeout in seconds (reserved for future use)
 	Logger     domain.Logger // nil-safe; warnings are sent here instead of raw stderr
+	ToolName   string                    // CLI tool name for stream events (e.g. "amadeus")
+	StreamBus  port.SessionStreamPublisher // optional: live session event streaming
 }
 
 // Run executes the Claude CLI, returning only the result text.
@@ -123,6 +126,15 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, _ io.Wri
 	sr := platform.NewStreamReader(bytes.NewReader(stdout.Bytes()))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 	emitter.SetInput(prompt)
+
+	if a.StreamBus != nil && a.ToolName != "" {
+		normalizer := platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
+			if ev := normalizer.Normalize(msg, raw); ev != nil {
+				a.StreamBus.Publish(ctx, *ev)
+			}
+		})
+	}
 
 	result, messages, err := emitter.CollectAll()
 	if err != nil {

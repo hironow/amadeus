@@ -63,7 +63,8 @@ type SpanEmittingStreamReader struct {
 	sessionID    string         // captured from stream session_id for Weave thread_id
 	resultText   string         // captured from result message for Weave output.value
 	inputText    string         // caller-provided prompt for Weave input.value
-	initMsg      *StreamMessage // captured from system:init for InitAttrs()
+	initMsg          *StreamMessage                        // captured from system:init for InitAttrs()
+	onStreamMessage  func(msg *StreamMessage, raw json.RawMessage) // optional live stream hook
 }
 
 // NewSpanEmittingStreamReader creates a SpanEmittingStreamReader.
@@ -75,6 +76,12 @@ func NewSpanEmittingStreamReader(reader *StreamReader, parentCtx context.Context
 		openSpans:   make(map[string]trace.Span),
 		maxValueLen: DefaultMaxValueLen,
 	}
+}
+
+// SetStreamMessageHandler registers a callback invoked for every parsed stream message.
+// Used by the session event bus for live streaming. Nil by default (no-op).
+func (s *SpanEmittingStreamReader) SetStreamMessageHandler(fn func(*StreamMessage, json.RawMessage)) {
+	s.onStreamMessage = fn
 }
 
 // RawEvents returns the collected raw event strings.
@@ -154,6 +161,11 @@ func (s *SpanEmittingStreamReader) processMessage(msg *StreamMessage) {
 		s.handleAssistant(msg)
 	case "tool_result":
 		s.handleToolResult(msg)
+	}
+
+	// Live stream hook: notify listener with parsed message + raw JSON.
+	if s.onStreamMessage != nil {
+		s.onStreamMessage(msg, raw)
 	}
 }
 
