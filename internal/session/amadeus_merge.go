@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -81,6 +82,7 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 }
 
 // tryMergePR attempts to merge a single PR. Returns true on success.
+// For CONFLICTING PRs, generates a D-Mail to paintress for conflict resolution.
 func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 	now := time.Now().UTC()
 
@@ -88,6 +90,10 @@ func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 		a.Logger.Info("auto-merge: skip %s (%s) — %v", mc.pr.Number(), mc.pr.Title(), mc.readiness.BlockReasons)
 		if a.Emitter != nil {
 			_ = a.emitMergeSkipped(mc.pr, mc.readiness.BlockReasons, now)
+		}
+		// Generate D-Mail for conflicting PRs so paintress can fix them
+		if mc.readiness.Mergeable == "CONFLICTING" && a.Emitter != nil {
+			a.emitConflictDMail(mc.pr, now)
 		}
 		return false
 	}
@@ -115,6 +121,37 @@ func (a *Amadeus) emitMerged(pr domain.PRState, method domain.MergeMethod, now t
 		Title:    pr.Title(),
 		Method:   string(method),
 	}, now)
+}
+
+// emitConflictDMail generates a KindImplFeedback D-Mail for a conflicting PR.
+// The D-Mail is routed to paintress via the outbox → phonewave path.
+func (a *Amadeus) emitConflictDMail(pr domain.PRState, now time.Time) {
+	name := fmt.Sprintf("am-conflict-%s-%s", pr.Number(), pr.HeadSHAShort())
+	dmail := domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          name,
+		Kind:          domain.KindImplFeedback,
+		Description:   fmt.Sprintf("PR %s has merge conflicts — rebase needed", pr.Number()),
+		Severity:      domain.SeverityMedium,
+		Action:        domain.ActionRetry,
+		Targets:       []string{"paintress"},
+		Metadata: map[string]string{
+			"pr_number":       pr.Number(),
+			"pr_title":        pr.Title(),
+			"conflict_reason": "CONFLICTING",
+			"type":            "merge-conflict",
+			"created_at":      now.Format(time.RFC3339),
+		},
+		Body: fmt.Sprintf("PR %s (%s) has merge conflicts with the base branch and cannot be merged automatically.\n\nAction needed: rebase this PR against %s and resolve conflicts.", pr.Number(), pr.Title(), pr.BaseBranch()),
+	}
+	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+		a.Logger.Warn("auto-merge: invalid conflict D-Mail for %s: %v", pr.Number(), errs)
+		return
+	}
+	domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
+	if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
+		a.Logger.Warn("auto-merge: emit conflict D-Mail for %s: %v", pr.Number(), err)
+	}
 }
 
 func (a *Amadeus) emitMergeSkipped(pr domain.PRState, reasons []string, now time.Time) error {
