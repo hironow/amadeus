@@ -71,6 +71,14 @@ If [path] is omitted, the current working directory is used. Requires
 				return fmt.Errorf("init .gate: %w", err)
 			}
 
+			// Acquire daemon lock — prevents multiple instances on the same directory
+			runDir := filepath.Join(divRoot, ".run")
+			unlock, lockErr := session.TryLockDaemon(runDir)
+			if lockErr != nil {
+				return fmt.Errorf("daemon lock: %w", lockErr)
+			}
+			defer unlock()
+
 			if configPath == "" {
 				configPath = filepath.Join(divRoot, "config.yaml")
 			}
