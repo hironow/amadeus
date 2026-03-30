@@ -850,3 +850,44 @@ func TestGoTaskboardScenario_ConflictingPRs_GeneratesDMails(t *testing.T) {
 		t.Errorf("expected 3 skipped events, got %d", len(emitter.skipped))
 	}
 }
+
+// TestAttemptAutoMerge_BlockedButNotConflicting_NoDMail verifies that
+// non-CONFLICTING skip reasons (BLOCKED CI, missing review, etc.)
+// do NOT generate conflict D-Mails. Only CONFLICTING triggers D-Mail.
+func TestAttemptAutoMerge_BlockedButNotConflicting_NoDMail(t *testing.T) {
+	// given: PR blocked by CI (not conflicting)
+	pr := mustPR(t, "#1", "blocked", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
+	reader := &mergeMockPRReader{
+		prs: []domain.PRState{pr},
+		readiness: map[string]*domain.PRMergeReadiness{
+			"#1": blockedPR("#1", "BLOCKED"), // CI blocked, but MERGEABLE
+		},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: skipped but NO conflict D-Mail (not CONFLICTING)
+	if len(emitter.skipped) != 1 {
+		t.Errorf("expected 1 skipped, got %d", len(emitter.skipped))
+	}
+	if len(emitter.dmailsGenerated) != 0 {
+		t.Errorf("expected 0 conflict D-Mails for BLOCKED (non-CONFLICTING), got %d", len(emitter.dmailsGenerated))
+	}
+}
+
+// TestAttemptAutoMerge_EmptyPRList verifies no panic on empty PR list.
+func TestAttemptAutoMerge_EmptyPRList(t *testing.T) {
+	reader := &mergeMockPRReader{prs: nil, readiness: map[string]*domain.PRMergeReadiness{}}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	merged := a.attemptAutoMerge(context.Background(), "main")
+	if merged != 0 {
+		t.Errorf("expected 0, got %d", merged)
+	}
+}

@@ -164,6 +164,26 @@ func TestFilterMergeReady(t *testing.T) {
 	}
 }
 
+func TestEvaluateMergeReadiness_ChangesRequested(t *testing.T) {
+	readiness := domain.EvaluateMergeReadiness("#1", "CLEAN", "CHANGES_REQUESTED", "MERGEABLE", true)
+	if readiness.Ready {
+		t.Error("expected Ready=false for CHANGES_REQUESTED")
+	}
+}
+
+func TestEvaluateMergeReadiness_MultipleBlockReasons(t *testing.T) {
+	// given: all 4 conditions fail
+	readiness := domain.EvaluateMergeReadiness("#1", "BLOCKED", "REVIEW_REQUIRED", "CONFLICTING", false)
+
+	// then
+	if readiness.Ready {
+		t.Error("expected Ready=false")
+	}
+	if len(readiness.BlockReasons) != 4 {
+		t.Errorf("expected 4 block reasons, got %d: %v", len(readiness.BlockReasons), readiness.BlockReasons)
+	}
+}
+
 // TestGoTaskboardScenario_ChainDetectionAndMergeStrategy reproduces the
 // exact go-taskboard state (2026-03-30) to verify chain detection and
 // merge strategy selection work correctly with real-world data.
