@@ -14,8 +14,10 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 		return
 	}
 
-	// 1. List open PRs
-	prs, err := a.PRReader.ListOpenPRs(ctx, integrationBranch)
+	// 1. List ALL open PRs (not filtered by base branch).
+	// We need the full set to correctly build dependency chains.
+	// ListOpenPRs with "" returns all open PRs regardless of base branch.
+	prs, err := a.PRReader.ListOpenPRs(ctx, "")
 	if err != nil {
 		a.Logger.Warn("auto-merge: list PRs: %v", err)
 		return

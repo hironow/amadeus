@@ -187,7 +187,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 							} else {
 								a.Logger.Warn("post-merge check error: %v", checkErr)
 							}
-						} else if opts.AutoMerge {
+						} else if opts.AutoMerge && !opts.DryRun {
 							// No drift detected — attempt auto-merge of eligible PRs
 							a.attemptAutoMerge(ctx, integrationBranch)
 						}
