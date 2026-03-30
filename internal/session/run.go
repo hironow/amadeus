@@ -114,7 +114,10 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 	}
 
 	// Startup auto-merge: attempt merge before entering waiting mode.
-	// Guard: only when auto-merge enabled, not dry-run, and last divergence was clean.
+	// Guard mirrors the daemon loop's DriftError check:
+	//   DriftError is returned only when D-Mails are generated (len(DMails) > 0).
+	//   A non-zero Divergence with zero D-Mails means "minor drift, no action needed"
+	//   and is NOT world-line divergence (世界線逸脱).
 	if opts.AutoMerge && !opts.DryRun && opts.BaseBranch != "" {
 		previous, loadErr := a.Store.LoadLatest()
 		if loadErr != nil {
@@ -123,11 +126,11 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 			if !opts.Quiet {
 				a.Logger.Info("amadeus run: no prior check state, skipping startup auto-merge")
 			}
-		} else if previous.Divergence > 0.0 {
-			a.Logger.Warn("Previous divergence (%.2f) — skipping startup auto-merge", previous.Divergence)
+		} else if len(previous.DMails) > 0 {
+			a.Logger.Warn("Previous check generated %d D-Mail(s) (divergence=%.2f) — world line diverged, skipping startup auto-merge", len(previous.DMails), previous.Divergence)
 		} else {
 			if !opts.Quiet {
-				a.Logger.Info("amadeus run: attempting startup auto-merge (last check: clean)...")
+				a.Logger.Info("amadeus run: attempting startup auto-merge (last check: no D-Mails, divergence=%.2f)...", previous.Divergence)
 			}
 			a.attemptAutoMerge(ctx, integrationBranch)
 		}

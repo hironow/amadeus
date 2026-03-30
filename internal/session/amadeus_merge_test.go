@@ -516,7 +516,7 @@ func (m *mockMergeStateReader) LoadSyncState() (domain.SyncState, error) {
 // --- startup auto-merge tests ---
 
 func TestStartupAutoMerge_PreviousClean_MergesOnStartup(t *testing.T) {
-	// given: last check was clean (Divergence=0)
+	// given: last check was clean (no D-Mails generated, even with non-zero divergence)
 	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
 	reader := &mergeMockPRReader{
 		prs:       []domain.PRState{pr},
@@ -524,25 +524,25 @@ func TestStartupAutoMerge_PreviousClean_MergesOnStartup(t *testing.T) {
 	}
 	writer := &mergeMockPRWriter{}
 	emitter := &mergeEmitter{}
-	store := &mockMergeStateReader{latest: domain.CheckResult{CheckedAt: time.Now(), Divergence: 0.0}}
+	store := &mockMergeStateReader{latest: domain.CheckResult{CheckedAt: time.Now(), Divergence: 0.21, DMails: nil}}
 
 	a := newMergeTestAmadeus(reader, writer, emitter)
 	a.Store = store
 
-	// Simulate startup auto-merge logic
+	// Simulate startup auto-merge logic (mirrors run.go guard)
 	previous, _ := a.Store.LoadLatest()
-	if !previous.CheckedAt.IsZero() && previous.Divergence == 0.0 {
+	if !previous.CheckedAt.IsZero() && len(previous.DMails) == 0 {
 		a.attemptAutoMerge(context.Background(), "main")
 	}
 
-	// then: merge was called
+	// then: merge was called (divergence 0.21 is LOW, no D-Mails = not diverged)
 	if len(writer.calls) != 1 {
 		t.Fatalf("expected 1 merge call, got %d", len(writer.calls))
 	}
 }
 
 func TestStartupAutoMerge_PreviousDrift_SkipsMerge(t *testing.T) {
-	// given: last check had drift (Divergence > 0)
+	// given: last check generated D-Mails (world line diverged)
 	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
 	reader := &mergeMockPRReader{
 		prs:       []domain.PRState{pr},
@@ -550,18 +550,22 @@ func TestStartupAutoMerge_PreviousDrift_SkipsMerge(t *testing.T) {
 	}
 	writer := &mergeMockPRWriter{}
 	emitter := &mergeEmitter{}
-	store := &mockMergeStateReader{latest: domain.CheckResult{CheckedAt: time.Now(), Divergence: 0.42}}
+	store := &mockMergeStateReader{latest: domain.CheckResult{
+		CheckedAt:  time.Now(),
+		Divergence: 0.42,
+		DMails:     []string{"feedback-1", "feedback-2"}, // D-Mails generated = DriftError
+	}}
 
 	a := newMergeTestAmadeus(reader, writer, emitter)
 	a.Store = store
 
 	// Simulate startup auto-merge logic
 	previous, _ := a.Store.LoadLatest()
-	if !previous.CheckedAt.IsZero() && previous.Divergence == 0.0 {
+	if !previous.CheckedAt.IsZero() && len(previous.DMails) == 0 {
 		a.attemptAutoMerge(context.Background(), "main")
 	}
 
-	// then: no merge (drift detected)
+	// then: no merge (D-Mails generated = world line diverged)
 	if len(writer.calls) != 0 {
 		t.Errorf("expected 0 merge calls during drift, got %d", len(writer.calls))
 	}
@@ -583,12 +587,119 @@ func TestStartupAutoMerge_NoPriorCheck_SkipsMerge(t *testing.T) {
 
 	// Simulate startup auto-merge logic
 	previous, _ := a.Store.LoadLatest()
-	if !previous.CheckedAt.IsZero() && previous.Divergence == 0.0 {
+	if !previous.CheckedAt.IsZero() && len(previous.DMails) == 0 {
 		a.attemptAutoMerge(context.Background(), "main")
 	}
 
 	// then: no merge (no prior check)
 	if len(writer.calls) != 0 {
 		t.Errorf("expected 0 merge calls for first run, got %d", len(writer.calls))
+	}
+}
+
+// TestStartupAutoMerge_ZeroDivergenceButDMails_SkipsMerge verifies that
+// even with Divergence=0.0, if D-Mails were generated (e.g. from convergence
+// alerts), merge is still blocked. The guard is D-Mail count, not score.
+func TestStartupAutoMerge_ZeroDivergenceButDMails_SkipsMerge(t *testing.T) {
+	// given: divergence is 0.0 but D-Mails were generated
+	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{pr},
+		readiness: map[string]*domain.PRMergeReadiness{"#1": readyPR("#1")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	store := &mockMergeStateReader{latest: domain.CheckResult{
+		CheckedAt:  time.Now(),
+		Divergence: 0.0,
+		DMails:     []string{"convergence-alert-1"}, // D-Mail from convergence, not divergence
+	}}
+
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.Store = store
+
+	// Simulate startup auto-merge guard
+	previous, _ := a.Store.LoadLatest()
+	if !previous.CheckedAt.IsZero() && len(previous.DMails) == 0 {
+		a.attemptAutoMerge(context.Background(), "main")
+	}
+
+	// then: no merge (D-Mails exist even though divergence is 0)
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls when D-Mails exist, got %d", len(writer.calls))
+	}
+}
+
+// TestGoTaskboardScenario_StartupMerge_Divergence021_NoDMails reproduces the
+// exact go-taskboard state (2026-03-30): Divergence=0.208, DMails=nil.
+// This verifies that LOW divergence with no D-Mails allows startup merge.
+func TestGoTaskboardScenario_StartupMerge_Divergence021_NoDMails(t *testing.T) {
+	// given: go-taskboard state — 18 PRs, divergence 0.208, no D-Mails
+	prs := []domain.PRState{
+		mustPR(t, "#14", "status-validation", "main", "feat/input-w2-5", []string{"amadeus:reviewed-a9c5"}, "a9c5"),
+		mustPR(t, "#15", "pagination-repro", "main", "feat/pagination-w1", []string{"amadeus:reviewed-e6a3"}, "e6a3"),
+		mustPR(t, "#16", "handler-validation", "main", "feat/cluster-w2-1", []string{"amadeus:reviewed-4112"}, "4112"),
+		mustPR(t, "#22", "http-test-infra", "main", "feat/http-test", []string{"amadeus:reviewed-0ef9"}, "0ef9"),
+		mustPR(t, "#23", "reproduction-test", "feat/http-test", "feat/repro", nil, "dead"), // chain leaf, no review label
+	}
+
+	allReady := map[string]*domain.PRMergeReadiness{
+		"#14": readyPR("#14"),
+		"#15": readyPR("#15"),
+		"#16": readyPR("#16"),
+		"#22": readyPR("#22"),
+		"#23": func() *domain.PRMergeReadiness {
+			r := domain.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false) // no review label
+			return &r
+		}(),
+	}
+
+	reader := &mergeMockPRReader{prs: prs, readiness: allReady}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	// go-taskboard actual state: divergence 0.208, DMails nil (no D-Mails generated)
+	store := &mockMergeStateReader{latest: domain.CheckResult{
+		CheckedAt:  time.Now(),
+		Divergence: 0.208,
+		DMails:     nil, // no D-Mails = no DriftError = world line normal
+	}}
+
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.Store = store
+
+	// when: simulate startup auto-merge guard (mirrors run.go)
+	previous, _ := a.Store.LoadLatest()
+	if !previous.CheckedAt.IsZero() && len(previous.DMails) == 0 {
+		a.attemptAutoMerge(context.Background(), "main")
+	}
+
+	// then: merge proceeds (divergence 0.208 with no D-Mails is NOT 世界線逸脱)
+	if len(writer.calls) == 0 {
+		t.Fatal("expected merge calls but got 0 — startup merge should proceed when DMails is nil")
+	}
+
+	// then: #14, #15, #16 merged as squash (standalone)
+	// #22 merged as merge (chain root with #23 dependent)
+	// #23 skipped (no review label)
+	callMap := make(map[string]domain.MergeMethod)
+	for _, c := range writer.calls {
+		callMap[c.number] = c.method
+	}
+
+	if callMap["#22"] != domain.MergeMethodMerge {
+		t.Errorf("#22 (chain root): expected merge, got %s", callMap["#22"])
+	}
+	if _, merged := callMap["#23"]; merged {
+		t.Error("#23 should NOT be merged (no review label)")
+	}
+	for _, num := range []string{"#14", "#15", "#16"} {
+		if callMap[num] != domain.MergeMethodSquash {
+			t.Errorf("%s (standalone): expected squash, got %s", num, callMap[num])
+		}
+	}
+
+	// then: #23 skipped with reason
+	if len(emitter.skipped) != 1 || emitter.skipped[0].PRNumber != "#23" {
+		t.Errorf("expected #23 skipped, got %v", emitter.skipped)
 	}
 }
