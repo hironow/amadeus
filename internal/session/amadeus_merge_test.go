@@ -481,3 +481,114 @@ func TestGoTaskboardScenario_PartialChainReadiness(t *testing.T) {
 		t.Errorf("expected #23 skipped, got %v", emitter.skipped)
 	}
 }
+
+// --- startup auto-merge test doubles ---
+
+type mockMergeStateReader struct {
+	latest domain.CheckResult
+	err    error
+}
+
+func (m *mockMergeStateReader) LoadLatest() (domain.CheckResult, error) {
+	return m.latest, m.err
+}
+
+func (m *mockMergeStateReader) ScanInbox(_ context.Context) ([]domain.DMail, error) {
+	return nil, nil
+}
+
+func (m *mockMergeStateReader) NextDMailName(_ domain.DMailKind) (string, error) {
+	return "", nil
+}
+
+func (m *mockMergeStateReader) LoadAllDMails() ([]domain.DMail, error) {
+	return nil, nil
+}
+
+func (m *mockMergeStateReader) LoadConsumed() ([]domain.ConsumedRecord, error) {
+	return nil, nil
+}
+
+func (m *mockMergeStateReader) LoadSyncState() (domain.SyncState, error) {
+	return domain.SyncState{}, nil
+}
+
+// --- startup auto-merge tests ---
+
+func TestStartupAutoMerge_PreviousClean_MergesOnStartup(t *testing.T) {
+	// given: last check was clean (Divergence=0)
+	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{pr},
+		readiness: map[string]*domain.PRMergeReadiness{"#1": readyPR("#1")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	store := &mockMergeStateReader{latest: domain.CheckResult{CheckedAt: time.Now(), Divergence: 0.0}}
+
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.Store = store
+
+	// Simulate startup auto-merge logic
+	previous, _ := a.Store.LoadLatest()
+	if !previous.CheckedAt.IsZero() && previous.Divergence == 0.0 {
+		a.attemptAutoMerge(context.Background(), "main")
+	}
+
+	// then: merge was called
+	if len(writer.calls) != 1 {
+		t.Fatalf("expected 1 merge call, got %d", len(writer.calls))
+	}
+}
+
+func TestStartupAutoMerge_PreviousDrift_SkipsMerge(t *testing.T) {
+	// given: last check had drift (Divergence > 0)
+	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{pr},
+		readiness: map[string]*domain.PRMergeReadiness{"#1": readyPR("#1")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	store := &mockMergeStateReader{latest: domain.CheckResult{CheckedAt: time.Now(), Divergence: 0.42}}
+
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.Store = store
+
+	// Simulate startup auto-merge logic
+	previous, _ := a.Store.LoadLatest()
+	if !previous.CheckedAt.IsZero() && previous.Divergence == 0.0 {
+		a.attemptAutoMerge(context.Background(), "main")
+	}
+
+	// then: no merge (drift detected)
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls during drift, got %d", len(writer.calls))
+	}
+}
+
+func TestStartupAutoMerge_NoPriorCheck_SkipsMerge(t *testing.T) {
+	// given: no prior check (CheckedAt is zero)
+	pr := mustPR(t, "#1", "ready", "main", "feat-a", []string{"amadeus:reviewed-aaa"}, "aaa")
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{pr},
+		readiness: map[string]*domain.PRMergeReadiness{"#1": readyPR("#1")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	store := &mockMergeStateReader{latest: domain.CheckResult{}} // zero CheckedAt
+
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.Store = store
+
+	// Simulate startup auto-merge logic
+	previous, _ := a.Store.LoadLatest()
+	if !previous.CheckedAt.IsZero() && previous.Divergence == 0.0 {
+		a.attemptAutoMerge(context.Background(), "main")
+	}
+
+	// then: no merge (no prior check)
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls for first run, got %d", len(writer.calls))
+	}
+}

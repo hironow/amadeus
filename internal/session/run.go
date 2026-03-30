@@ -113,6 +113,26 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		}
 	}
 
+	// Startup auto-merge: attempt merge before entering waiting mode.
+	// Guard: only when auto-merge enabled, not dry-run, and last divergence was clean.
+	if opts.AutoMerge && !opts.DryRun && opts.BaseBranch != "" {
+		previous, loadErr := a.Store.LoadLatest()
+		if loadErr != nil {
+			a.Logger.Warn("startup auto-merge: load previous state: %v", loadErr)
+		} else if previous.CheckedAt.IsZero() {
+			if !opts.Quiet {
+				a.Logger.Info("amadeus run: no prior check state, skipping startup auto-merge")
+			}
+		} else if previous.Divergence > 0.0 {
+			a.Logger.Warn("Previous divergence (%.2f) — skipping startup auto-merge", previous.Divergence)
+		} else {
+			if !opts.Quiet {
+				a.Logger.Info("amadeus run: attempting startup auto-merge (last check: clean)...")
+			}
+			a.attemptAutoMerge(ctx, integrationBranch)
+		}
+	}
+
 	if !opts.Quiet {
 		a.Logger.Info("amadeus run: waiting for inbox D-Mails...")
 	}
