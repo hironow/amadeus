@@ -148,6 +148,16 @@ func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedDat
 	return NewEvent(EventPRConvergenceChecked, data, now)
 }
 
+// RecordPRMerged produces a pr.merged event.
+func (a *CheckAggregate) RecordPRMerged(data PRMergedData, now time.Time) (Event, error) {
+	return NewEvent(EventPRMerged, data, now)
+}
+
+// RecordPRMergeSkipped produces a pr.merge_skipped event.
+func (a *CheckAggregate) RecordPRMergeSkipped(data PRMergeSkippedData, now time.Time) (Event, error) {
+	return NewEvent(EventPRMergeSkipped, data, now)
+}
+
 // RecordCheck produces events for a completed check result.
 // For full checks, it also produces a baseline.updated event.
 // The caller is responsible for persisting the returned events.

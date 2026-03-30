@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -178,10 +179,17 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 							Quiet: opts.Quiet,
 							JSON:  opts.JSON,
 						}
-						if checkErr := a.runPostMergeCheck(ctx, checkOpts, []domain.DMail{dmail}); checkErr != nil {
-							if _, ok := checkErr.(*domain.DriftError); !ok {
+						checkErr := a.runPostMergeCheck(ctx, checkOpts, []domain.DMail{dmail})
+						if checkErr != nil {
+							var de *domain.DriftError
+							if errors.As(checkErr, &de) {
+								a.Logger.Warn("World line diverged (score=%.2f) — auto-merge suspended", de.Divergence)
+							} else {
 								a.Logger.Warn("post-merge check error: %v", checkErr)
 							}
+						} else if opts.AutoMerge && !opts.DryRun {
+							// No drift detected — attempt auto-merge of eligible PRs
+							a.attemptAutoMerge(ctx, integrationBranch)
 						}
 					}
 				}

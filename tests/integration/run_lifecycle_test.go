@@ -42,6 +42,10 @@ func (r *lifecyclePRReader) GetPRDiff(_ context.Context, _ string) (string, erro
 	return "", nil
 }
 
+func (r *lifecyclePRReader) GetPRMergeReadiness(_ context.Context, _ string) (*domain.PRMergeReadiness, error) {
+	return nil, nil
+}
+
 var _ port.GitHubPRReader = (*lifecyclePRReader)(nil)
 
 // --- Helpers ---

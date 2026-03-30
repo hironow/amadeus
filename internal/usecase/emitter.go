@@ -144,6 +144,22 @@ func (e *checkEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCh
 	return e.emit(ev)
 }
 
+func (e *checkEventEmitter) EmitPRMerged(data domain.PRMergedData, now time.Time) error {
+	ev, err := e.agg.RecordPRMerged(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *checkEventEmitter) EmitPRMergeSkipped(data domain.PRMergeSkippedData, now time.Time) error {
+	ev, err := e.agg.RecordPRMergeSkipped(data, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
 // checkStateProvider implements port.CheckStateProvider.
 // It delegates to the aggregate for state queries and mutations.
 type checkStateProvider struct {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -50,6 +51,28 @@ func (g *GhPRWriter) DeleteLabel(_ context.Context, label string) error {
 	_, err := ghClient.runGH("label", "delete", label, "--yes")
 	if err != nil {
 		return fmt.Errorf("delete label %q: %w", label, err)
+	}
+	return nil
+}
+
+// MergePR merges the given PR using the specified method.
+// For squash: uses --squash --delete-branch (clean history + branch cleanup).
+// For merge: uses --merge without --delete-branch (preserve hash for chain dependents).
+func (g *GhPRWriter) MergePR(_ context.Context, prNumber string, method domain.MergeMethod) error {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	num := strings.TrimPrefix(prNumber, "#")
+	args := []string{"pr", "merge", num}
+	switch method {
+	case domain.MergeMethodSquash:
+		args = append(args, "--squash", "--delete-branch")
+	case domain.MergeMethodMerge:
+		args = append(args, "--merge")
+	default:
+		return fmt.Errorf("unknown merge method: %s", method)
+	}
+	_, err := ghClient.runGH(args...)
+	if err != nil {
+		return fmt.Errorf("merge PR %s via %s: %w", prNumber, method, err)
 	}
 	return nil
 }

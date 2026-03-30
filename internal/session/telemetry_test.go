@@ -74,6 +74,12 @@ func (e *testInternalCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRC
 	_, err := e.agg.RecordPRConvergenceChecked(data, now)
 	return err
 }
+func (e *testInternalCheckEventEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error {
+	return nil
+}
+func (e *testInternalCheckEventEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
+	return nil
+}
 
 // testInternalCheckStateProvider implements port.CheckStateManager for internal session tests.
 type testInternalCheckStateProvider struct {

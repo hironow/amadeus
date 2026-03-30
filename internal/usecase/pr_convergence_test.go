@@ -26,6 +26,10 @@ func (m *mockPRReader) GetPRDiff(_ context.Context, _ string) (string, error) {
 	return "", nil
 }
 
+func (m *mockPRReader) GetPRMergeReadiness(_ context.Context, _ string) (*domain.PRMergeReadiness, error) {
+	return nil, nil
+}
+
 type mockEmitter struct {
 	dmailsGenerated          []domain.DMail
 	prConvergenceCheckedData *domain.PRConvergenceCheckedData
@@ -60,6 +64,8 @@ func (m *mockEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedD
 	m.prConvergenceCheckedData = &data
 	return nil
 }
+func (m *mockEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error       { return nil }
+func (m *mockEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error { return nil }
 
 type mockStateReader struct {
 	seq int

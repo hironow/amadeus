@@ -121,9 +121,11 @@ type GitHubPRReader interface {
 	ListOpenPRs(ctx context.Context, targetBranch string) ([]domain.PRState, error)
 	// GetPRDiff returns the unified diff for the given PR number.
 	GetPRDiff(ctx context.Context, prNumber string) (string, error)
+	// GetPRMergeReadiness returns the merge readiness state for the given PR.
+	GetPRMergeReadiness(ctx context.Context, prNumber string) (*domain.PRMergeReadiness, error)
 }
 
-// GitHubPRWriter writes labels to PRs on GitHub.
+// GitHubPRWriter writes labels and merges PRs on GitHub.
 // Implemented by session-layer adapter using `gh` CLI.
 type GitHubPRWriter interface {
 	// ApplyLabel adds a label to the given PR. Creates the label if it doesn't exist.
@@ -132,6 +134,8 @@ type GitHubPRWriter interface {
 	RemoveLabel(ctx context.Context, prNumber, label string) error
 	// DeleteLabel deletes a label definition from the repository.
 	DeleteLabel(ctx context.Context, label string) error
+	// MergePR merges the given PR using the specified method.
+	MergePR(ctx context.Context, prNumber string, method domain.MergeMethod) error
 }
 
 // PRPipelineRunner executes the pre-merge PR convergence pipeline.
@@ -169,6 +173,8 @@ type CheckEventEmitter interface {
 	EmitRunStarted(data domain.RunStartedData, now time.Time) error
 	EmitRunStopped(data domain.RunStoppedData, now time.Time) error
 	EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error
+	EmitPRMerged(data domain.PRMergedData, now time.Time) error
+	EmitPRMergeSkipped(data domain.PRMergeSkippedData, now time.Time) error
 }
 
 // CheckStateProvider provides aggregate state read/write without exposing the aggregate type.
