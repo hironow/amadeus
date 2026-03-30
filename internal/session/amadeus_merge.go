@@ -9,9 +9,10 @@ import (
 
 // attemptAutoMerge discovers merge-ready PRs and merges them in dependency order.
 // It is called after a successful post-merge check (no DriftError) when auto-merge is enabled.
-func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string) {
+// Returns the number of PRs successfully merged.
+func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string) int {
 	if a.PRReader == nil || a.PRWriter == nil {
-		return
+		return 0
 	}
 
 	// 1. List ALL open PRs (not filtered by base branch).
@@ -20,10 +21,10 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 	prs, err := a.PRReader.ListOpenPRs(ctx, "")
 	if err != nil {
 		a.Logger.Warn("auto-merge: list PRs: %v", err)
-		return
+		return 0
 	}
 	if len(prs) == 0 {
-		return
+		return 0
 	}
 
 	// 2. Build chain structure for merge order and strategy
@@ -76,6 +77,7 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 	if merged > 0 {
 		a.Logger.OK("auto-merge: merged %d PR(s)", merged)
 	}
+	return merged
 }
 
 // tryMergePR attempts to merge a single PR. Returns true on success.

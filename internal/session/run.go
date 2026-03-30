@@ -132,7 +132,12 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 			if !opts.Quiet {
 				a.Logger.Info("amadeus run: attempting startup auto-merge (last check: no D-Mails, divergence=%.2f)...", previous.Divergence)
 			}
-			a.attemptAutoMerge(ctx, integrationBranch)
+			if merged := a.attemptAutoMerge(ctx, integrationBranch); merged > 0 {
+				// PRs were merged — main branch changed. Re-run pipelines to:
+				// 1. Detect new conflicts and generate D-Mails for paintress
+				// 2. Re-review remaining PRs (their merge status may have changed)
+				a.rerunPipelinesAfterMerge(ctx, integrationBranch, opts.Quiet)
+			}
 		}
 	}
 
@@ -212,11 +217,40 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 							}
 						} else if opts.AutoMerge && !opts.DryRun {
 							// No drift detected — attempt auto-merge of eligible PRs
-							a.attemptAutoMerge(ctx, integrationBranch)
+							if merged := a.attemptAutoMerge(ctx, integrationBranch); merged > 0 {
+								a.rerunPipelinesAfterMerge(ctx, integrationBranch, opts.Quiet)
+							}
 						}
 					}
 				}
 			}
+		}
+	}
+}
+
+// rerunPipelinesAfterMerge re-runs the PR convergence and review pipelines after
+// successful merges. This detects new conflicts (from merged code changing main)
+// and generates D-Mails for paintress to fix them, keeping the convergence loop alive.
+func (a *Amadeus) rerunPipelinesAfterMerge(ctx context.Context, integrationBranch string, quiet bool) {
+	if !quiet {
+		a.Logger.Info("amadeus run: re-running pipelines after merge...")
+	}
+
+	if a.PRPipeline != nil {
+		dmails, prErr := a.runPreMergePipeline(ctx, integrationBranch)
+		if prErr != nil {
+			a.Logger.Warn("post-merge pipeline error: %v", prErr)
+		} else if len(dmails) > 0 && !quiet {
+			a.Logger.OK("post-merge: generated %d convergence D-Mail(s) for conflicting PRs", len(dmails))
+		}
+	}
+
+	if a.PRReader != nil {
+		reviewDMails, reviewErr := a.evaluatePRDiffs(ctx, integrationBranch)
+		if reviewErr != nil {
+			a.Logger.Warn("post-merge PR review error: %v", reviewErr)
+		} else if len(reviewDMails) > 0 && !quiet {
+			a.Logger.OK("post-merge: generated %d PR review D-Mail(s)", len(reviewDMails))
 		}
 	}
 }
