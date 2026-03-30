@@ -139,10 +139,14 @@ func (s *SQLiteCodingSessionStore) List(ctx context.Context, opts port.ListSessi
 	return scanRecords(rows)
 }
 
-func (s *SQLiteCodingSessionStore) UpdateStatus(ctx context.Context, id string, status domain.SessionStatus, providerSessionID string) error {
+func (s *SQLiteCodingSessionStore) UpdateStatus(ctx context.Context, id string, status domain.SessionStatus, providerSessionID string, metadata map[string]string) error {
+	meta, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("marshal metadata: %w", err)
+	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE coding_sessions SET status = ?, provider_session_id = ?, updated_at = ? WHERE id = ?`,
-		string(status), providerSessionID, time.Now().UTC().Format(time.RFC3339Nano), id)
+		`UPDATE coding_sessions SET status = ?, provider_session_id = ?, metadata = ?, updated_at = ? WHERE id = ?`,
+		string(status), providerSessionID, string(meta), time.Now().UTC().Format(time.RFC3339Nano), id)
 	if err != nil {
 		return err
 	}

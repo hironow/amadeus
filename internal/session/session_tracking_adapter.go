@@ -40,13 +40,13 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 			rec.Metadata = make(map[string]string)
 		}
 		rec.Metadata["failure_reason"] = runErr.Error()
-		_ = a.store.UpdateStatus(ctx, rec.ID, domain.SessionFailed, result.ProviderSessionID)
+		_ = a.store.UpdateStatus(ctx, rec.ID, domain.SessionFailed, result.ProviderSessionID, rec.Metadata)
 		return rec, result.Text, runErr
 	}
 
 	rec.ProviderSessionID = result.ProviderSessionID
 	rec.Status = domain.SessionCompleted
-	_ = a.store.UpdateStatus(ctx, rec.ID, domain.SessionCompleted, result.ProviderSessionID)
+	_ = a.store.UpdateStatus(ctx, rec.ID, domain.SessionCompleted, result.ProviderSessionID, rec.Metadata)
 
 	return rec, result.Text, nil
 }

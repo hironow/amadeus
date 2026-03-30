@@ -32,6 +32,6 @@ type CodingSessionStore interface {
 	FindByProviderSessionID(ctx context.Context, provider domain.Provider, pid string) ([]domain.CodingSessionRecord, error)
 	LatestByProviderSessionID(ctx context.Context, provider domain.Provider, pid string) (domain.CodingSessionRecord, error)
 	List(ctx context.Context, opts ListSessionOpts) ([]domain.CodingSessionRecord, error)
-	UpdateStatus(ctx context.Context, id string, status domain.SessionStatus, providerSessionID string) error
+	UpdateStatus(ctx context.Context, id string, status domain.SessionStatus, providerSessionID string, metadata map[string]string) error
 	Close() error
 }

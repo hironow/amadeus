@@ -131,7 +131,10 @@ func newSessionsEnterCmd() *cobra.Command {
 			if configPath == "" {
 				configPath = filepath.Join(repoRoot, domain.StateDir, "config.yaml")
 			}
-			cfg, _ := loadConfig(configPath)
+			cfg, err := loadConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("load config %q: %w", configPath, err)
+			}
 
 			enterCfg := session.EnterConfig{
 				ProviderCmd:       cfg.ClaudeCmd,

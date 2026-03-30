@@ -62,17 +62,21 @@ func TestCodingSessionStore_UpdateStatus(t *testing.T) {
 	rec := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "opus", "/tmp/repo")
 	_ = store.Save(ctx, rec)
 
-	err := store.UpdateStatus(ctx, rec.ID, domain.SessionCompleted, "provider-session-xyz")
+	meta := map[string]string{"failure_reason": "timeout"}
+	err := store.UpdateStatus(ctx, rec.ID, domain.SessionFailed, "provider-session-xyz", meta)
 	if err != nil {
 		t.Fatalf("UpdateStatus: %v", err)
 	}
 
 	loaded, _ := store.Load(ctx, rec.ID)
-	if loaded.Status != domain.SessionCompleted {
-		t.Errorf("Status = %q, want %q", loaded.Status, domain.SessionCompleted)
+	if loaded.Status != domain.SessionFailed {
+		t.Errorf("Status = %q, want %q", loaded.Status, domain.SessionFailed)
 	}
 	if loaded.ProviderSessionID != "provider-session-xyz" {
 		t.Errorf("ProviderSessionID = %q, want %q", loaded.ProviderSessionID, "provider-session-xyz")
+	}
+	if loaded.Metadata["failure_reason"] != "timeout" {
+		t.Errorf("Metadata[failure_reason] = %q, want %q", loaded.Metadata["failure_reason"], "timeout")
 	}
 }
 
@@ -83,11 +87,11 @@ func TestCodingSessionStore_FindByProviderSessionID(t *testing.T) {
 
 	rec1 := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "opus", "/tmp/repo")
 	_ = store.Save(ctx, rec1)
-	_ = store.UpdateStatus(ctx, rec1.ID, domain.SessionCompleted, "prov-abc")
+	_ = store.UpdateStatus(ctx, rec1.ID, domain.SessionCompleted, "prov-abc", nil)
 
 	rec2 := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "opus", "/tmp/repo")
 	_ = store.Save(ctx, rec2)
-	_ = store.UpdateStatus(ctx, rec2.ID, domain.SessionCompleted, "prov-abc")
+	_ = store.UpdateStatus(ctx, rec2.ID, domain.SessionCompleted, "prov-abc", nil)
 
 	found, err := store.FindByProviderSessionID(ctx, domain.ProviderClaudeCode, "prov-abc")
 	if err != nil {
@@ -111,11 +115,11 @@ func TestCodingSessionStore_LatestByProviderSessionID(t *testing.T) {
 
 	rec1 := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "opus", "/tmp/repo-old")
 	_ = store.Save(ctx, rec1)
-	_ = store.UpdateStatus(ctx, rec1.ID, domain.SessionCompleted, "prov-abc")
+	_ = store.UpdateStatus(ctx, rec1.ID, domain.SessionCompleted, "prov-abc", nil)
 
 	rec2 := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "opus", "/tmp/repo-new")
 	_ = store.Save(ctx, rec2)
-	_ = store.UpdateStatus(ctx, rec2.ID, domain.SessionCompleted, "prov-abc")
+	_ = store.UpdateStatus(ctx, rec2.ID, domain.SessionCompleted, "prov-abc", nil)
 
 	latest, err := store.LatestByProviderSessionID(ctx, domain.ProviderClaudeCode, "prov-abc")
 	if err != nil {
