@@ -128,6 +128,10 @@ type GitHubPRReader interface {
 type GitHubPRWriter interface {
 	// ApplyLabel adds a label to the given PR. Creates the label if it doesn't exist.
 	ApplyLabel(ctx context.Context, prNumber, label string) error
+	// RemoveLabel removes a label from the given PR.
+	RemoveLabel(ctx context.Context, prNumber, label string) error
+	// DeleteLabel deletes a label definition from the repository.
+	DeleteLabel(ctx context.Context, label string) error
 }
 
 // PRPipelineRunner executes the pre-merge PR convergence pipeline.
