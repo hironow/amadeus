@@ -34,6 +34,8 @@ const (
 	EventRunStarted           EventType = "run.started"
 	EventRunStopped           EventType = "run.stopped"
 	EventPRConvergenceChecked EventType = "pr_convergence.checked"
+	EventPRMerged             EventType = "pr.merged"
+	EventPRMergeSkipped       EventType = "pr.merge_skipped"
 )
 
 // validEventTypes is the set of recognized EventType values.
@@ -49,6 +51,8 @@ var validEventTypes = map[EventType]bool{
 	EventRunStarted:           true,
 	EventRunStopped:           true,
 	EventPRConvergenceChecked: true,
+	EventPRMerged:             true,
+	EventPRMergeSkipped:       true,
 }
 
 // ValidEventType returns true if the given EventType is recognized.
@@ -182,6 +186,20 @@ type PRConvergenceCheckedData struct {
 	Chains            int    `json:"chains"`
 	ConflictPRs       int    `json:"conflict_prs"`
 	DMails            int    `json:"dmails_generated"`
+}
+
+// PRMergedData is the payload for pr.merged events.
+type PRMergedData struct {
+	PRNumber string `json:"pr_number"`
+	Title    string `json:"title"`
+	Method   string `json:"method"` // "squash" or "merge"
+}
+
+// PRMergeSkippedData is the payload for pr.merge_skipped events.
+type PRMergeSkippedData struct {
+	PRNumber string   `json:"pr_number"`
+	Title    string   `json:"title"`
+	Reasons  []string `json:"reasons"`
 }
 
 // TrimCheckHistory keeps only the maxKeep most recent EventCheckCompleted events,

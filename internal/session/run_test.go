@@ -28,6 +28,10 @@ func (m *mockPRReader) GetPRDiff(_ context.Context, _ string) (string, error) {
 	return "", nil
 }
 
+func (m *mockPRReader) GetPRMergeReadiness(_ context.Context, _ string) (*domain.PRMergeReadiness, error) {
+	return nil, nil
+}
+
 func mustPRState(t *testing.T, number, title, base, head string, mergeable bool, behindBy int, conflicts []string) domain.PRState {
 	t.Helper()
 	pr, err := domain.NewPRState(number, title, base, head, mergeable, behindBy, conflicts, nil, "")
@@ -160,6 +164,8 @@ func (e *runEmitter) EmitPRConvergenceChecked(_ domain.PRConvergenceCheckedData,
 	e.prConvergenceCalls++
 	return nil
 }
+func (e *runEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error       { return nil }
+func (e *runEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error { return nil }
 
 // runGit implements port.Git for Run tests.
 type runGit struct {

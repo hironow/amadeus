@@ -195,9 +195,12 @@ If [path] is omitted, the current working directory is used. Requires
 			// With --base: daemon loop with inbox monitoring + post-merge checks.
 			// Adds PR convergence analysis (via PRReader/gh) on top of divergence scoring.
 			if baseBranch != "" {
+				noMerge, _ := cmd.Flags().GetBool("no-merge")
+				autoMerge := !noMerge // default ON when --base is set
 				runErr := usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
 					CheckOptions: checkOpts,
 					BaseBranch:   baseBranch,
+					AutoMerge:    autoMerge,
 				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{}, prReader, store)
 				return tryWriteHandover(cmd.Context(), runErr, repoRoot, domain.HandoverState{
 					Tool:       "amadeus",
@@ -291,7 +294,8 @@ If [path] is omitted, the current working directory is used. Requires
 	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
 	// New flag for run
 	cmd.Flags().String("base", "", "upstream branch for post-merge divergence check")
-	cmd.Flags().Duration("idle-timeout", domain.DefaultIdleTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
+	cmd.Flags().Bool("no-merge", false, "disable automatic PR merging (only effective with --base)")
+	cmd.Flags().Duration("idle-timeout", domain.DefaultIdleTimeout, "idle timeout — exit after no D-Mail activity (0 = 24h safety cap, negative = disable)")
 
 	return cmd
 }

@@ -30,6 +30,10 @@ func (f *fakePRReaderForReview) GetPRDiff(_ context.Context, prNumber string) (s
 	return "", nil
 }
 
+func (f *fakePRReaderForReview) GetPRMergeReadiness(_ context.Context, _ string) (*domain.PRMergeReadiness, error) {
+	return nil, nil
+}
+
 type fakePRWriterForReview struct {
 	appliedLabels map[string][]string // prNumber -> []label
 	removedLabels map[string][]string // prNumber -> []label
@@ -55,6 +59,10 @@ func (f *fakePRWriterForReview) RemoveLabel(_ context.Context, prNumber, label s
 
 func (f *fakePRWriterForReview) DeleteLabel(_ context.Context, label string) error {
 	f.deletedLabels = append(f.deletedLabels, label)
+	return nil
+}
+
+func (f *fakePRWriterForReview) MergePR(_ context.Context, _ string, _ domain.MergeMethod) error {
 	return nil
 }
 
@@ -355,5 +363,9 @@ func (n *nopReviewEmitter) EmitRunStopped(_ domain.RunStoppedData, _ time.Time) 
 	return nil
 }
 func (n *nopReviewEmitter) EmitPRConvergenceChecked(_ domain.PRConvergenceCheckedData, _ time.Time) error {
+	return nil
+}
+func (n *nopReviewEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error { return nil }
+func (n *nopReviewEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
 	return nil
 }

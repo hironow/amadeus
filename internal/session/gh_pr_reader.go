@@ -69,6 +69,49 @@ func (g *GhPRReader) GetPRDiff(_ context.Context, prNumber string) (string, erro
 	return string(data), nil
 }
 
+// ghPRViewEntry is the JSON structure returned by `gh pr view --json` for merge readiness.
+type ghPRViewEntry struct {
+	MergeStateStatus string         `json:"mergeStateStatus"` // "CLEAN", "BLOCKED", "BEHIND", "DIRTY", "UNSTABLE"
+	ReviewDecision   string         `json:"reviewDecision"`   // "APPROVED", "REVIEW_REQUIRED", "CHANGES_REQUESTED", ""
+	Mergeable        string         `json:"mergeable"`        // "MERGEABLE", "CONFLICTING", "UNKNOWN"
+	Labels           []ghLabelEntry `json:"labels"`
+	HeadRefOid       string         `json:"headRefOid"`
+}
+
+// GetPRMergeReadiness returns the merge readiness state for the given PR number.
+func (g *GhPRReader) GetPRMergeReadiness(_ context.Context, prNumber string) (*domain.PRMergeReadiness, error) {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	data, err := ghClient.runGH(
+		"pr", "view", strings.TrimPrefix(prNumber, "#"),
+		"--json", "mergeStateStatus,reviewDecision,mergeable,labels,headRefOid",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get PR merge readiness for %s: %w", prNumber, err)
+	}
+
+	var entry ghPRViewEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, fmt.Errorf("parse PR view JSON for %s: %w", prNumber, err)
+	}
+
+	hasReviewLabel := false
+	for _, l := range entry.Labels {
+		if strings.HasPrefix(l.Name, PRReviewLabelPrefix) {
+			hasReviewLabel = true
+			break
+		}
+	}
+
+	r := domain.EvaluateMergeReadiness(
+		prNumber,
+		entry.MergeStateStatus,
+		entry.ReviewDecision,
+		entry.Mergeable,
+		hasReviewLabel,
+	)
+	return &r, nil
+}
+
 // parseGhPRListOutput parses the JSON output from `gh pr list --json` into domain PRState slice.
 func parseGhPRListOutput(data []byte) ([]domain.PRState, error) {
 	var entries []ghPRListEntry

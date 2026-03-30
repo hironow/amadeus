@@ -186,6 +186,10 @@ func (e *testCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergen
 	}
 	return e.emit(ev)
 }
+func (e *testCheckEventEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error { return nil }
+func (e *testCheckEventEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
+	return nil
+}
 
 // testCheckStateProvider implements port.CheckStateManager for session tests.
 type testCheckStateProvider struct {
