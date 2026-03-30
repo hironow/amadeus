@@ -49,14 +49,13 @@ func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string)
 
 		// Remove stale review labels before applying the new one.
 		// This prevents unbounded label accumulation across force-pushes.
+		// Only removes from the PR (not repo-wide delete) to avoid
+		// affecting other PRs that might reference the same label.
 		if a.PRWriter != nil {
 			for _, label := range pr.Labels() {
 				if strings.HasPrefix(label, PRReviewLabelPrefix) && label != reviewLabel {
 					if rmErr := a.PRWriter.RemoveLabel(ctx, pr.Number(), label); rmErr != nil {
 						a.Logger.Warn("PR %s: remove stale label %s: %v", pr.Number(), label, rmErr)
-					}
-					if delErr := a.PRWriter.DeleteLabel(ctx, label); delErr != nil {
-						a.Logger.Warn("PR %s: delete stale label %s: %v", pr.Number(), label, delErr)
 					}
 				}
 			}

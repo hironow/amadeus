@@ -21,9 +21,9 @@ Extend amadeus's role from **Conductor** to **Conductor + Reviewer** for PRs tar
 
 1. **LLM-based PR diff evaluation**: For each open PR targeting `--base`, amadeus reads the unified diff via `gh pr diff` and evaluates ADR/DoD compliance using Claude (the same Divergence Meter pattern used for post-merge checks). This supersedes ADR-0015 Decision item 1.
 
-2. **Label write access**: amadeus applies `amadeus:reviewed-{head_sha8}` labels to evaluated PRs via `gh pr edit --add-label`. This is the only write operation — amadeus does NOT merge, rebase, close, or modify PR content. This supersedes ADR-0015 Decision item 2.
+2. **Label write access**: amadeus applies `amadeus:reviewed-{head_sha8}` labels to evaluated PRs via `gh pr edit --add-label` and removes stale labels via `gh pr edit --remove-label`. These are the only write operations — amadeus does NOT merge, rebase, close, or modify PR content. This supersedes ADR-0015 Decision item 2.
 
-3. **Commit-aware re-evaluation**: Labels encode the HEAD commit SHA (first 8 chars). When a PR receives new commits, the label no longer matches, triggering re-evaluation. Old labels remain as audit history.
+3. **Commit-aware re-evaluation**: Labels encode the HEAD commit SHA (first 8 chars). When a PR receives new commits, the label no longer matches, triggering re-evaluation. Stale labels are removed from the PR to prevent unbounded accumulation.
 
 4. **Existing convergence preserved**: Chain detection, conflict analysis, and implementation-feedback D-Mail generation (ADR-0015 items 3-5) remain unchanged.
 

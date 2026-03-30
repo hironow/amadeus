@@ -156,16 +156,6 @@ func TestEvaluatePRDiffs_ReEvaluatesAfterPush(t *testing.T) {
 		t.Errorf("expected old label 'amadeus:reviewed-old12345' in removed list %v", removed)
 	}
 
-	// then: old label definition should have been deleted from repo
-	oldLabelDeleted := false
-	for _, l := range writer.deletedLabels {
-		if l == "amadeus:reviewed-old12345" {
-			oldLabelDeleted = true
-		}
-	}
-	if !oldLabelDeleted {
-		t.Errorf("expected old label 'amadeus:reviewed-old12345' in deleted list %v", writer.deletedLabels)
-	}
 	_ = dmails
 }
 
