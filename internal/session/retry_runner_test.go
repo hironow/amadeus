@@ -210,5 +210,107 @@ func (h *hangingRunner) Run(ctx context.Context, _ string, _ io.Writer, _ ...por
 	return "", ctx.Err()
 }
 
+// retryDetailedRunner implements both ClaudeRunner and DetailedRunner.
+type retryDetailedRunner struct {
+	calls             int
+	failN             int
+	output            string
+	providerSessionID string
+}
+
+func (f *retryDetailedRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	f.calls++
+	if f.calls <= f.failN {
+		return "", errors.New("claude exit: non-zero")
+	}
+	return f.output, nil
+}
+
+func (f *retryDetailedRunner) RunDetailed(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (port.RunResult, error) {
+	f.calls++
+	if f.calls <= f.failN {
+		return port.RunResult{}, errors.New("claude exit: non-zero")
+	}
+	return port.RunResult{Text: f.output, ProviderSessionID: f.providerSessionID}, nil
+}
+
+func TestRetryRunner_RunDetailed_SucceedsFirstAttempt(t *testing.T) {
+	// given
+	inner := &retryDetailedRunner{output: "ok", providerSessionID: "sess-1"}
+	runner := &session.RetryRunner{
+		Inner:       inner,
+		MaxAttempts: 3,
+		BaseDelay:   0,
+		Logger:      &domain.NopLogger{},
+	}
+
+	// when
+	result, err := runner.RunDetailed(context.Background(), "test", io.Discard)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Text != "ok" {
+		t.Errorf("expected 'ok', got %q", result.Text)
+	}
+	if result.ProviderSessionID != "sess-1" {
+		t.Errorf("expected 'sess-1', got %q", result.ProviderSessionID)
+	}
+	if inner.calls != 1 {
+		t.Errorf("expected 1 call, got %d", inner.calls)
+	}
+}
+
+func TestRetryRunner_RunDetailed_RetriesAndSucceeds(t *testing.T) {
+	// given: fails once, succeeds on 2nd
+	inner := &retryDetailedRunner{failN: 1, output: "recovered", providerSessionID: "sess-2"}
+	runner := &session.RetryRunner{
+		Inner:       inner,
+		MaxAttempts: 3,
+		BaseDelay:   0,
+		Logger:      &domain.NopLogger{},
+	}
+
+	// when
+	result, err := runner.RunDetailed(context.Background(), "test", io.Discard)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Text != "recovered" {
+		t.Errorf("expected 'recovered', got %q", result.Text)
+	}
+	if inner.calls != 2 {
+		t.Errorf("expected 2 calls, got %d", inner.calls)
+	}
+}
+
+func TestRetryRunner_RunDetailed_FallsBackToRun(t *testing.T) {
+	// given: inner does NOT implement DetailedRunner
+	inner := &fakeRunner{output: "plain"}
+	runner := &session.RetryRunner{
+		Inner:       inner,
+		MaxAttempts: 1,
+		BaseDelay:   0,
+		Logger:      &domain.NopLogger{},
+	}
+
+	// when
+	result, err := runner.RunDetailed(context.Background(), "test", io.Discard)
+
+	// then: falls back to Run(), wraps result in RunResult
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Text != "plain" {
+		t.Errorf("expected 'plain', got %q", result.Text)
+	}
+	if result.ProviderSessionID != "" {
+		t.Errorf("expected empty ProviderSessionID, got %q", result.ProviderSessionID)
+	}
+}
+
 // Verify RetryRunner satisfies the ClaudeRunner interface at compile time.
 var _ port.ClaudeRunner = (*session.RetryRunner)(nil)
