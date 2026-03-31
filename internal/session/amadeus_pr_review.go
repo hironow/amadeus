@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // PRReviewLabelPrefix is the label prefix used for commit-aware PR review tracking.
@@ -89,7 +90,7 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 
 	prompt := a.buildPRReviewPrompt(pr, diff)
 
-	rawResp, err := a.claudeRunner().Run(ctx, prompt, nil)
+	rawResp, err := a.claudeRunner().Run(ctx, prompt, nil, port.WithAllowedTools(DivergenceMeterAllowedTools...))
 	if err != nil {
 		return nil, fmt.Errorf("claude evaluation: %w", err)
 	}

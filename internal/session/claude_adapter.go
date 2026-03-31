@@ -179,6 +179,10 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			streamErr <- readErr
 			return
 		}
+		if result == nil {
+			streamErr <- fmt.Errorf("no result message in stream-json output")
+			return
+		}
 
 		for _, msg := range messages {
 			switch msg.Type {
