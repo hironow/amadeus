@@ -94,12 +94,15 @@ func createOutboxSchema(db *sql.DB) error {
 }
 
 // Stage inserts a D-Mail into the staging table. Idempotent: re-staging the
-// same name is silently ignored (INSERT OR IGNORE).
+// same name updates the data and resets flushed/retry state, enabling
+// re-delivery of D-Mails that have already been flushed (e.g. recurring
+// conflict notifications for the same PR).
 func (s *SQLiteOutboxStore) Stage(ctx context.Context, name string, data []byte) error {
 	_, span := platform.Tracer.Start(ctx, "outbox.stage")
 	defer span.End()
 
-	_, err := s.db.Exec(`INSERT OR IGNORE INTO staged (name, data) VALUES (?, ?)`, name, data)
+	_, err := s.db.Exec(`INSERT INTO staged (name, data) VALUES (?, ?)
+		ON CONFLICT(name) DO UPDATE SET data = excluded.data, flushed = 0, retry_count = 0`, name, data)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "outbox.stage"))
