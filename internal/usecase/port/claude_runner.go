@@ -14,6 +14,7 @@ type RunConfig struct {
 	WorkDir         string // sets cmd.Dir for the subprocess
 	ConfigBase      string // base directory for resolving stateDir settings (defaults to WorkDir)
 	Continue        bool   // passes --continue to resume a prior session
+	Model           string // overrides the default model for this invocation
 	ResumeSessionID string // passes --resume <id> to target a specific session (mutually exclusive with Continue)
 }
 
@@ -40,18 +41,26 @@ func WithWorkDir(dir string) RunOption {
 	}
 }
 
+// WithContinue enables --continue mode to resume a prior Claude session.
+func WithContinue() RunOption {
+	return func(c *RunConfig) {
+		c.Continue = true
+	}
+}
+
 // WithConfigBase sets the base directory for resolving tool stateDir settings
-// (e.g. .gate/.claude/settings.json). When unset, WorkDir is used.
+// (e.g. .claude/settings.json under the stateDir). When unset, WorkDir is used.
+// Use this when WorkDir is a worktree that doesn't contain the stateDir.
 func WithConfigBase(dir string) RunOption {
 	return func(c *RunConfig) {
 		c.ConfigBase = dir
 	}
 }
 
-// WithContinue enables --continue mode to resume a prior Claude session.
-func WithContinue() RunOption {
+// WithModel overrides the default model for this invocation.
+func WithModel(model string) RunOption {
 	return func(c *RunConfig) {
-		c.Continue = true
+		c.Model = model
 	}
 }
 
