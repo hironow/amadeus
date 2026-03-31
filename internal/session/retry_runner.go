@@ -24,6 +24,14 @@ type RetryRunner struct {
 	Logger      domain.Logger
 }
 
+// logger returns Logger if non-nil, otherwise a NopLogger.
+func (r *RetryRunner) logger() domain.Logger {
+	if r.Logger != nil {
+		return r.Logger
+	}
+	return &domain.NopLogger{}
+}
+
 // Run executes the inner runner with exponential backoff retry.
 // The entire retry loop is bounded by Timeout.
 func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
@@ -40,11 +48,6 @@ func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts 
 		defer cancel()
 	}
 
-	logger := r.Logger
-	if logger == nil {
-		logger = &domain.NopLogger{}
-	}
-
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if ctx.Err() != nil {
@@ -56,7 +59,7 @@ func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts 
 				shift = 30
 			}
 			delay := r.BaseDelay * time.Duration(1<<shift)
-			logger.Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			r.logger().Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()
@@ -80,4 +83,63 @@ func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts 
 		)
 	}
 	return "", fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
+}
+
+// RunDetailed executes the inner runner with retry, returning the last RunResult.
+func (r *RetryRunner) RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (port.RunResult, error) {
+	// If inner supports DetailedRunner, use it to capture session ID.
+	detailed, ok := r.Inner.(port.DetailedRunner)
+	if !ok {
+		text, err := r.Run(ctx, prompt, w, opts...)
+		return port.RunResult{Text: text}, err
+	}
+
+	maxAttempts := r.MaxAttempts
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+
+	if r.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
+		defer cancel()
+	}
+
+	var lastResult port.RunResult
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return lastResult, ctx.Err()
+		}
+		if attempt > 1 {
+			shift := attempt - 2
+			if shift > 30 {
+				shift = 30
+			}
+			delay := r.BaseDelay * time.Duration(1<<shift)
+			r.logger().Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			select {
+			case <-ctx.Done():
+				return lastResult, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		result, err := detailed.RunDetailed(ctx, prompt, w, opts...)
+		lastResult = result
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			return result, err
+		}
+		span := trace.SpanFromContext(ctx)
+		span.AddEvent("claude.retry",
+			trace.WithAttributes(
+				attribute.Int("claude.attempt", attempt),
+				attribute.String("claude.error", platform.SanitizeUTF8(err.Error())),
+			),
+		)
+	}
+	return lastResult, fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
 }

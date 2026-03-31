@@ -31,7 +31,7 @@ func (a *SessionTrackingAdapter) Run(ctx context.Context, prompt string, w io.Wr
 // RunSession executes the inner runner and persists session metadata.
 func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (domain.CodingSessionRecord, string, error) {
 	rc := port.ApplyOptions(opts...)
-	rec := domain.NewCodingSessionRecord(a.provider, "", rc.WorkDir)
+	rec := domain.NewCodingSessionRecord(a.provider, rc.Model, rc.WorkDir)
 
 	// Persist running state (best-effort: if store fails, continue anyway)
 	_ = a.store.Save(ctx, rec)

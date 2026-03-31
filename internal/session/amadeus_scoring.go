@@ -13,6 +13,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -264,7 +265,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
-	rawResp, err := a.claudeRunner().Run(invokeCtx, prompt, nil)
+	rawResp, err := a.claudeRunner().Run(invokeCtx, prompt, nil, port.WithAllowedTools(DivergenceMeterAllowedTools...))
 	invokeSpan.End()
 	if err != nil {
 		span2.End()
