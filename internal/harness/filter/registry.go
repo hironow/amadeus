@@ -135,12 +135,51 @@ func (r *Registry) Names() []string {
 	return names
 }
 
-// ExpandTemplate performs simple {key} substitution on a template string.
-// Placeholders not present in vars are left unchanged.
+// ExpandTemplate performs {key} substitution and {#if key}...{#else}...{/if}
+// conditionals on a template string. Placeholders not present in vars are
+// left unchanged. A key is truthy if present, non-empty, and not "false".
 func ExpandTemplate(tmpl string, vars map[string]string) string {
-	result := tmpl
+	result := processConditionals(tmpl, vars)
 	for k, v := range vars {
 		result = strings.ReplaceAll(result, "{"+k+"}", v)
 	}
 	return result
+}
+
+// processConditionals handles {#if key}...{#else}...{/if} blocks.
+func processConditionals(tmpl string, vars map[string]string) string {
+	for {
+		start := strings.Index(tmpl, "{#if ")
+		if start == -1 {
+			return tmpl
+		}
+		closeTag := strings.Index(tmpl[start:], "}")
+		if closeTag == -1 {
+			return tmpl
+		}
+		key := tmpl[start+len("{#if ") : start+closeTag]
+		endTag := "{/if}"
+		endIdx := strings.Index(tmpl[start:], endTag)
+		if endIdx == -1 {
+			return tmpl
+		}
+		endIdx += start
+		body := tmpl[start+closeTag+1 : endIdx]
+		var ifBlock, elseBlock string
+		if elseIdx := strings.Index(body, "{#else}"); elseIdx != -1 {
+			ifBlock = body[:elseIdx]
+			elseBlock = body[elseIdx+len("{#else}"):]
+		} else {
+			ifBlock = body
+		}
+		val, exists := vars[key]
+		truthy := exists && val != "" && val != "false"
+		var replacement string
+		if truthy {
+			replacement = ifBlock
+		} else {
+			replacement = elseBlock
+		}
+		tmpl = tmpl[:start] + replacement + tmpl[endIdx+len(endTag):]
+	}
 }
