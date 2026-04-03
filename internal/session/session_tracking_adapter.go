@@ -8,9 +8,10 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// SessionTrackingAdapter wraps a DetailedRunner with session persistence.
+// SessionTrackingAdapter wraps a DetailedRunner with provider-agnostic session persistence.
 // It creates a CodingSessionRecord before each invocation, captures the
-// provider session ID from the result, and updates the record in the store.
+// provider's session ID from the result, updates the record in the store,
+// and records circuit breaker state from stderr.
 type SessionTrackingAdapter struct {
 	inner    port.DetailedRunner
 	store    port.CodingSessionStore
@@ -22,7 +23,7 @@ func NewSessionTrackingAdapter(inner port.DetailedRunner, store port.CodingSessi
 	return &SessionTrackingAdapter{inner: inner, store: store, provider: provider}
 }
 
-// Run implements port.ClaudeRunner, enabling drop-in replacement of plain adapters.
+// Run implements the provider runner interface, enabling drop-in replacement of plain adapters.
 func (a *SessionTrackingAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
 	_, text, err := a.RunSession(ctx, prompt, w, opts...)
 	return text, err
@@ -38,6 +39,9 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 
 	result, runErr := a.inner.RunDetailed(ctx, prompt, w, opts...)
 
+	// Circuit breaker: classify provider error from stderr
+	recordCircuitBreaker(a.provider, runErr, result.Stderr)
+
 	if runErr != nil {
 		// Capture provider session ID even on failure
 		rec.ProviderSessionID = result.ProviderSessionID
@@ -46,6 +50,9 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 			rec.Metadata = make(map[string]string)
 		}
 		rec.Metadata["failure_reason"] = runErr.Error()
+		if result.Stderr != "" {
+			rec.Metadata["stderr"] = result.Stderr
+		}
 		_ = a.store.UpdateStatus(ctx, rec.ID, domain.SessionFailed, result.ProviderSessionID, rec.Metadata)
 		return rec, result.Text, runErr
 	}

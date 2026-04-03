@@ -16,3 +16,7 @@ docs/plans/
 .gocache/
 # firebase local debug log
 firebase-debug.log
+# state
+.siren/
+.expedition/
+.gate/

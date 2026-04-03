@@ -20,12 +20,12 @@ import (
 // as a subprocess with streaming (--output-format stream-json).
 // It does NOT retry; wrap with RetryRunner for that.
 type ClaudeAdapter struct {
-	ClaudeCmd  string
-	Model      string
-	TimeoutSec int
-	Logger     domain.Logger
-	ToolName   string                       // CLI tool name for stream events (e.g. "sightjack")
-	StreamBus  port.SessionStreamPublisher   // optional: live session event streaming
+	ClaudeCmd      string
+	Model          string
+	TimeoutSec     int
+	Logger         domain.Logger
+	ToolName       string                       // CLI tool name for stream events (e.g. "sightjack")
+	StreamBus      port.SessionStreamPublisher   // optional: live session event streaming
 	// NewCmd overrides command creation. If nil, platform.NewShellCmd is used.
 	NewCmd     func(ctx context.Context, name string, args ...string) *exec.Cmd
 	// CancelFunc sets cmd.Cancel for graceful shutdown. If nil, default (process kill) is used.
@@ -260,30 +260,35 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	}
 
 	// Log captured stderr at debug level; suppress raw NDJSON from errors.
-	if stderrBuf.Len() > 0 && a.Logger != nil {
-		a.Logger.Debug("claude stderr:\n%s", stderrBuf.String())
+	stderr := stderrBuf.String()
+	if stderr != "" && a.Logger != nil {
+		a.Logger.Debug("claude stderr:\n%s", stderr)
+	}
+
+	makeResult := func() port.RunResult {
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID, Stderr: stderr}
 	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
 		span.RecordError(waitErr)
-		diagnostic := stderrBuf.String()
+		diagnostic := stderr
 		if diagnostic != "" {
 			if platform.IsNDJSON(diagnostic) {
 				diagnostic = platform.SummarizeNDJSON(diagnostic)
 			}
 			runResultErr = fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
-			return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
+			return makeResult(), runResultErr
 		}
 		runResultErr = fmt.Errorf("claude exit: %w", waitErr)
-		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
+		return makeResult(), runResultErr
 	}
 
 	if readError != nil {
 		runResultErr = fmt.Errorf("stream read: %w", readError)
-		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
+		return makeResult(), runResultErr
 	}
 
-	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
+	return makeResult(), nil
 }
 
 // effectiveDir returns dir if non-empty, otherwise ".".

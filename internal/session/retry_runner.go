@@ -13,15 +13,16 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// RetryRunner wraps a ClaudeRunner with exponential backoff retry.
+// RetryRunner wraps a provider runner (ClaudeRunner) with exponential backoff retry.
 // Use the inner runner directly for non-idempotent operations.
 // Timeout bounds the entire retry loop (not per-attempt).
 type RetryRunner struct {
-	Inner       port.ClaudeRunner
-	MaxAttempts int
-	BaseDelay   time.Duration
-	Timeout     time.Duration
-	Logger      domain.Logger
+	Inner          port.ClaudeRunner
+	MaxAttempts    int
+	BaseDelay      time.Duration
+	Timeout        time.Duration
+	Logger         domain.Logger
+	CircuitBreaker *platform.CircuitBreaker // optional: skip retries when circuit is open
 }
 
 // logger returns Logger if non-nil, otherwise a NopLogger.
@@ -52,6 +53,15 @@ func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
+		}
+		// Circuit breaker: skip remaining retries when rate-limited
+		if r.CircuitBreaker != nil {
+			if cbErr := r.CircuitBreaker.Allow(ctx); cbErr != nil {
+				if lastErr != nil {
+					return "", lastErr
+				}
+				return "", cbErr
+			}
 		}
 		if attempt > 1 {
 			shift := attempt - 2
@@ -110,6 +120,15 @@ func (r *RetryRunner) RunDetailed(ctx context.Context, prompt string, w io.Write
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return lastResult, ctx.Err()
+		}
+		// Circuit breaker: skip remaining retries when rate-limited
+		if r.CircuitBreaker != nil {
+			if cbErr := r.CircuitBreaker.Allow(ctx); cbErr != nil {
+				if lastErr != nil {
+					return lastResult, lastErr
+				}
+				return lastResult, cbErr
+			}
 		}
 		if attempt > 1 {
 			shift := attempt - 2

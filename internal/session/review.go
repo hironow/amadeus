@@ -159,8 +159,14 @@ func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments s
 	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
 	defer fixCancel()
 
+	if sharedCircuitBreaker != nil {
+		if cbErr := sharedCircuitBreaker.Allow(fixCtx); cbErr != nil {
+			return fmt.Errorf("review fix circuit breaker: %w", cbErr)
+		}
+	}
 	logger.Info("Review fix: running claude --continue in %s", dir)
 	_, err = runner.Run(fixCtx, prompt, io.Discard, port.WithContinue(), port.WithWorkDir(dir))
+	recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
 	if err != nil {
 		return fmt.Errorf("claude fix: %w", err)
 	}
