@@ -1073,7 +1073,11 @@ func TestAttemptAutoMerge_MixedOrphans_ClosePipelineKeepOthers(t *testing.T) {
 // TestAttemptAutoMerge_ClosesPipelineOrphan_IssueLink verifies that
 // orphaned PRs without branch/label signals are still detected as
 // pipeline PRs via issue link (title references a sightjack:ready issue).
-func TestAttemptAutoMerge_ClosesPipelineOrphan_IssueLink(t *testing.T) {
+// TestAttemptAutoMerge_IssueLinkOnly_WarnsButDoesNotClose verifies that
+// issue-link-only matches do NOT trigger close (codex review finding:
+// false positive risk for release/hotfix PRs referencing the same issue).
+// Only label/branch pattern matches warrant automatic close.
+func TestAttemptAutoMerge_IssueLinkOnly_WarnsButDoesNotClose(t *testing.T) {
 	// given: orphaned PR with no pipeline branch pattern or label,
 	// but title references issue #1 which has sightjack:ready
 	orphan := mustPR(t, "#70", "fix: address #1 pagination bug",
@@ -1097,12 +1101,13 @@ func TestAttemptAutoMerge_ClosesPipelineOrphan_IssueLink(t *testing.T) {
 	// when
 	a.attemptAutoMerge(context.Background(), "main")
 
-	// then: PR was closed (detected via issue link), NOT merge-attempted
-	if len(writer.calls) != 0 {
-		t.Errorf("expected 0 merge calls, got %d", len(writer.calls))
+	// then: NOT closed — issue link alone is insufficient for close
+	if len(writer.closed) != 0 {
+		t.Errorf("expected 0 close calls (issue-link only should warn, not close), got %d", len(writer.closed))
 	}
-	if len(writer.closed) != 1 || writer.closed[0].number != "#70" {
-		t.Fatalf("expected closed PR #70, got %v", writer.closed)
+	// then: still merge-attempted as a regular orphan
+	if len(writer.calls) != 1 || writer.calls[0].number != "#70" {
+		t.Errorf("expected merge attempt for #70 (issue-link-only orphan), got %v", writer.calls)
 	}
 }
 

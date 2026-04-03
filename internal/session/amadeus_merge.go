@@ -65,7 +65,7 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 			}
 		}
 	}
-	// Pre-fetch sightjack:ready issue numbers once for issue-link detection.
+	// Pre-fetch sightjack:ready issue numbers once for issue-link warnings.
 	var sightjackIssues []string
 	if len(report.OrphanedPRs) > 0 && a.IssueWriter != nil {
 		var issueErr error
@@ -76,13 +76,19 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 	}
 
 	for _, orphan := range report.OrphanedPRs {
-		// Pipeline-generated orphans (wave/expedition/amadeus branches,
-		// paintress labels, or title referencing a sightjack:ready issue)
-		// have a stale base branch — close them so the pipeline can
-		// re-create from the correct base.
-		if domain.IsPipelinePRWithIssueContext(orphan, sightjackIssues) {
+		// Pipeline-generated orphans (wave/expedition/amadeus branches or
+		// paintress labels) have a stale base branch — close them so the
+		// pipeline can re-create from the correct base.
+		if domain.IsPipelinePR(orphan) {
 			a.closePipelineOrphan(ctx, orphan)
 			continue
+		}
+		// Issue-link-only match: warn but do NOT close.
+		// Closing based solely on issue reference risks false positives
+		// for release/hotfix PRs that happen to mention the same issue.
+		if !domain.IsPipelinePR(orphan) && domain.IsPipelinePRWithIssueContext(orphan, sightjackIssues) {
+			a.Logger.Warn("auto-merge: orphan %s (%s) references a sightjack:ready issue but lacks pipeline branch/label — skipping auto-close (manual review recommended)",
+				orphan.Number(), orphan.Title())
 		}
 		mc := findCandidate(candidates, orphan.Number())
 		if mc == nil {
