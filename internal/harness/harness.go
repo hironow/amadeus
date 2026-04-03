@@ -75,3 +75,20 @@ var MustDefaultPromptRegistry = filter.MustDefaultRegistry
 
 // ExpandPromptTemplate performs {key} substitution on a template string.
 var ExpandPromptTemplate = filter.ExpandTemplate
+
+// --- filter layer: optimization (Phase 3) ---
+
+// PromptOptimizer is the port interface for prompt optimization backends.
+type PromptOptimizer = filter.PromptOptimizer
+
+// EvalCase is a universal evaluation case for prompt optimization.
+type EvalCase = filter.EvalCase
+
+// OptimizedResult is the result of a prompt optimization run.
+type OptimizedResult = filter.OptimizedResult
+
+// SavePrompt writes an updated prompt config to disk (for optimization results).
+var SavePrompt = filter.Save
+
+// PromptsDir returns the on-disk path to the prompts/ directory.
+var PromptsDir = filter.PromptsDir
