@@ -6,11 +6,11 @@ import (
 )
 
 // sharedCircuitBreaker is the process-wide circuit breaker shared across all
-// ClaudeAdapter instances. Set via SetCircuitBreaker at startup.
+// provider adapter instances. Set via SetCircuitBreaker at startup.
 var sharedCircuitBreaker *platform.CircuitBreaker
 
-// SetCircuitBreaker sets the process-wide circuit breaker for all Claude calls.
-// Call this once during startup before any Claude invocations.
+// SetCircuitBreaker sets the process-wide circuit breaker for all provider calls.
+// Call this once during startup before any provider invocations.
 func SetCircuitBreaker(cb *platform.CircuitBreaker) {
 	sharedCircuitBreaker = cb
 }

@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// RetryRunner wraps a ClaudeRunner with exponential backoff retry.
+// RetryRunner wraps a provider runner (ClaudeRunner) with exponential backoff retry.
 // Use the inner runner directly for non-idempotent operations.
 // Timeout bounds the entire retry loop (not per-attempt).
 type RetryRunner struct {

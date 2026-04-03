@@ -8,9 +8,10 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// SessionTrackingAdapter wraps a DetailedRunner with session persistence.
+// SessionTrackingAdapter wraps a DetailedRunner with provider-agnostic session persistence.
 // It creates a CodingSessionRecord before each invocation, captures the
-// provider session ID from the result, and updates the record in the store.
+// provider's session ID from the result, updates the record in the store,
+// and records circuit breaker state from stderr.
 type SessionTrackingAdapter struct {
 	inner    port.DetailedRunner
 	store    port.CodingSessionStore
@@ -22,7 +23,7 @@ func NewSessionTrackingAdapter(inner port.DetailedRunner, store port.CodingSessi
 	return &SessionTrackingAdapter{inner: inner, store: store, provider: provider}
 }
 
-// Run implements port.ClaudeRunner, enabling drop-in replacement of plain adapters.
+// Run implements the provider runner interface, enabling drop-in replacement of plain adapters.
 func (a *SessionTrackingAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
 	_, text, err := a.RunSession(ctx, prompt, w, opts...)
 	return text, err

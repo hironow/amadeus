@@ -5,10 +5,10 @@ import (
 	"io"
 )
 
-// RunOption configures optional behavior for a ClaudeRunner invocation.
+// RunOption configures optional behavior for a provider runner invocation.
 type RunOption func(*RunConfig)
 
-// RunConfig holds per-invocation configuration for ClaudeRunner.
+// RunConfig holds per-invocation configuration for a provider runner.
 type RunConfig struct {
 	AllowedTools    []string
 	WorkDir         string // sets cmd.Dir for the subprocess
@@ -34,14 +34,14 @@ func WithAllowedTools(tools ...string) RunOption {
 	}
 }
 
-// WithWorkDir sets the working directory for the Claude subprocess.
+// WithWorkDir sets the working directory for the provider subprocess.
 func WithWorkDir(dir string) RunOption {
 	return func(c *RunConfig) {
 		c.WorkDir = dir
 	}
 }
 
-// WithContinue enables --continue mode to resume a prior Claude session.
+// WithContinue enables --continue mode to resume a prior provider session.
 func WithContinue() RunOption {
 	return func(c *RunConfig) {
 		c.Continue = true
@@ -72,7 +72,8 @@ func WithResume(providerSessionID string) RunOption {
 	}
 }
 
-// ClaudeRunner executes the Claude CLI and returns the result text.
+// ClaudeRunner executes an AI coding tool and returns the result text.
+// Provider-agnostic: implementations wrap any CLI (Claude, Codex, Copilot, etc.).
 // Implementations may stream intermediate output to w.
 type ClaudeRunner interface {
 	Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error)
