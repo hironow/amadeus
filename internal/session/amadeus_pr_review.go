@@ -89,7 +89,13 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 
 	prompt := a.buildPRReviewPrompt(pr, diff)
 
+	if sharedCircuitBreaker != nil {
+		if cbErr := sharedCircuitBreaker.Allow(ctx); cbErr != nil {
+			return nil, fmt.Errorf("PR %s circuit breaker: %w", pr.Number(), cbErr)
+		}
+	}
 	rawResp, err := a.claudeRunner().Run(ctx, prompt, nil, port.WithAllowedTools(DivergenceMeterAllowedTools...))
+	recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
 	if err != nil {
 		return nil, fmt.Errorf("claude evaluation: %w", err)
 	}

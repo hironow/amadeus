@@ -101,6 +101,9 @@ If [path] is omitted, the current working directory is used. Requires
 				return preErr
 			}
 
+			// Initialize process-wide circuit breaker for rate limit / server error protection
+			session.SetCircuitBreaker(platform.NewCircuitBreaker(logger))
+
 			if cmd.Flags().Changed("idle-timeout") {
 				cfg.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
 			}

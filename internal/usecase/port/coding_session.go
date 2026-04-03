@@ -11,6 +11,7 @@ import (
 type RunResult struct {
 	Text              string
 	ProviderSessionID string
+	Stderr            string // captured stderr for circuit breaker inspection
 }
 
 // DetailedRunner extends ClaudeRunner to also return session metadata.

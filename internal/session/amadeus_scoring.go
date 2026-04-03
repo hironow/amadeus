@@ -265,7 +265,15 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
+	if sharedCircuitBreaker != nil {
+		if cbErr := sharedCircuitBreaker.Allow(invokeCtx); cbErr != nil {
+			invokeSpan.End()
+			span2.End()
+			return domain.MeterResult{}, fmt.Errorf("phase 2 (circuit breaker): %w", cbErr)
+		}
+	}
 	rawResp, err := a.claudeRunner().Run(invokeCtx, prompt, nil, port.WithAllowedTools(DivergenceMeterAllowedTools...))
+	recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
 	invokeSpan.End()
 	if err != nil {
 		span2.End()
