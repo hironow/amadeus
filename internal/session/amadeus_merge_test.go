@@ -40,11 +40,17 @@ type mergeCall struct {
 	method domain.MergeMethod
 }
 
+type closeCall struct {
+	number  string
+	comment string
+}
+
 type mergeMockPRWriter struct {
 	mu         sync.Mutex
 	calls      []mergeCall
 	failOn     map[string]bool // PR numbers that should fail
 	labelCalls []string
+	closed     []closeCall
 }
 
 func (m *mergeMockPRWriter) ApplyLabel(_ context.Context, prNumber, label string) error {
@@ -56,6 +62,13 @@ func (m *mergeMockPRWriter) ApplyLabel(_ context.Context, prNumber, label string
 
 func (m *mergeMockPRWriter) RemoveLabel(_ context.Context, _, _ string) error { return nil }
 func (m *mergeMockPRWriter) DeleteLabel(_ context.Context, _ string) error    { return nil }
+
+func (m *mergeMockPRWriter) ClosePR(_ context.Context, prNumber, comment string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closed = append(m.closed, closeCall{number: prNumber, comment: comment})
+	return nil
+}
 
 func (m *mergeMockPRWriter) MergePR(_ context.Context, prNumber string, method domain.MergeMethod) error {
 	m.mu.Lock()
@@ -876,6 +889,328 @@ func TestAttemptAutoMerge_BlockedButNotConflicting_NoDMail(t *testing.T) {
 	}
 	if len(emitter.dmailsGenerated) != 0 {
 		t.Errorf("expected 0 conflict D-Mails for BLOCKED (non-CONFLICTING), got %d", len(emitter.dmailsGenerated))
+	}
+}
+
+// --- orphaned pipeline PR tests ---
+
+// TestAttemptAutoMerge_ClosesPipelineOrphan_WaveBranch reproduces the
+// go-taskboard PR #23 scenario: an orphaned PR whose base/head branches
+// match the sightjack wave naming pattern. Pipeline orphans are closed
+// instead of merge-attempted.
+func TestAttemptAutoMerge_ClosesPipelineOrphan_WaveBranch(t *testing.T) {
+	// given: orphaned PR with wave pattern in both base and head branches
+	// (PR #23's exact pattern from go-taskboard)
+	orphan := mustPR(t, "#23", "test: #1 pagination bug reproduction",
+		"feat/pagination-validation-w1-21-http-test-infra",
+		"feat/pagination-validation-w3-1-reproduction-test",
+		nil, "deadbeef")
+
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#23": readyPR("#23")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: PR was closed, NOT merge-attempted
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls for pipeline orphan, got %d", len(writer.calls))
+	}
+	if len(writer.closed) != 1 {
+		t.Fatalf("expected 1 close call, got %d", len(writer.closed))
+	}
+	if writer.closed[0].number != "#23" {
+		t.Errorf("expected closed PR #23, got %s", writer.closed[0].number)
+	}
+}
+
+// TestAttemptAutoMerge_ClosesPipelineOrphan_ExpeditionBranch verifies
+// expedition-prefixed orphaned PRs are closed.
+func TestAttemptAutoMerge_ClosesPipelineOrphan_ExpeditionBranch(t *testing.T) {
+	// given: orphaned PR from expedition (paintress)
+	orphan := mustPR(t, "#50", "feat: migrate errors.Is",
+		"feat-deleted-base", "expedition/052-errors-is-migration",
+		nil, "abc12345")
+
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#50": readyPR("#50")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: closed, not merged
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls, got %d", len(writer.calls))
+	}
+	if len(writer.closed) != 1 || writer.closed[0].number != "#50" {
+		t.Fatalf("expected closed PR #50, got %v", writer.closed)
+	}
+}
+
+// TestAttemptAutoMerge_ClosesPipelineOrphan_PaintressLabel verifies
+// orphaned PRs with paintress:pr-open label are closed.
+func TestAttemptAutoMerge_ClosesPipelineOrphan_PaintressLabel(t *testing.T) {
+	// given: orphaned PR with paintress:pr-open label (no wave pattern in branch)
+	orphan := mustPR(t, "#60", "fix: some issue",
+		"feat-old-base", "fix/some-fix",
+		[]string{"paintress:pr-open"}, "abc12345")
+
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#60": readyPR("#60")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: closed due to paintress:pr-open label
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls, got %d", len(writer.calls))
+	}
+	if len(writer.closed) != 1 || writer.closed[0].number != "#60" {
+		t.Fatalf("expected closed PR #60, got %v", writer.closed)
+	}
+}
+
+// TestAttemptAutoMerge_NonPipelineOrphan_StillMergeAttempted verifies
+// orphaned PRs WITHOUT pipeline indicators are still merge-attempted
+// (existing behavior preserved).
+func TestAttemptAutoMerge_NonPipelineOrphan_StillMergeAttempted(t *testing.T) {
+	// given: orphaned PR with no pipeline indicators
+	orphan := mustPR(t, "#40", "manual PR",
+		"feat-deleted", "feat-orphan",
+		nil, "abc12345")
+
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#40": readyPR("#40")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: merge attempted (not a pipeline PR, might be intentional)
+	if len(writer.calls) != 1 || writer.calls[0].number != "#40" {
+		t.Errorf("expected merge attempt for non-pipeline orphan #40, got %v", writer.calls)
+	}
+	if len(writer.closed) != 0 {
+		t.Errorf("expected 0 close calls for non-pipeline orphan, got %d", len(writer.closed))
+	}
+}
+
+// TestAttemptAutoMerge_MixedOrphans_ClosePipelineKeepOthers verifies
+// that in a mixed scenario, pipeline orphans are closed while
+// non-pipeline orphans are merge-attempted.
+func TestAttemptAutoMerge_MixedOrphans_ClosePipelineKeepOthers(t *testing.T) {
+	// given: 1 pipeline orphan + 1 normal orphan + 1 chain PR
+	chainRoot := mustPR(t, "#1", "chain root", "main", "feat-a", nil, "aaa")
+	pipelineOrphan := mustPR(t, "#23", "wave PR",
+		"feat/pagination-w1-21-infra", "feat/pagination-w3-1-test",
+		nil, "bbb")
+	normalOrphan := mustPR(t, "#40", "manual PR",
+		"develop", "feat-manual",
+		nil, "ccc")
+
+	reader := &mergeMockPRReader{
+		prs: []domain.PRState{chainRoot, pipelineOrphan, normalOrphan},
+		readiness: map[string]*domain.PRMergeReadiness{
+			"#1":  readyPR("#1"),
+			"#23": readyPR("#23"),
+			"#40": readyPR("#40"),
+		},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: #1 merged (chain), #23 closed (pipeline orphan), #40 merged (non-pipeline orphan)
+	mergedNums := make(map[string]bool)
+	for _, c := range writer.calls {
+		mergedNums[c.number] = true
+	}
+	if !mergedNums["#1"] {
+		t.Error("#1 (chain root) should be merged")
+	}
+	if mergedNums["#23"] {
+		t.Error("#23 (pipeline orphan) should NOT be merged")
+	}
+	if !mergedNums["#40"] {
+		t.Error("#40 (non-pipeline orphan) should be merge-attempted")
+	}
+
+	// then: #23 closed
+	closedNums := make(map[string]bool)
+	for _, c := range writer.closed {
+		closedNums[c.number] = true
+	}
+	if !closedNums["#23"] {
+		t.Error("#23 should be closed")
+	}
+	if closedNums["#40"] {
+		t.Error("#40 should NOT be closed")
+	}
+}
+
+// TestAttemptAutoMerge_ClosesPipelineOrphan_IssueLink verifies that
+// orphaned PRs without branch/label signals are still detected as
+// pipeline PRs via issue link (title references a sightjack:ready issue).
+// TestAttemptAutoMerge_IssueLinkOnly_WarnsButDoesNotClose verifies that
+// issue-link-only matches do NOT trigger close (codex review finding:
+// false positive risk for release/hotfix PRs referencing the same issue).
+// Only label/branch pattern matches warrant automatic close.
+func TestAttemptAutoMerge_IssueLinkOnly_WarnsButDoesNotClose(t *testing.T) {
+	// given: orphaned PR with no pipeline branch pattern or label,
+	// but title references issue #1 which has sightjack:ready
+	orphan := mustPR(t, "#70", "fix: address #1 pagination bug",
+		"feat-old-branch", "fix/pagination-fix",
+		nil, "abc12345")
+
+	reader := &mergeMockPRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#70": readyPR("#70")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	issueWriter := &mockIssueWriterForMerge{
+		issuesByLabel: map[string][]string{
+			"sightjack:ready": {"1", "5", "9"},
+		},
+	}
+	a := newMergeTestAmadeus(reader, writer, emitter)
+	a.IssueWriter = issueWriter
+
+	// when
+	a.attemptAutoMerge(context.Background(), "main")
+
+	// then: NOT closed — issue link alone is insufficient for close
+	if len(writer.closed) != 0 {
+		t.Errorf("expected 0 close calls (issue-link only should warn, not close), got %d", len(writer.closed))
+	}
+	// then: still merge-attempted as a regular orphan
+	if len(writer.calls) != 1 || writer.calls[0].number != "#70" {
+		t.Errorf("expected merge attempt for #70 (issue-link-only orphan), got %v", writer.calls)
+	}
+}
+
+// mockIssueWriterForMerge is a minimal GitHubIssueWriter mock for merge tests.
+type mockIssueWriterForMerge struct {
+	issuesByLabel map[string][]string
+}
+
+func (m *mockIssueWriterForMerge) ListOpenIssuesByLabel(_ context.Context, label string) ([]string, error) {
+	return m.issuesByLabel[label], nil
+}
+
+func (m *mockIssueWriterForMerge) CloseIssue(_ context.Context, _, _ string) error {
+	return nil
+}
+
+// --- go-taskboard exact scenario: evaluatePRDiffs + attemptAutoMerge ---
+
+// branchAwarePRReader filters PRs by target branch, matching real gh behavior:
+//   ListOpenPRs("main") → only PRs where baseBranch == "main"
+//   ListOpenPRs("")     → all PRs regardless of baseBranch
+type branchAwarePRReader struct {
+	prs       []domain.PRState
+	readiness map[string]*domain.PRMergeReadiness
+}
+
+func (m *branchAwarePRReader) ListOpenPRs(_ context.Context, targetBranch string) ([]domain.PRState, error) {
+	if targetBranch == "" {
+		return m.prs, nil
+	}
+	var filtered []domain.PRState
+	for _, pr := range m.prs {
+		if pr.BaseBranch() == targetBranch {
+			filtered = append(filtered, pr)
+		}
+	}
+	return filtered, nil
+}
+
+func (m *branchAwarePRReader) GetPRDiff(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *branchAwarePRReader) GetPRMergeReadiness(_ context.Context, prNumber string) (*domain.PRMergeReadiness, error) {
+	r, ok := m.readiness[prNumber]
+	if !ok {
+		return nil, fmt.Errorf("no readiness for %s", prNumber)
+	}
+	return r, nil
+}
+
+// TestGoTaskboardScenario_OrphanOnlyPR_EvalSkipsAutoMergeCloses reproduces
+// the exact go-taskboard state: PR #23 targets a merged feature branch (not main).
+//   - evaluatePRDiffs("main") sees 0 PRs (correct — #23 doesn't target main)
+//   - attemptAutoMerge gets all PRs → #23 is orphaned pipeline PR → closes it
+// Before the fix, attemptAutoMerge would skip #23 with "missing review label"
+// indefinitely because evaluatePRDiffs never reviewed it.
+func TestGoTaskboardScenario_OrphanOnlyPR_EvalSkipsAutoMergeCloses(t *testing.T) {
+	// given: only PR #23 exists, targeting a merged feature branch
+	orphan := mustPR(t, "#23", "test: #1 pagination bug reproduction tests — cannot-reproduce",
+		"feat/pagination-validation-w1-21-http-test-infra",
+		"feat/pagination-validation-w3-1-reproduction-test",
+		nil, "deadbeef12345678")
+
+	reader := &branchAwarePRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#23": readyPR("#23")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := &Amadeus{
+		PRReader: reader,
+		PRWriter: writer,
+		Emitter:  emitter,
+		Logger:   &domain.NopLogger{},
+	}
+
+	// when: evaluatePRDiffs runs first (as in run.go)
+	reviewDMails, reviewErr := a.evaluatePRDiffs(context.Background(), "main")
+
+	// then: evaluatePRDiffs sees 0 PRs targeting main
+	if reviewErr != nil {
+		t.Fatalf("evaluatePRDiffs error: %v", reviewErr)
+	}
+	if len(reviewDMails) != 0 {
+		t.Errorf("expected 0 review D-Mails (no main-targeting PRs), got %d", len(reviewDMails))
+	}
+
+	// when: attemptAutoMerge runs next (as in run.go)
+	merged := a.attemptAutoMerge(context.Background(), "main")
+
+	// then: #23 was closed as pipeline orphan, not merge-attempted
+	if merged != 0 {
+		t.Errorf("expected 0 merged, got %d", merged)
+	}
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls, got %d", len(writer.calls))
+	}
+	if len(writer.closed) != 1 {
+		t.Fatalf("expected 1 close call, got %d", len(writer.closed))
+	}
+	if writer.closed[0].number != "#23" {
+		t.Errorf("expected closed PR #23, got %s", writer.closed[0].number)
 	}
 }
 

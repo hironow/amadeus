@@ -65,7 +65,31 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 			}
 		}
 	}
+	// Pre-fetch sightjack:ready issue numbers once for issue-link warnings.
+	var sightjackIssues []string
+	if len(report.OrphanedPRs) > 0 && a.IssueWriter != nil {
+		var issueErr error
+		sightjackIssues, issueErr = a.IssueWriter.ListOpenIssuesByLabel(ctx, "sightjack:ready")
+		if issueErr != nil {
+			a.Logger.Debug("auto-merge: list sightjack:ready issues: %v", issueErr)
+		}
+	}
+
 	for _, orphan := range report.OrphanedPRs {
+		// Pipeline-generated orphans (wave/expedition/amadeus branches or
+		// paintress labels) have a stale base branch — close them so the
+		// pipeline can re-create from the correct base.
+		if domain.IsPipelinePR(orphan) {
+			a.closePipelineOrphan(ctx, orphan)
+			continue
+		}
+		// Issue-link-only match: warn but do NOT close.
+		// Closing based solely on issue reference risks false positives
+		// for release/hotfix PRs that happen to mention the same issue.
+		if !domain.IsPipelinePR(orphan) && domain.IsPipelinePRWithIssueContext(orphan, sightjackIssues) {
+			a.Logger.Warn("auto-merge: orphan %s (%s) references a sightjack:ready issue but lacks pipeline branch/label — skipping auto-close (manual review recommended)",
+				orphan.Number(), orphan.Title())
+		}
 		mc := findCandidate(candidates, orphan.Number())
 		if mc == nil {
 			continue
@@ -79,6 +103,27 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 		a.Logger.OK("auto-merge: merged %d PR(s)", merged)
 	}
 	return merged
+}
+
+// closePipelineOrphan closes an orphaned pipeline PR whose base branch
+// has been merged. Logs a banner and emits a merge-skipped event.
+func (a *Amadeus) closePipelineOrphan(ctx context.Context, pr domain.PRState) {
+	comment := fmt.Sprintf("Closed by amadeus: this PR targets branch `%s` which is no longer the integration branch. "+
+		"The pipeline will re-create a PR from the correct base if the linked issue is still open.", pr.BaseBranch())
+
+	a.Logger.Warn("auto-merge: closing pipeline orphan %s (%s) — base %s is stale",
+		pr.Number(), pr.Title(), pr.BaseBranch())
+
+	if a.PRWriter != nil {
+		if err := a.PRWriter.ClosePR(ctx, pr.Number(), comment); err != nil {
+			a.Logger.Warn("auto-merge: close pipeline orphan %s: %v", pr.Number(), err)
+		}
+	}
+
+	if a.Emitter != nil {
+		now := time.Now().UTC()
+		_ = a.emitMergeSkipped(pr, []string{"pipeline orphan: base branch " + pr.BaseBranch() + " is stale"}, now)
+	}
 }
 
 // tryMergePR attempts to merge a single PR. Returns true on success.

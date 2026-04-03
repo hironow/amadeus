@@ -55,6 +55,17 @@ func (g *GhPRWriter) DeleteLabel(_ context.Context, label string) error {
 	return nil
 }
 
+// ClosePR closes the given PR with a comment.
+func (g *GhPRWriter) ClosePR(_ context.Context, prNumber, comment string) error {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	num := strings.TrimPrefix(prNumber, "#")
+	_, err := ghClient.runGH("pr", "close", num, "--comment", comment)
+	if err != nil {
+		return fmt.Errorf("close PR %s: %w", prNumber, err)
+	}
+	return nil
+}
+
 // MergePR merges the given PR using the specified method.
 // For squash: uses --squash --delete-branch (clean history + branch cleanup).
 // For merge: uses --merge without --delete-branch (preserve hash for chain dependents).
