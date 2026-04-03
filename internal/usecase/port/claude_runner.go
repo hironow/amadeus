@@ -75,6 +75,9 @@ func WithResume(providerSessionID string) RunOption {
 // ClaudeRunner executes an AI coding tool and returns the result text.
 // Provider-agnostic: implementations wrap any CLI (Claude, Codex, Copilot, etc.).
 // Implementations may stream intermediate output to w.
+//
+// TODO(rename): ClaudeRunner → ProviderRunner — legacy name from Claude-only era.
+// The interface is fully provider-agnostic; rename blocked only by 40+ call sites.
 type ClaudeRunner interface {
 	Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error)
 }
