@@ -1119,6 +1119,96 @@ func (m *mockIssueWriterForMerge) CloseIssue(_ context.Context, _, _ string) err
 	return nil
 }
 
+// --- go-taskboard exact scenario: evaluatePRDiffs + attemptAutoMerge ---
+
+// branchAwarePRReader filters PRs by target branch, matching real gh behavior:
+//   ListOpenPRs("main") → only PRs where baseBranch == "main"
+//   ListOpenPRs("")     → all PRs regardless of baseBranch
+type branchAwarePRReader struct {
+	prs       []domain.PRState
+	readiness map[string]*domain.PRMergeReadiness
+}
+
+func (m *branchAwarePRReader) ListOpenPRs(_ context.Context, targetBranch string) ([]domain.PRState, error) {
+	if targetBranch == "" {
+		return m.prs, nil
+	}
+	var filtered []domain.PRState
+	for _, pr := range m.prs {
+		if pr.BaseBranch() == targetBranch {
+			filtered = append(filtered, pr)
+		}
+	}
+	return filtered, nil
+}
+
+func (m *branchAwarePRReader) GetPRDiff(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *branchAwarePRReader) GetPRMergeReadiness(_ context.Context, prNumber string) (*domain.PRMergeReadiness, error) {
+	r, ok := m.readiness[prNumber]
+	if !ok {
+		return nil, fmt.Errorf("no readiness for %s", prNumber)
+	}
+	return r, nil
+}
+
+// TestGoTaskboardScenario_OrphanOnlyPR_EvalSkipsAutoMergeCloses reproduces
+// the exact go-taskboard state: PR #23 targets a merged feature branch (not main).
+//   - evaluatePRDiffs("main") sees 0 PRs (correct — #23 doesn't target main)
+//   - attemptAutoMerge gets all PRs → #23 is orphaned pipeline PR → closes it
+// Before the fix, attemptAutoMerge would skip #23 with "missing review label"
+// indefinitely because evaluatePRDiffs never reviewed it.
+func TestGoTaskboardScenario_OrphanOnlyPR_EvalSkipsAutoMergeCloses(t *testing.T) {
+	// given: only PR #23 exists, targeting a merged feature branch
+	orphan := mustPR(t, "#23", "test: #1 pagination bug reproduction tests — cannot-reproduce",
+		"feat/pagination-validation-w1-21-http-test-infra",
+		"feat/pagination-validation-w3-1-reproduction-test",
+		nil, "deadbeef12345678")
+
+	reader := &branchAwarePRReader{
+		prs:       []domain.PRState{orphan},
+		readiness: map[string]*domain.PRMergeReadiness{"#23": readyPR("#23")},
+	}
+	writer := &mergeMockPRWriter{}
+	emitter := &mergeEmitter{}
+	a := &Amadeus{
+		PRReader: reader,
+		PRWriter: writer,
+		Emitter:  emitter,
+		Logger:   &domain.NopLogger{},
+	}
+
+	// when: evaluatePRDiffs runs first (as in run.go)
+	reviewDMails, reviewErr := a.evaluatePRDiffs(context.Background(), "main")
+
+	// then: evaluatePRDiffs sees 0 PRs targeting main
+	if reviewErr != nil {
+		t.Fatalf("evaluatePRDiffs error: %v", reviewErr)
+	}
+	if len(reviewDMails) != 0 {
+		t.Errorf("expected 0 review D-Mails (no main-targeting PRs), got %d", len(reviewDMails))
+	}
+
+	// when: attemptAutoMerge runs next (as in run.go)
+	merged := a.attemptAutoMerge(context.Background(), "main")
+
+	// then: #23 was closed as pipeline orphan, not merge-attempted
+	if merged != 0 {
+		t.Errorf("expected 0 merged, got %d", merged)
+	}
+	if len(writer.calls) != 0 {
+		t.Errorf("expected 0 merge calls, got %d", len(writer.calls))
+	}
+	if len(writer.closed) != 1 {
+		t.Fatalf("expected 1 close call, got %d", len(writer.closed))
+	}
+	if writer.closed[0].number != "#23" {
+		t.Errorf("expected closed PR #23, got %s", writer.closed[0].number)
+	}
+}
+
 // TestAttemptAutoMerge_EmptyPRList verifies no panic on empty PR list.
 func TestAttemptAutoMerge_EmptyPRList(t *testing.T) {
 	reader := &mergeMockPRReader{prs: nil, readiness: map[string]*domain.PRMergeReadiness{}}
