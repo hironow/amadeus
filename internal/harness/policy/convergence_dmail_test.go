@@ -6,7 +6,6 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/harness/policy"
-	"github.com/hironow/amadeus/internal/harness/verifier"
 )
 
 func TestBuildConvergenceDMailBody_singleChain(t *testing.T) {
@@ -139,11 +138,7 @@ func TestBuildConvergenceDMail_valid(t *testing.T) {
 	if dmail.Body == "" {
 		t.Error("expected non-empty body")
 	}
-	// Must pass ValidateDMail
-	errs := verifier.ValidateDMail(dmail)
-	if len(errs) > 0 {
-		t.Errorf("ValidateDMail failed: %v", errs)
-	}
+	// D-Mail schema validation is tested in harness/verifier (layer separation).
 }
 
 func TestBuildConvergenceDMail_severityFromWorstChain(t *testing.T) {
