@@ -146,12 +146,14 @@ If [path] is omitted, the current working directory is used. Requires
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 			git := session.NewGitClient(repoRoot)
 
-			// PRReader/PRWriter require gh CLI — only create when --base is set
+			// PRReader/PRWriter/IssueWriter require gh CLI — only create when --base is set
 			var prReader *session.GhPRReader
 			var prWriter *session.GhPRWriter
+			var issueWriter *session.GhIssueWriter
 			if baseBranch != "" {
 				prReader = session.NewGhPRReader(repoRoot)
 				prWriter = session.NewGhPRWriter(repoRoot)
+				issueWriter = session.NewGhIssueWriter(repoRoot)
 			}
 
 			insightWriter := session.NewInsightWriter(
@@ -174,9 +176,10 @@ If [path] is omitted, the current working directory is used. Requires
 				ReviewCmd:   reviewCmd,
 				ClaudeCmd:   cfg.ClaudeCmd,
 				ClaudeModel: cfg.Model,
-				PRReader:    prReader,
-				PRWriter:    prWriter,
-				Insights:    insightWriter,
+				PRReader:     prReader,
+				PRWriter:     prWriter,
+				IssueWriter:  issueWriter,
+				Insights:     insightWriter,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
@@ -201,6 +204,7 @@ If [path] is omitted, the current working directory is used. Requires
 					CheckOptions: checkOpts,
 					BaseBranch:   baseBranch,
 					AutoMerge:    autoMerge,
+					ReadyLabel:   "sightjack:ready",
 				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{}, prReader, store)
 				return tryWriteHandover(cmd.Context(), runErr, repoRoot, domain.HandoverState{
 					Tool:       "amadeus",

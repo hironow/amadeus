@@ -133,6 +133,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 				a.Logger.Info("amadeus run: attempting startup auto-merge (last check: no D-Mails, divergence=%.2f)...", previous.Divergence)
 			}
 			if merged := a.attemptAutoMerge(ctx, integrationBranch); merged > 0 {
+				a.closeReadyIssues(ctx, opts.ReadyLabel)
 				// PRs were merged — main branch changed. Re-run pipelines to:
 				// 1. Detect new conflicts and generate D-Mails for paintress
 				// 2. Re-review remaining PRs (their merge status may have changed)
@@ -218,6 +219,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 						} else if opts.AutoMerge && !opts.DryRun {
 							// No drift detected — attempt auto-merge of eligible PRs
 							if merged := a.attemptAutoMerge(ctx, integrationBranch); merged > 0 {
+								a.closeReadyIssues(ctx, opts.ReadyLabel)
 								a.rerunPipelinesAfterMerge(ctx, integrationBranch, opts.Quiet)
 							}
 						}
