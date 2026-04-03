@@ -69,7 +69,7 @@ func (cb *CircuitBreaker) Allow(ctx context.Context) error {
 			return ctx.Err()
 		}
 
-		cb.mu.Lock()
+		cb.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- Lock is released before blocking wait to avoid holding mutex during sleep [permanent]
 		switch cb.state {
 		case circuitClosed, circuitHalfOpen:
 			cb.mu.Unlock()
