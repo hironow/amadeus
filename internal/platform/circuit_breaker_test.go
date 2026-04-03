@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
@@ -16,16 +17,21 @@ func TestCircuitBreaker_AllowWhenClosed(t *testing.T) {
 	}
 }
 
-func TestCircuitBreaker_TripsOnRateLimit(t *testing.T) {
+func TestCircuitBreaker_TripsOnRateLimit_BlocksUntilCancelled(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-
-	// Classify and record a rate limit error
 	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
 	cb.RecordProviderError(info)
 
-	err := cb.Allow(context.Background())
-	if !errors.Is(err, platform.ErrCircuitOpen) {
-		t.Fatalf("expected ErrCircuitOpen, got %v", err)
+	// Allow blocks when OPEN; use short deadline to verify blocking behavior
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err := cb.Allow(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected DeadlineExceeded (blocking), got %v", err)
+	}
+	if !cb.IsOpen() {
+		t.Fatal("expected still open after cancelled wait")
 	}
 }
 
@@ -46,9 +52,8 @@ func TestCircuitBreaker_TripsOnServerError(t *testing.T) {
 			info := domain.ClassifyProviderError(domain.ProviderClaudeCode, tc.stderr)
 			cb.RecordProviderError(info)
 
-			err := cb.Allow(context.Background())
-			if !errors.Is(err, platform.ErrCircuitOpen) {
-				t.Fatalf("expected ErrCircuitOpen for %q, got %v", tc.name, err)
+			if !cb.IsOpen() {
+				t.Fatalf("expected open for %q", tc.name)
 			}
 		})
 	}
@@ -57,7 +62,7 @@ func TestCircuitBreaker_TripsOnServerError(t *testing.T) {
 func TestCircuitBreaker_DoesNotTripOnNormalError(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
 	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "some normal error")
-	cb.RecordProviderError(info) // should be a no-op
+	cb.RecordProviderError(info)
 
 	if err := cb.Allow(context.Background()); err != nil {
 		t.Fatalf("expected nil (closed), got %v", err)
@@ -90,6 +95,25 @@ func TestCircuitBreaker_RespectsContextCancellation(t *testing.T) {
 	}
 }
 
+func TestCircuitBreaker_BlocksAndResumesAfterBackoff(t *testing.T) {
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	// Trip with server error (no reset time → uses backoff)
+	info := domain.ProviderErrorInfo{Kind: domain.ProviderErrorServer}
+	cb.RecordProviderError(info)
+
+	// Allow should block then transition to HALF_OPEN when backoff elapses.
+	// We can't wait 30s in a test, so reset externally.
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cb.RecordSuccess()
+	}()
+
+	err := cb.Allow(context.Background())
+	if err != nil {
+		t.Fatalf("expected nil after recovery, got %v", err)
+	}
+}
+
 func TestCircuitBreaker_ParsesResetTimeViaClassifier(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
 	info := domain.ClassifyProviderError(domain.ProviderClaudeCode,
@@ -110,8 +134,8 @@ func TestCircuitBreaker_FallbackBackoffWhenNoResetTime(t *testing.T) {
 	if !cb.ResetAt().IsZero() {
 		t.Fatalf("expected zero ResetAt, got %v", cb.ResetAt())
 	}
-	if err := cb.Allow(context.Background()); !errors.Is(err, platform.ErrCircuitOpen) {
-		t.Fatalf("expected ErrCircuitOpen, got %v", err)
+	if !cb.IsOpen() {
+		t.Fatal("expected open")
 	}
 }
 

@@ -51,38 +51,65 @@ func NewCircuitBreaker(logger domain.Logger) *CircuitBreaker {
 	}
 }
 
-// Allow checks if a call is permitted. Returns nil when closed/half-open,
-// ErrCircuitOpen when open.
+// Allow checks if a call is permitted. When the circuit is OPEN, it blocks
+// until the reset time or backoff period elapses, then transitions to HALF_OPEN
+// and returns nil. Returns context error if cancelled while waiting.
 func (cb *CircuitBreaker) Allow(ctx context.Context) error {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
+		cb.mu.Lock()
+		switch cb.state {
+		case circuitClosed, circuitHalfOpen:
+			cb.mu.Unlock()
+			return nil
+		case circuitOpen:
+			// Check if reset time has passed
+			if !cb.resetAt.IsZero() && time.Now().After(cb.resetAt) {
+				cb.state = circuitHalfOpen
+				cb.logger.Info("Circuit breaker: reset time reached, transitioning to HALF_OPEN (probe)")
+				cb.mu.Unlock()
+				return nil
+			}
+			// Check if backoff period has passed
+			if cb.resetAt.IsZero() && time.Since(cb.lastTrip) > cb.backoffCurrent {
+				cb.state = circuitHalfOpen
+				cb.logger.Info("Circuit breaker: backoff elapsed, transitioning to HALF_OPEN (probe)")
+				cb.mu.Unlock()
+				return nil
+			}
 
-	switch cb.state {
-	case circuitClosed, circuitHalfOpen:
-		return nil
-	case circuitOpen:
-		if !cb.resetAt.IsZero() && time.Now().After(cb.resetAt) {
-			cb.state = circuitHalfOpen
-			cb.logger.Info("Circuit breaker: reset time reached, transitioning to HALF_OPEN (probe)")
+			// Calculate wait duration
+			var waitDur time.Duration
+			if !cb.resetAt.IsZero() {
+				waitDur = time.Until(cb.resetAt)
+				cb.logger.Warn("PAUSED — Provider rate limit reached. Resets at %s. Waiting...",
+					cb.resetAt.Format("Jan 2, 3:04 PM (MST)"))
+			} else {
+				waitDur = cb.backoffCurrent - time.Since(cb.lastTrip)
+				cb.logger.Warn("PAUSED — Provider server error. Waiting %v for recovery...", waitDur.Round(time.Second))
+			}
+			if waitDur <= 0 {
+				waitDur = time.Second // minimum wait to avoid spin
+			}
+			cb.mu.Unlock()
+
+			// Block until wait expires or context cancelled
+			timer := time.NewTimer(waitDur)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+				// Loop back to re-check state
+			}
+		default:
+			cb.mu.Unlock()
 			return nil
 		}
-		if cb.resetAt.IsZero() && time.Since(cb.lastTrip) > cb.backoffCurrent {
-			cb.state = circuitHalfOpen
-			cb.logger.Info("Circuit breaker: backoff elapsed, transitioning to HALF_OPEN (probe)")
-			return nil
-		}
-		if !cb.resetAt.IsZero() {
-			cb.logger.Warn("PAUSED — Provider rate limit reached. Resets at %s", cb.resetAt.Format("Jan 2, 3:04 PM (MST)"))
-		} else {
-			cb.logger.Warn("PAUSED — Provider server error. Waiting for recovery...")
-		}
-		return ErrCircuitOpen
 	}
-	return nil
 }
 
 // RecordProviderError updates the circuit breaker state based on a classified

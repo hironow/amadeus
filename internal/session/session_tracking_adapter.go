@@ -38,6 +38,9 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 
 	result, runErr := a.inner.RunDetailed(ctx, prompt, w, opts...)
 
+	// Circuit breaker: classify provider error from stderr
+	recordCircuitBreaker(a.provider, runErr, result.Stderr)
+
 	if runErr != nil {
 		// Capture provider session ID even on failure
 		rec.ProviderSessionID = result.ProviderSessionID
@@ -46,6 +49,9 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 			rec.Metadata = make(map[string]string)
 		}
 		rec.Metadata["failure_reason"] = runErr.Error()
+		if result.Stderr != "" {
+			rec.Metadata["stderr"] = result.Stderr
+		}
 		_ = a.store.UpdateStatus(ctx, rec.ID, domain.SessionFailed, result.ProviderSessionID, rec.Metadata)
 		return rec, result.Text, runErr
 	}
