@@ -70,3 +70,29 @@ func TestVersionCmd_JSONOutput(t *testing.T) {
 		t.Errorf("expected version=1.2.3, got %q", info["version"])
 	}
 }
+
+func TestVersionCmd_NoDoubleV_WhenVersionStartsWithV(t *testing.T) {
+	// given: Version starts with "v" (git describe output)
+	origVersion, origCommit, origDate := Version, Commit, Date
+	Version, Commit, Date = "v0.0.11-test", "def5678", "2026-04-03T00:00:00Z"
+	defer func() { Version, Commit, Date = origVersion, origCommit, origDate }()
+	root := NewRootCommand()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetArgs([]string{"version"})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "vv") {
+		t.Errorf("version output contains double-v 'vv': %s", out)
+	}
+	if !strings.Contains(out, "amadeus v0.0.11-test") {
+		t.Errorf("expected 'amadeus v0.0.11-test' in output, got: %s", out)
+	}
+}
