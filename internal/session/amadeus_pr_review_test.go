@@ -66,6 +66,10 @@ func (f *fakePRWriterForReview) MergePR(_ context.Context, _ string, _ domain.Me
 	return nil
 }
 
+func (f *fakePRWriterForReview) ClosePR(_ context.Context, _, _ string) error {
+	return nil
+}
+
 type fakeClaudeRunnerForReview struct {
 	response string
 }

@@ -136,6 +136,9 @@ type GitHubPRWriter interface {
 	DeleteLabel(ctx context.Context, label string) error
 	// MergePR merges the given PR using the specified method.
 	MergePR(ctx context.Context, prNumber string, method domain.MergeMethod) error
+	// ClosePR closes the given PR with a comment.
+	// Used to clean up stale pipeline PRs whose base branch has been merged.
+	ClosePR(ctx context.Context, prNumber, comment string) error
 }
 
 // GitHubIssueWriter closes issues on GitHub.
