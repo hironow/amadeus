@@ -96,7 +96,8 @@ func (g *GhPRReader) GetPRMergeReadiness(_ context.Context, prNumber string) (*d
 
 	hasReviewLabel := false
 	for _, l := range entry.Labels {
-		if strings.HasPrefix(l.Name, PRReviewLabelPrefix) {
+		// Accept both new ("amadeus:reviewed") and legacy ("amadeus:reviewed-{sha8}") formats
+		if l.Name == PRReviewLabel || strings.HasPrefix(l.Name, PRReviewLabelLegacyPrefix) {
 			hasReviewLabel = true
 			break
 		}

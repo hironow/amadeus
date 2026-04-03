@@ -130,7 +130,7 @@ func TestEvaluatePRDiffs_ReEvaluatesAfterPush(t *testing.T) {
 	// when
 	dmails, err := a.evaluatePRDiffs(context.Background(), "main")
 
-	// then: re-evaluated (new commit), label applied with new SHA
+	// then: re-evaluated (new commit), single label applied
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,21 +138,20 @@ func TestEvaluatePRDiffs_ReEvaluatesAfterPush(t *testing.T) {
 	if !ok {
 		t.Fatal("expected label applied to #1")
 	}
-	expectedLabel := "amadeus:reviewed-newsha78"
 	found := false
 	for _, l := range labels {
-		if l == expectedLabel {
+		if l == PRReviewLabel {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected label %q in %v", expectedLabel, labels)
+		t.Errorf("expected label %q in %v", PRReviewLabel, labels)
 	}
 
-	// then: old label should have been removed from PR
+	// then: legacy label should have been removed from PR
 	removed, ok := writer.removedLabels["#1"]
 	if !ok || len(removed) == 0 {
-		t.Fatal("expected old label removed from #1")
+		t.Fatal("expected legacy label removed from #1")
 	}
 	oldLabelRemoved := false
 	for _, l := range removed {
@@ -161,7 +160,7 @@ func TestEvaluatePRDiffs_ReEvaluatesAfterPush(t *testing.T) {
 		}
 	}
 	if !oldLabelRemoved {
-		t.Errorf("expected old label 'amadeus:reviewed-old12345' in removed list %v", removed)
+		t.Errorf("expected legacy label 'amadeus:reviewed-old12345' in removed list %v", removed)
 	}
 
 	_ = dmails
@@ -277,16 +276,15 @@ func TestEvaluatePRDiffs_GoTaskboardScenario(t *testing.T) {
 	if len(writer.appliedLabels) != 7 {
 		t.Errorf("expected 7 PRs labeled, got %d", len(writer.appliedLabels))
 	}
-	// Each PR should have exactly one label: amadeus:reviewed-{sha8}
+	// Each PR should have exactly one label: amadeus:reviewed
 	for _, pr := range prs {
 		labels, ok := writer.appliedLabels[pr.Number()]
 		if !ok {
 			t.Errorf("PR %s: expected label applied", pr.Number())
 			continue
 		}
-		expectedLabel := PRReviewLabelPrefix + pr.HeadSHAShort()
-		if len(labels) != 1 || labels[0] != expectedLabel {
-			t.Errorf("PR %s: expected label %q, got %v", pr.Number(), expectedLabel, labels)
+		if len(labels) != 1 || labels[0] != PRReviewLabel {
+			t.Errorf("PR %s: expected label %q, got %v", pr.Number(), PRReviewLabel, labels)
 		}
 	}
 
@@ -294,9 +292,8 @@ func TestEvaluatePRDiffs_GoTaskboardScenario(t *testing.T) {
 	// Simulate labeled state by recreating PRs with labels
 	var labeledPRs []domain.PRState
 	for _, pr := range prs {
-		lbl := PRReviewLabelPrefix + pr.HeadSHAShort()
 		lp, _ := domain.NewPRState(pr.Number(), pr.Title(), pr.BaseBranch(), pr.HeadBranch(),
-			pr.Mergeable(), pr.BehindBy(), pr.ConflictFiles(), []string{lbl}, pr.HeadSHA())
+			pr.Mergeable(), pr.BehindBy(), pr.ConflictFiles(), []string{PRReviewLabel}, pr.HeadSHA())
 		labeledPRs = append(labeledPRs, lp)
 	}
 	reader2 := &fakePRReaderForReview{prs: labeledPRs, diffs: diffs}
