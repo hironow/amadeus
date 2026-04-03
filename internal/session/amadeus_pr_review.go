@@ -176,14 +176,8 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 // buildPRReviewPrompt constructs the evaluation prompt for a single PR.
 // Uses the PromptRegistry to load the template from YAML.
 func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
-	reg, err := harness.DefaultPromptRegistry()
-	if err != nil {
-		// Fallback: should never happen since prompts are embedded at compile time.
-		a.Logger.Warn("prompt registry unavailable: %v", err)
-		return fmt.Sprintf("Evaluate PR %s: %s\n\n%s", pr.Number(), pr.Title(), diff)
-	}
-
-	expanded, err := reg.Expand("pr_review", map[string]string{
+	reg := harness.MustDefaultPromptRegistry()
+	return reg.MustExpand("pr_review", map[string]string{
 		"pr_number":   pr.Number(),
 		"pr_title":    pr.Title(),
 		"base_branch": pr.BaseBranch(),
@@ -191,9 +185,4 @@ func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
 		"diff":        diff,
 		"lang":        a.Config.Lang,
 	})
-	if err != nil {
-		a.Logger.Warn("prompt expansion failed: %v", err)
-		return fmt.Sprintf("Evaluate PR %s: %s\n\n%s", pr.Number(), pr.Title(), diff)
-	}
-	return expanded
 }

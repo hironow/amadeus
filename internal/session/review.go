@@ -177,20 +177,11 @@ func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments s
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.
 // Uses the PromptRegistry to load the template from YAML.
 func BuildReviewFixPrompt(branch string, comments string) string {
-	reg, err := harness.DefaultPromptRegistry()
-	if err != nil {
-		// Fallback: should never happen since prompts are embedded at compile time.
-		return fmt.Sprintf("Fix review comments on branch %s:\n\n%s", branch, comments)
-	}
-
-	expanded, err := reg.Expand("review_fix", map[string]string{
+	reg := harness.MustDefaultPromptRegistry()
+	return reg.MustExpand("review_fix", map[string]string{
 		"branch":   branch,
 		"comments": comments,
 	})
-	if err != nil {
-		return fmt.Sprintf("Fix review comments on branch %s:\n\n%s", branch, comments)
-	}
-	return expanded
 }
 
 // summarizeReview normalizes multi-line review output and truncates.

@@ -70,5 +70,8 @@ var NewPromptRegistry = filter.NewRegistry
 // DefaultPromptRegistry returns the process-wide singleton PromptRegistry.
 var DefaultPromptRegistry = filter.DefaultRegistry
 
+// MustDefaultPromptRegistry returns the singleton or panics. Safe with embed.FS.
+var MustDefaultPromptRegistry = filter.MustDefaultRegistry
+
 // ExpandPromptTemplate performs {key} substitution on a template string.
 var ExpandPromptTemplate = filter.ExpandTemplate

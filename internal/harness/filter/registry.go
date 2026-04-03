@@ -50,6 +50,16 @@ func DefaultRegistry() (*Registry, error) {
 	return defaultRegistry, defaultRegistryErr
 }
 
+// MustDefaultRegistry returns the process-wide PromptRegistry or panics.
+// Safe to call because prompts are embedded at compile time.
+func MustDefaultRegistry() *Registry {
+	r, err := DefaultRegistry()
+	if err != nil {
+		panic("prompt registry: " + err.Error())
+	}
+	return r
+}
+
 // NewRegistry loads all YAML prompt files from the embedded filesystem
 // and returns a populated Registry.
 func NewRegistry() (*Registry, error) {
@@ -105,6 +115,15 @@ func (r *Registry) Expand(name string, vars map[string]string) (string, error) {
 		return "", err
 	}
 	return ExpandTemplate(cfg.Template, vars), nil
+}
+
+// MustExpand is like Expand but panics on error.
+func (r *Registry) MustExpand(name string, vars map[string]string) string {
+	result, err := r.Expand(name, vars)
+	if err != nil {
+		panic("prompt expand " + name + ": " + err.Error())
+	}
+	return result
 }
 
 // Names returns a sorted list of all registered prompt names.
