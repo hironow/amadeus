@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -37,7 +38,7 @@ for structured output suitable for scripts and CI.`,
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "amadeus v%s (commit: %s, date: %s, go: %s)\n",
-				Version, Commit, Date, runtime.Version())
+				strings.TrimPrefix(Version, "v"), Commit, Date, runtime.Version())
 			return nil
 		},
 	}

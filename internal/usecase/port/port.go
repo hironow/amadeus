@@ -138,6 +138,15 @@ type GitHubPRWriter interface {
 	MergePR(ctx context.Context, prNumber string, method domain.MergeMethod) error
 }
 
+// GitHubIssueWriter closes issues on GitHub.
+// Implemented by session-layer adapter using `gh` CLI.
+type GitHubIssueWriter interface {
+	// ListOpenIssuesByLabel returns issue numbers with the given label that are still open.
+	ListOpenIssuesByLabel(ctx context.Context, label string) ([]string, error)
+	// CloseIssue closes the given issue with a comment.
+	CloseIssue(ctx context.Context, issueNumber, comment string) error
+}
+
 // PRPipelineRunner executes the pre-merge PR convergence pipeline.
 // Implemented in usecase layer, injected into session by cmd (composition root).
 type PRPipelineRunner interface {
