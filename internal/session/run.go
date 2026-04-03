@@ -143,7 +143,8 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 	}
 
 	if !opts.Quiet {
-		a.Logger.Info("amadeus run: waiting for inbox D-Mails...")
+		a.Logger.Info("Waiting for incoming D-Mails... (timeout: %s)", a.Config.IdleTimeout)
+		a.Logger.Info("Press Ctrl+C to exit.")
 	}
 
 	// Main loop: event-driven via channel
