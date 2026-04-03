@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -44,13 +43,6 @@ const (
 	// ActionResolve indicates the issue can be resolved.
 	ActionResolve DMailAction = "resolve"
 )
-
-// validActions is the set of valid DMailAction values per schema v1.
-var validActions = map[DMailAction]bool{
-	ActionRetry:    true,
-	ActionEscalate: true,
-	ActionResolve:  true,
-}
 
 // DMailStatus represents the lifecycle status of a D-Mail.
 type DMailStatus string
@@ -116,23 +108,6 @@ type DMail struct {
 	Body          string            `yaml:"-"`
 }
 
-// validKinds is the set of valid DMailKind values per schema v1.
-var validKinds = map[DMailKind]bool{
-	KindDesignFeedback: true,
-	KindImplFeedback:   true,
-	KindSpecification:  true,
-	KindReport:         true,
-	KindConvergence:    true,
-	KindCIResult:       true,
-}
-
-// validSeverities is the set of valid Severity values per schema v1.
-var validSeverities = map[Severity]bool{
-	SeverityLow:    true,
-	SeverityMedium: true,
-	SeverityHigh:   true,
-}
-
 // DefaultDMailAction returns the default DMailAction for a given severity.
 // Used when a D-Mail candidate does not specify an explicit action.
 func DefaultDMailAction(severity Severity) DMailAction {
@@ -144,76 +119,6 @@ func DefaultDMailAction(severity Severity) DMailAction {
 	default:
 		return ActionResolve
 	}
-}
-
-// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
-// Returns a list of validation errors (empty if valid).
-func ValidateDMail(dmail DMail) []string {
-	var errs []string
-	if dmail.SchemaVersion == "" {
-		errs = append(errs, "dmail-schema-version is required")
-	} else if dmail.SchemaVersion != DMailSchemaVersion {
-		errs = append(errs, fmt.Sprintf("unsupported dmail-schema-version: %q (want %q)", dmail.SchemaVersion, DMailSchemaVersion))
-	}
-	if dmail.Name == "" {
-		errs = append(errs, "name is required")
-	}
-	if dmail.Kind == "" {
-		errs = append(errs, "kind is required")
-	} else if !validKinds[dmail.Kind] {
-		errs = append(errs, fmt.Sprintf("invalid kind: %q", dmail.Kind))
-	}
-	if dmail.Description == "" {
-		errs = append(errs, "description is required")
-	}
-	if dmail.Severity != "" && !validSeverities[dmail.Severity] {
-		errs = append(errs, fmt.Sprintf("invalid severity: %q", dmail.Severity))
-	}
-	if dmail.Action != "" && !validActions[dmail.Action] {
-		errs = append(errs, fmt.Sprintf("invalid action %q", dmail.Action))
-	}
-	if strings.TrimSpace(dmail.Body) == "" {
-		errs = append(errs, "body is required")
-	}
-	errs = append(errs, validateTargets(dmail.Targets)...)
-	return errs
-}
-
-// validateTargets checks D-Mail targets for path traversal and duplicates.
-func validateTargets(targets []string) []string {
-	var errs []string
-	seen := make(map[string]bool)
-	for _, target := range targets {
-		if strings.TrimSpace(target) == "" {
-			errs = append(errs, "target must not be empty")
-			continue
-		}
-		if filepath.IsAbs(target) {
-			errs = append(errs, fmt.Sprintf("target %q must be a relative path", target))
-			continue
-		}
-		if containsDotDotElement(target) {
-			errs = append(errs, fmt.Sprintf("target %q contains path traversal", target))
-			continue
-		}
-		if seen[target] {
-			errs = append(errs, fmt.Sprintf("duplicate target %q", target))
-			continue
-		}
-		seen[target] = true
-	}
-	return errs
-}
-
-// containsDotDotElement reports whether the path contains ".." as a path element
-// (e.g. "../foo" or "foo/../bar") rather than as a substring (e.g. "foo..bar").
-func containsDotDotElement(path string) bool {
-	for _, elem := range strings.Split(filepath.ToSlash(path), "/") {
-		if elem == ".." {
-			return true
-		}
-	}
-	return false
 }
 
 // SanitizeTargets removes self-referencing targets from a D-Mail's target list.

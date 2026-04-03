@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 )
 
 func TestParseDMail_Valid(t *testing.T) {
@@ -250,7 +251,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 		Severity:      domain.SeverityHigh,
 		Body:          "Details.\n",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors, got %v", errs)
 	}
@@ -266,7 +267,7 @@ func TestValidateDMail_AllKinds(t *testing.T) {
 			Severity:      domain.SeverityLow,
 			Body:          "Content.\n",
 		}
-		errs := domain.ValidateDMail(dmail)
+		errs := verifier.ValidateDMail(dmail)
 		if len(errs) != 0 {
 			t.Errorf("kind %s: expected no errors, got %v", kind, errs)
 		}
@@ -279,7 +280,7 @@ func TestValidateDMail_MissingName(t *testing.T) {
 		Description: "test",
 		Severity:    domain.SeverityHigh,
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing name")
 	}
@@ -291,7 +292,7 @@ func TestValidateDMail_MissingKind(t *testing.T) {
 		Description: "test",
 		Severity:    domain.SeverityHigh,
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing kind")
 	}
@@ -304,7 +305,7 @@ func TestValidateDMail_InvalidKind(t *testing.T) {
 		Description: "test",
 		Severity:    domain.SeverityHigh,
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for invalid kind")
 	}
@@ -316,7 +317,7 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 		Kind:     domain.KindDesignFeedback,
 		Severity: domain.SeverityHigh,
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing description")
 	}
@@ -331,7 +332,7 @@ func TestValidateDMail_MissingSeverity_IsValid(t *testing.T) {
 		Description:   "test",
 		Body:          "Content.\n",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for missing severity, got %v", errs)
 	}
@@ -344,7 +345,7 @@ func TestValidateDMail_InvalidSeverity(t *testing.T) {
 		Description: "test",
 		Severity:    domain.Severity("critical"),
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for invalid severity")
 	}
@@ -352,7 +353,7 @@ func TestValidateDMail_InvalidSeverity(t *testing.T) {
 
 func TestValidateDMail_MultipleErrors(t *testing.T) {
 	dmail := domain.DMail{}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) < 3 {
 		t.Errorf("expected at least 3 errors for empty DMail, got %d: %v", len(errs), errs)
 	}
@@ -364,7 +365,7 @@ func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
 		Kind:        domain.KindDesignFeedback,
 		Description: "test",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for missing dmail-schema-version")
 	}
@@ -377,7 +378,7 @@ func TestValidateDMail_UnsupportedSchemaVersion(t *testing.T) {
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) == 0 {
 		t.Error("expected error for unsupported dmail-schema-version")
 	}
@@ -624,7 +625,7 @@ func TestValidateDMail_CIResultKind(t *testing.T) {
 	}
 
 	// when
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 
 	// then
 	if len(errs) != 0 {
@@ -670,7 +671,7 @@ func TestValidateDMail_InvalidAction(t *testing.T) {
 	}
 
 	// when
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 
 	// then
 	if len(errs) == 0 {
@@ -699,7 +700,7 @@ func TestValidateDMail_EmptyAction_IsValid(t *testing.T) {
 	}
 
 	// when
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 
 	// then
 	if len(errs) != 0 {
@@ -717,7 +718,7 @@ func TestValidateDMail_AllActions(t *testing.T) {
 			Action:        action,
 			Body:          "Content.\n",
 		}
-		errs := domain.ValidateDMail(dmail)
+		errs := verifier.ValidateDMail(dmail)
 		if len(errs) != 0 {
 			t.Errorf("action %s: expected no errors, got %v", action, errs)
 		}
@@ -920,7 +921,7 @@ func TestValidateDMail_EmptyBody_IsInvalid(t *testing.T) {
 		Kind:          domain.KindDesignFeedback,
 		Description:   "test",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	found := false
 	for _, e := range errs {
 		if e == "body is required" {
@@ -940,7 +941,7 @@ func TestValidateDMail_WhitespaceOnlyBody_IsInvalid(t *testing.T) {
 		Description:   "test",
 		Body:          "   \n\t  ",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	found := false
 	for _, e := range errs {
 		if e == "body is required" {
@@ -960,7 +961,7 @@ func TestValidateDMail_NonEmptyBody_IsValid(t *testing.T) {
 		Description:   "test",
 		Body:          "# Details\n\nSome content.\n",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for non-empty body, got %v", errs)
 	}
@@ -975,7 +976,7 @@ func TestValidateDMail_PathTraversal_IsInvalid(t *testing.T) {
 		Body:          "Content.\n",
 		Targets:       []string{"../../etc/passwd"},
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	found := false
 	for _, e := range errs {
 		if strings.Contains(e, "path traversal") {
@@ -996,7 +997,7 @@ func TestValidateDMail_AbsoluteTarget_IsInvalid(t *testing.T) {
 		Body:          "Content.\n",
 		Targets:       []string{"/etc/passwd"},
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	found := false
 	for _, e := range errs {
 		if strings.Contains(e, "relative path") {
@@ -1017,7 +1018,7 @@ func TestValidateDMail_DuplicateTargets_IsInvalid(t *testing.T) {
 		Body:          "Content.\n",
 		Targets:       []string{"auth/session.go", "auth/session.go"},
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	found := false
 	for _, e := range errs {
 		if strings.Contains(e, "duplicate target") {
@@ -1038,7 +1039,7 @@ func TestValidateDMail_EmptyTarget_IsInvalid(t *testing.T) {
 		Body:          "Content.\n",
 		Targets:       []string{""},
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	found := false
 	for _, e := range errs {
 		if strings.Contains(e, "target must not be empty") {
@@ -1059,7 +1060,7 @@ func TestValidateDMail_ValidTargets(t *testing.T) {
 		Body:          "Content.\n",
 		Targets:       []string{"auth/session.go", "api/handler.go"},
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for valid targets, got %v", errs)
 	}
@@ -1073,7 +1074,7 @@ func TestValidateDMail_NoTargets_IsValid(t *testing.T) {
 		Description:   "test",
 		Body:          "Content.\n",
 	}
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for no targets, got %v", errs)
 	}
@@ -1182,21 +1183,21 @@ func TestSanitizeTargets_EmptyTargets(t *testing.T) {
 
 func TestValidateDMail_DesignFeedbackKind(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindDesignFeedback, Description: "test", Body: "Content.\n"}
-	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+	if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
 		t.Errorf("expected valid, got: %v", errs)
 	}
 }
 
 func TestValidateDMail_ImplFeedbackKind(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: domain.KindImplFeedback, Description: "test", Body: "Content.\n"}
-	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+	if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
 		t.Errorf("expected valid, got: %v", errs)
 	}
 }
 
 func TestValidateDMail_OldFeedbackKind_Invalid(t *testing.T) {
 	dmail := domain.DMail{SchemaVersion: "1", Name: "test", Kind: "feedback", Description: "test"}
-	if errs := domain.ValidateDMail(dmail); len(errs) == 0 {
+	if errs := verifier.ValidateDMail(dmail); len(errs) == 0 {
 		t.Error("expected validation error for old feedback kind")
 	}
 }

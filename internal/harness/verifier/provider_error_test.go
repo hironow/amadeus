@@ -1,14 +1,15 @@
-package domain_test
+package verifier_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 )
 
 func TestClassifyProviderError_Claude_RateLimit(t *testing.T) {
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
 	if info.Kind != domain.ProviderErrorRateLimit {
 		t.Fatalf("expected RateLimit, got %v", info.Kind)
 	}
@@ -23,7 +24,7 @@ func TestClassifyProviderError_Claude_ServerError(t *testing.T) {
 		"Error: 503 Service Unavailable",
 	}
 	for _, stderr := range cases {
-		info := domain.ClassifyProviderError(domain.ProviderClaudeCode, stderr)
+		info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, stderr)
 		if info.Kind != domain.ProviderErrorServer {
 			t.Errorf("expected Server for %q, got %v", stderr, info.Kind)
 		}
@@ -31,7 +32,7 @@ func TestClassifyProviderError_Claude_ServerError(t *testing.T) {
 }
 
 func TestClassifyProviderError_Claude_NormalError(t *testing.T) {
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "some normal error")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "some normal error")
 	if info.Kind != domain.ProviderErrorNone {
 		t.Fatalf("expected None, got %v", info.Kind)
 	}
@@ -44,7 +45,7 @@ func TestClassifyProviderError_Codex_RateLimit(t *testing.T) {
 		"rate limit reached",
 	}
 	for _, stderr := range cases {
-		info := domain.ClassifyProviderError(domain.ProviderCodex, stderr)
+		info := verifier.ClassifyProviderError(domain.ProviderCodex, stderr)
 		if info.Kind != domain.ProviderErrorRateLimit {
 			t.Errorf("expected RateLimit for %q, got %v", stderr, info.Kind)
 		}
@@ -52,21 +53,21 @@ func TestClassifyProviderError_Codex_RateLimit(t *testing.T) {
 }
 
 func TestClassifyProviderError_Codex_ServerError(t *testing.T) {
-	info := domain.ClassifyProviderError(domain.ProviderCodex, "internal server error")
+	info := verifier.ClassifyProviderError(domain.ProviderCodex, "internal server error")
 	if info.Kind != domain.ProviderErrorServer {
 		t.Fatalf("expected Server, got %v", info.Kind)
 	}
 }
 
 func TestClassifyProviderError_UnknownProvider_FallsBackToGeneric(t *testing.T) {
-	info := domain.ClassifyProviderError(domain.ProviderGeminiCLI, "rate limit exceeded")
+	info := verifier.ClassifyProviderError(domain.ProviderGeminiCLI, "rate limit exceeded")
 	if info.Kind != domain.ProviderErrorRateLimit {
 		t.Fatalf("expected RateLimit via generic, got %v", info.Kind)
 	}
 }
 
 func TestClassifyProviderError_ParsesResetTime(t *testing.T) {
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode,
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode,
 		"You've hit your limit · resets Apr 3 at 1pm (Asia/Tokyo)")
 	if info.Kind != domain.ProviderErrorRateLimit {
 		t.Fatalf("expected RateLimit, got %v", info.Kind)

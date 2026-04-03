@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/policy"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -57,7 +59,7 @@ func runPreMergePipeline(ctx context.Context, integrationBranch string,
 	}
 	logger.Info("PR convergence: fetched %d open PRs, analyzing chains...", len(prs))
 
-	report := domain.BuildPRConvergenceReport(integrationBranch, prs)
+	report := policy.BuildPRConvergenceReport(integrationBranch, prs)
 
 	if len(report.Chains) == 0 && len(report.OrphanedPRs) == 0 {
 		logger.Info("PR convergence: %d open PRs, no chains or orphans detected", report.TotalOpenPRs)
@@ -96,9 +98,9 @@ func runPreMergePipeline(ctx context.Context, integrationBranch string,
 			Chains:            []domain.PRChain{chain},
 			TotalOpenPRs:      report.TotalOpenPRs,
 		}
-		dmail := domain.BuildConvergenceDMail(name, singleChainReport)
+		dmail := policy.BuildConvergenceDMail(name, singleChainReport)
 
-		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
 			logger.Warn("skipping invalid PR convergence dmail %s: %v", name, errs)
 			continue
 		}

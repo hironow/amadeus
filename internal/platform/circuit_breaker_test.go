@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 	"github.com/hironow/amadeus/internal/platform"
 )
 
@@ -19,7 +20,7 @@ func TestCircuitBreaker_AllowWhenClosed(t *testing.T) {
 
 func TestCircuitBreaker_TripsOnRateLimit_BlocksUntilCancelled(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
 	cb.RecordProviderError(info)
 
 	// Allow blocks when OPEN; use short deadline to verify blocking behavior
@@ -49,7 +50,7 @@ func TestCircuitBreaker_TripsOnServerError(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-			info := domain.ClassifyProviderError(domain.ProviderClaudeCode, tc.stderr)
+			info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, tc.stderr)
 			cb.RecordProviderError(info)
 
 			if !cb.IsOpen() {
@@ -61,7 +62,7 @@ func TestCircuitBreaker_TripsOnServerError(t *testing.T) {
 
 func TestCircuitBreaker_DoesNotTripOnNormalError(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "some normal error")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "some normal error")
 	cb.RecordProviderError(info)
 
 	if err := cb.Allow(context.Background()); err != nil {
@@ -71,7 +72,7 @@ func TestCircuitBreaker_DoesNotTripOnNormalError(t *testing.T) {
 
 func TestCircuitBreaker_ResetsOnSuccess(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
 	cb.RecordProviderError(info)
 
 	cb.RecordSuccess()
@@ -116,7 +117,7 @@ func TestCircuitBreaker_BlocksAndResumesAfterBackoff(t *testing.T) {
 
 func TestCircuitBreaker_ParsesResetTimeViaClassifier(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode,
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode,
 		"You've hit your limit · resets Apr 3 at 1pm (Asia/Tokyo)")
 	cb.RecordProviderError(info)
 
@@ -128,7 +129,7 @@ func TestCircuitBreaker_ParsesResetTimeViaClassifier(t *testing.T) {
 
 func TestCircuitBreaker_FallbackBackoffWhenNoResetTime(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
 	cb.RecordProviderError(info)
 
 	if !cb.ResetAt().IsZero() {
@@ -145,7 +146,7 @@ func TestCircuitBreaker_IsOpen(t *testing.T) {
 		t.Fatal("expected not open initially")
 	}
 
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "overloaded")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "overloaded")
 	cb.RecordProviderError(info)
 
 	if !cb.IsOpen() {
@@ -155,7 +156,7 @@ func TestCircuitBreaker_IsOpen(t *testing.T) {
 
 func TestCircuitBreaker_CodexRateLimit(t *testing.T) {
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderCodex, "rate_limit_exceeded: too many requests")
+	info := verifier.ClassifyProviderError(domain.ProviderCodex, "rate_limit_exceeded: too many requests")
 	cb.RecordProviderError(info)
 
 	if !cb.IsOpen() {
@@ -258,8 +259,8 @@ func TestCircuitBreaker_BackoffCapsAtMax(t *testing.T) {
 func TestRecordCircuitBreaker_ClassifiesFromErrorMessage_WhenStderrEmpty(t *testing.T) {
 	// This tests the recordCircuitBreaker function's fallback behavior:
 	// when stderr is empty, it uses err.Error() for classification.
-	// We test this via the domain.ClassifyProviderError path directly.
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "claude exit: exit status 1\nYou've hit your limit")
+	// We test this via the verifier.ClassifyProviderError path directly.
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "claude exit: exit status 1\nYou've hit your limit")
 	if !info.IsTrip() {
 		t.Fatal("expected trip from error message containing rate limit text")
 	}

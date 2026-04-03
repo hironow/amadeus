@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/policy"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 )
 
 // attemptAutoMerge discovers merge-ready PRs and merges them in dependency order.
@@ -29,7 +31,7 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 	}
 
 	// 2. Build chain structure for merge order and strategy
-	report := domain.BuildPRConvergenceReport(integrationBranch, prs)
+	report := policy.BuildPRConvergenceReport(integrationBranch, prs)
 
 	// 3. Build a map of PR number -> chain for merge method determination
 	prChainMap := buildPRChainMap(report)
@@ -43,7 +45,7 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 			continue
 		}
 		chain := prChainMap[pr.Number()]
-		method := domain.DetermineMergeMethod(pr, chain)
+		method := policy.DetermineMergeMethod(pr, chain)
 		candidates = append(candidates, mergeCandidate{
 			pr:        pr,
 			readiness: *readiness,
@@ -79,14 +81,14 @@ func (a *Amadeus) attemptAutoMerge(ctx context.Context, integrationBranch string
 		// Pipeline-generated orphans (wave/expedition/amadeus branches or
 		// paintress labels) have a stale base branch — close them so the
 		// pipeline can re-create from the correct base.
-		if domain.IsPipelinePR(orphan) {
+		if policy.IsPipelinePR(orphan) {
 			a.closePipelineOrphan(ctx, orphan)
 			continue
 		}
 		// Issue-link-only match: warn but do NOT close.
 		// Closing based solely on issue reference risks false positives
 		// for release/hotfix PRs that happen to mention the same issue.
-		if !domain.IsPipelinePR(orphan) && domain.IsPipelinePRWithIssueContext(orphan, sightjackIssues) {
+		if !policy.IsPipelinePR(orphan) && policy.IsPipelinePRWithIssueContext(orphan, sightjackIssues) {
 			a.Logger.Warn("auto-merge: orphan %s (%s) references a sightjack:ready issue but lacks pipeline branch/label — skipping auto-close (manual review recommended)",
 				orphan.Number(), orphan.Title())
 		}
@@ -194,7 +196,7 @@ func (a *Amadeus) emitConflictDMail(pr domain.PRState, now time.Time) {
 		},
 		Body: fmt.Sprintf("PR %s (%s) has merge conflicts with the base branch and cannot be merged automatically.\n\nAction needed: rebase this PR against %s and resolve conflicts.", pr.Number(), pr.Title(), pr.BaseBranch()),
 	}
-	if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+	if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
 		a.Logger.Warn("auto-merge: invalid conflict D-Mail for %s: %v", pr.Number(), errs)
 		return
 	}

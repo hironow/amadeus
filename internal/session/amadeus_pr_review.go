@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -148,7 +149,7 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 		}
 
 		// Validate before emitting — reject protocol-violating D-Mails
-		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
 			a.Logger.Warn("PR %s: invalid D-Mail %s: %v", pr.Number(), dmail.Name, errs)
 			continue
 		}

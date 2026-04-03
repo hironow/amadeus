@@ -2,6 +2,7 @@ package session
 
 import (
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 	"github.com/hironow/amadeus/internal/platform"
 )
 
@@ -37,7 +38,7 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 	if classifyTarget == "" {
 		classifyTarget = err.Error()
 	}
-	info := domain.ClassifyProviderError(provider, classifyTarget)
+	info := verifier.ClassifyProviderError(provider, classifyTarget)
 	if info.IsTrip() {
 		sharedCircuitBreaker.RecordProviderError(info)
 	}

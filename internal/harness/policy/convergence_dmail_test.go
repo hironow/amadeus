@@ -1,10 +1,12 @@
-package domain_test
+package policy_test
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/policy"
+	"github.com/hironow/amadeus/internal/harness/verifier"
 )
 
 func TestBuildConvergenceDMailBody_singleChain(t *testing.T) {
@@ -20,7 +22,7 @@ func TestBuildConvergenceDMailBody_singleChain(t *testing.T) {
 	}
 
 	// when
-	body := domain.BuildConvergenceDMailBody(report)
+	body := policy.BuildConvergenceDMailBody(report)
 
 	// then — header present
 	if !strings.Contains(body, "## PR Dependency Chain Analysis") {
@@ -49,7 +51,7 @@ func TestBuildConvergenceDMailBody_withConflict(t *testing.T) {
 	}
 
 	// when
-	body := domain.BuildConvergenceDMailBody(report)
+	body := policy.BuildConvergenceDMailBody(report)
 
 	// then — conflict details section present
 	if !strings.Contains(body, "Conflict") {
@@ -79,7 +81,7 @@ func TestBuildConvergenceDMailBody_multipleChains(t *testing.T) {
 	}
 
 	// when
-	body := domain.BuildConvergenceDMailBody(report)
+	body := policy.BuildConvergenceDMailBody(report)
 
 	// then — both chains referenced
 	if !strings.Contains(body, "chain-a") {
@@ -109,7 +111,7 @@ func TestBuildConvergenceDMail_valid(t *testing.T) {
 	}
 
 	// when
-	dmail := domain.BuildConvergenceDMail("test-convergence", report)
+	dmail := policy.BuildConvergenceDMail("test-convergence", report)
 
 	// then — Kind
 	if dmail.Kind != domain.KindImplFeedback {
@@ -138,7 +140,7 @@ func TestBuildConvergenceDMail_valid(t *testing.T) {
 		t.Error("expected non-empty body")
 	}
 	// Must pass ValidateDMail
-	errs := domain.ValidateDMail(dmail)
+	errs := verifier.ValidateDMail(dmail)
 	if len(errs) > 0 {
 		t.Errorf("ValidateDMail failed: %v", errs)
 	}
@@ -159,7 +161,7 @@ func TestBuildConvergenceDMail_severityFromWorstChain(t *testing.T) {
 	}
 
 	// when
-	dmail := domain.BuildConvergenceDMail("test-severity", report)
+	dmail := policy.BuildConvergenceDMail("test-severity", report)
 
 	// then — severity from worst chain (conflict => high)
 	if dmail.Severity != domain.SeverityHigh {
