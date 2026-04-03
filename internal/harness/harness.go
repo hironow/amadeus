@@ -9,6 +9,7 @@ package harness
 
 import (
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/filter"
 	"github.com/hironow/amadeus/internal/harness/policy"
 	"github.com/hironow/amadeus/internal/harness/verifier"
 )
@@ -54,3 +55,20 @@ var ValidateDMail = verifier.ValidateDMail
 func ClassifyProviderError(provider domain.Provider, stderr string) domain.ProviderErrorInfo {
 	return verifier.ClassifyProviderError(provider, stderr)
 }
+
+// --- filter layer (LLM action spaces: prompts, response schemas) ---
+
+// PromptRegistry is the type alias for the filter.Registry.
+type PromptRegistry = filter.Registry
+
+// PromptConfig is the type alias for a single prompt configuration.
+type PromptConfig = filter.PromptConfig
+
+// NewPromptRegistry creates a new prompt registry from embedded YAML files.
+var NewPromptRegistry = filter.NewRegistry
+
+// DefaultPromptRegistry returns the process-wide singleton PromptRegistry.
+var DefaultPromptRegistry = filter.DefaultRegistry
+
+// ExpandPromptTemplate performs {key} substitution on a template string.
+var ExpandPromptTemplate = filter.ExpandTemplate
