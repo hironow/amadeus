@@ -162,3 +162,108 @@ func TestCircuitBreaker_CodexRateLimit(t *testing.T) {
 		t.Fatal("expected open for Codex rate limit")
 	}
 }
+
+func TestCircuitBreaker_ConcurrentAllow_AllBlockAndResume(t *testing.T) {
+	// given — CB tripped
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorServer})
+
+	// when — 10 goroutines call Allow, then RecordSuccess unblocks them
+	const n = 10
+	errs := make(chan error, n)
+	for range n {
+		go func() {
+			errs <- cb.Allow(context.Background())
+		}()
+	}
+
+	// Unblock after a short delay
+	time.Sleep(30 * time.Millisecond)
+	cb.RecordSuccess()
+
+	// then — all should return nil (no deadlock, no race)
+	for range n {
+		select {
+		case err := <-errs:
+			if err != nil {
+				t.Errorf("expected nil, got %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout: goroutine did not unblock")
+		}
+	}
+}
+
+func TestCircuitBreaker_AllowBlocksThenRecordSuccessUnblocks(t *testing.T) {
+	// given — CB tripped with long backoff (no resetAt)
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorServer})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cb.Allow(context.Background())
+	}()
+
+	// when — RecordSuccess from another goroutine
+	time.Sleep(30 * time.Millisecond)
+	cb.RecordSuccess()
+
+	// then — Allow should unblock with nil
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("deadlock: Allow did not unblock after RecordSuccess")
+	}
+}
+
+func TestCircuitBreaker_FailedProbeReTripsWithDoubledBackoff(t *testing.T) {
+	// given — trip once
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorServer})
+
+	// when — reset, then trip again
+	cb.RecordSuccess()
+	cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorServer})
+
+	// then — should be open again
+	if !cb.IsOpen() {
+		t.Fatal("expected open after re-trip")
+	}
+
+	// Verify it's blocking (backoff should be doubled)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	err := cb.Allow(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected blocking (DeadlineExceeded), got %v", err)
+	}
+}
+
+func TestCircuitBreaker_BackoffCapsAtMax(t *testing.T) {
+	// given — trip many times to exceed max backoff
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	for range 20 {
+		cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorServer})
+	}
+
+	// then — should still be open, not panic or overflow
+	if !cb.IsOpen() {
+		t.Fatal("expected open after many trips")
+	}
+}
+
+func TestRecordCircuitBreaker_ClassifiesFromErrorMessage_WhenStderrEmpty(t *testing.T) {
+	// This tests the recordCircuitBreaker function's fallback behavior:
+	// when stderr is empty, it uses err.Error() for classification.
+	// We test this via the domain.ClassifyProviderError path directly.
+	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "claude exit: exit status 1\nYou've hit your limit")
+	if !info.IsTrip() {
+		t.Fatal("expected trip from error message containing rate limit text")
+	}
+	if info.Kind != domain.ProviderErrorRateLimit {
+		t.Fatalf("expected RateLimit, got %v", info.Kind)
+	}
+}

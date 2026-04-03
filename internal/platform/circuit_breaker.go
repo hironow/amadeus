@@ -40,6 +40,7 @@ type CircuitBreaker struct {
 	logger         domain.Logger
 	tripped        int
 	lastTrip       time.Time
+	notify         chan struct{} // closed on state change to wake blocked Allow() callers
 }
 
 // NewCircuitBreaker creates a circuit breaker in the closed state.
@@ -48,7 +49,15 @@ func NewCircuitBreaker(logger domain.Logger) *CircuitBreaker {
 		state:          circuitClosed,
 		backoffCurrent: defaultBackoffBase,
 		logger:         logger,
+		notify:         make(chan struct{}),
 	}
+}
+
+// stateChanged closes the current notify channel and creates a new one.
+// Must be called with mu held.
+func (cb *CircuitBreaker) stateChanged() {
+	close(cb.notify)
+	cb.notify = make(chan struct{})
 }
 
 // Allow checks if a call is permitted. When the circuit is OPEN, it blocks
@@ -94,9 +103,10 @@ func (cb *CircuitBreaker) Allow(ctx context.Context) error {
 			if waitDur <= 0 {
 				waitDur = time.Second // minimum wait to avoid spin
 			}
+			notifyCh := cb.notify // snapshot under lock
 			cb.mu.Unlock()
 
-			// Block until wait expires or context cancelled
+			// Block until wait expires, state changes, or context cancelled
 			timer := time.NewTimer(waitDur)
 			select {
 			case <-ctx.Done():
@@ -104,6 +114,9 @@ func (cb *CircuitBreaker) Allow(ctx context.Context) error {
 				return ctx.Err()
 			case <-timer.C:
 				// Loop back to re-check state
+			case <-notifyCh:
+				// State changed (RecordSuccess or RecordProviderError); re-check
+				timer.Stop()
 			}
 		default:
 			cb.mu.Unlock()
@@ -131,6 +144,7 @@ func (cb *CircuitBreaker) RecordProviderError(info domain.ProviderErrorInfo) {
 		cb.backoffCurrent = defaultBackoffMax
 	}
 	cb.resetAt = info.ResetAt
+	cb.stateChanged()
 
 	if !cb.resetAt.IsZero() {
 		cb.logger.Warn("PAUSED — Circuit breaker OPEN. Rate limit resets at %s",
@@ -148,6 +162,7 @@ func (cb *CircuitBreaker) RecordSuccess() {
 	if cb.state != circuitClosed {
 		cb.logger.Info("Circuit breaker: CLOSED (recovered)")
 		cb.backoffCurrent = defaultBackoffBase
+		cb.stateChanged()
 	}
 	cb.state = circuitClosed
 	cb.resetAt = time.Time{}
