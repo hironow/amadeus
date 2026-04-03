@@ -112,6 +112,11 @@ func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 	if a.Emitter != nil {
 		_ = a.emitMerged(mc.pr, mc.method, now)
 	}
+
+	// Remove review label from merged PR (cleanup)
+	if a.PRWriter != nil {
+		_ = a.PRWriter.RemoveLabel(ctx, mc.pr.Number(), PRReviewLabel)
+	}
 	return true
 }
 

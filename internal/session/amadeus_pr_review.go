@@ -10,8 +10,13 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// PRReviewLabelPrefix is the label prefix used for commit-aware PR review tracking.
-const PRReviewLabelPrefix = "amadeus:reviewed-"
+// PRReviewLabel is the label applied to PRs after amadeus review.
+// Replaces the old "amadeus:reviewed-{sha8}" pattern to prevent unbounded label accumulation.
+const PRReviewLabel = "amadeus:reviewed"
+
+// PRReviewLabelLegacyPrefix is the old label prefix kept for backward compatibility
+// during migration. Labels with this prefix are cleaned up on encounter.
+const PRReviewLabelLegacyPrefix = "amadeus:reviewed-"
 
 // evaluatePRDiffs fetches open PRs targeting integrationBranch, evaluates each
 // PR's diff against ADRs/DoDs using Claude, generates feedback D-Mails, and
@@ -35,8 +40,7 @@ func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string)
 
 	var allDMails []domain.DMail
 	for _, pr := range prs {
-		reviewLabel := PRReviewLabelPrefix + pr.HeadSHAShort()
-		if pr.HasLabel(reviewLabel) {
+		if pr.HasLabel(PRReviewLabel) {
 			a.Logger.Info("PR %s: already reviewed at %s, skipping", pr.Number(), pr.HeadSHAShort())
 			continue
 		}
@@ -48,26 +52,21 @@ func (a *Amadeus) evaluatePRDiffs(ctx context.Context, integrationBranch string)
 		}
 		allDMails = append(allDMails, dmails...)
 
-		// Remove stale review labels before applying the new one.
-		// This prevents unbounded label accumulation across force-pushes.
-		// Only removes from the PR (not repo-wide delete) to avoid
-		// affecting other PRs that might reference the same label.
 		if a.PRWriter != nil {
+			// Clean up legacy "amadeus:reviewed-{sha8}" labels
 			for _, label := range pr.Labels() {
-				if strings.HasPrefix(label, PRReviewLabelPrefix) && label != reviewLabel {
+				if strings.HasPrefix(label, PRReviewLabelLegacyPrefix) {
 					if rmErr := a.PRWriter.RemoveLabel(ctx, pr.Number(), label); rmErr != nil {
-						a.Logger.Warn("PR %s: remove stale label %s: %v", pr.Number(), label, rmErr)
+						a.Logger.Warn("PR %s: remove legacy label %s: %v", pr.Number(), label, rmErr)
 					}
 				}
 			}
-		}
 
-		// Apply review label ONLY after successful D-Mail emission.
-		if a.PRWriter != nil {
-			if labelErr := a.PRWriter.ApplyLabel(ctx, pr.Number(), reviewLabel); labelErr != nil {
+			// Apply single review label after successful D-Mail emission.
+			if labelErr := a.PRWriter.ApplyLabel(ctx, pr.Number(), PRReviewLabel); labelErr != nil {
 				a.Logger.Warn("PR %s: failed to apply label: %v", pr.Number(), labelErr)
 			} else {
-				a.Logger.Info("PR %s: labeled %s", pr.Number(), reviewLabel)
+				a.Logger.Info("PR %s: labeled %s", pr.Number(), PRReviewLabel)
 			}
 		}
 	}
