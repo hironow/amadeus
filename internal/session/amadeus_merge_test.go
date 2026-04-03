@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/harness/policy"
+	"github.com/hironow/amadeus/internal/harness"
 )
 
 // --- merge test doubles ---
@@ -137,12 +137,12 @@ func newMergeTestAmadeus(reader *mergeMockPRReader, writer *mergeMockPRWriter, e
 }
 
 func readyPR(number string) *domain.PRMergeReadiness {
-	r := policy.EvaluateMergeReadiness(number, "CLEAN", "APPROVED", "MERGEABLE", true)
+	r := harness.EvaluateMergeReadiness(number, "CLEAN", "APPROVED", "MERGEABLE", true)
 	return &r
 }
 
 func blockedPR(number string, reason string) *domain.PRMergeReadiness {
-	r := policy.EvaluateMergeReadiness(number, reason, "APPROVED", "MERGEABLE", true)
+	r := harness.EvaluateMergeReadiness(number, reason, "APPROVED", "MERGEABLE", true)
 	return &r
 }
 
@@ -475,7 +475,7 @@ func TestGoTaskboardScenario_PartialChainReadiness(t *testing.T) {
 		readiness: map[string]*domain.PRMergeReadiness{
 			"#22": readyPR("#22"),
 			"#23": func() *domain.PRMergeReadiness {
-				r := policy.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false)
+				r := harness.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false)
 				return &r
 			}(),
 		},
@@ -669,7 +669,7 @@ func TestGoTaskboardScenario_StartupMerge_Divergence021_NoDMails(t *testing.T) {
 		"#16": readyPR("#16"),
 		"#22": readyPR("#22"),
 		"#23": func() *domain.PRMergeReadiness {
-			r := policy.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false) // no review label
+			r := harness.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false) // no review label
 			return &r
 		}(),
 	}
@@ -812,7 +812,7 @@ func TestGoTaskboardScenario_ConflictingPRs_GeneratesDMails(t *testing.T) {
 	}
 
 	conflictingReadiness := func(number string) *domain.PRMergeReadiness {
-		r := policy.EvaluateMergeReadiness(number, "DIRTY", "", "CONFLICTING", true)
+		r := harness.EvaluateMergeReadiness(number, "DIRTY", "", "CONFLICTING", true)
 		return &r
 	}
 

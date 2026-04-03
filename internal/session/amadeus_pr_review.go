@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/harness/verifier"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -149,7 +149,7 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 		}
 
 		// Validate before emitting — reject protocol-violating D-Mails
-		if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := harness.ValidateDMail(dmail); len(errs) > 0 {
 			a.Logger.Warn("PR %s: invalid D-Mail %s: %v", pr.Number(), dmail.Name, errs)
 			continue
 		}
@@ -175,7 +175,7 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 
 // buildPRReviewPrompt constructs the evaluation prompt for a single PR.
 func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
-	return fmt.Sprintf(`You are amadeus, a post-merge integrity verifier. You are evaluating a pull request diff against the project's Architecture Decision Records (ADRs) and Definitions of Done (DoDs).
+	return fmt.Sprintf(`You are amadeus, a post-merge integrity harness. You are evaluating a pull request diff against the project's Architecture Decision Records (ADRs) and Definitions of Done (DoDs).
 
 ## PR Information
 - Number: %s

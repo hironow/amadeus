@@ -15,7 +15,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/harness/verifier"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase"
@@ -696,7 +696,7 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheck {
 			invalid = append(invalid, fmt.Sprintf("%s: %v", name, parseErr))
 			continue
 		}
-		if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := harness.ValidateDMail(dmail); len(errs) > 0 {
 			invalid = append(invalid, fmt.Sprintf("%s: %s", name, strings.Join(errs, "; ")))
 		}
 	}

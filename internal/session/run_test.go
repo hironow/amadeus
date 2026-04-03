@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
-	"github.com/hironow/amadeus/internal/harness/policy"
-	"github.com/hironow/amadeus/internal/harness/verifier"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -64,7 +63,7 @@ func (p *testPRPipeline) RunPreMergePipeline(ctx context.Context, integrationBra
 	if len(prs) == 0 {
 		return nil, nil
 	}
-	report := policy.BuildPRConvergenceReport(integrationBranch, prs)
+	report := harness.BuildPRConvergenceReport(integrationBranch, prs)
 	var dmails []domain.DMail
 	var conflictCount int
 	now := time.Now().UTC()
@@ -88,8 +87,8 @@ func (p *testPRPipeline) RunPreMergePipeline(ctx context.Context, integrationBra
 			Chains:            []domain.PRChain{chain},
 			TotalOpenPRs:      report.TotalOpenPRs,
 		}
-		dmail := policy.BuildConvergenceDMail(name, singleReport)
-		if errs := verifier.ValidateDMail(dmail); len(errs) > 0 {
+		dmail := harness.BuildConvergenceDMail(name, singleReport)
+		if errs := harness.ValidateDMail(dmail); len(errs) > 0 {
 			continue
 		}
 		_ = p.emitter.EmitDMailGenerated(dmail, now)
