@@ -15,12 +15,12 @@ func TestNewRegistry_LoadsAllPrompts(t *testing.T) {
 		t.Fatalf("NewRegistry() error: %v", err)
 	}
 	names := reg.Names()
-	if len(names) < 2 {
-		t.Fatalf("expected at least 2 prompts, got %d: %v", len(names), names)
+	if len(names) < 6 {
+		t.Fatalf("expected at least 6 prompts, got %d: %v", len(names), names)
 	}
 
 	// Verify expected prompts exist
-	for _, expected := range []string{"pr_review", "review_fix"} {
+	for _, expected := range []string{"pr_review", "review_fix", "fileref_diff_check_en", "fileref_diff_check_ja", "fileref_full_check_en", "fileref_full_check_ja"} {
 		if _, err := reg.Get(expected); err != nil {
 			t.Errorf("expected prompt %q to exist: %v", expected, err)
 		}
