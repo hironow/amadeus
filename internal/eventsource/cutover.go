@@ -48,6 +48,13 @@ func RunCutover(
 	if err != nil {
 		return CutoverResult{}, fmt.Errorf("cutover: load all events: %w", err)
 	}
+
+	// No existing events = fresh install. Skip cutover — no migration needed.
+	// SeqCounter is already initialized (INSERT OR IGNORE in NewSeqCounter).
+	if len(events) == 0 {
+		logger.Info("cutover: fresh install, no migration needed")
+		return CutoverResult{AlreadyDone: true}, nil
+	}
 	logger.Info("cutover: found %d pre-cutover events", len(events))
 
 	// Step 3: Save sentinel snapshot at SeqNr=0

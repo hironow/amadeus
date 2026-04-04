@@ -38,6 +38,7 @@ type Amadeus struct {
 	IssueWriter   port.GitHubIssueWriter  // nil = skip issue close
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
+	SeqAlloc    port.SeqAllocator       // global SeqNr (ADR S0040)
 	Insights    *InsightWriter          // nil = skip insight generation
 
 	// InboxCh overrides MonitorInbox when set (for testing).
@@ -86,6 +87,10 @@ func (a *Amadeus) EventStore() port.EventStore {
 // EventApplier returns the projection applier.
 func (a *Amadeus) EventApplier() domain.EventApplier {
 	return a.Projector
+}
+
+func (a *Amadeus) SeqAllocator() port.SeqAllocator {
+	return a.SeqAlloc
 }
 
 // autoRebuildIfNeeded checks if projections are missing but events exist,
