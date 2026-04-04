@@ -69,7 +69,7 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 		),
 	)
 	if fullCheck {
-		report, err = rs.DetectShiftFull(a.RepoDir)
+		report, err = rs.detectShiftFull(a.RepoDir)
 		if err != nil {
 			span1.End()
 			return ShiftReport{}, fullCheck, wasForced, fmt.Errorf("phase 1 (full): %w", err)
@@ -78,13 +78,13 @@ func (a *Amadeus) detectShift(ctx context.Context, previous domain.CheckResult, 
 		sinceCommit := previous.Commit
 		if sinceCommit == "" {
 			fullCheck = true
-			report, err = rs.DetectShiftFull(a.RepoDir)
+			report, err = rs.detectShiftFull(a.RepoDir)
 			if err != nil {
 				span1.End()
 				return ShiftReport{}, fullCheck, wasForced, fmt.Errorf("phase 1 (first run): %w", err)
 			}
 		} else {
-			report, err = rs.DetectShift(sinceCommit)
+			report, err = rs.detectShift(sinceCommit)
 			if err != nil {
 				span1.End()
 				return ShiftReport{}, fullCheck, wasForced, fmt.Errorf("phase 1 (diff): %w", err)

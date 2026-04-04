@@ -1,21 +1,15 @@
 name: pr_review
-version: 1
+version: "1"
 description: >
   Evaluates a pull request diff against the project's Architecture Decision Records
   (ADRs) and Definitions of Done (DoDs). Used by amadeus PR review pipeline.
 variables:
-  - name: pr_number
-    description: The PR number (e.g. "#42")
-  - name: pr_title
-    description: The PR title
-  - name: base_branch
-    description: The base branch the PR targets
-  - name: head_branch
-    description: The head branch of the PR
-  - name: diff
-    description: The full PR diff content
-  - name: lang
-    description: Language for the reasoning output (e.g. "en", "ja")
+  pr_number: The PR number (e.g. "#42")
+  pr_title: The PR title
+  base_branch: The base branch the PR targets
+  head_branch: The head branch of the PR
+  diff: The full PR diff content
+  lang: Language for the reasoning output (e.g. "en", "ja")
 template: |
   You are amadeus, a post-merge integrity harness. You are evaluating a pull request diff against the project's Architecture Decision Records (ADRs) and Definitions of Done (DoDs).
 

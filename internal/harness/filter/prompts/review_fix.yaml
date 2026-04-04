@@ -1,13 +1,11 @@
 name: review_fix
-version: 1
+version: "1"
 description: >
   Focused prompt for fixing code review comments on a branch.
   Used by the review gate cycle to instruct Claude to fix issues.
 variables:
-  - name: branch
-    description: The current git branch name
-  - name: comments
-    description: The review comments to fix
+  branch: The current git branch name
+  comments: The review comments to fix
 template: |
   You are on branch {branch}. A code review found the following issues:
 

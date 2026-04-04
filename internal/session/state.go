@@ -68,7 +68,7 @@ func InitGateDir(root string, logger domain.Logger) error {
 		}
 		skillPath := filepath.Join(destDir, "SKILL.md")
 		tmplPath := path.Join("templates", "skills", name, "SKILL.md")
-		content, readErr := platform.SkillTemplateFS.ReadFile(tmplPath)
+		content, readErr := platform.SkillsFS.ReadFile(tmplPath)
 		if readErr != nil {
 			return fmt.Errorf("read skill template %s: %w", name, readErr)
 		}

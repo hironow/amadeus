@@ -70,6 +70,7 @@ type Event struct {
 	Type          EventType       `json:"type"`
 	Timestamp     time.Time       `json:"timestamp"`
 	Data          json.RawMessage `json:"data"`
+	SessionID     string          `json:"session_id,omitempty"`
 	CorrelationID string          `json:"correlation_id,omitempty"`
 	CausationID   string          `json:"causation_id,omitempty"`
 	AggregateID   string          `json:"aggregate_id,omitempty"`
@@ -250,4 +251,21 @@ func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error)
 		Timestamp:     timestamp,
 		Data:          raw,
 	}, nil
+}
+
+// Policy represents an implicit reactive rule: WHEN [EVENT] THEN [COMMAND].
+// See ADR S0014 for the POLICY pattern reference.
+type Policy struct {
+	Name    string    // unique identifier for the policy
+	Trigger EventType // domain event that activates this policy
+	Action  string    // description of the resulting command
+}
+
+// Policies registers all known implicit policies in amadeus.
+// These document the existing reactive behaviors for future automation.
+var Policies = []Policy{
+	{Name: "CheckCompletedGenerateDMail", Trigger: EventCheckCompleted, Action: "GenerateDMail"},
+	{Name: "ConvergenceDetectedNotify", Trigger: EventConvergenceDetected, Action: "NotifyConvergence"},
+	{Name: "InboxConsumedUpdateProjection", Trigger: EventInboxConsumed, Action: "UpdateProjection"},
+	{Name: "DMailGeneratedFlushOutbox", Trigger: EventDMailGenerated, Action: "FlushOutbox"},
 }

@@ -40,9 +40,9 @@ type PromptOptimizer interface {
 // Used by optimization backends to persist improved templates.
 // The version field should be incremented by the caller before saving.
 //
-// promptsDir is the on-disk path to the prompts/ directory (NOT embed.FS).
-// After saving, call NewRegistryFromDir() to reload.
-func Save(promptsDir string, cfg PromptConfig) error {
+// filterDir is the on-disk path returned by PromptsDir() (the filter package root).
+// After saving, call NewRegistryFromFS(os.DirFS(filterDir)) to reload.
+func Save(filterDir string, cfg PromptConfig) error {
 	data := map[string]any{
 		"name":        cfg.Name,
 		"version":     cfg.Version,
@@ -56,7 +56,7 @@ func Save(promptsDir string, cfg PromptConfig) error {
 		return fmt.Errorf("marshal prompt %s: %w", cfg.Name, err)
 	}
 
-	path := filepath.Join(promptsDir, cfg.Name+".yaml")
+	path := filepath.Join(filterDir, "prompts", cfg.Name+".yaml")
 	if err := os.WriteFile(path, out, 0o644); err != nil {
 		return fmt.Errorf("write prompt %s: %w", cfg.Name, err)
 	}
@@ -64,8 +64,10 @@ func Save(promptsDir string, cfg PromptConfig) error {
 	return nil
 }
 
-// PromptsDir returns the on-disk path to the prompts/ directory relative to
+// PromptsDir returns the on-disk path to the filter package root relative to
 // the project root. This is used by optimization tools (not runtime).
+// The returned path is the parent of the prompts/ subdirectory, suitable for
+// os.DirFS() + NewRegistryFromFS() which expects to find "prompts/" inside.
 func PromptsDir(projectRoot string) string {
-	return filepath.Join(projectRoot, "internal", "harness", "filter", "prompts")
+	return filepath.Join(projectRoot, "internal", "harness", "filter")
 }

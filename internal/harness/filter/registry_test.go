@@ -28,6 +28,22 @@ func TestNewRegistry_LoadsAllPrompts(t *testing.T) {
 	}
 }
 
+func TestNewRegistry_NamesSorted(t *testing.T) {
+	// when
+	reg, err := NewRegistry()
+	if err != nil {
+		t.Fatalf("NewRegistry() error: %v", err)
+	}
+	names := reg.Names()
+
+	// then
+	for i := 1; i < len(names); i++ {
+		if names[i-1] >= names[i] {
+			t.Errorf("Names() not sorted: %q >= %q at index %d", names[i-1], names[i], i)
+		}
+	}
+}
+
 func TestRegistry_Get_NotFound(t *testing.T) {
 	// given
 	reg, err := NewRegistry()
@@ -64,8 +80,8 @@ func TestRegistry_Get_HasFields(t *testing.T) {
 	if cfg.Name != "pr_review" {
 		t.Errorf("Name = %q, want %q", cfg.Name, "pr_review")
 	}
-	if cfg.Version < 1 {
-		t.Errorf("Version = %d, want >= 1", cfg.Version)
+	if cfg.Version == "" {
+		t.Error("Version is empty")
 	}
 	if cfg.Description == "" {
 		t.Error("Description is empty")
@@ -339,24 +355,24 @@ Keep fixes focused — only address the review comments, do not refactor unrelat
 	}
 }
 
-func TestDefaultRegistry(t *testing.T) {
+func TestDefault(t *testing.T) {
 	// when
-	reg, err := DefaultRegistry()
+	reg, err := Default()
 
 	// then
 	if err != nil {
-		t.Fatalf("DefaultRegistry() error: %v", err)
+		t.Fatalf("Default() error: %v", err)
 	}
 	if reg == nil {
-		t.Fatal("DefaultRegistry() returned nil")
+		t.Fatal("Default() returned nil")
 	}
 
 	// Verify it returns the same instance
-	reg2, err := DefaultRegistry()
+	reg2, err := Default()
 	if err != nil {
-		t.Fatalf("DefaultRegistry() second call error: %v", err)
+		t.Fatalf("Default() second call error: %v", err)
 	}
 	if reg != reg2 {
-		t.Error("DefaultRegistry() returned different instances")
+		t.Error("Default() returned different instances")
 	}
 }
