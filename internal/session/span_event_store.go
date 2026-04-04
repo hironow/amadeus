@@ -72,3 +72,32 @@ func (s *SpanEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 	)
 	return events, result, nil
 }
+
+func (s *SpanEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
+	_, span := platform.Tracer.Start(context.Background(), "eventsource.load_after_seq_nr")
+	defer span.End()
+
+	span.SetAttributes(attribute.Int64("event.after_seq_nr", int64(afterSeqNr)))
+	events, result, err := s.inner.LoadAfterSeqNr(afterSeqNr)
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.load_after_seq_nr"))
+		return events, result, err
+	}
+	span.SetAttributes(attribute.Int("event.count.out", len(events)))
+	return events, result, nil
+}
+
+func (s *SpanEventStore) LatestSeqNr() (uint64, error) {
+	_, span := platform.Tracer.Start(context.Background(), "eventsource.latest_seq_nr")
+	defer span.End()
+
+	seqNr, err := s.inner.LatestSeqNr()
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.latest_seq_nr"))
+		return 0, err
+	}
+	span.SetAttributes(attribute.Int64("event.latest_seq_nr", int64(seqNr)))
+	return seqNr, nil
+}

@@ -36,6 +36,7 @@ const (
 	EventPRConvergenceChecked EventType = "pr_convergence.checked"
 	EventPRMerged             EventType = "pr.merged"
 	EventPRMergeSkipped       EventType = "pr.merge_skipped"
+	EventSystemCutover        EventType = "system.cutover"
 )
 
 // validEventTypes is the set of recognized EventType values.
@@ -53,6 +54,7 @@ var validEventTypes = map[EventType]bool{
 	EventPRConvergenceChecked: true,
 	EventPRMerged:             true,
 	EventPRMergeSkipped:       true,
+	EventSystemCutover:        true,
 }
 
 // ValidEventType returns true if the given EventType is recognized.

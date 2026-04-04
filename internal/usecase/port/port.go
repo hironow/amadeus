@@ -66,6 +66,32 @@ type EventStore interface {
 
 	// LoadSince returns events with timestamps after the given time.
 	LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error)
+
+	// LoadAfterSeqNr returns all events with SeqNr > afterSeqNr,
+	// ordered by SeqNr ascending. Used for snapshot-based recovery.
+	LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error)
+
+	// LatestSeqNr returns the highest recorded SeqNr across all events.
+	// Returns 0 if no events have a SeqNr assigned.
+	LatestSeqNr() (uint64, error)
+}
+
+// SnapshotStore persists materialized projection state at a known SeqNr.
+// Snapshots are an optimization — the system must function without them
+// (falling back to full replay via LoadAll).
+type SnapshotStore interface {
+	// Save persists a snapshot. aggregateType identifies the projection kind.
+	Save(ctx context.Context, aggregateType string, seqNr uint64, state []byte) error
+
+	// Load returns the latest snapshot for the given aggregateType.
+	// Returns (0, nil, nil) if no snapshot exists.
+	Load(ctx context.Context, aggregateType string) (seqNr uint64, state []byte, err error)
+}
+
+// SeqAllocator assigns globally monotonic sequence numbers to events.
+// Implemented by eventsource.SeqCounter (SQLite-backed).
+type SeqAllocator interface {
+	AllocSeqNr(ctx context.Context) (uint64, error)
 }
 
 // OutboxStore is the transactional outbox interface for D-Mail delivery.

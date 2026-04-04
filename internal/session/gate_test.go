@@ -78,6 +78,12 @@ func (e *fakeEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
 func (e *fakeEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return e.events, domain.LoadResult{}, nil
 }
+func (e *fakeEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+	return e.events, domain.LoadResult{}, nil
+}
+func (e *fakeEventStore) LatestSeqNr() (uint64, error) {
+	return 0, nil
+}
 
 type fakeProjector struct {
 	applied []domain.Event
