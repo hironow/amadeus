@@ -31,7 +31,7 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	registerCheckPolicies(engine, logger, notifier, metrics)
 
 	// Create EventEmitter + StateManager wrapping the aggregate
-	emitter := NewCheckEventEmitter(agg, pipeline.EventStore(), pipeline.EventApplier(), engine, logger)
+	emitter := NewCheckEventEmitter(agg, pipeline.EventStore(), pipeline.EventApplier(), engine, nil, logger)
 	state := NewCheckStateProvider(agg)
 
 	// Delegate to session I/O pipeline via Orchestrator interface
