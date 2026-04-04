@@ -52,3 +52,12 @@ var DefaultPromptRegistry = filter.Default
 
 // MustDefaultPromptRegistry returns the singleton or panics. Safe with embed.FS.
 var MustDefaultPromptRegistry = filter.MustDefault
+
+// --- filter layer: optimization (Phase 3) ---
+
+type PromptOptimizer = filter.PromptOptimizer
+type EvalCase = filter.EvalCase
+type OptimizedResult = filter.OptimizedResult
+
+var SavePrompt = filter.Save
+var PromptsDir = filter.PromptsDir
