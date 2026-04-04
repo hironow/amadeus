@@ -392,7 +392,7 @@ Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.crea
 
 ## Development
 
-All code lives in `internal/` (Go convention). See [docs/conformance.md](docs/conformance.md) for layer architecture and directory responsibilities. Run `just --list` for available tasks.
+All code lives in `internal/` (Go convention). The `internal/harness/` layer mediates between the LLM and the task environment, with sub-packages `policy/` (deterministic decisions), `verifier/` (validation rules), and `filter/` (externalized YAML prompts via PromptRegistry). See [docs/conformance.md](docs/conformance.md) for full layer architecture and directory responsibilities. Run `just --list` for available tasks.
 
 ## The Ecosystem
 
