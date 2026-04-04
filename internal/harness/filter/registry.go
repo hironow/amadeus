@@ -140,8 +140,16 @@ func (r *Registry) Names() []string {
 // left unchanged. A key is truthy if present, non-empty, and not "false".
 func ExpandTemplate(tmpl string, vars map[string]string) string {
 	result := processConditionals(tmpl, vars)
+
+	// Two-pass expansion prevents variable values containing {key} patterns
+	// from being re-expanded by subsequent iterations. Pass 1 replaces
+	// placeholders with unique tokens; pass 2 replaces tokens with values.
+	const sentinel = "\x00PROMPT_VAR_"
+	for k := range vars {
+		result = strings.ReplaceAll(result, "{"+k+"}", sentinel+k+"\x00")
+	}
 	for k, v := range vars {
-		result = strings.ReplaceAll(result, "{"+k+"}", v)
+		result = strings.ReplaceAll(result, sentinel+k+"\x00", v)
 	}
 	return result
 }

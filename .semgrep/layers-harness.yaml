@@ -111,3 +111,48 @@ rules:
         - "/internal/harness/filter/**"
     message: |
       harness/filter は domain + harness/verifier + harness/policy のみ import 可。usecase/session/cmd/platform/eventsource 禁止。
+
+  # --- Rule: harness sub-packages must not import harness facade ---
+  - id: layer-harness-no-import-facade
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/harness\"$"
+    paths:
+      include:
+        - "/internal/harness/policy/**"
+        - "/internal/harness/verifier/**"
+        - "/internal/harness/filter/**"
+    message: |
+      harness sub-package から harness facade への import は禁止です (循環依存)。
+      sub-package 間の依存は直接 import してください (policy→domain, verifier→policy+domain, filter→verifier+policy+domain)。
+
+  # --- Rule: external callers must use harness facade, not sub-packages ---
+  - id: layer-harness-facade-only
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/harness/(policy|verifier|filter).*"
+    paths:
+      include:
+        - "/internal/cmd/**"
+        - "/internal/usecase/**"
+        - "/internal/session/**"
+
+        - "/internal/eventsource/**"
+    message: |
+      外部から harness sub-package の直接 import は禁止です。harness facade (internal/harness) を使用してください。
