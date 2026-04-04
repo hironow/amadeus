@@ -1,3 +1,4 @@
+// white-box-reason: tests unexported registry internals (embed.FS loading, singleton)
 package filter
 
 import (
