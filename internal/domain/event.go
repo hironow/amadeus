@@ -70,6 +70,7 @@ type Event struct {
 	Type          EventType       `json:"type"`
 	Timestamp     time.Time       `json:"timestamp"`
 	Data          json.RawMessage `json:"data"`
+	SessionID     string          `json:"session_id,omitempty"`
 	CorrelationID string          `json:"correlation_id,omitempty"`
 	CausationID   string          `json:"causation_id,omitempty"`
 	AggregateID   string          `json:"aggregate_id,omitempty"`
