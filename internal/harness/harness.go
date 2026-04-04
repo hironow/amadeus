@@ -44,5 +44,11 @@ func ClassifyProviderError(provider domain.Provider, stderr string) domain.Provi
 
 // --- filter layer (LLM action spaces: prompts, response schemas) ---
 
+// PromptRegistry is a type alias for filter.PromptRegistry.
+type PromptRegistry = filter.PromptRegistry
+
+// DefaultPromptRegistry returns the process-wide PromptRegistry.
+var DefaultPromptRegistry = filter.Default
+
 // MustDefaultPromptRegistry returns the singleton or panics. Safe with embed.FS.
-var MustDefaultPromptRegistry = filter.MustDefaultRegistry
+var MustDefaultPromptRegistry = filter.MustDefault

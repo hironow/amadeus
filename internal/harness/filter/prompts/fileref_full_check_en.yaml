@@ -1,11 +1,10 @@
 name: fileref_full_check_en
-version: 1
+version: "1"
 description: >
   English file-reference full check prompt. Instructs Claude to read eval files
   and score divergence axes for a full calibration (zero-base) integrity check.
 variables:
-  - name: eval_dir
-    description: Absolute path to the eval directory containing scored files
+  eval_dir: Absolute path to the eval directory containing scored files
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.

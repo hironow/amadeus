@@ -1,27 +1,22 @@
 name: fileref_diff_check_ja
-version: 1
+version: "1"
 description: >
   Japanese file-reference diff check prompt. Instructs Claude to read eval files
   and score divergence axes for an incremental (diff-based) integrity check.
 variables:
-  - name: eval_dir
-    description: Absolute path to the eval directory containing scored files
-  - name: pr_reviews_section
-    description: >
-      Pre-rendered section listing the pr_reviews.md file reference.
-      Empty string when no PR reviews are available.
-  - name: linked_issues_section
-    description: >
-      Pre-rendered section with linked Linear Issue IDs and fetch instructions.
-      Empty string when no linked issues exist.
-  - name: repeated_violations_section
-    description: >
-      Pre-rendered section listing repeated violation warnings.
-      Empty string when no repeated violations exist.
-  - name: divergence_trend_section
-    description: >
-      Pre-rendered section showing divergence trend analysis.
-      Empty string when no trend data is available.
+  eval_dir: Absolute path to the eval directory containing scored files
+  pr_reviews_section: >-
+    Pre-rendered section listing the pr_reviews.md file reference.
+    Empty string when no PR reviews are available.
+  linked_issues_section: >-
+    Pre-rendered section with linked Linear Issue IDs and fetch instructions.
+    Empty string when no linked issues exist.
+  repeated_violations_section: >-
+    Pre-rendered section listing repeated violation warnings.
+    Empty string when no repeated violations exist.
+  divergence_trend_section: >-
+    Pre-rendered section showing divergence trend analysis.
+    Empty string when no trend data is available.
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.

@@ -22,7 +22,7 @@ type ReadingSteiner struct {
 	Git port.Git
 }
 
-func (rs *ReadingSteiner) DetectShift(sinceCommit string) (ShiftReport, error) {
+func (rs *ReadingSteiner) detectShift(sinceCommit string) (ShiftReport, error) {
 	prs, err := rs.Git.MergedPRsSince(sinceCommit)
 	if err != nil {
 		return ShiftReport{}, fmt.Errorf("reading steiner: merged PRs: %w", err)
@@ -39,7 +39,7 @@ func (rs *ReadingSteiner) DetectShift(sinceCommit string) (ShiftReport, error) {
 	}, nil
 }
 
-func (rs *ReadingSteiner) DetectShiftFull(repoRoot string) (ShiftReport, error) {
+func (rs *ReadingSteiner) detectShiftFull(repoRoot string) (ShiftReport, error) {
 	structure, err := buildDirectoryTree(repoRoot, 3)
 	if err != nil {
 		return ShiftReport{}, fmt.Errorf("reading steiner: directory tree: %w", err)

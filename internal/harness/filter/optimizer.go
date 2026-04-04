@@ -41,7 +41,7 @@ type PromptOptimizer interface {
 // The version field should be incremented by the caller before saving.
 //
 // promptsDir is the on-disk path to the prompts/ directory (NOT embed.FS).
-// After saving, call NewRegistryFromDir() to reload.
+// After saving, call NewRegistry() to reload.
 func Save(promptsDir string, cfg PromptConfig) error {
 	data := map[string]any{
 		"name":        cfg.Name,
@@ -62,10 +62,4 @@ func Save(promptsDir string, cfg PromptConfig) error {
 	}
 
 	return nil
-}
-
-// PromptsDir returns the on-disk path to the prompts/ directory relative to
-// the project root. This is used by optimization tools (not runtime).
-func PromptsDir(projectRoot string) string {
-	return filepath.Join(projectRoot, "internal", "harness", "filter", "prompts")
 }
