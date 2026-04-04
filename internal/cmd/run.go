@@ -137,6 +137,13 @@ If [path] is omitted, the current working directory is used. Requires
 
 			reviewCmd, _ := cmd.Flags().GetString("review-cmd")
 
+			// One-time cutover: migrate to global SeqNr (ADR S0040, idempotent)
+			seqAlloc, closeSeq, cutoverErr := session.EnsureCutover(cmd.Context(), divRoot, "amadeus.state", logger)
+			if cutoverErr != nil {
+				return fmt.Errorf("cutover: %w", cutoverErr)
+			}
+			defer closeSeq()
+
 			// Composition root: wire session.Amadeus
 			store := session.NewProjectionStore(divRoot)
 			eventStore := session.NewEventStore(divRoot, logger)
@@ -182,6 +189,7 @@ If [path] is omitted, the current working directory is used. Requires
 				PRReader:     prReader,
 				PRWriter:     prWriter,
 				IssueWriter:  issueWriter,
+				SeqAlloc:     seqAlloc,
 				Insights:     insightWriter,
 			}
 

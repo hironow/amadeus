@@ -241,4 +241,6 @@ type Orchestrator interface {
 	EventStore() EventStore
 	// EventApplier returns the projection applier.
 	EventApplier() domain.EventApplier
+	// SeqAllocator returns the global SeqNr allocator (ADR S0040). May return nil.
+	SeqAllocator() SeqAllocator
 }
