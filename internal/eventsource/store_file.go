@@ -89,7 +89,11 @@ func (s *FileEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 }
 
 // LoadAfterSeqNr returns all events with SeqNr > afterSeqNr, ordered by SeqNr ascending.
-// Events with SeqNr == 0 (pre-cutover legacy events) are excluded.
+// Only events with globally-allocated SeqNr (assigned by SeqCounter after cutover)
+// are included. Pre-cutover events may carry aggregate-local SeqNr values that
+// overlap with global SeqNr space; callers must use afterSeqNr >= cutover SeqNr
+// to avoid double-replaying legacy events.
+// Events with SeqNr == 0 are always excluded.
 func (s *FileEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
 	all, result, err := s.loadEvents(time.Time{})
 	if err != nil {
@@ -97,7 +101,7 @@ func (s *FileEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, doma
 	}
 	var filtered []domain.Event
 	for _, ev := range all {
-		if ev.SeqNr > afterSeqNr {
+		if ev.SeqNr > 0 && ev.SeqNr > afterSeqNr {
 			filtered = append(filtered, ev)
 		}
 	}

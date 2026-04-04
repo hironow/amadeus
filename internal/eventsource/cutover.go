@@ -51,8 +51,11 @@ func RunCutover(
 	logger.Info("cutover: found %d pre-cutover events", len(events))
 
 	// Step 3: Save sentinel snapshot at SeqNr=0
-	// In Phase 1, the snapshot state is empty (no projection serialization yet).
-	// Phase 2 will populate this with actual projection state.
+	// Phase 1: snapshot body is "null" because projection Serialize/Deserialize
+	// is not yet implemented. This sentinel marks "all pre-cutover events are
+	// accounted for" — recovery will use LoadAll() (full replay) until Phase 2
+	// adds real projection state. Phase 2 will overwrite this with actual
+	// projection state after a full rebuild.
 	if err := snapshotStore.Save(ctx, aggregateType, 0, []byte("null")); err != nil {
 		return CutoverResult{}, fmt.Errorf("cutover: save sentinel snapshot: %w", err)
 	}
