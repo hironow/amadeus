@@ -15,23 +15,26 @@ import (
 type checkEventEmitter struct {
 	agg        *domain.CheckAggregate
 	store      port.EventStore
+	seqAlloc   port.SeqAllocator // SQLite-backed global SeqNr (ADR S0040)
 	projector  domain.EventApplier
 	dispatcher port.EventDispatcher
 	logger     domain.Logger
-	seqNr      uint64
 }
 
 // NewCheckEventEmitter creates a CheckEventEmitter that wraps the aggregate event chain.
+// seqAlloc is optional — pass nil to skip global SeqNr assignment.
 func NewCheckEventEmitter(
 	agg *domain.CheckAggregate,
 	store port.EventStore,
 	projector domain.EventApplier,
 	dispatcher port.EventDispatcher,
+	seqAlloc port.SeqAllocator,
 	logger domain.Logger,
 ) port.CheckEventEmitter {
 	return &checkEventEmitter{
 		agg:        agg,
 		store:      store,
+		seqAlloc:   seqAlloc,
 		projector:  projector,
 		dispatcher: dispatcher,
 		logger:     logger,
@@ -44,11 +47,16 @@ func (e *checkEventEmitter) emit(events ...domain.Event) error {
 	if e.store == nil && e.projector == nil {
 		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
 	}
-	// Tag events with aggregate identity
+	// Tag events with aggregate identity and global SeqNr
 	for i := range events {
-		e.seqNr++
 		events[i].AggregateType = domain.AggregateTypeCheck
-		events[i].SeqNr = e.seqNr
+		if e.seqAlloc != nil {
+			seq, err := e.seqAlloc.AllocSeqNr(context.Background())
+			if err != nil {
+				return fmt.Errorf("alloc seq nr: %w", err)
+			}
+			events[i].SeqNr = seq
+		}
 	}
 	if e.store != nil {
 		if _, err := e.store.Append(events...); err != nil {

@@ -32,6 +32,16 @@ func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return NewSpanEventStore(raw)
 }
 
+// NewSnapshotStore creates a FileSnapshotStore at {stateDir}/snapshots/.
+func NewSnapshotStore(stateDir string) port.SnapshotStore {
+	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
+}
+
+// NewSeqCounter creates a SeqCounter at {stateDir}/.run/seq.db.
+func NewSeqCounter(stateDir string) (*eventsource.SeqCounter, error) {
+	return eventsource.NewSeqCounter(filepath.Join(stateDir, ".run", "seq.db"))
+}
+
 // EventsDir returns the events directory path for a state root.
 func EventsDir(stateDir string) string {
 	return eventsource.EventsDir(stateDir)

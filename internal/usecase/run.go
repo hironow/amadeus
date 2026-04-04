@@ -41,7 +41,7 @@ func Run(ctx context.Context, _ domain.ExecuteRunCommand, opts domain.RunOptions
 	registerCheckPolicies(engine, logger, notifier, metrics)
 
 	// Create EventEmitter + StateProvider wrapping the aggregate
-	emitter := NewCheckEventEmitter(agg, store, pipeline.EventApplier(), engine, logger)
+	emitter := NewCheckEventEmitter(agg, store, pipeline.EventApplier(), engine, nil, logger)
 	state := NewCheckStateProvider(agg)
 
 	// Wire PRPipelineRunner if prReader is available
