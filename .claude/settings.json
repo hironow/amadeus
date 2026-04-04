@@ -7,6 +7,10 @@
       "Bash(go *)",
       "Bash(git *)",
       "Bash(semgrep *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -f *)"
     ]
   }
 }
