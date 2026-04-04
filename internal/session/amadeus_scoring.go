@@ -158,7 +158,7 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 			return "", nil, err
 		}
 
-		prompt, err := platform.BuildFullCheckPrompt(a.Config.ConfigLang(), domain.FullCheckParams{
+		prompt, err := buildFullCheckPrompt(a.Config.ConfigLang(), domain.FullCheckParams{
 			EvalDir: evalDir,
 		})
 		if err != nil {
@@ -214,7 +214,7 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 	repeatedViolations := domain.CollectRepeatedViolations(recentResults)
 	divergenceTrend := domain.AnalyzeDivergenceTrend(recentResults)
 
-	prompt, err := platform.BuildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
+	prompt, err := buildDiffCheckPrompt(a.Config.ConfigLang(), domain.DiffCheckParams{
 		EvalDir:            evalDir,
 		HasPRReviews:       hasPRReviews,
 		LinkedIssueIDs:     strings.Join(issueIDs, ", "),

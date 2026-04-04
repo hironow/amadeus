@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
@@ -174,13 +175,13 @@ func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments s
 }
 
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.
+// Uses the PromptRegistry to load the template from YAML.
 func BuildReviewFixPrompt(branch string, comments string) string {
-	return fmt.Sprintf(`You are on branch %s. A code review found the following issues:
-
-%s
-
-Fix all review comments above. Commit and push your changes.
-Keep fixes focused — only address the review comments, do not refactor unrelated code.`, branch, comments)
+	reg := harness.MustDefaultPromptRegistry()
+	return reg.MustExpand("review_fix", map[string]string{
+		"branch":   branch,
+		"comments": comments,
+	})
 }
 
 // summarizeReview normalizes multi-line review output and truncates.

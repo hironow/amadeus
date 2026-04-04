@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -148,7 +149,7 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 		}
 
 		// Validate before emitting — reject protocol-violating D-Mails
-		if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+		if errs := harness.ValidateDMail(dmail); len(errs) > 0 {
 			a.Logger.Warn("PR %s: invalid D-Mail %s: %v", pr.Number(), dmail.Name, errs)
 			continue
 		}
@@ -173,44 +174,15 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 }
 
 // buildPRReviewPrompt constructs the evaluation prompt for a single PR.
+// Uses the PromptRegistry to load the template from YAML.
 func (a *Amadeus) buildPRReviewPrompt(pr domain.PRState, diff string) string {
-	return fmt.Sprintf(`You are amadeus, a post-merge integrity verifier. You are evaluating a pull request diff against the project's Architecture Decision Records (ADRs) and Definitions of Done (DoDs).
-
-## PR Information
-- Number: %s
-- Title: %s
-- Base Branch: %s
-- Head Branch: %s
-
-## PR Diff
-%s
-
-## Instructions
-1. Read all ADR files in docs/adr/ and DoD files if they exist
-2. Evaluate whether this PR's changes comply with established ADRs and DoDs
-3. Identify any violations, deviations, or areas of concern
-4. Score the overall divergence (0 = fully compliant, 100 = completely divergent)
-
-## Response Format (JSON)
-{
-  "files_read": ["docs/adr/...", ...],
-  "axes": {
-    "structural": {"score": 0, "details": "..."},
-    "behavioral": {"score": 0, "details": "..."},
-    "convention": {"score": 0, "details": "..."},
-    "dependency": {"score": 0, "details": "..."}
-  },
-  "dmails": [
-    {
-      "description": "Brief description of the issue",
-      "detail": "Detailed explanation",
-      "targets": ["file.go"],
-      "action": "retry|escalate|resolve",
-      "category": "design|implementation"
-    }
-  ],
-  "reasoning": "Overall assessment in %s"
-}
-
-Only report genuine ADR/DoD violations. Do not flag stylistic preferences or minor formatting issues.`, pr.Number(), pr.Title(), pr.BaseBranch(), pr.HeadBranch(), diff, a.Config.Lang)
+	reg := harness.MustDefaultPromptRegistry()
+	return reg.MustExpand("pr_review", map[string]string{
+		"pr_number":   pr.Number(),
+		"pr_title":    pr.Title(),
+		"base_branch": pr.BaseBranch(),
+		"head_branch": pr.HeadBranch(),
+		"diff":        diff,
+		"lang":        a.Config.Lang,
+	})
 }

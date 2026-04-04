@@ -1,0 +1,158 @@
+rules:
+  # ==========================================================================
+  # Harness layer rules (AutoHarness spectrum: policy -> verifier -> filter)
+  #
+  # harness/ is the decision/validation/specification layer between LLM and env.
+  # Internal sub-packages: policy/ (deterministic), verifier/ (validation),
+  # filter/ (LLM action space). Facade harness.go re-exports all.
+  #
+  # Allowed:
+  #   harness/policy   -> domain
+  #   harness/verifier -> domain, harness/policy
+  #   harness/filter   -> domain, harness/verifier, harness/policy
+  #   harness (facade) -> harness/policy, harness/verifier, harness/filter, domain
+  #
+  # Ref: Plan refs/plans/2026-04-04-harness-layer-restructure-v3.md
+  # ==========================================================================
+
+  # --- domain must not import harness ---
+  - id: layer-domain-no-import-harness
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/harness.*"
+    paths:
+      include:
+        - "/internal/domain/**"
+    message: |
+      domain -> harness import 禁止。domain は型と集約のみ。
+      How: テストは harness/ 配下のテストファイルに移動してください
+
+  # --- eventsource must not import harness ---
+  - id: layer-eventsource-no-import-harness
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/harness.*"
+    paths:
+      include:
+        - "/internal/eventsource/**"
+    message: |
+      eventsource -> harness import 禁止。ValidateEvent は domain に残す。
+
+  # --- harness/policy: no reverse deps (most independent layer) ---
+  - id: layer-harness-policy-isolation
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/(harness/(verifier|filter)|usecase|session|cmd|platform|eventsource).*"
+    paths:
+      include:
+        - "/internal/harness/policy/**"
+    message: |
+      harness/policy は domain のみ import 可。verifier/filter/usecase/session/cmd/platform/eventsource 禁止。
+      Why: policy は LLM 不要の純粋決定層。他層への依存は昇格パスを壊す。テストも例外なし。
+
+  # --- harness/verifier: no filter or non-harness deps ---
+  - id: layer-harness-verifier-isolation
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/(harness/filter|usecase|session|cmd|platform|eventsource).*"
+    paths:
+      include:
+        - "/internal/harness/verifier/**"
+    message: |
+      harness/verifier は domain + harness/policy のみ import 可。filter/usecase/session/cmd/platform/eventsource 禁止。
+
+  # --- harness/filter: no non-harness deps ---
+  - id: layer-harness-filter-isolation
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/(usecase|session|cmd|platform|eventsource).*"
+    paths:
+      include:
+        - "/internal/harness/filter/**"
+    message: |
+      harness/filter は domain + harness/verifier + harness/policy のみ import 可。usecase/session/cmd/platform/eventsource 禁止。
+
+  # --- Rule: harness sub-packages must not import harness facade ---
+  - id: layer-harness-no-import-facade
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/harness\"$"
+    paths:
+      include:
+        - "/internal/harness/policy/**"
+        - "/internal/harness/verifier/**"
+        - "/internal/harness/filter/**"
+    message: |
+      harness sub-package から harness facade への import は禁止です (循環依存)。
+      sub-package 間の依存は直接 import してください (policy→domain, verifier→policy+domain, filter→verifier+policy+domain)。
+
+  # --- Rule: external callers must use harness facade, not sub-packages ---
+  - id: layer-harness-facade-only
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/harness/(policy|verifier|filter).*"
+    paths:
+      include:
+        - "/internal/cmd/**"
+        - "/internal/usecase/**"
+        - "/internal/session/**"
+
+        - "/internal/eventsource/**"
+    message: |
+      外部から harness sub-package の直接 import は禁止です。harness facade (internal/harness) を使用してください。

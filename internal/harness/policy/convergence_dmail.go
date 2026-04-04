@@ -1,13 +1,14 @@
-package domain
+package policy
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // BuildConvergenceDMailBody produces a Markdown body from a PRConvergenceReport.
-// Pure function with no I/O.
-func BuildConvergenceDMailBody(report PRConvergenceReport) string {
+func BuildConvergenceDMailBody(report domain.PRConvergenceReport) string {
 	var sb strings.Builder
 
 	sb.WriteString("## PR Dependency Chain Analysis\n\n")
@@ -16,7 +17,6 @@ func BuildConvergenceDMailBody(report PRConvergenceReport) string {
 	for _, chain := range report.Chains {
 		sb.WriteString(fmt.Sprintf("### %s\n\n", chain.ID))
 
-		// Chain structure visualization.
 		sb.WriteString("**Chain structure:** ")
 		for i, pr := range chain.PRs {
 			if i == 0 {
@@ -27,7 +27,6 @@ func BuildConvergenceDMailBody(report PRConvergenceReport) string {
 		}
 		sb.WriteString("\n\n")
 
-		// Issue table.
 		sb.WriteString("| PR | Base | Status | Issue |\n")
 		sb.WriteString("|---|---|---|---|\n")
 		for _, pr := range chain.PRs {
@@ -44,7 +43,6 @@ func BuildConvergenceDMailBody(report PRConvergenceReport) string {
 		}
 		sb.WriteString("\n")
 
-		// Recommended actions.
 		sb.WriteString("**Recommended merge order:** ")
 		for i, pr := range chain.PRs {
 			if i > 0 {
@@ -55,7 +53,6 @@ func BuildConvergenceDMailBody(report PRConvergenceReport) string {
 		sb.WriteString(" (root first, then dependents)\n\n")
 	}
 
-	// Conflict details section if any chain has conflicts.
 	hasAnyConflict := false
 	for _, chain := range report.Chains {
 		if chain.HasConflict {
@@ -83,11 +80,9 @@ func BuildConvergenceDMailBody(report PRConvergenceReport) string {
 }
 
 // BuildConvergenceDMail constructs a valid DMail from a PRConvergenceReport.
-// Uses KindImplFeedback and ClassifyConvergenceScenario for the most severe chain.
-func BuildConvergenceDMail(name string, report PRConvergenceReport) DMail {
-	// Determine worst severity across all chains.
-	worstSeverity := SeverityLow
-	worstAction := ActionResolve
+func BuildConvergenceDMail(name string, report domain.PRConvergenceReport) domain.DMail {
+	worstSeverity := domain.SeverityLow
+	worstAction := domain.ActionResolve
 	for _, chain := range report.Chains {
 		sev, act := ClassifyConvergenceScenario(chain)
 		if severityRank(sev) > severityRank(worstSeverity) {
@@ -96,7 +91,6 @@ func BuildConvergenceDMail(name string, report PRConvergenceReport) DMail {
 		}
 	}
 
-	// Collect all PR numbers as targets.
 	var targets []string
 	for _, chain := range report.Chains {
 		for _, pr := range chain.PRs {
@@ -107,10 +101,8 @@ func BuildConvergenceDMail(name string, report PRConvergenceReport) DMail {
 		targets = append(targets, pr.Number())
 	}
 
-	// Build description summarizing chains.
 	desc := buildConvergenceDescription(report)
 
-	// Conflict PRs for metadata.
 	var conflictPRs []string
 	for _, chain := range report.Chains {
 		for _, pr := range chain.PRs {
@@ -126,10 +118,10 @@ func BuildConvergenceDMail(name string, report PRConvergenceReport) DMail {
 		"conflict_prs":       strings.Join(conflictPRs, ","),
 	}
 
-	return DMail{
-		SchemaVersion: DMailSchemaVersion,
+	return domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
 		Name:          name,
-		Kind:          KindImplFeedback,
+		Kind:          domain.KindImplFeedback,
 		Description:   desc,
 		Severity:      worstSeverity,
 		Action:        worstAction,
@@ -139,12 +131,10 @@ func BuildConvergenceDMail(name string, report PRConvergenceReport) DMail {
 	}
 }
 
-// buildConvergenceDescription summarizes chains for the D-Mail description field.
-func buildConvergenceDescription(report PRConvergenceReport) string {
+func buildConvergenceDescription(report domain.PRConvergenceReport) string {
 	if len(report.Chains) == 0 {
 		return "No PR dependency chains detected"
 	}
-	// Summarize the first chain as example.
 	chain := report.Chains[0]
 	var nums []string
 	for _, pr := range chain.PRs {
@@ -157,14 +147,13 @@ func buildConvergenceDescription(report PRConvergenceReport) string {
 	return desc
 }
 
-// severityRank returns a numeric rank for severity comparison.
-func severityRank(s Severity) int {
+func severityRank(s domain.Severity) int {
 	switch s {
-	case SeverityHigh:
+	case domain.SeverityHigh:
 		return 3
-	case SeverityMedium:
+	case domain.SeverityMedium:
 		return 2
-	case SeverityLow:
+	case domain.SeverityLow:
 		return 1
 	default:
 		return 0

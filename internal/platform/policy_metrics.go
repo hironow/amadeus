@@ -11,7 +11,7 @@ import (
 type OTelPolicyMetrics struct{}
 
 func (*OTelPolicyMetrics) RecordPolicyEvent(ctx context.Context, eventType, status string) {
-	c, _ := Meter.Int64Counter("amadeus.policy.event.total",
+	c, _ := Meter.Int64Counter("amadeus.harness.event.total",
 		metric.WithDescription("Policy handler execution count"),
 	)
 	c.Add(ctx, 1,

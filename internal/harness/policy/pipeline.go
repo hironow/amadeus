@@ -1,9 +1,11 @@
-package domain
+package policy
 
 import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // pipelineLabels are labels applied by the 4-tool pipeline.
@@ -32,7 +34,7 @@ var githubIssuePattern = regexp.MustCompile(`#(\d+)`)
 // Detection methods (any match → true):
 //  1. Label: paintress:pr-open or sightjack:ready
 //  2. Branch pattern (head or base): wave (-wN-), expedition/, or amadeus fix prefix
-func IsPipelinePR(pr PRState) bool {
+func IsPipelinePR(pr domain.PRState) bool {
 	// 1. Label check
 	for _, label := range pipelineLabels {
 		if pr.HasLabel(label) {
@@ -62,7 +64,7 @@ func IsPipelinePR(pr PRState) bool {
 // the PR title references any issue from the sightjack pipeline.
 // sightjackIssueNumbers is a pre-fetched list of issue numbers (as strings,
 // without "#") that have the sightjack:ready label.
-func IsPipelinePRWithIssueContext(pr PRState, sightjackIssueNumbers []string) bool {
+func IsPipelinePRWithIssueContext(pr domain.PRState, sightjackIssueNumbers []string) bool {
 	if IsPipelinePR(pr) {
 		return true
 	}

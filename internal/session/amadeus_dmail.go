@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -131,7 +132,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 			if dmail.Action == "" {
 				dmail.Action = domain.DefaultDMailAction(meterResult.Divergence.Severity)
 			}
-			if errs := domain.ValidateDMail(dmail); len(errs) > 0 {
+			if errs := harness.ValidateDMail(dmail); len(errs) > 0 {
 				a.Logger.Warn("skipping invalid %s dmail %s: %v", kind, name, errs)
 				continue
 			}

@@ -1,9 +1,10 @@
-package domain_test
+package policy_test
 
 import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness/policy"
 )
 
 func mustPR(t *testing.T, number, title, base, head string, mergeable bool, labels []string, sha string) domain.PRState {
@@ -22,7 +23,7 @@ func TestDetermineMergeMethod_ChainRootWithDependents_ReturnsMerge(t *testing.T)
 	chain := domain.PRChain{ID: "chain-a", PRs: []domain.PRState{root, leaf}}
 
 	// when
-	method := domain.DetermineMergeMethod(root, &chain)
+	method := policy.DetermineMergeMethod(root, &chain)
 
 	// then: merge (not squash) to preserve hash for dependents
 	if method != domain.MergeMethodMerge {
@@ -37,7 +38,7 @@ func TestDetermineMergeMethod_ChainLeaf_ReturnsSquash(t *testing.T) {
 	chain := domain.PRChain{ID: "chain-a", PRs: []domain.PRState{root, leaf}}
 
 	// when
-	method := domain.DetermineMergeMethod(leaf, &chain)
+	method := policy.DetermineMergeMethod(leaf, &chain)
 
 	// then: squash (clean history, no dependents)
 	if method != domain.MergeMethodSquash {
@@ -50,7 +51,7 @@ func TestDetermineMergeMethod_Standalone_ReturnsSquash(t *testing.T) {
 	pr := mustPR(t, "#1", "solo", "main", "feat-a", true, nil, "abc123")
 
 	// when
-	method := domain.DetermineMergeMethod(pr, nil)
+	method := policy.DetermineMergeMethod(pr, nil)
 
 	// then
 	if method != domain.MergeMethodSquash {
@@ -64,7 +65,7 @@ func TestDetermineMergeMethod_SinglePRChain_ReturnsSquash(t *testing.T) {
 	chain := domain.PRChain{ID: "chain-a", PRs: []domain.PRState{pr}}
 
 	// when
-	method := domain.DetermineMergeMethod(pr, &chain)
+	method := policy.DetermineMergeMethod(pr, &chain)
 
 	// then: squash (no dependents even though in a chain)
 	if method != domain.MergeMethodSquash {
@@ -74,7 +75,7 @@ func TestDetermineMergeMethod_SinglePRChain_ReturnsSquash(t *testing.T) {
 
 func TestEvaluateMergeReadiness_AllGreen(t *testing.T) {
 	// given: all preconditions met
-	readiness := domain.EvaluateMergeReadiness(
+	readiness := policy.EvaluateMergeReadiness(
 		"#1", "CLEAN", "APPROVED", "MERGEABLE", true,
 	)
 
@@ -86,7 +87,7 @@ func TestEvaluateMergeReadiness_AllGreen(t *testing.T) {
 
 func TestEvaluateMergeReadiness_CIFailing(t *testing.T) {
 	// given: merge state not clean
-	readiness := domain.EvaluateMergeReadiness(
+	readiness := policy.EvaluateMergeReadiness(
 		"#1", "BLOCKED", "APPROVED", "MERGEABLE", true,
 	)
 
@@ -101,7 +102,7 @@ func TestEvaluateMergeReadiness_CIFailing(t *testing.T) {
 
 func TestEvaluateMergeReadiness_ReviewRequired(t *testing.T) {
 	// given: review not approved
-	readiness := domain.EvaluateMergeReadiness(
+	readiness := policy.EvaluateMergeReadiness(
 		"#1", "CLEAN", "REVIEW_REQUIRED", "MERGEABLE", true,
 	)
 
@@ -113,7 +114,7 @@ func TestEvaluateMergeReadiness_ReviewRequired(t *testing.T) {
 
 func TestEvaluateMergeReadiness_NoReviewDecision_IsOK(t *testing.T) {
 	// given: no reviewers assigned (empty review decision)
-	readiness := domain.EvaluateMergeReadiness(
+	readiness := policy.EvaluateMergeReadiness(
 		"#1", "CLEAN", "", "MERGEABLE", true,
 	)
 
@@ -125,7 +126,7 @@ func TestEvaluateMergeReadiness_NoReviewDecision_IsOK(t *testing.T) {
 
 func TestEvaluateMergeReadiness_NotMergeable(t *testing.T) {
 	// given: conflicting
-	readiness := domain.EvaluateMergeReadiness(
+	readiness := policy.EvaluateMergeReadiness(
 		"#1", "CLEAN", "APPROVED", "CONFLICTING", true,
 	)
 
@@ -137,7 +138,7 @@ func TestEvaluateMergeReadiness_NotMergeable(t *testing.T) {
 
 func TestEvaluateMergeReadiness_NoReviewLabel(t *testing.T) {
 	// given: amadeus hasn't reviewed
-	readiness := domain.EvaluateMergeReadiness(
+	readiness := policy.EvaluateMergeReadiness(
 		"#1", "CLEAN", "APPROVED", "MERGEABLE", false,
 	)
 
@@ -149,11 +150,11 @@ func TestEvaluateMergeReadiness_NoReviewLabel(t *testing.T) {
 
 func TestFilterMergeReady(t *testing.T) {
 	// given
-	readyPR := domain.EvaluateMergeReadiness("#1", "CLEAN", "APPROVED", "MERGEABLE", true)
-	blockedPR := domain.EvaluateMergeReadiness("#2", "BLOCKED", "APPROVED", "MERGEABLE", true)
+	readyPR := policy.EvaluateMergeReadiness("#1", "CLEAN", "APPROVED", "MERGEABLE", true)
+	blockedPR := policy.EvaluateMergeReadiness("#2", "BLOCKED", "APPROVED", "MERGEABLE", true)
 
 	// when
-	ready := domain.FilterMergeReady([]domain.PRMergeReadiness{readyPR, blockedPR})
+	ready := policy.FilterMergeReady([]domain.PRMergeReadiness{readyPR, blockedPR})
 
 	// then
 	if len(ready) != 1 {
@@ -165,7 +166,7 @@ func TestFilterMergeReady(t *testing.T) {
 }
 
 func TestEvaluateMergeReadiness_ChangesRequested(t *testing.T) {
-	readiness := domain.EvaluateMergeReadiness("#1", "CLEAN", "CHANGES_REQUESTED", "MERGEABLE", true)
+	readiness := policy.EvaluateMergeReadiness("#1", "CLEAN", "CHANGES_REQUESTED", "MERGEABLE", true)
 	if readiness.Ready {
 		t.Error("expected Ready=false for CHANGES_REQUESTED")
 	}
@@ -173,7 +174,7 @@ func TestEvaluateMergeReadiness_ChangesRequested(t *testing.T) {
 
 func TestEvaluateMergeReadiness_MultipleBlockReasons(t *testing.T) {
 	// given: all 4 conditions fail
-	readiness := domain.EvaluateMergeReadiness("#1", "BLOCKED", "REVIEW_REQUIRED", "CONFLICTING", false)
+	readiness := policy.EvaluateMergeReadiness("#1", "BLOCKED", "REVIEW_REQUIRED", "CONFLICTING", false)
 
 	// then
 	if readiness.Ready {
@@ -218,7 +219,7 @@ func TestGoTaskboardScenario_ChainDetectionAndMergeStrategy(t *testing.T) {
 	}
 
 	// when: build convergence report
-	report := domain.BuildPRConvergenceReport("main", prs)
+	report := policy.BuildPRConvergenceReport("main", prs)
 
 	// then: should detect exactly 1 chain (#22 → #23)
 	chainCount := 0
@@ -243,13 +244,13 @@ func TestGoTaskboardScenario_ChainDetectionAndMergeStrategy(t *testing.T) {
 	}
 
 	// then: #22 (chain root with dependent) → merge method
-	method22 := domain.DetermineMergeMethod(chainWith22.PRs[0], chainWith22)
+	method22 := policy.DetermineMergeMethod(chainWith22.PRs[0], chainWith22)
 	if method22 != domain.MergeMethodMerge {
 		t.Errorf("#22 (chain root): expected merge, got %s", method22)
 	}
 
 	// then: #23 (chain leaf) → squash method
-	method23 := domain.DetermineMergeMethod(chainWith22.PRs[1], chainWith22)
+	method23 := policy.DetermineMergeMethod(chainWith22.PRs[1], chainWith22)
 	if method23 != domain.MergeMethodSquash {
 		t.Errorf("#23 (chain leaf): expected squash, got %s", method23)
 	}
@@ -257,7 +258,7 @@ func TestGoTaskboardScenario_ChainDetectionAndMergeStrategy(t *testing.T) {
 	// then: standalone PRs → squash
 	for _, chain := range report.Chains {
 		if len(chain.PRs) == 1 {
-			method := domain.DetermineMergeMethod(chain.PRs[0], &chain)
+			method := policy.DetermineMergeMethod(chain.PRs[0], &chain)
 			if method != domain.MergeMethodSquash {
 				t.Errorf("%s (standalone): expected squash, got %s", chain.PRs[0].Number(), method)
 			}
@@ -265,13 +266,13 @@ func TestGoTaskboardScenario_ChainDetectionAndMergeStrategy(t *testing.T) {
 	}
 
 	// then: #23 without review label → not merge ready
-	readiness23 := domain.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false)
+	readiness23 := policy.EvaluateMergeReadiness("#23", "CLEAN", "", "MERGEABLE", false)
 	if readiness23.Ready {
 		t.Error("#23 should NOT be merge-ready (no review label)")
 	}
 
 	// then: #22 with review label → merge ready
-	readiness22 := domain.EvaluateMergeReadiness("#22", "CLEAN", "", "MERGEABLE", true)
+	readiness22 := policy.EvaluateMergeReadiness("#22", "CLEAN", "", "MERGEABLE", true)
 	if !readiness22.Ready {
 		t.Errorf("#22 should be merge-ready, got reasons: %v", readiness22.BlockReasons)
 	}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/harness"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -103,7 +104,7 @@ func (g *GhPRReader) GetPRMergeReadiness(_ context.Context, prNumber string) (*d
 		}
 	}
 
-	r := domain.EvaluateMergeReadiness(
+	r := harness.EvaluateMergeReadiness(
 		prNumber,
 		entry.MergeStateStatus,
 		entry.ReviewDecision,
