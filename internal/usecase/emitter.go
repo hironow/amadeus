@@ -13,12 +13,13 @@ import (
 // It wraps the aggregate + event store + projector + policy dispatcher.
 // Emit chain: agg.Record*() → store.Append() → projector.Apply() → dispatch (best-effort).
 type checkEventEmitter struct {
-	agg        *domain.CheckAggregate
-	store      port.EventStore
-	seqAlloc   port.SeqAllocator // SQLite-backed global SeqNr (ADR S0040)
-	projector  domain.EventApplier
-	dispatcher port.EventDispatcher
-	logger     domain.Logger
+	agg           *domain.CheckAggregate
+	store         port.EventStore
+	seqAlloc      port.SeqAllocator // SQLite-backed global SeqNr (ADR S0040)
+	seqNrFallback uint64            // fallback counter when seqAlloc is nil
+	projector     domain.EventApplier
+	dispatcher    port.EventDispatcher
+	logger        domain.Logger
 }
 
 // NewCheckEventEmitter creates a CheckEventEmitter that wraps the aggregate event chain.
@@ -56,6 +57,11 @@ func (e *checkEventEmitter) emit(events ...domain.Event) error {
 				return fmt.Errorf("alloc seq nr: %w", err)
 			}
 			events[i].SeqNr = seq
+		} else {
+			// Fallback: process-local counter for backward compatibility
+			// until SeqAllocator is wired in all call sites.
+			e.seqNrFallback++
+			events[i].SeqNr = e.seqNrFallback
 		}
 	}
 	if e.store != nil {
