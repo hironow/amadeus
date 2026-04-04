@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /Users/nino/tap/*)",
+      "Bash(rm *)",
+      "Bash(mv *)",
+      "Bash(mkdir *)",
+      "Bash(go *)",
+      "Bash(git *)",
+      "Bash(semgrep *)"
+    ]
+  }
+}
