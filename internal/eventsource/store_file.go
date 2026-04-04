@@ -88,6 +88,41 @@ func (s *FileEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 	return s.loadEvents(after)
 }
 
+// LoadAfterSeqNr returns all events with SeqNr > afterSeqNr, ordered by SeqNr ascending.
+// Events with SeqNr == 0 (pre-cutover legacy events) are excluded.
+func (s *FileEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
+	all, result, err := s.loadEvents(time.Time{})
+	if err != nil {
+		return nil, result, err
+	}
+	var filtered []domain.Event
+	for _, ev := range all {
+		if ev.SeqNr > afterSeqNr {
+			filtered = append(filtered, ev)
+		}
+	}
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return filtered[i].SeqNr < filtered[j].SeqNr
+	})
+	return filtered, result, nil
+}
+
+// LatestSeqNr returns the highest SeqNr across all persisted events.
+// Returns 0 if no events exist or none have a SeqNr assigned.
+func (s *FileEventStore) LatestSeqNr() (uint64, error) {
+	all, _, err := s.loadEvents(time.Time{})
+	if err != nil {
+		return 0, err
+	}
+	var max uint64
+	for _, ev := range all {
+		if ev.SeqNr > max {
+			max = ev.SeqNr
+		}
+	}
+	return max, nil
+}
+
 func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, domain.LoadResult, error) {
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {

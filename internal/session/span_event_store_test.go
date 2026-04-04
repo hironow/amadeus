@@ -31,6 +31,14 @@ func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResu
 	return s.loadEvents, s.loadResult, nil
 }
 
+func (s *stubEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+	return s.loadEvents, s.loadResult, nil
+}
+
+func (s *stubEventStore) LatestSeqNr() (uint64, error) {
+	return 0, nil
+}
+
 // findSpanByName returns the first span stub matching the given name, or nil.
 func findSpanByName(spans tracetest.SpanStubs, name string) *tracetest.SpanStub {
 	for i := range spans {
