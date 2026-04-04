@@ -1,3 +1,4 @@
+// white-box-reason: tests unexported prompt section renderers (renderPRReviewsSection etc.)
 package session
 
 import (
