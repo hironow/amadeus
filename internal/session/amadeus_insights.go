@@ -91,7 +91,7 @@ func (a *Amadeus) writeImprovementOutcomeInsight(inboxDMails []domain.DMail, ses
 		return
 	}
 	meta := latestImprovementMetadata(inboxDMails)
-	if meta.SchemaVersion == "" {
+	if !meta.IsImprovement() || !meta.HasSupportedVocabulary() {
 		return
 	}
 	outcome := domain.ImprovementOutcomeResolved
@@ -110,7 +110,7 @@ func latestImprovementMetadata(dmails []domain.DMail) domain.CorrectionMetadata 
 			continue
 		}
 		meta := domain.CorrectionMetadataFromMap(dmails[i].Metadata)
-		if meta.SchemaVersion != "" {
+		if meta.IsImprovement() && meta.HasSupportedVocabulary() {
 			return meta
 		}
 	}
@@ -148,6 +148,9 @@ func improvementOutcomeInsight(meta domain.CorrectionMetadata, outcome domain.Im
 	}
 	if meta.CorrectiveAction != "" {
 		entry.Extra["corrective-action"] = meta.CorrectiveAction
+	}
+	if meta.Severity != "" {
+		entry.Extra["severity"] = string(domain.NormalizeSeverity(meta.Severity))
 	}
 	if meta.RetryAllowed != nil {
 		entry.Extra["retry-allowed"] = strconv.FormatBool(*meta.RetryAllowed)

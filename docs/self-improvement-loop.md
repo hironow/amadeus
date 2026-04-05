@@ -20,12 +20,14 @@ The current implementation does four things:
 2. It preserves rerun correlation so the next report can be tied back to the original corrective thread.
 3. It classifies rerun outcome as `resolved` or `failed_again`.
 4. It stores provider pause state in coding session metadata using the shared provider-state vocabulary.
+5. It can poll Weave feedback into the improvement ledger when Weave environment variables are present.
 
 ## Shared corrective metadata
 
 When `amadeus` emits corrective feedback, it can attach structured metadata such as:
 
 - `failure_type`
+- `severity`
 - `secondary_type`
 - `target_agent`
 - `recurrence_count`
@@ -37,6 +39,8 @@ When `amadeus` emits corrective feedback, it can attach structured metadata such
 - `outcome`
 
 This metadata is meant to be carried forward by rerun-linked reports so later checks can reason about the same corrective thread.
+
+`amadeus` now emits `severity` and explicitly marks escalation-producing corrective D-Mails as `outcome=escalated`.
 
 ## Corrective routing behavior
 
@@ -79,10 +83,11 @@ What is in:
 - observable corrective rerun tracking
 - small failure taxonomy for corrective routing
 - provider pause state snapshots in session metadata
+- Weave feedback collector MVP writing normalized entries into `.gate/insights/improvement-loop.md`
+- normalized ingestion for feedback / CI / PR / scorer / trace outcome payloads
 
 What is not in yet:
 
 - a separate improvement controller
 - long-horizon learning or policy updates
-- Weave-driven automatic improvement ingestion
-
+- richer Weave query/filter configuration beyond the default env-driven poller

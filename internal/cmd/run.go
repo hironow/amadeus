@@ -175,6 +175,11 @@ If [path] is omitted, the current working directory is used. Requires
 				filepath.Join(divRoot, "insights"),
 				filepath.Join(divRoot, ".run"),
 			)
+			collector, closeCollector, collectorErr := session.NewImprovementCollectorFromEnv(repoRoot, insightWriter, logger)
+			if collectorErr != nil {
+				return fmt.Errorf("improvement collector: %w", collectorErr)
+			}
+			defer closeCollector()
 
 			a := &session.Amadeus{
 				Config:      cfg,
@@ -191,11 +196,12 @@ If [path] is omitted, the current working directory is used. Requires
 				ReviewCmd:   reviewCmd,
 				ClaudeCmd:   cfg.ClaudeCmd,
 				ClaudeModel: cfg.Model,
-				PRReader:     prReader,
-				PRWriter:     prWriter,
-				IssueWriter:  issueWriter,
-				SeqAlloc:     seqAlloc,
-				Insights:     insightWriter,
+				PRReader:    prReader,
+				PRWriter:    prWriter,
+				IssueWriter: issueWriter,
+				SeqAlloc:    seqAlloc,
+				Insights:    insightWriter,
+				Collector:   collector,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT

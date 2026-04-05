@@ -28,11 +28,20 @@ func TestDMailCorrectionMetadata_AllowsRetryForFirstMediumPass(t *testing.T) {
 	if meta.CorrectiveAction != string(domain.ActionRetry) {
 		t.Fatalf("CorrectiveAction = %q, want %q", meta.CorrectiveAction, domain.ActionRetry)
 	}
+	if meta.SchemaVersion != domain.ImprovementSchemaVersion {
+		t.Fatalf("SchemaVersion = %q, want %q", meta.SchemaVersion, domain.ImprovementSchemaVersion)
+	}
+	if meta.Severity != domain.SeverityMedium {
+		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityMedium)
+	}
 	if meta.TargetAgent != "paintress" {
 		t.Fatalf("TargetAgent = %q, want paintress", meta.TargetAgent)
 	}
 	if meta.EscalationReason != "" {
 		t.Fatalf("EscalationReason = %q, want empty", meta.EscalationReason)
+	}
+	if meta.Outcome != domain.ImprovementOutcomePending {
+		t.Fatalf("Outcome = %q, want %q", meta.Outcome, domain.ImprovementOutcomePending)
 	}
 }
 
@@ -54,11 +63,17 @@ func TestDMailCorrectionMetadata_EscalatesHighSeverity(t *testing.T) {
 	if meta.CorrectiveAction != string(domain.ActionEscalate) {
 		t.Fatalf("CorrectiveAction = %q, want %q", meta.CorrectiveAction, domain.ActionEscalate)
 	}
+	if meta.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
+	}
 	if meta.TargetAgent != "" {
 		t.Fatalf("TargetAgent = %q, want empty", meta.TargetAgent)
 	}
 	if meta.EscalationReason != "high-severity" {
 		t.Fatalf("EscalationReason = %q, want high-severity", meta.EscalationReason)
+	}
+	if meta.Outcome != domain.ImprovementOutcomeEscalated {
+		t.Fatalf("Outcome = %q, want %q", meta.Outcome, domain.ImprovementOutcomeEscalated)
 	}
 }
 
@@ -90,7 +105,36 @@ func TestDMailCorrectionMetadata_EscalatesAfterRecurrenceThreshold(t *testing.T)
 	if meta.EscalationReason != "recurrence-threshold" {
 		t.Fatalf("EscalationReason = %q, want recurrence-threshold", meta.EscalationReason)
 	}
-	if meta.Outcome != domain.ImprovementOutcomeFailedAgain {
-		t.Fatalf("Outcome = %q, want %q", meta.Outcome, domain.ImprovementOutcomeFailedAgain)
+	if meta.Outcome != domain.ImprovementOutcomeEscalated {
+		t.Fatalf("Outcome = %q, want %q", meta.Outcome, domain.ImprovementOutcomeEscalated)
+	}
+}
+
+func TestDMailCorrectionMetadata_PreservesLegacyTriggerSchemaAsV1(t *testing.T) {
+	meta := dmailCorrectionMetadata(
+		domain.ClaudeDMailCandidate{Category: "implementation", Action: "retry"},
+		domain.KindImplFeedback,
+		"feedback-4",
+		domain.SeverityMedium,
+		nil,
+		1,
+		domain.CorrectionMetadata{
+			FailureType:     domain.FailureTypeExecutionFailure,
+			Severity:        domain.SeverityHigh,
+			CorrelationID:   "corr-legacy",
+			RecurrenceCount: 1,
+			RetryAllowed:    domain.BoolPtr(true),
+		},
+		trace.SpanFromContext(context.Background()),
+	)
+
+	if meta.SchemaVersion != domain.ImprovementSchemaVersion {
+		t.Fatalf("SchemaVersion = %q, want %q", meta.SchemaVersion, domain.ImprovementSchemaVersion)
+	}
+	if meta.CorrelationID != "corr-legacy" {
+		t.Fatalf("CorrelationID = %q, want corr-legacy", meta.CorrelationID)
+	}
+	if meta.Severity != domain.SeverityMedium {
+		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityMedium)
 	}
 }

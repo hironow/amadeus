@@ -40,6 +40,7 @@ type Amadeus struct {
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
 	SeqAlloc    port.SeqAllocator       // global SeqNr (ADR S0040)
 	Insights    *InsightWriter          // nil = skip insight generation
+	Collector   *ImprovementCollector   // nil = skip external improvement signal ingestion
 
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.
@@ -173,6 +174,12 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 	// Restore aggregate state from persisted projection
 	a.State.Restore(previous)
+
+	if a.Collector != nil {
+		if _, err := a.Collector.PollOnce(ctx, 100); err != nil && a.Logger != nil {
+			a.Logger.Warn("improvement collector: %v", err)
+		}
+	}
 
 	// Phase 0: Consume inbox D-Mails (skip in dry-run to avoid mutating state).
 	// Consumed D-Mails are passed to generateDMails for feedback_round propagation.

@@ -1,6 +1,9 @@
 package domain
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 type FailureType string
 
@@ -28,6 +31,7 @@ const ImprovementSchemaVersion = "1"
 
 const (
 	MetadataFailureType              = "failure_type"
+	MetadataSeverity                 = "severity"
 	MetadataSecondaryType            = "secondary_type"
 	MetadataTargetAgent              = "target_agent"
 	MetadataRecurrenceCount          = "recurrence_count"
@@ -43,6 +47,7 @@ const (
 type CorrectionMetadata struct {
 	SchemaVersion    string
 	FailureType      FailureType
+	Severity         Severity
 	SecondaryType    string
 	TargetAgent      string
 	RecurrenceCount  int
@@ -57,6 +62,7 @@ type CorrectionMetadata struct {
 type ImprovementEvent struct {
 	SchemaVersion    string             `json:"schema_version" yaml:"schema_version"`
 	FailureType      FailureType        `json:"failure_type" yaml:"failure_type"`
+	Severity         Severity           `json:"severity,omitempty" yaml:"severity,omitempty"`
 	SecondaryType    string             `json:"secondary_type,omitempty" yaml:"secondary_type,omitempty"`
 	TargetAgent      string             `json:"target_agent,omitempty" yaml:"target_agent,omitempty"`
 	RecurrenceCount  int                `json:"recurrence_count,omitempty" yaml:"recurrence_count,omitempty"`
@@ -66,6 +72,71 @@ type ImprovementEvent struct {
 	CorrelationID    string             `json:"correlation_id,omitempty" yaml:"correlation_id,omitempty"`
 	TraceID          string             `json:"trace_id,omitempty" yaml:"trace_id,omitempty"`
 	Outcome          ImprovementOutcome `json:"outcome,omitempty" yaml:"outcome,omitempty"`
+}
+
+func (m CorrectionMetadata) IsImprovement() bool {
+	return m.SchemaVersion != "" ||
+		m.FailureType != "" ||
+		m.Severity != "" ||
+		m.SecondaryType != "" ||
+		m.TargetAgent != "" ||
+		m.RecurrenceCount > 0 ||
+		m.CorrectiveAction != "" ||
+		m.RetryAllowed != nil ||
+		m.EscalationReason != "" ||
+		m.CorrelationID != "" ||
+		m.TraceID != "" ||
+		m.Outcome != ""
+}
+
+func (m CorrectionMetadata) ConsumerSchemaVersion() string {
+	if m.SchemaVersion != "" {
+		return m.SchemaVersion
+	}
+	if m.IsImprovement() {
+		return ImprovementSchemaVersion
+	}
+	return ""
+}
+
+func (m CorrectionMetadata) HasSupportedVocabulary() bool {
+	return (m.Severity == "" || IsKnownSeverity(m.Severity)) &&
+		(m.Outcome == "" || IsKnownImprovementOutcome(m.Outcome))
+}
+
+func NormalizeImprovementOutcome(outcome ImprovementOutcome) ImprovementOutcome {
+	switch ImprovementOutcome(strings.ToLower(string(outcome))) {
+	case ImprovementOutcomePending:
+		return ImprovementOutcomePending
+	case ImprovementOutcomeResolved:
+		return ImprovementOutcomeResolved
+	case ImprovementOutcomeEscalated:
+		return ImprovementOutcomeEscalated
+	case ImprovementOutcomeFailedAgain:
+		return ImprovementOutcomeFailedAgain
+	case ImprovementOutcomeIgnored:
+		return ImprovementOutcomeIgnored
+	default:
+		return outcome
+	}
+}
+
+func IsKnownImprovementOutcome(outcome ImprovementOutcome) bool {
+	switch NormalizeImprovementOutcome(outcome) {
+	case ImprovementOutcomePending, ImprovementOutcomeResolved, ImprovementOutcomeEscalated, ImprovementOutcomeFailedAgain, ImprovementOutcomeIgnored:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsKnownSeverity(severity Severity) bool {
+	switch NormalizeSeverity(severity) {
+	case SeverityLow, SeverityMedium, SeverityHigh:
+		return true
+	default:
+		return false
+	}
 }
 
 func CorrectionMetadataFromMap(meta map[string]string) CorrectionMetadata {
@@ -83,6 +154,7 @@ func CorrectionMetadataFromMap(meta map[string]string) CorrectionMetadata {
 	return CorrectionMetadata{
 		SchemaVersion:    meta[MetadataImprovementSchemaVersion],
 		FailureType:      FailureType(meta[MetadataFailureType]),
+		Severity:         NormalizeSeverity(Severity(meta[MetadataSeverity])),
 		SecondaryType:    meta[MetadataSecondaryType],
 		TargetAgent:      meta[MetadataTargetAgent],
 		RecurrenceCount:  recurrence,
@@ -91,7 +163,7 @@ func CorrectionMetadataFromMap(meta map[string]string) CorrectionMetadata {
 		EscalationReason: meta[MetadataEscalationReason],
 		CorrelationID:    meta[MetadataCorrelationID],
 		TraceID:          meta[MetadataTraceID],
-		Outcome:          ImprovementOutcome(meta[MetadataOutcome]),
+		Outcome:          NormalizeImprovementOutcome(ImprovementOutcome(meta[MetadataOutcome])),
 	}
 }
 
@@ -107,6 +179,9 @@ func (m CorrectionMetadata) Apply(meta map[string]string) map[string]string {
 	cp[MetadataImprovementSchemaVersion] = schemaVersion
 	if m.FailureType != "" {
 		cp[MetadataFailureType] = string(m.FailureType)
+	}
+	if m.Severity != "" {
+		cp[MetadataSeverity] = string(NormalizeSeverity(m.Severity))
 	}
 	if m.SecondaryType != "" {
 		cp[MetadataSecondaryType] = m.SecondaryType
@@ -146,6 +221,7 @@ func (m CorrectionMetadata) ImprovementEvent() ImprovementEvent {
 	return ImprovementEvent{
 		SchemaVersion:    schemaVersion,
 		FailureType:      m.FailureType,
+		Severity:         NormalizeSeverity(m.Severity),
 		SecondaryType:    m.SecondaryType,
 		TargetAgent:      m.TargetAgent,
 		RecurrenceCount:  m.RecurrenceCount,
@@ -160,6 +236,9 @@ func (m CorrectionMetadata) ImprovementEvent() ImprovementEvent {
 
 func (m CorrectionMetadata) ForwardForRecheck() CorrectionMetadata {
 	forwarded := m
+	if !forwarded.IsImprovement() {
+		return forwarded
+	}
 	if forwarded.SchemaVersion == "" {
 		forwarded.SchemaVersion = ImprovementSchemaVersion
 	}
