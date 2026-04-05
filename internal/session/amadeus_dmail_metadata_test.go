@@ -37,6 +37,9 @@ func TestDMailCorrectionMetadata_AllowsRetryForFirstMediumPass(t *testing.T) {
 	if meta.TargetAgent != "paintress" {
 		t.Fatalf("TargetAgent = %q, want paintress", meta.TargetAgent)
 	}
+	if meta.RoutingMode != domain.RoutingModeRetry {
+		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeRetry)
+	}
 	if meta.EscalationReason != "" {
 		t.Fatalf("EscalationReason = %q, want empty", meta.EscalationReason)
 	}
@@ -68,6 +71,9 @@ func TestDMailCorrectionMetadata_EscalatesHighSeverity(t *testing.T) {
 	}
 	if meta.TargetAgent != "" {
 		t.Fatalf("TargetAgent = %q, want empty", meta.TargetAgent)
+	}
+	if meta.RoutingMode != domain.RoutingModeEscalate {
+		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeEscalate)
 	}
 	if meta.EscalationReason != "high-severity" {
 		t.Fatalf("EscalationReason = %q, want high-severity", meta.EscalationReason)
@@ -101,6 +107,9 @@ func TestDMailCorrectionMetadata_EscalatesAfterRecurrenceThreshold(t *testing.T)
 	}
 	if meta.CorrectiveAction != string(domain.ActionEscalate) {
 		t.Fatalf("CorrectiveAction = %q, want %q", meta.CorrectiveAction, domain.ActionEscalate)
+	}
+	if meta.RoutingMode != domain.RoutingModeEscalate {
+		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeEscalate)
 	}
 	if meta.EscalationReason != "recurrence-threshold" {
 		t.Fatalf("EscalationReason = %q, want recurrence-threshold", meta.EscalationReason)
@@ -136,5 +145,31 @@ func TestDMailCorrectionMetadata_PreservesLegacyTriggerSchemaAsV1(t *testing.T) 
 	}
 	if meta.Severity != domain.SeverityMedium {
 		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityMedium)
+	}
+}
+
+func TestDMailCorrectionMetadata_ReroutesImplementationFeedbackToSightjackForDesignFailure(t *testing.T) {
+	meta := dmailCorrectionMetadata(
+		domain.ClaudeDMailCandidate{Category: "design", Action: "retry"},
+		domain.KindImplFeedback,
+		"feedback-5",
+		domain.SeverityMedium,
+		nil,
+		1,
+		domain.CorrectionMetadata{},
+		trace.SpanFromContext(context.Background()),
+	)
+
+	if meta.TargetAgent != "sightjack" {
+		t.Fatalf("TargetAgent = %q, want sightjack", meta.TargetAgent)
+	}
+	if meta.RoutingMode != domain.RoutingModeReroute {
+		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeReroute)
+	}
+	if meta.CorrectiveAction != string(domain.ActionRetry) {
+		t.Fatalf("CorrectiveAction = %q, want %q", meta.CorrectiveAction, domain.ActionRetry)
+	}
+	if meta.RetryAllowed == nil || !*meta.RetryAllowed {
+		t.Fatal("RetryAllowed = nil/false, want true")
 	}
 }

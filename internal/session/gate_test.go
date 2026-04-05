@@ -527,3 +527,47 @@ func TestRunCheck_FeedbackDMail_ExplicitAction_FromCandidate(t *testing.T) {
 		}
 	}
 }
+
+func TestRunCheck_FeedbackDMail_PreservesRetryRoutingMetadata(t *testing.T) {
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
+	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("retry")}
+
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
+
+	var driftErr *domain.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected feedback D-Mail")
+	}
+
+	for _, dmail := range dmails {
+		meta := domain.CorrectionMetadataFromMap(dmail.Metadata)
+		if meta.TargetAgent == "" {
+			continue
+		}
+		if meta.RoutingMode != domain.RoutingModeRetry {
+			t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeRetry)
+		}
+		if meta.CorrectiveAction != string(domain.ActionRetry) {
+			t.Fatalf("CorrectiveAction = %q, want %q", meta.CorrectiveAction, domain.ActionRetry)
+		}
+		if meta.TargetAgent != "sightjack" && meta.TargetAgent != "paintress" {
+			t.Fatalf("TargetAgent = %q, want known corrective owner", meta.TargetAgent)
+		}
+		return
+	}
+
+	t.Fatal("expected retry metadata with target agent")
+}

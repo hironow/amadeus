@@ -12,6 +12,7 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 		Severity:         domain.SeverityMedium,
 		SecondaryType:    "implementation",
 		TargetAgent:      "paintress",
+		RoutingMode:      domain.RoutingModeRetry,
 		RecurrenceCount:  2,
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(true),
@@ -32,6 +33,9 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	}
 	if got.TargetAgent != "paintress" {
 		t.Fatalf("TargetAgent = %q, want paintress", got.TargetAgent)
+	}
+	if got.RoutingMode != domain.RoutingModeRetry {
+		t.Fatalf("RoutingMode = %q, want %q", got.RoutingMode, domain.RoutingModeRetry)
 	}
 	if got.RecurrenceCount != 2 {
 		t.Fatalf("RecurrenceCount = %d, want 2", got.RecurrenceCount)
@@ -65,6 +69,9 @@ func TestCorrectionMetadataForwardForRecheck(t *testing.T) {
 
 	if got.TargetAgent != "" {
 		t.Fatalf("TargetAgent = %q, want empty", got.TargetAgent)
+	}
+	if got.RoutingMode != "" {
+		t.Fatalf("RoutingMode = %q, want empty", got.RoutingMode)
 	}
 	if got.Outcome != domain.ImprovementOutcomePending {
 		t.Fatalf("Outcome = %q, want %q", got.Outcome, domain.ImprovementOutcomePending)
