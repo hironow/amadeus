@@ -213,9 +213,9 @@ func (cb *CircuitBreaker) Snapshot() domain.ProviderStateSnapshot {
 	case circuitHalfOpen:
 		return domain.ProviderStateSnapshot{
 			State:           domain.ProviderStateDegraded,
-			Reason:          "probe",
+			Reason:          domain.ProviderReasonProbe,
 			RetryBudget:     1,
-			ResumeCondition: "probe-succeeds",
+			ResumeCondition: domain.ResumeConditionProbeSucceeds,
 		}
 	case circuitOpen:
 		snapshot := domain.ProviderStateSnapshot{
@@ -226,11 +226,11 @@ func (cb *CircuitBreaker) Snapshot() domain.ProviderStateSnapshot {
 			snapshot.State = domain.ProviderStatePaused
 			snapshot.Reason = cb.lastReason
 			snapshot.ResumeAt = cb.resetAt
-			snapshot.ResumeCondition = "provider-reset-window"
+			snapshot.ResumeCondition = domain.ResumeConditionProviderReset
 			return snapshot
 		}
 		snapshot.Reason = cb.lastReason
-		snapshot.ResumeCondition = "backoff-elapses"
+		snapshot.ResumeCondition = domain.ResumeConditionBackoffElapses
 		return snapshot
 	default:
 		return domain.ActiveProviderState()
@@ -240,9 +240,9 @@ func (cb *CircuitBreaker) Snapshot() domain.ProviderStateSnapshot {
 func providerPauseReason(kind domain.ProviderErrorKind) string {
 	switch kind {
 	case domain.ProviderErrorRateLimit:
-		return "rate_limit"
+		return domain.ProviderReasonRateLimit
 	case domain.ProviderErrorServer:
-		return "server_error"
+		return domain.ProviderReasonServerError
 	default:
 		return "provider_error"
 	}

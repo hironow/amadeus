@@ -8,20 +8,25 @@ import (
 
 func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	meta := domain.CorrectionMetadata{
-		FailureType:      domain.FailureTypeExecutionFailure,
-		Severity:         domain.SeverityMedium,
-		SecondaryType:    "implementation",
-		TargetAgent:      "paintress",
-		RoutingMode:      domain.RoutingModeRetry,
-		RoutingHistory:   []string{"retry", "reroute"},
-		OwnerHistory:     []string{"paintress", "sightjack"},
-		RecurrenceCount:  2,
-		CorrectiveAction: "retry",
-		RetryAllowed:     domain.BoolPtr(true),
-		EscalationReason: "recurrence-threshold",
-		CorrelationID:    "corr-1",
-		TraceID:          "trace-1",
-		Outcome:          domain.ImprovementOutcomePending,
+		FailureType:         domain.FailureTypeExecutionFailure,
+		Severity:            domain.SeverityMedium,
+		SecondaryType:       "implementation",
+		TargetAgent:         "paintress",
+		RoutingMode:         domain.RoutingModeRetry,
+		RoutingHistory:      []string{"retry", "reroute"},
+		OwnerHistory:        []string{"paintress", "sightjack"},
+		RecurrenceCount:     2,
+		CorrectiveAction:    "retry",
+		RetryAllowed:        domain.BoolPtr(true),
+		EscalationReason:    "recurrence-threshold",
+		CorrelationID:       "corr-1",
+		TraceID:             "trace-1",
+		ProviderState:       domain.ProviderStateWaiting,
+		ProviderReason:      domain.ProviderReasonRateLimit,
+		ProviderRetryBudget: 0,
+		ProviderResumeAt:    "2026-04-05T00:00:00Z",
+		ProviderResumeWhen:  domain.ResumeConditionProbeSucceeds,
+		Outcome:             domain.ImprovementOutcomePending,
 	}
 
 	applied := meta.Apply(map[string]string{"existing": "ok"})
@@ -54,6 +59,21 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	if got.EscalationReason != "recurrence-threshold" {
 		t.Fatalf("EscalationReason = %q, want recurrence-threshold", got.EscalationReason)
 	}
+	if got.ProviderState != domain.ProviderStateWaiting {
+		t.Fatalf("ProviderState = %q, want %q", got.ProviderState, domain.ProviderStateWaiting)
+	}
+	if got.ProviderReason != domain.ProviderReasonRateLimit {
+		t.Fatalf("ProviderReason = %q, want %q", got.ProviderReason, domain.ProviderReasonRateLimit)
+	}
+	if got.ProviderRetryBudget != 0 {
+		t.Fatalf("ProviderRetryBudget = %d, want 0", got.ProviderRetryBudget)
+	}
+	if got.ProviderResumeAt != "2026-04-05T00:00:00Z" {
+		t.Fatalf("ProviderResumeAt = %q, want 2026-04-05T00:00:00Z", got.ProviderResumeAt)
+	}
+	if got.ProviderResumeWhen != domain.ResumeConditionProbeSucceeds {
+		t.Fatalf("ProviderResumeWhen = %q, want %q", got.ProviderResumeWhen, domain.ResumeConditionProbeSucceeds)
+	}
 	if applied["existing"] != "ok" {
 		t.Fatal("existing metadata was lost")
 	}
@@ -62,6 +82,9 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	}
 	if applied[domain.MetadataSeverity] != string(domain.SeverityMedium) {
 		t.Fatalf("severity = %q, want %q", applied[domain.MetadataSeverity], domain.SeverityMedium)
+	}
+	if applied[domain.MetadataProviderRetryBudget] != "0" {
+		t.Fatalf("provider_retry_budget = %q, want 0", applied[domain.MetadataProviderRetryBudget])
 	}
 }
 
