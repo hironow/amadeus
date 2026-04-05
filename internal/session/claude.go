@@ -43,3 +43,10 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 		sharedCircuitBreaker.RecordProviderError(info)
 	}
 }
+
+func currentProviderState() domain.ProviderStateSnapshot {
+	if sharedCircuitBreaker == nil {
+		return domain.ActiveProviderState()
+	}
+	return sharedCircuitBreaker.Snapshot()
+}

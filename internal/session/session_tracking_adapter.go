@@ -41,14 +41,12 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 
 	// Circuit breaker: classify provider error from stderr
 	recordCircuitBreaker(a.provider, runErr, result.Stderr)
+	rec.Metadata = currentProviderState().ApplyMetadata(rec.Metadata)
 
 	if runErr != nil {
 		// Capture provider session ID even on failure
 		rec.ProviderSessionID = result.ProviderSessionID
 		rec.Status = domain.SessionFailed
-		if rec.Metadata == nil {
-			rec.Metadata = make(map[string]string)
-		}
 		rec.Metadata["failure_reason"] = runErr.Error()
 		if result.Stderr != "" {
 			rec.Metadata["stderr"] = result.Stderr

@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -147,6 +148,12 @@ func improvementOutcomeInsight(meta domain.CorrectionMetadata, outcome domain.Im
 	}
 	if meta.CorrectiveAction != "" {
 		entry.Extra["corrective-action"] = meta.CorrectiveAction
+	}
+	if meta.RetryAllowed != nil {
+		entry.Extra["retry-allowed"] = strconv.FormatBool(*meta.RetryAllowed)
+	}
+	if meta.EscalationReason != "" {
+		entry.Extra["escalation-reason"] = meta.EscalationReason
 	}
 	return entry
 }
