@@ -111,6 +111,8 @@ func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
 			domain.MetadataCorrelationID:    "corr-1",
 			domain.MetadataTraceID:          "trace-1",
 			domain.MetadataCorrectiveAction: "retry",
+			domain.MetadataRoutingHistory:   "retry>escalate",
+			domain.MetadataOwnerHistory:     "paintress>sightjack",
 		},
 	}}
 
@@ -139,6 +141,12 @@ func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
 	}
 	if entry.Extra["severity"] != string(domain.SeverityHigh) {
 		t.Fatalf("severity = %q, want %q", entry.Extra["severity"], domain.SeverityHigh)
+	}
+	if entry.Extra["routing-history"] != "retry>escalate" {
+		t.Fatalf("routing-history = %q, want retry>escalate", entry.Extra["routing-history"])
+	}
+	if entry.Extra["owner-history"] != "paintress>sightjack" {
+		t.Fatalf("owner-history = %q, want paintress>sightjack", entry.Extra["owner-history"])
 	}
 }
 

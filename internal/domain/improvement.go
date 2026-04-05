@@ -43,6 +43,8 @@ const (
 	MetadataSecondaryType            = "secondary_type"
 	MetadataTargetAgent              = "target_agent"
 	MetadataRoutingMode              = "routing_mode"
+	MetadataRoutingHistory           = "routing_history"
+	MetadataOwnerHistory             = "owner_history"
 	MetadataRecurrenceCount          = "recurrence_count"
 	MetadataCorrectiveAction         = "corrective_action"
 	MetadataRetryAllowed             = "retry_allowed"
@@ -60,6 +62,8 @@ type CorrectionMetadata struct {
 	SecondaryType    string
 	TargetAgent      string
 	RoutingMode      RoutingMode
+	RoutingHistory   []string
+	OwnerHistory     []string
 	RecurrenceCount  int
 	CorrectiveAction string
 	RetryAllowed     *bool
@@ -76,6 +80,8 @@ type ImprovementEvent struct {
 	SecondaryType    string             `json:"secondary_type,omitempty" yaml:"secondary_type,omitempty"`
 	TargetAgent      string             `json:"target_agent,omitempty" yaml:"target_agent,omitempty"`
 	RoutingMode      RoutingMode        `json:"routing_mode,omitempty" yaml:"routing_mode,omitempty"`
+	RoutingHistory   []string           `json:"routing_history,omitempty" yaml:"routing_history,omitempty"`
+	OwnerHistory     []string           `json:"owner_history,omitempty" yaml:"owner_history,omitempty"`
 	RecurrenceCount  int                `json:"recurrence_count,omitempty" yaml:"recurrence_count,omitempty"`
 	CorrectiveAction string             `json:"corrective_action,omitempty" yaml:"corrective_action,omitempty"`
 	RetryAllowed     *bool              `json:"retry_allowed,omitempty" yaml:"retry_allowed,omitempty"`
@@ -92,6 +98,8 @@ func (m CorrectionMetadata) IsImprovement() bool {
 		m.SecondaryType != "" ||
 		m.TargetAgent != "" ||
 		m.RoutingMode != "" ||
+		len(m.RoutingHistory) > 0 ||
+		len(m.OwnerHistory) > 0 ||
 		m.RecurrenceCount > 0 ||
 		m.CorrectiveAction != "" ||
 		m.RetryAllowed != nil ||
@@ -193,6 +201,8 @@ func CorrectionMetadataFromMap(meta map[string]string) CorrectionMetadata {
 		SecondaryType:    meta[MetadataSecondaryType],
 		TargetAgent:      meta[MetadataTargetAgent],
 		RoutingMode:      NormalizeRoutingMode(RoutingMode(meta[MetadataRoutingMode])),
+		RoutingHistory:   parseImprovementHistory(meta[MetadataRoutingHistory]),
+		OwnerHistory:     parseImprovementHistory(meta[MetadataOwnerHistory]),
 		RecurrenceCount:  recurrence,
 		CorrectiveAction: meta[MetadataCorrectiveAction],
 		RetryAllowed:     retryAllowed,
@@ -227,6 +237,12 @@ func (m CorrectionMetadata) Apply(meta map[string]string) map[string]string {
 	}
 	if m.RoutingMode != "" {
 		cp[MetadataRoutingMode] = string(NormalizeRoutingMode(m.RoutingMode))
+	}
+	if len(m.RoutingHistory) > 0 {
+		cp[MetadataRoutingHistory] = formatImprovementHistory(m.RoutingHistory)
+	}
+	if len(m.OwnerHistory) > 0 {
+		cp[MetadataOwnerHistory] = formatImprovementHistory(m.OwnerHistory)
 	}
 	if m.RecurrenceCount > 0 {
 		cp[MetadataRecurrenceCount] = strconv.Itoa(m.RecurrenceCount)
@@ -264,6 +280,8 @@ func (m CorrectionMetadata) ImprovementEvent() ImprovementEvent {
 		SecondaryType:    m.SecondaryType,
 		TargetAgent:      m.TargetAgent,
 		RoutingMode:      NormalizeRoutingMode(m.RoutingMode),
+		RoutingHistory:   append([]string(nil), m.RoutingHistory...),
+		OwnerHistory:     append([]string(nil), m.OwnerHistory...),
 		RecurrenceCount:  m.RecurrenceCount,
 		CorrectiveAction: m.CorrectiveAction,
 		RetryAllowed:     m.RetryAllowed,
@@ -288,6 +306,65 @@ func (m CorrectionMetadata) ForwardForRecheck() CorrectionMetadata {
 		forwarded.Outcome = ImprovementOutcomePending
 	}
 	return forwarded
+}
+
+func ParseImprovementHistory(raw string) []string {
+	return parseImprovementHistory(raw)
+}
+
+func FormatImprovementHistory(values []string) string {
+	return formatImprovementHistory(values)
+}
+
+func AppendImprovementHistory(history []string, value string) []string {
+	return appendImprovementHistory(history, value)
+}
+
+func parseImprovementHistory(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ">")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = appendImprovementHistory(out, part)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func formatImprovementHistory(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.Join(normalizeImprovementHistory(values), ">")
+}
+
+func appendImprovementHistory(history []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return append([]string(nil), history...)
+	}
+	next := append([]string(nil), history...)
+	if len(next) > 0 && next[len(next)-1] == value {
+		return next
+	}
+	return append(next, value)
+}
+
+func normalizeImprovementHistory(values []string) []string {
+	var out []string
+	for _, value := range values {
+		out = appendImprovementHistory(out, value)
+	}
+	return out
 }
 
 func BoolPtr(v bool) *bool {

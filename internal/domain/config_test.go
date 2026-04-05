@@ -503,3 +503,21 @@ func TestValidateConfig_InvalidLang(t *testing.T) {
 		t.Errorf("expected validation error mentioning 'lang', got: %v", errs)
 	}
 }
+
+func TestValidateConfig_ImprovementCollectorQueryLimitNegative(t *testing.T) {
+	cfg := domain.DefaultConfig()
+	cfg.ImprovementCollector.QueryLimit = -1
+
+	errs := domain.ValidateConfig(cfg)
+
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "improvement_collector.query_limit") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected validation error mentioning improvement_collector.query_limit, got: %v", errs)
+	}
+}

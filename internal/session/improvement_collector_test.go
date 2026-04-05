@@ -13,16 +13,21 @@ import (
 )
 
 type fakeImprovementFeedbackSource struct {
-	rows []ImprovementFeedbackRow
+	rows      []ImprovementFeedbackRow
+	lastQuery ImprovementFeedbackQuery
 }
 
 func (f fakeImprovementFeedbackSource) QueryFeedback(_ context.Context, query ImprovementFeedbackQuery) ([]ImprovementFeedbackRow, error) {
+	f.lastQuery = query
 	var out []ImprovementFeedbackRow
 	for _, row := range f.rows {
 		if row.CreatedAt.Before(query.CreatedAfter) {
 			continue
 		}
 		if row.CreatedAt.Equal(query.CreatedAfter) && query.AfterFeedback != "" && row.ID <= query.AfterFeedback {
+			continue
+		}
+		if !improvementFeedbackTypeAllowed(query.FeedbackTypes, row.FeedbackType) {
 			continue
 		}
 		out = append(out, row)
@@ -61,6 +66,8 @@ func TestImprovementCollectorPollOnce_AppendsNormalizedEntryOnce(t *testing.T) {
 					"failure_type":      "execution_failure",
 					"severity":          "HIGH",
 					"target_agent":      "paintress",
+					"routing_history":   "retry",
+					"owner_history":     "paintress",
 					"corrective_action": "retry",
 					"correlation_id":    "corr-1",
 					"trace_id":          "trace-1",
@@ -103,6 +110,19 @@ func TestImprovementCollectorPollOnce_AppendsNormalizedEntryOnce(t *testing.T) {
 	}
 	if entry.Extra["feedback-id"] != "fb-1" {
 		t.Fatalf("feedback-id = %q, want fb-1", entry.Extra["feedback-id"])
+	}
+	signals, err := store.LoadSignals(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("LoadSignals: %v", err)
+	}
+	if len(signals) != 1 {
+		t.Fatalf("signals = %d, want 1", len(signals))
+	}
+	if got := domain.FormatImprovementHistory(signals[0].RoutingHistory); got != "retry" {
+		t.Fatalf("signal routing history = %q, want retry", got)
+	}
+	if got := domain.FormatImprovementHistory(signals[0].OwnerHistory); got != "paintress" {
+		t.Fatalf("signal owner history = %q, want paintress", got)
 	}
 }
 
@@ -278,5 +298,125 @@ func TestNormalizeImprovementFeedback_SurfaceSignals(t *testing.T) {
 				t.Fatalf("%s = %q, want %q", tt.wantExtraKey, got, tt.wantExtraValue)
 			}
 		})
+	}
+}
+
+type recordingImprovementFeedbackSource struct {
+	rows      []ImprovementFeedbackRow
+	lastQuery ImprovementFeedbackQuery
+}
+
+func (f *recordingImprovementFeedbackSource) QueryFeedback(_ context.Context, query ImprovementFeedbackQuery) ([]ImprovementFeedbackRow, error) {
+	f.lastQuery = query
+	var out []ImprovementFeedbackRow
+	for _, row := range f.rows {
+		if !improvementFeedbackTypeAllowed(query.FeedbackTypes, row.FeedbackType) {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+func TestImprovementCollectorPollOnce_UsesConfiguredLimitAndFeedbackTypes(t *testing.T) {
+	base := t.TempDir()
+	insightsDir := filepath.Join(base, "insights")
+	runDir := filepath.Join(base, ".run")
+	if err := os.MkdirAll(insightsDir, 0o755); err != nil {
+		t.Fatalf("mkdir insights: %v", err)
+	}
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run: %v", err)
+	}
+	writer := NewInsightWriter(insightsDir, runDir)
+	store, err := NewSQLiteImprovementCollectorStore(filepath.Join(runDir, "improvement-ingestion.db"))
+	if err != nil {
+		t.Fatalf("NewSQLiteImprovementCollectorStore: %v", err)
+	}
+	defer store.Close()
+
+	source := &recordingImprovementFeedbackSource{
+		rows: []ImprovementFeedbackRow{
+			{
+				ID:           "fb-keep",
+				ProjectID:    "proj-1",
+				WeaveRef:     "call-keep",
+				FeedbackType: "ci-outcome",
+				CreatedAt:    time.Date(2026, 4, 5, 12, 3, 0, 0, time.UTC),
+				Payload: map[string]any{
+					"ci_status": "failed",
+				},
+			},
+			{
+				ID:           "fb-skip",
+				ProjectID:    "proj-1",
+				WeaveRef:     "call-skip",
+				FeedbackType: "comment",
+				CreatedAt:    time.Date(2026, 4, 5, 12, 4, 0, 0, time.UTC),
+				Payload: map[string]any{
+					"failure_type": "execution_failure",
+				},
+			},
+		},
+	}
+	collector := &ImprovementCollector{
+		ProjectID:            "proj-1",
+		Source:               source,
+		Store:                store,
+		Ledger:               writer,
+		Logger:               &domain.NopLogger{},
+		QueryLimit:           7,
+		AllowedFeedbackTypes: []string{"ci-outcome"},
+	}
+
+	processed, err := collector.PollOnce(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("PollOnce: %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("processed = %d, want 1", processed)
+	}
+	if source.lastQuery.Limit != 7 {
+		t.Fatalf("query limit = %d, want 7", source.lastQuery.Limit)
+	}
+	if len(source.lastQuery.FeedbackTypes) != 1 || source.lastQuery.FeedbackTypes[0] != "ci-outcome" {
+		t.Fatalf("feedback types = %v, want [ci-outcome]", source.lastQuery.FeedbackTypes)
+	}
+
+	file, err := writer.Read("improvement-loop.md")
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(file.Entries) != 1 {
+		t.Fatalf("entries = %d, want 1", len(file.Entries))
+	}
+	if got := file.Entries[0].Extra["feedback-id"]; got != "fb-keep" {
+		t.Fatalf("feedback-id = %q, want fb-keep", got)
+	}
+}
+
+func TestNormalizeImprovementFeedbackRecord_PreservesRoutingHistory(t *testing.T) {
+	record := normalizeImprovementFeedbackRecord(ImprovementFeedbackRow{
+		ID:           "fb-history",
+		ProjectID:    "proj-1",
+		WeaveRef:     "call-history",
+		FeedbackType: "comment",
+		CreatedAt:    time.Date(2026, 4, 5, 12, 5, 0, 0, time.UTC),
+		Payload: map[string]any{
+			"failure_type":    "execution_failure",
+			"routing_mode":    "retry",
+			"routing_history": "retry>escalate",
+			"owner_history":   "paintress>sightjack",
+		},
+	})
+
+	if got := record.Entry.Extra["routing-history"]; got != "retry>escalate" {
+		t.Fatalf("routing-history = %q, want retry>escalate", got)
+	}
+	if got := domain.FormatImprovementHistory(record.Signal.OwnerHistory); got != "paintress>sightjack" {
+		t.Fatalf("signal owner history = %q, want paintress>sightjack", got)
+	}
+	if record.Signal.RoutingMode != "retry" {
+		t.Fatalf("signal routing mode = %q, want retry", record.Signal.RoutingMode)
 	}
 }

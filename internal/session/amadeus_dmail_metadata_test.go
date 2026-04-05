@@ -46,6 +46,12 @@ func TestDMailCorrectionMetadata_AllowsRetryForFirstMediumPass(t *testing.T) {
 	if meta.Outcome != domain.ImprovementOutcomePending {
 		t.Fatalf("Outcome = %q, want %q", meta.Outcome, domain.ImprovementOutcomePending)
 	}
+	if got := domain.FormatImprovementHistory(meta.RoutingHistory); got != "retry" {
+		t.Fatalf("RoutingHistory = %q, want retry", got)
+	}
+	if got := domain.FormatImprovementHistory(meta.OwnerHistory); got != "paintress" {
+		t.Fatalf("OwnerHistory = %q, want paintress", got)
+	}
 }
 
 func TestDMailCorrectionMetadata_EscalatesHighSeverity(t *testing.T) {
@@ -93,6 +99,8 @@ func TestDMailCorrectionMetadata_EscalatesAfterRecurrenceThreshold(t *testing.T)
 		1,
 		domain.CorrectionMetadata{
 			SchemaVersion:   domain.ImprovementSchemaVersion,
+			RoutingHistory:  []string{"retry"},
+			OwnerHistory:    []string{"paintress"},
 			RecurrenceCount: 1,
 			RetryAllowed:    domain.BoolPtr(true),
 		},
@@ -122,6 +130,12 @@ func TestDMailCorrectionMetadata_EscalatesAfterRecurrenceThreshold(t *testing.T)
 	}
 	if meta.Outcome != domain.ImprovementOutcomeEscalated {
 		t.Fatalf("Outcome = %q, want %q", meta.Outcome, domain.ImprovementOutcomeEscalated)
+	}
+	if got := domain.FormatImprovementHistory(meta.RoutingHistory); got != "retry>escalate" {
+		t.Fatalf("RoutingHistory = %q, want retry>escalate", got)
+	}
+	if got := domain.FormatImprovementHistory(meta.OwnerHistory); got != "paintress" {
+		t.Fatalf("OwnerHistory = %q, want paintress", got)
 	}
 }
 

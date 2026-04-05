@@ -152,6 +152,12 @@ func improvementOutcomeInsight(meta domain.CorrectionMetadata, outcome domain.Im
 	if meta.RoutingMode != "" {
 		entry.Extra["routing-mode"] = string(domain.NormalizeRoutingMode(meta.RoutingMode))
 	}
+	if len(meta.RoutingHistory) > 0 {
+		entry.Extra["routing-history"] = domain.FormatImprovementHistory(meta.RoutingHistory)
+	}
+	if len(meta.OwnerHistory) > 0 {
+		entry.Extra["owner-history"] = domain.FormatImprovementHistory(meta.OwnerHistory)
+	}
 	if meta.Severity != "" {
 		entry.Extra["severity"] = string(domain.NormalizeSeverity(meta.Severity))
 	}

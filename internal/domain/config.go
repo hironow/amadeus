@@ -21,6 +21,14 @@ type ConvergenceConfig struct {
 // ComputedConfig holds system-written fields. Empty for amadeus today.
 type ComputedConfig struct{}
 
+type ImprovementCollectorConfig struct {
+	Enabled       *bool    `yaml:"enabled,omitempty"`
+	ProjectID     string   `yaml:"project_id,omitempty"`
+	APIURL        string   `yaml:"api_url,omitempty"`
+	QueryLimit    int      `yaml:"query_limit,omitempty"`
+	FeedbackTypes []string `yaml:"feedback_types,omitempty"`
+}
+
 // Default values for Config fields. Used by DefaultConfig and post-load
 // validation to avoid hardcoded strings throughout the codebase.
 const (
@@ -53,18 +61,19 @@ func (f FlagApproverConfig) ApproveCmdString() string { return f.ApproveCmd }
 
 // Config holds the complete Amadeus configuration.
 type Config struct {
-	Lang              string                  `yaml:"lang"`
-	ClaudeCmd         string                  `yaml:"claude_cmd,omitempty"`
-	Model             string                  `yaml:"model,omitempty"`
-	TimeoutSec        int                     `yaml:"timeout_sec,omitempty"`
-	Weights           Weights                 `yaml:"weights"`
-	Thresholds        Thresholds              `yaml:"thresholds"`
-	PerAxisOverride   PerAxisOverride         `yaml:"per_axis_override"`
-	FullCheck         FullCheckConfig         `yaml:"full_check"`
-	Convergence       ConvergenceConfig       `yaml:"convergence"`
-	BaselineStaleness BaselineStalenessConfig `yaml:"baseline_staleness,omitempty"`
-	IdleTimeout       time.Duration           `yaml:"idle_timeout,omitempty"`
-	Computed          ComputedConfig          `yaml:"computed,omitempty"`
+	Lang                 string                     `yaml:"lang"`
+	ClaudeCmd            string                     `yaml:"claude_cmd,omitempty"`
+	Model                string                     `yaml:"model,omitempty"`
+	TimeoutSec           int                        `yaml:"timeout_sec,omitempty"`
+	Weights              Weights                    `yaml:"weights"`
+	Thresholds           Thresholds                 `yaml:"thresholds"`
+	PerAxisOverride      PerAxisOverride            `yaml:"per_axis_override"`
+	FullCheck            FullCheckConfig            `yaml:"full_check"`
+	Convergence          ConvergenceConfig          `yaml:"convergence"`
+	BaselineStaleness    BaselineStalenessConfig    `yaml:"baseline_staleness,omitempty"`
+	ImprovementCollector ImprovementCollectorConfig `yaml:"improvement_collector,omitempty"`
+	IdleTimeout          time.Duration              `yaml:"idle_timeout,omitempty"`
+	Computed             ComputedConfig             `yaml:"computed,omitempty"`
 }
 
 // DefaultMaxResultHistory is the default maximum number of check results to
@@ -208,6 +217,9 @@ func ValidateConfig(cfg Config) []string {
 	// TimeoutSec check
 	if cfg.TimeoutSec < 0 {
 		errs = append(errs, fmt.Sprintf("timeout_sec must be non-negative (got %d)", cfg.TimeoutSec))
+	}
+	if cfg.ImprovementCollector.QueryLimit < 0 {
+		errs = append(errs, fmt.Sprintf("improvement_collector.query_limit must be non-negative (got %d)", cfg.ImprovementCollector.QueryLimit))
 	}
 
 	// Full check config

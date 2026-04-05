@@ -52,6 +52,12 @@ If [path] is omitted, the current working directory is used. Requires
 			jsonOut, _ := cmd.Flags().GetBool("json")
 			lang, _ := cmd.Flags().GetString("lang")
 			baseBranch, _ := cmd.Flags().GetString("base")
+			collectorEnable, _ := cmd.Flags().GetBool("collector-enable")
+			collectorDisable, _ := cmd.Flags().GetBool("collector-disable")
+			collectorProjectID, _ := cmd.Flags().GetString("collector-project-id")
+			collectorAPIURL, _ := cmd.Flags().GetString("collector-api-url")
+			collectorQueryLimit, _ := cmd.Flags().GetInt("collector-query-limit")
+			collectorFeedbackTypes, _ := cmd.Flags().GetStringSlice("collector-feedback-type")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
@@ -85,6 +91,29 @@ If [path] is omitted, the current working directory is used. Requires
 			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
+			}
+			if collectorEnable && collectorDisable {
+				return fmt.Errorf("--collector-enable and --collector-disable cannot be used together")
+			}
+			if collectorEnable {
+				enabled := true
+				cfg.ImprovementCollector.Enabled = &enabled
+			}
+			if collectorDisable {
+				enabled := false
+				cfg.ImprovementCollector.Enabled = &enabled
+			}
+			if cmd.Flags().Changed("collector-project-id") {
+				cfg.ImprovementCollector.ProjectID = collectorProjectID
+			}
+			if cmd.Flags().Changed("collector-api-url") {
+				cfg.ImprovementCollector.APIURL = collectorAPIURL
+			}
+			if cmd.Flags().Changed("collector-query-limit") {
+				cfg.ImprovementCollector.QueryLimit = collectorQueryLimit
+			}
+			if cmd.Flags().Changed("collector-feedback-type") {
+				cfg.ImprovementCollector.FeedbackTypes = collectorFeedbackTypes
 			}
 
 			// Preflight: verify required binaries exist
@@ -175,7 +204,7 @@ If [path] is omitted, the current working directory is used. Requires
 				filepath.Join(divRoot, "insights"),
 				filepath.Join(divRoot, ".run"),
 			)
-			collector, closeCollector, collectorErr := session.NewImprovementCollectorFromEnv(repoRoot, insightWriter, logger)
+			collector, closeCollector, collectorErr := session.NewImprovementCollector(repoRoot, cfg.ImprovementCollector, insightWriter, logger)
 			if collectorErr != nil {
 				return fmt.Errorf("improvement collector: %w", collectorErr)
 			}
@@ -318,6 +347,12 @@ If [path] is omitted, the current working directory is used. Requires
 	cmd.Flags().String("approve-cmd", "", "external command for approval ({message} placeholder)")
 	cmd.Flags().String("notify-cmd", "", "external command for notifications ({title} and {message} placeholders)")
 	cmd.Flags().String("review-cmd", "", "code review command after check (exit 0=pass, non-zero=comments)")
+	cmd.Flags().Bool("collector-enable", false, "force-enable the improvement collector")
+	cmd.Flags().Bool("collector-disable", false, "disable the improvement collector even when env vars are present")
+	cmd.Flags().String("collector-project-id", "", "override the Weave/W&B project id for the improvement collector")
+	cmd.Flags().String("collector-api-url", "", "override the Weave API base URL for the improvement collector")
+	cmd.Flags().Int("collector-query-limit", 0, "override the improvement collector query limit (0 = default)")
+	cmd.Flags().StringSlice("collector-feedback-type", nil, "restrict the improvement collector to specific feedback types")
 	// New flag for run
 	cmd.Flags().String("base", "", "upstream branch for post-merge divergence check")
 	cmd.Flags().Bool("no-merge", false, "disable automatic PR merging (only effective with --base)")

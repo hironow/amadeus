@@ -2,19 +2,13 @@ package session
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
-
-	_ "modernc.org/sqlite"
 )
 
 type improvementSignalSurface string
@@ -32,6 +26,7 @@ type ImprovementFeedbackQuery struct {
 	CreatedAfter  time.Time
 	AfterFeedback string
 	Limit         int
+	FeedbackTypes []string
 }
 
 type ImprovementFeedbackRow struct {
@@ -48,167 +43,18 @@ type ImprovementFeedbackSource interface {
 }
 
 type ImprovementCollector struct {
-	ProjectID string
-	Source    ImprovementFeedbackSource
-	Store     *SQLiteImprovementCollectorStore
-	Ledger    *InsightWriter
-	Logger    domain.Logger
+	ProjectID            string
+	Source               ImprovementFeedbackSource
+	Store                *SQLiteImprovementCollectorStore
+	Ledger               *InsightWriter
+	Logger               domain.Logger
+	QueryLimit           int
+	AllowedFeedbackTypes []string
 }
 
-type ImprovementCursor struct {
-	CreatedAt  time.Time
-	FeedbackID string
-}
-
-type SQLiteImprovementCollectorStore struct {
-	db *sql.DB
-}
-
-const improvementCollectorSchema = `
-CREATE TABLE IF NOT EXISTS improvement_ingestion_cursor (
-	name TEXT PRIMARY KEY,
-	created_at TEXT NOT NULL DEFAULT '',
-	feedback_id TEXT NOT NULL DEFAULT ''
-);
-CREATE TABLE IF NOT EXISTS improvement_ingestion_seen (
-	dedup_key TEXT PRIMARY KEY,
-	created_at TEXT NOT NULL,
-	feedback_id TEXT NOT NULL
-);
-`
-
-func NewSQLiteImprovementCollectorStore(dbPath string) (*SQLiteImprovementCollectorStore, error) {
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		return nil, fmt.Errorf("improvement collector store: mkdir: %w", err)
-	}
-	db, err := sql.Open("sqlite", dbPath) // nosemgrep: d4-sql-open-without-defer-close -- stored in struct, closed via Close() [permanent]
-	if err != nil {
-		return nil, fmt.Errorf("improvement collector store: open: %w", err)
-	}
-	db.SetMaxOpenConns(1)
-	for _, pragma := range []string{
-		"PRAGMA journal_mode=WAL",
-		"PRAGMA synchronous=NORMAL",
-		"PRAGMA busy_timeout=5000",
-	} {
-		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("improvement collector store: pragma: %w", err)
-		}
-	}
-	if _, err := db.Exec(improvementCollectorSchema); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("improvement collector store: schema: %w", err)
-	}
-	return &SQLiteImprovementCollectorStore{db: db}, nil
-}
-
-func (s *SQLiteImprovementCollectorStore) Close() error {
-	if s == nil || s.db == nil {
-		return nil
-	}
-	return s.db.Close()
-}
-
-func (s *SQLiteImprovementCollectorStore) LoadCursor(ctx context.Context) (ImprovementCursor, error) {
-	if s == nil || s.db == nil {
-		return ImprovementCursor{}, fmt.Errorf("improvement collector store: nil db")
-	}
-	row := s.db.QueryRowContext(ctx,
-		`SELECT created_at, feedback_id FROM improvement_ingestion_cursor WHERE name = ?`,
-		"default",
-	)
-	var createdAtRaw string
-	var cursor ImprovementCursor
-	err := row.Scan(&createdAtRaw, &cursor.FeedbackID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ImprovementCursor{}, nil
-	}
-	if err != nil {
-		return ImprovementCursor{}, fmt.Errorf("improvement collector store: load cursor: %w", err)
-	}
-	if createdAtRaw != "" {
-		cursor.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAtRaw)
-		if err != nil {
-			return ImprovementCursor{}, fmt.Errorf("improvement collector store: parse cursor time: %w", err)
-		}
-	}
-	return cursor, nil
-}
-
-func (s *SQLiteImprovementCollectorStore) ApplyFeedback(ctx context.Context, row ImprovementFeedbackRow, appendEntry func() error) (bool, error) {
-	if s == nil || s.db == nil {
-		return false, fmt.Errorf("improvement collector store: nil db")
-	}
-	conn, err := s.db.Conn(ctx)
-	if err != nil {
-		return false, fmt.Errorf("improvement collector store: get conn: %w", err)
-	}
-	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
-		return false, fmt.Errorf("improvement collector store: begin immediate: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			conn.ExecContext(ctx, "ROLLBACK") //nolint:errcheck
-		}
-	}()
-
-	dedupKey := improvementFeedbackDedupKey(row)
-	var exists int
-	err = conn.QueryRowContext(ctx,
-		`SELECT 1 FROM improvement_ingestion_seen WHERE dedup_key = ?`,
-		dedupKey,
-	).Scan(&exists)
-	switch {
-	case err == nil:
-		if err := saveImprovementCursor(ctx, conn, row); err != nil {
-			return false, err
-		}
-		if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
-			return false, fmt.Errorf("improvement collector store: commit duplicate: %w", err)
-		}
-		committed = true
-		return false, nil
-	case !errors.Is(err, sql.ErrNoRows):
-		return false, fmt.Errorf("improvement collector store: check dedup: %w", err)
-	}
-
-	if err := appendEntry(); err != nil {
-		return false, err
-	}
-	if _, err := conn.ExecContext(ctx,
-		`INSERT INTO improvement_ingestion_seen(dedup_key, created_at, feedback_id) VALUES (?, ?, ?)`,
-		dedupKey,
-		row.CreatedAt.UTC().Format(time.RFC3339Nano),
-		row.ID,
-	); err != nil {
-		return false, fmt.Errorf("improvement collector store: insert dedup: %w", err)
-	}
-	if err := saveImprovementCursor(ctx, conn, row); err != nil {
-		return false, err
-	}
-	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
-		return false, fmt.Errorf("improvement collector store: commit: %w", err)
-	}
-	committed = true
-	return true, nil
-}
-
-func saveImprovementCursor(ctx context.Context, conn *sql.Conn, row ImprovementFeedbackRow) error {
-	_, err := conn.ExecContext(ctx,
-		`INSERT INTO improvement_ingestion_cursor(name, created_at, feedback_id)
-		VALUES (?, ?, ?)
-		ON CONFLICT(name) DO UPDATE SET created_at = excluded.created_at, feedback_id = excluded.feedback_id`,
-		"default",
-		row.CreatedAt.UTC().Format(time.RFC3339Nano),
-		row.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("improvement collector store: save cursor: %w", err)
-	}
-	return nil
+type normalizedImprovementFeedbackRecord struct {
+	Entry  domain.InsightEntry
+	Signal NormalizedImprovementSignal
 }
 
 func (c *ImprovementCollector) PollOnce(ctx context.Context, limit int) (int, error) {
@@ -232,7 +78,8 @@ func (c *ImprovementCollector) PollOnce(ctx context.Context, limit int) (int, er
 		ProjectID:     c.ProjectID,
 		CreatedAfter:  cursor.CreatedAt,
 		AfterFeedback: cursor.FeedbackID,
-		Limit:         limit,
+		Limit:         improvementCollectorQueryLimit(limit, c.QueryLimit),
+		FeedbackTypes: c.AllowedFeedbackTypes,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("improvement collector: query feedback: %w", err)
@@ -246,9 +93,12 @@ func (c *ImprovementCollector) PollOnce(ctx context.Context, limit int) (int, er
 
 	processed := 0
 	for _, row := range rows {
-		entry := normalizeImprovementFeedback(row)
-		applied, err := c.Store.ApplyFeedback(ctx, row, func() error {
-			return c.Ledger.Append("improvement-loop.md", "improvement-loop", "amadeus", entry)
+		if !improvementFeedbackTypeAllowed(c.AllowedFeedbackTypes, row.FeedbackType) {
+			continue
+		}
+		record := normalizeImprovementFeedbackRecord(row)
+		applied, err := c.Store.ApplyFeedback(ctx, row, record.Signal, func() error {
+			return c.Ledger.Append("improvement-loop.md", "improvement-loop", "amadeus", record.Entry)
 		})
 		if err != nil {
 			return processed, err
@@ -260,7 +110,34 @@ func (c *ImprovementCollector) PollOnce(ctx context.Context, limit int) (int, er
 	return processed, nil
 }
 
+func improvementCollectorQueryLimit(runtimeLimit, configuredLimit int) int {
+	if runtimeLimit > 0 {
+		return runtimeLimit
+	}
+	if configuredLimit > 0 {
+		return configuredLimit
+	}
+	return 100
+}
+
+func improvementFeedbackTypeAllowed(allowed []string, feedbackType string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	normalized := normalizeImprovementToken(feedbackType)
+	for _, candidate := range allowed {
+		if normalizeImprovementToken(candidate) == normalized {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizeImprovementFeedback(row ImprovementFeedbackRow) domain.InsightEntry {
+	return normalizeImprovementFeedbackRecord(row).Entry
+}
+
+func normalizeImprovementFeedbackRecord(row ImprovementFeedbackRow) normalizedImprovementFeedbackRecord {
 	surface := detectImprovementSurface(row)
 	meta := domain.CorrectionMetadata{
 		SchemaVersion: domain.ImprovementSchemaVersion,
@@ -268,6 +145,13 @@ func normalizeImprovementFeedback(row ImprovementFeedbackRow) domain.InsightEntr
 		Severity:      domain.NormalizeSeverity(domain.Severity(payloadString(row.Payload, "severity"))),
 		SecondaryType: payloadString(row.Payload, "secondary_type"),
 		TargetAgent:   payloadString(row.Payload, "target_agent"),
+		RoutingMode:   domain.NormalizeRoutingMode(domain.RoutingMode(payloadString(row.Payload, "routing_mode"))),
+		RoutingHistory: domain.ParseImprovementHistory(
+			payloadString(row.Payload, "routing_history"),
+		),
+		OwnerHistory: domain.ParseImprovementHistory(
+			payloadString(row.Payload, "owner_history"),
+		),
 		CorrelationID: payloadString(row.Payload, "correlation_id"),
 		TraceID:       payloadString(row.Payload, "trace_id"),
 		Outcome:       domain.NormalizeImprovementOutcome(domain.ImprovementOutcome(payloadString(row.Payload, "outcome"))),
@@ -348,6 +232,12 @@ func normalizeImprovementFeedback(row ImprovementFeedbackRow) domain.InsightEntr
 	if meta.TargetAgent != "" {
 		entry.Extra["target-agent"] = meta.TargetAgent
 	}
+	if len(meta.RoutingHistory) > 0 {
+		entry.Extra["routing-history"] = domain.FormatImprovementHistory(meta.RoutingHistory)
+	}
+	if len(meta.OwnerHistory) > 0 {
+		entry.Extra["owner-history"] = domain.FormatImprovementHistory(meta.OwnerHistory)
+	}
 	if meta.CorrectiveAction != "" {
 		entry.Extra["corrective-action"] = meta.CorrectiveAction
 	}
@@ -375,7 +265,35 @@ func normalizeImprovementFeedback(row ImprovementFeedbackRow) domain.InsightEntr
 	if ignoredReason != "" {
 		entry.Extra["ignored-reason"] = ignoredReason
 	}
-	return entry
+	return normalizedImprovementFeedbackRecord{
+		Entry: entry,
+		Signal: NormalizedImprovementSignal{
+			DedupKey:         improvementFeedbackDedupKey(row),
+			FeedbackID:       row.ID,
+			ProjectID:        row.ProjectID,
+			WeaveRef:         row.WeaveRef,
+			FeedbackType:     row.FeedbackType,
+			SourceSurface:    string(surface),
+			SchemaVersion:    meta.ConsumerSchemaVersion(),
+			FailureType:      string(meta.FailureType),
+			Severity:         string(domain.NormalizeSeverity(meta.Severity)),
+			SecondaryType:    meta.SecondaryType,
+			TargetAgent:      meta.TargetAgent,
+			RoutingMode:      string(domain.NormalizeRoutingMode(meta.RoutingMode)),
+			RoutingHistory:   append([]string(nil), meta.RoutingHistory...),
+			OwnerHistory:     append([]string(nil), meta.OwnerHistory...),
+			RecurrenceCount:  meta.RecurrenceCount,
+			CorrectiveAction: meta.CorrectiveAction,
+			RetryAllowed:     meta.RetryAllowed,
+			EscalationReason: meta.EscalationReason,
+			CorrelationID:    meta.CorrelationID,
+			TraceID:          meta.TraceID,
+			Outcome:          string(meta.Outcome),
+			IgnoredReason:    ignoredReason,
+			PayloadJSON:      marshalImprovementPayload(row.Payload),
+			CreatedAt:        row.CreatedAt.UTC(),
+		},
+	}
 }
 
 func detectImprovementSurface(row ImprovementFeedbackRow) improvementSignalSurface {

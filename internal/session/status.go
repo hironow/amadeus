@@ -5,15 +5,18 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // Status collects current operational status from the event store and filesystem.
 // gateDir is the .gate/ directory path (e.g. "<repo>/.gate").
 func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.StatusReport {
 	var report domain.StatusReport
+	applyLatestProviderMetadata(ctx, gateDir, &report)
 
 	// Count inbox files
 	report.InboxCount = countDirFiles(gateDir, "inbox")
@@ -72,6 +75,33 @@ func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.St
 	report.Trend = domain.AnalyzeDivergenceTrend(checkResults)
 
 	return report
+}
+
+func applyLatestProviderMetadata(ctx context.Context, gateDir string, report *domain.StatusReport) {
+	dbPath := filepath.Join(gateDir, ".run", "sessions.db")
+	store, err := NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+	records, err := store.List(ctx, port.ListSessionOpts{Limit: 1})
+	if err != nil || len(records) == 0 {
+		return
+	}
+	meta := records[0].Metadata
+	report.ProviderState = meta[domain.MetadataProviderState]
+	report.ProviderReason = meta[domain.MetadataProviderReason]
+	if budget := meta[domain.MetadataProviderRetryBudget]; budget != "" {
+		if n, err := strconv.Atoi(budget); err == nil {
+			report.ProviderRetryBudget = n
+		}
+	}
+	if resumeAt := meta[domain.MetadataProviderResumeAt]; resumeAt != "" {
+		if ts, err := time.Parse(time.RFC3339, resumeAt); err == nil {
+			report.ProviderResumeAt = ts
+		}
+	}
+	report.ProviderResumeWhen = meta[domain.MetadataProviderResumeWhen]
 }
 
 // countDirFiles returns the number of non-directory entries in a subdirectory of gateDir.
