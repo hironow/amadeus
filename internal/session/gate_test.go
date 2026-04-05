@@ -571,3 +571,43 @@ func TestRunCheck_FeedbackDMail_PreservesRetryRoutingMetadata(t *testing.T) {
 
 	t.Fatal("expected retry metadata with target agent")
 }
+
+func TestRunCheck_FeedbackDMail_EscalationKeepsHandoffOwner(t *testing.T) {
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
+
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
+
+	var driftErr *domain.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected feedback D-Mail")
+	}
+
+	for _, dmail := range dmails {
+		meta := domain.CorrectionMetadataFromMap(dmail.Metadata)
+		if meta.RoutingMode != domain.RoutingModeEscalate {
+			continue
+		}
+		if meta.TargetAgent == "" {
+			t.Fatal("TargetAgent = empty, want explicit handoff owner")
+		}
+		if meta.Severity != domain.SeverityHigh {
+			t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
+		}
+		return
+	}
+
+	t.Fatal("expected escalated corrective metadata")
+}
