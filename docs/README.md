@@ -4,6 +4,7 @@
 
 - [conformance.md](conformance.md) — What/Why/How conformance table (single source), including harness layer architecture
 - [gate-directory.md](gate-directory.md) — `.gate/` directory structure specification
+- [self-improvement-loop.md](self-improvement-loop.md) — How amadeus participates in the observable self-improvement loop
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
 - Claude subprocess isolation: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it

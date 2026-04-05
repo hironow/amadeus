@@ -8,6 +8,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// white-box-reason: session internals: tests unexported corrective metadata decision helper
+
 func TestDMailCorrectionMetadata_AllowsRetryForFirstMediumPass(t *testing.T) {
 	meta := dmailCorrectionMetadata(
 		domain.ClaudeDMailCandidate{Category: "implementation", Action: "retry"},
