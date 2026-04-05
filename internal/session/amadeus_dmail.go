@@ -70,6 +70,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 	// mis-threading feedback across different waves.
 	triggerRound := 0
 	var triggerWave *domain.WaveReference
+	triggerCorrection := domain.CorrectionMetadata{}
 	wavedReportCount := 0
 	for _, d := range inboxDMails {
 		if d.Kind == domain.KindReport {
@@ -79,6 +80,9 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 			if d.Wave != nil {
 				wavedReportCount++
 				triggerWave = d.Wave
+			}
+			if meta := domain.CorrectionMetadataFromMap(d.Metadata); meta.SchemaVersion != "" {
+				triggerCorrection = meta
 			}
 		}
 	}
@@ -114,6 +118,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 					sanitized = append(sanitized, req)
 				}
 			}
+			correctionMeta := dmailCorrectionMetadata(candidate, kind, name, meterResult.Divergence.Severity, triggerWave, triggerRound, triggerCorrection, span3)
 			dmail := domain.DMail{
 				SchemaVersion: domain.DMailSchemaVersion,
 				Name:          name,
@@ -121,19 +126,10 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				Description:   candidate.Description,
 				Issues:        candidate.Issues,
 				Severity:      meterResult.Divergence.Severity,
-				Action:        domain.DMailAction(candidate.Action),
+				Action:        domain.DMailAction(correctionMeta.CorrectiveAction),
 				Targets:       sanitized,
 				Wave:          triggerWave, // S01: propagate wave reference from triggering report
-				Metadata: domain.CorrectionMetadata{
-					FailureType:      failureTypeForCandidate(candidate),
-					SecondaryType:    strings.ToLower(candidate.Category),
-					TargetAgent:      targetAgentForKind(kind),
-					RecurrenceCount:  triggerRound,
-					CorrectiveAction: candidate.Action,
-					CorrelationID:    correlationIDForDMail(name, triggerWave),
-					TraceID:          span3.SpanContext().TraceID().String(),
-					Outcome:          domain.ImprovementOutcomePending,
-				}.Apply(map[string]string{
+				Metadata: correctionMeta.Apply(map[string]string{
 					"created_at":     now.Format(time.RFC3339),
 					"feedback_round": strconv.Itoa(nextRound),
 				}),
@@ -252,6 +248,75 @@ func targetAgentForKind(kind domain.DMailKind) string {
 	default:
 		return ""
 	}
+}
+
+func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, severity domain.Severity, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, span trace.Span) domain.CorrectionMetadata {
+	recurrenceCount := triggerRound
+	meta := domain.CorrectionMetadata{
+		FailureType:     failureTypeForCandidate(candidate),
+		SecondaryType:   strings.ToLower(candidate.Category),
+		RecurrenceCount: recurrenceCount,
+		CorrelationID:   correlationIDForDMail(name, wave),
+		TraceID:         span.SpanContext().TraceID().String(),
+		Outcome:         domain.ImprovementOutcomePending,
+	}
+	if trigger.SchemaVersion != "" {
+		meta.SchemaVersion = trigger.SchemaVersion
+		if trigger.FailureType != "" {
+			meta.FailureType = trigger.FailureType
+		}
+		if trigger.SecondaryType != "" {
+			meta.SecondaryType = trigger.SecondaryType
+		}
+		if trigger.CorrelationID != "" {
+			meta.CorrelationID = trigger.CorrelationID
+		}
+		recurrenceCount = trigger.RecurrenceCount + 1
+		meta.RecurrenceCount = recurrenceCount
+		meta.Outcome = domain.ImprovementOutcomeFailedAgain
+	}
+	action, targetAgent, retryAllowed, escalationReason := correctionDecision(kind, severity, candidate, recurrenceCount, trigger)
+	meta.TargetAgent = targetAgent
+	meta.CorrectiveAction = string(action)
+	meta.RetryAllowed = retryAllowed
+	meta.EscalationReason = escalationReason
+	return meta
+}
+
+func correctionDecision(kind domain.DMailKind, severity domain.Severity, candidate domain.ClaudeDMailCandidate, recurrenceCount int, trigger domain.CorrectionMetadata) (domain.DMailAction, string, *bool, string) {
+	action := domain.DMailAction(candidate.Action)
+	explicitAction := action != ""
+	if action == "" {
+		action = domain.DefaultDMailAction(severity)
+	}
+	targetAgent := targetAgentForKind(kind)
+	retryAllowed := domain.BoolPtr(action != domain.ActionEscalate)
+	escalationReason := ""
+
+	if trigger.RetryAllowed != nil && !*trigger.RetryAllowed {
+		return domain.ActionEscalate, "", domain.BoolPtr(false), fallbackEscalationReason(trigger.EscalationReason)
+	}
+	switch {
+	case recurrenceCount >= 2:
+		return domain.ActionEscalate, "", domain.BoolPtr(false), "recurrence-threshold"
+	case explicitAction && action == domain.ActionEscalate:
+		return action, "", domain.BoolPtr(false), "candidate-requested-escalation"
+	case explicitAction:
+		return action, targetAgent, domain.BoolPtr(true), ""
+	case domain.NormalizeSeverity(severity) == domain.SeverityHigh:
+		return domain.ActionEscalate, "", domain.BoolPtr(false), "high-severity"
+	case action == domain.ActionEscalate:
+		return action, "", domain.BoolPtr(false), "candidate-requested-escalation"
+	default:
+		return action, targetAgent, retryAllowed, escalationReason
+	}
+}
+
+func fallbackEscalationReason(reason string) string {
+	if reason == "" {
+		return "retry-disabled"
+	}
+	return reason
 }
 
 func correlationIDForDMail(name string, wave *domain.WaveReference) string {

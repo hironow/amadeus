@@ -18,9 +18,9 @@ var ErrCircuitOpen = errors.New("circuit breaker open: rate limit or server erro
 type circuitState int
 
 const (
-	circuitClosed  circuitState = iota // normal operation
-	circuitOpen                        // blocking calls
-	circuitHalfOpen                    // probing
+	circuitClosed   circuitState = iota // normal operation
+	circuitOpen                         // blocking calls
+	circuitHalfOpen                     // probing
 )
 
 // defaultBackoffBase is the initial wait duration when reset time is unknown.
@@ -40,6 +40,7 @@ type CircuitBreaker struct {
 	logger         domain.Logger
 	tripped        int
 	lastTrip       time.Time
+	lastReason     string
 	notify         chan struct{} // closed on state change to wake blocked Allow() callers
 }
 
@@ -144,6 +145,7 @@ func (cb *CircuitBreaker) RecordProviderError(info domain.ProviderErrorInfo) {
 		cb.backoffCurrent = defaultBackoffMax
 	}
 	cb.resetAt = info.ResetAt
+	cb.lastReason = providerPauseReason(info.Kind)
 	cb.stateChanged()
 
 	if !cb.resetAt.IsZero() {
@@ -166,6 +168,7 @@ func (cb *CircuitBreaker) RecordSuccess() {
 	}
 	cb.state = circuitClosed
 	cb.resetAt = time.Time{}
+	cb.lastReason = ""
 }
 
 // IsOpen returns true if the circuit breaker is in the open state.
@@ -198,4 +201,49 @@ func (cb *CircuitBreaker) String() string {
 		return "HALF_OPEN"
 	}
 	return "UNKNOWN"
+}
+
+func (cb *CircuitBreaker) Snapshot() domain.ProviderStateSnapshot {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	switch cb.state {
+	case circuitClosed:
+		return domain.ActiveProviderState()
+	case circuitHalfOpen:
+		return domain.ProviderStateSnapshot{
+			State:           domain.ProviderStateDegraded,
+			Reason:          "probe",
+			RetryBudget:     1,
+			ResumeCondition: "probe-succeeds",
+		}
+	case circuitOpen:
+		snapshot := domain.ProviderStateSnapshot{
+			State:       domain.ProviderStateWaiting,
+			RetryBudget: 0,
+		}
+		if !cb.resetAt.IsZero() {
+			snapshot.State = domain.ProviderStatePaused
+			snapshot.Reason = cb.lastReason
+			snapshot.ResumeAt = cb.resetAt
+			snapshot.ResumeCondition = "provider-reset-window"
+			return snapshot
+		}
+		snapshot.Reason = cb.lastReason
+		snapshot.ResumeCondition = "backoff-elapses"
+		return snapshot
+	default:
+		return domain.ActiveProviderState()
+	}
+}
+
+func providerPauseReason(kind domain.ProviderErrorKind) string {
+	switch kind {
+	case domain.ProviderErrorRateLimit:
+		return "rate_limit"
+	case domain.ProviderErrorServer:
+		return "server_error"
+	default:
+		return "provider_error"
+	}
 }

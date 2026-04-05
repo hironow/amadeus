@@ -90,6 +90,54 @@ func TestWriteDivergenceInsight_CreatesFile(t *testing.T) {
 	}
 }
 
+func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	insightsDir := filepath.Join(dir, "insights")
+	runDir := filepath.Join(dir, ".run")
+	os.MkdirAll(insightsDir, 0o755)
+	os.MkdirAll(runDir, 0o755)
+
+	writer := session.NewInsightWriter(insightsDir, runDir)
+	a := &session.Amadeus{
+		Logger:   &domain.NopLogger{},
+		Insights: writer,
+	}
+	inbox := []domain.DMail{{
+		Name: "pt-report-1",
+		Kind: domain.KindReport,
+		Metadata: domain.CorrectionMetadata{
+			FailureType:      domain.FailureTypeExecutionFailure,
+			CorrelationID:    "corr-1",
+			TraceID:          "trace-1",
+			CorrectiveAction: "retry",
+		}.Apply(nil),
+	}}
+
+	session.ExportWriteImprovementOutcomeInsight(a, inbox, "abc123", 0)
+
+	data, err := os.ReadFile(filepath.Join(insightsDir, "improvement-loop.md"))
+	if err != nil {
+		t.Fatalf("expected improvement-loop.md to exist: %v", err)
+	}
+	file, err := domain.UnmarshalInsightFile(data)
+	if err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if len(file.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(file.Entries))
+	}
+	entry := file.Entries[0]
+	if entry.Title != "improvement-corr-1-resolved" {
+		t.Fatalf("title = %q", entry.Title)
+	}
+	if entry.Extra["outcome"] != "resolved" {
+		t.Fatalf("outcome = %q, want resolved", entry.Extra["outcome"])
+	}
+	if entry.Extra["correlation-id"] != "corr-1" {
+		t.Fatalf("correlation-id = %q, want corr-1", entry.Extra["correlation-id"])
+	}
+}
+
 func TestWriteDivergenceInsight_NilInsightsSkips(t *testing.T) {
 	// given: Amadeus with nil Insights
 	a := &session.Amadeus{
@@ -215,10 +263,10 @@ func TestWriteConvergenceInsight_IncludesDMailDescriptions(t *testing.T) {
 	}
 
 	alert := domain.ConvergenceAlert{
-		Target:   "internal/domain/scoring.go",
-		Count:    3,
-		Window:   7,
-		DMails:   []string{"dmail-001", "dmail-002"},
+		Target: "internal/domain/scoring.go",
+		Count:  3,
+		Window: 7,
+		DMails: []string{"dmail-001", "dmail-002"},
 		Descriptions: map[string]string{
 			"dmail-001": "ADR-003 violation in auth module",
 			"dmail-002": "Dependency drift in logging subsystem",
