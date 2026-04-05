@@ -250,6 +250,17 @@ func targetAgentForKind(kind domain.DMailKind) string {
 	}
 }
 
+func correctiveTargetAgentForFailure(kind domain.DMailKind, failureType domain.FailureType) string {
+	switch failureType {
+	case domain.FailureTypeScopeViolation, domain.FailureTypeMissingAcceptance:
+		return "sightjack"
+	case domain.FailureTypeExecutionFailure, domain.FailureTypeProviderFailure, domain.FailureTypeRoutingFailure:
+		return "paintress"
+	default:
+		return targetAgentForKind(kind)
+	}
+}
+
 func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, severity domain.Severity, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, span trace.Span) domain.CorrectionMetadata {
 	recurrenceCount := triggerRound
 	meta := domain.CorrectionMetadata{
@@ -277,7 +288,8 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 		meta.RecurrenceCount = recurrenceCount
 		meta.Outcome = domain.ImprovementOutcomeFailedAgain
 	}
-	action, targetAgent, retryAllowed, escalationReason := correctionDecision(kind, severity, candidate, recurrenceCount, trigger)
+	action, routingMode, targetAgent, retryAllowed, escalationReason := correctionDecision(kind, severity, candidate, meta.FailureType, recurrenceCount, trigger)
+	meta.RoutingMode = routingMode
 	meta.TargetAgent = targetAgent
 	meta.CorrectiveAction = string(action)
 	meta.RetryAllowed = retryAllowed
@@ -286,33 +298,45 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 	return meta
 }
 
-func correctionDecision(kind domain.DMailKind, severity domain.Severity, candidate domain.ClaudeDMailCandidate, recurrenceCount int, trigger domain.CorrectionMetadata) (domain.DMailAction, string, *bool, string) {
+func correctionDecision(kind domain.DMailKind, severity domain.Severity, candidate domain.ClaudeDMailCandidate, failureType domain.FailureType, recurrenceCount int, trigger domain.CorrectionMetadata) (domain.DMailAction, domain.RoutingMode, string, *bool, string) {
 	action := domain.DMailAction(candidate.Action)
 	explicitAction := action != ""
 	if action == "" {
 		action = domain.DefaultDMailAction(severity)
 	}
-	targetAgent := targetAgentForKind(kind)
-	retryAllowed := domain.BoolPtr(action != domain.ActionEscalate)
-	escalationReason := ""
+	targetAgent := correctiveTargetAgentForFailure(kind, failureType)
+	defaultTarget := targetAgentForKind(kind)
 
 	if trigger.RetryAllowed != nil && !*trigger.RetryAllowed {
-		return domain.ActionEscalate, "", domain.BoolPtr(false), fallbackEscalationReason(trigger.EscalationReason)
+		return domain.ActionEscalate, domain.RoutingModeEscalate, "", domain.BoolPtr(false), fallbackEscalationReason(trigger.EscalationReason)
 	}
 	switch {
 	case recurrenceCount >= 2:
-		return domain.ActionEscalate, "", domain.BoolPtr(false), "recurrence-threshold"
+		return domain.ActionEscalate, domain.RoutingModeEscalate, "", domain.BoolPtr(false), "recurrence-threshold"
 	case explicitAction && action == domain.ActionEscalate:
-		return action, "", domain.BoolPtr(false), "candidate-requested-escalation"
+		return action, domain.RoutingModeEscalate, "", domain.BoolPtr(false), "candidate-requested-escalation"
 	case explicitAction:
-		return action, targetAgent, domain.BoolPtr(true), ""
+		if targetAgent == "" {
+			targetAgent = defaultTarget
+		}
+		routingMode := domain.RoutingModeRetry
+		if targetAgent != "" && defaultTarget != "" && targetAgent != defaultTarget {
+			routingMode = domain.RoutingModeReroute
+		}
+		return action, routingMode, targetAgent, domain.BoolPtr(true), ""
 	case domain.NormalizeSeverity(severity) == domain.SeverityHigh:
-		return domain.ActionEscalate, "", domain.BoolPtr(false), "high-severity"
+		return domain.ActionEscalate, domain.RoutingModeEscalate, "", domain.BoolPtr(false), "high-severity"
 	case action == domain.ActionEscalate:
-		return action, "", domain.BoolPtr(false), "candidate-requested-escalation"
-	default:
-		return action, targetAgent, retryAllowed, escalationReason
+		return action, domain.RoutingModeEscalate, "", domain.BoolPtr(false), "candidate-requested-escalation"
 	}
+	if targetAgent == "" {
+		targetAgent = defaultTarget
+	}
+	routingMode := domain.RoutingModeRetry
+	if targetAgent != "" && defaultTarget != "" && targetAgent != defaultTarget {
+		routingMode = domain.RoutingModeReroute
+	}
+	return action, routingMode, targetAgent, domain.BoolPtr(true), ""
 }
 
 func fallbackEscalationReason(reason string) string {

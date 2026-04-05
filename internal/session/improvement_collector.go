@@ -351,6 +351,9 @@ func normalizeImprovementFeedback(row ImprovementFeedbackRow) domain.InsightEntr
 	if meta.CorrectiveAction != "" {
 		entry.Extra["corrective-action"] = meta.CorrectiveAction
 	}
+	if meta.RoutingMode != "" {
+		entry.Extra["routing-mode"] = string(domain.NormalizeRoutingMode(meta.RoutingMode))
+	}
 	if meta.CorrelationID != "" {
 		entry.Extra["correlation-id"] = meta.CorrelationID
 	}
