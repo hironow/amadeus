@@ -81,7 +81,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				wavedReportCount++
 				triggerWave = d.Wave
 			}
-			if meta := domain.CorrectionMetadataFromMap(d.Metadata); meta.SchemaVersion != "" {
+			if meta := domain.CorrectionMetadataFromMap(d.Metadata); meta.IsImprovement() && meta.HasSupportedVocabulary() {
 				triggerCorrection = meta
 			}
 		}
@@ -253,15 +253,17 @@ func targetAgentForKind(kind domain.DMailKind) string {
 func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, severity domain.Severity, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, span trace.Span) domain.CorrectionMetadata {
 	recurrenceCount := triggerRound
 	meta := domain.CorrectionMetadata{
+		SchemaVersion:   domain.ImprovementSchemaVersion,
 		FailureType:     failureTypeForCandidate(candidate),
+		Severity:        domain.NormalizeSeverity(severity),
 		SecondaryType:   strings.ToLower(candidate.Category),
 		RecurrenceCount: recurrenceCount,
 		CorrelationID:   correlationIDForDMail(name, wave),
 		TraceID:         span.SpanContext().TraceID().String(),
 		Outcome:         domain.ImprovementOutcomePending,
 	}
-	if trigger.SchemaVersion != "" {
-		meta.SchemaVersion = trigger.SchemaVersion
+	if trigger.IsImprovement() {
+		meta.SchemaVersion = trigger.ConsumerSchemaVersion()
 		if trigger.FailureType != "" {
 			meta.FailureType = trigger.FailureType
 		}
@@ -280,6 +282,7 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 	meta.CorrectiveAction = string(action)
 	meta.RetryAllowed = retryAllowed
 	meta.EscalationReason = escalationReason
+	meta.Outcome = correctionOutcome(action, trigger)
 	return meta
 }
 
@@ -317,6 +320,16 @@ func fallbackEscalationReason(reason string) string {
 		return "retry-disabled"
 	}
 	return reason
+}
+
+func correctionOutcome(action domain.DMailAction, trigger domain.CorrectionMetadata) domain.ImprovementOutcome {
+	if action == domain.ActionEscalate {
+		return domain.ImprovementOutcomeEscalated
+	}
+	if trigger.IsImprovement() {
+		return domain.ImprovementOutcomeFailedAgain
+	}
+	return domain.ImprovementOutcomePending
 }
 
 func correlationIDForDMail(name string, wave *domain.WaveReference) string {

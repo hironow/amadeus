@@ -105,12 +105,13 @@ func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
 	inbox := []domain.DMail{{
 		Name: "pt-report-1",
 		Kind: domain.KindReport,
-		Metadata: domain.CorrectionMetadata{
-			FailureType:      domain.FailureTypeExecutionFailure,
-			CorrelationID:    "corr-1",
-			TraceID:          "trace-1",
-			CorrectiveAction: "retry",
-		}.Apply(nil),
+		Metadata: map[string]string{
+			domain.MetadataFailureType:      string(domain.FailureTypeExecutionFailure),
+			domain.MetadataSeverity:         string(domain.SeverityHigh),
+			domain.MetadataCorrelationID:    "corr-1",
+			domain.MetadataTraceID:          "trace-1",
+			domain.MetadataCorrectiveAction: "retry",
+		},
 	}}
 
 	session.ExportWriteImprovementOutcomeInsight(a, inbox, "abc123", 0)
@@ -135,6 +136,9 @@ func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
 	}
 	if entry.Extra["correlation-id"] != "corr-1" {
 		t.Fatalf("correlation-id = %q, want corr-1", entry.Extra["correlation-id"])
+	}
+	if entry.Extra["severity"] != string(domain.SeverityHigh) {
+		t.Fatalf("severity = %q, want %q", entry.Extra["severity"], domain.SeverityHigh)
 	}
 }
 

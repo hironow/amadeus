@@ -9,6 +9,7 @@ import (
 func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	meta := domain.CorrectionMetadata{
 		FailureType:      domain.FailureTypeExecutionFailure,
+		Severity:         domain.SeverityMedium,
 		SecondaryType:    "implementation",
 		TargetAgent:      "paintress",
 		RecurrenceCount:  2,
@@ -25,6 +26,9 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 
 	if got.FailureType != meta.FailureType {
 		t.Fatalf("FailureType = %q, want %q", got.FailureType, meta.FailureType)
+	}
+	if got.Severity != meta.Severity {
+		t.Fatalf("Severity = %q, want %q", got.Severity, meta.Severity)
 	}
 	if got.TargetAgent != "paintress" {
 		t.Fatalf("TargetAgent = %q, want paintress", got.TargetAgent)
@@ -43,6 +47,9 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	}
 	if applied[domain.MetadataImprovementSchemaVersion] != domain.ImprovementSchemaVersion {
 		t.Fatalf("schema version = %q, want %q", applied[domain.MetadataImprovementSchemaVersion], domain.ImprovementSchemaVersion)
+	}
+	if applied[domain.MetadataSeverity] != string(domain.SeverityMedium) {
+		t.Fatalf("severity = %q, want %q", applied[domain.MetadataSeverity], domain.SeverityMedium)
 	}
 }
 
@@ -70,5 +77,41 @@ func TestCorrectionMetadataForwardForRecheck(t *testing.T) {
 	}
 	if got.RetryAllowed != nil {
 		t.Fatalf("RetryAllowed = %v, want nil", *got.RetryAllowed)
+	}
+}
+
+func TestCorrectionMetadataFromMap_LegacyV1WithoutSchemaVersion(t *testing.T) {
+	got := domain.CorrectionMetadataFromMap(map[string]string{
+		domain.MetadataFailureType: "execution_failure",
+		domain.MetadataSeverity:    "HIGH",
+		domain.MetadataOutcome:     "FAILED_AGAIN",
+	})
+
+	if !got.IsImprovement() {
+		t.Fatal("IsImprovement = false, want true")
+	}
+	if got.ConsumerSchemaVersion() != domain.ImprovementSchemaVersion {
+		t.Fatalf("ConsumerSchemaVersion = %q, want %q", got.ConsumerSchemaVersion(), domain.ImprovementSchemaVersion)
+	}
+	if got.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", got.Severity, domain.SeverityHigh)
+	}
+	if got.Outcome != domain.ImprovementOutcomeFailedAgain {
+		t.Fatalf("Outcome = %q, want %q", got.Outcome, domain.ImprovementOutcomeFailedAgain)
+	}
+	if !got.HasSupportedVocabulary() {
+		t.Fatal("HasSupportedVocabulary = false, want true")
+	}
+}
+
+func TestCorrectionMetadataHasSupportedVocabulary_RejectsUnknownOutcome(t *testing.T) {
+	meta := domain.CorrectionMetadata{
+		FailureType: domain.FailureTypeExecutionFailure,
+		Severity:    domain.SeverityMedium,
+		Outcome:     domain.ImprovementOutcome("not-real"),
+	}
+
+	if meta.HasSupportedVocabulary() {
+		t.Fatal("HasSupportedVocabulary = true, want false")
 	}
 }

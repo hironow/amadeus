@@ -65,6 +65,29 @@ just test-weave-live
 endpoint and verifies the exporter completes without error. Skipped when
 `WANDB_API_KEY` is not set.
 
+## Improvement collector
+
+`amadeus run` also enables the Weave feedback collector automatically when:
+
+- `WANDB_API_KEY` is set
+- and either `WEAVE_PROJECT_ID` / `WANDB_PROJECT_ID`, or `WANDB_ENTITY` + `WANDB_PROJECT` are set
+
+The collector polls Weave feedback, stores cursor/dedup state in
+`.gate/.run/improvement-ingestion.db`, and appends normalized entries to
+`.gate/insights/improvement-loop.md`.
+
+The normalizer now accepts these surface shapes from Weave payloads:
+
+- feedback rows with explicit improvement metadata
+- CI outcome rows (`ci_status`, `workflow_name`, `run_id`, ...)
+- PR outcome rows (`pr_number`, `pr_state`, `review_decision`, ...)
+- scorer outcome rows (`scorer_verdict`, `divergence_severity`, ...)
+- trace outcome rows (`trace_status`, `trace_name`, `trace_summary`, ...)
+
+When a payload omits `failure_type` or `outcome`, amadeus applies a small
+surface-specific fallback so the improvement ledger can still record a
+normalized event instead of dropping the signal immediately.
+
 | Attribute | Value |
 |-----------|-------|
 | OTLP Endpoint | `https://trace.wandb.ai/otel` |
