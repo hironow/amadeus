@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -123,10 +124,19 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				Action:        domain.DMailAction(candidate.Action),
 				Targets:       sanitized,
 				Wave:          triggerWave, // S01: propagate wave reference from triggering report
-				Metadata: map[string]string{
+				Metadata: domain.CorrectionMetadata{
+					FailureType:      failureTypeForCandidate(candidate),
+					SecondaryType:    strings.ToLower(candidate.Category),
+					TargetAgent:      targetAgentForKind(kind),
+					RecurrenceCount:  triggerRound,
+					CorrectiveAction: candidate.Action,
+					CorrelationID:    correlationIDForDMail(name, triggerWave),
+					TraceID:          span3.SpanContext().TraceID().String(),
+					Outcome:          domain.ImprovementOutcomePending,
+				}.Apply(map[string]string{
 					"created_at":     now.Format(time.RFC3339),
 					"feedback_round": strconv.Itoa(nextRound),
-				},
+				}),
 				Body: candidate.Detail + formatADRViolations(meterResult),
 			}
 			if dmail.Action == "" {
@@ -220,4 +230,36 @@ func formatADRViolations(meterResult domain.MeterResult) string {
 		return ""
 	}
 	return "\n\n" + section
+}
+
+func failureTypeForCandidate(candidate domain.ClaudeDMailCandidate) domain.FailureType {
+	switch strings.ToLower(candidate.Category) {
+	case "design":
+		return domain.FailureTypeScopeViolation
+	case "implementation":
+		return domain.FailureTypeExecutionFailure
+	default:
+		return domain.FailureTypeNone
+	}
+}
+
+func targetAgentForKind(kind domain.DMailKind) string {
+	switch kind {
+	case domain.KindDesignFeedback:
+		return "sightjack"
+	case domain.KindImplFeedback:
+		return "paintress"
+	default:
+		return ""
+	}
+}
+
+func correlationIDForDMail(name string, wave *domain.WaveReference) string {
+	if wave != nil && wave.ID != "" {
+		if wave.Step != "" {
+			return wave.ID + ":" + wave.Step
+		}
+		return wave.ID
+	}
+	return name
 }
