@@ -69,8 +69,8 @@ func TestDMailCorrectionMetadata_EscalatesHighSeverity(t *testing.T) {
 	if meta.Severity != domain.SeverityHigh {
 		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
 	}
-	if meta.TargetAgent != "" {
-		t.Fatalf("TargetAgent = %q, want empty", meta.TargetAgent)
+	if meta.TargetAgent != "paintress" {
+		t.Fatalf("TargetAgent = %q, want paintress", meta.TargetAgent)
 	}
 	if meta.RoutingMode != domain.RoutingModeEscalate {
 		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeEscalate)
@@ -108,6 +108,12 @@ func TestDMailCorrectionMetadata_EscalatesAfterRecurrenceThreshold(t *testing.T)
 	if meta.CorrectiveAction != string(domain.ActionEscalate) {
 		t.Fatalf("CorrectiveAction = %q, want %q", meta.CorrectiveAction, domain.ActionEscalate)
 	}
+	if meta.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
+	}
+	if meta.TargetAgent != "paintress" {
+		t.Fatalf("TargetAgent = %q, want paintress", meta.TargetAgent)
+	}
 	if meta.RoutingMode != domain.RoutingModeEscalate {
 		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeEscalate)
 	}
@@ -143,8 +149,8 @@ func TestDMailCorrectionMetadata_PreservesLegacyTriggerSchemaAsV1(t *testing.T) 
 	if meta.CorrelationID != "corr-legacy" {
 		t.Fatalf("CorrelationID = %q, want corr-legacy", meta.CorrelationID)
 	}
-	if meta.Severity != domain.SeverityMedium {
-		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityMedium)
+	if meta.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
 	}
 }
 
@@ -171,5 +177,28 @@ func TestDMailCorrectionMetadata_ReroutesImplementationFeedbackToSightjackForDes
 	}
 	if meta.RetryAllowed == nil || !*meta.RetryAllowed {
 		t.Fatal("RetryAllowed = nil/false, want true")
+	}
+}
+
+func TestDMailCorrectionMetadata_EscalatedDesignFailureKeepsSightjackAsHandoffOwner(t *testing.T) {
+	meta := dmailCorrectionMetadata(
+		domain.ClaudeDMailCandidate{Category: "design"},
+		domain.KindImplFeedback,
+		"feedback-6",
+		domain.SeverityHigh,
+		nil,
+		1,
+		domain.CorrectionMetadata{},
+		trace.SpanFromContext(context.Background()),
+	)
+
+	if meta.TargetAgent != "sightjack" {
+		t.Fatalf("TargetAgent = %q, want sightjack", meta.TargetAgent)
+	}
+	if meta.RoutingMode != domain.RoutingModeEscalate {
+		t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeEscalate)
+	}
+	if meta.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
 	}
 }
