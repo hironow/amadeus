@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: session internals: tests Weave HTTP source request shaping and env-based collector wiring
+
 import (
 	"context"
 	"encoding/base64"

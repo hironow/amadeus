@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: session internals: tests collector normalization and SQLite cursor/dedup behavior
+
 import (
 	"context"
 	"os"
