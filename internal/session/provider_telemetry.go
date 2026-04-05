@@ -21,7 +21,7 @@ func providerStateSpanAttrs(snapshot domain.ProviderStateSnapshot) []attribute.K
 		attrs = append(attrs, attribute.String(domain.MetadataProviderReason, platform.SanitizeUTF8(snapshot.Reason)))
 	}
 	if !snapshot.ResumeAt.IsZero() {
-		attrs = append(attrs, attribute.String(domain.MetadataProviderResumeAt, snapshot.ResumeAt.UTC().Format(time.RFC3339)))
+		attrs = append(attrs, attribute.String(domain.MetadataProviderResumeAt, platform.SanitizeUTF8(snapshot.ResumeAt.UTC().Format(time.RFC3339))))
 	}
 	if snapshot.ResumeCondition != "" {
 		attrs = append(attrs, attribute.String(domain.MetadataProviderResumeWhen, platform.SanitizeUTF8(snapshot.ResumeCondition)))

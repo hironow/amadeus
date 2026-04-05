@@ -150,6 +150,7 @@ func TestRetryRunner_RecordsProviderStateOnRetryEvent(t *testing.T) {
 	}
 
 	ctx, span := platform.Tracer.Start(context.Background(), "retry-parent")
+	defer span.End()
 	_, err := runner.Run(ctx, "test", io.Discard)
 	span.End()
 	if err != nil {
@@ -306,6 +307,7 @@ func TestRetryRunner_RecordsProviderStateOnBlockedEvent(t *testing.T) {
 	baseCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	ctx, span := platform.Tracer.Start(baseCtx, "retry-blocked-parent")
+	defer span.End()
 	_, err := runner.Run(ctx, "test", io.Discard)
 	span.End()
 	if !errors.Is(err, context.DeadlineExceeded) {

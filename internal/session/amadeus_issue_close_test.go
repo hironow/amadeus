@@ -1,4 +1,4 @@
-package session
+package session_test
 
 // white-box-reason: tests closeReadyIssues orchestration internals (label listing, close calls, error handling)
 
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 )
 
 // --- issue close test doubles ---
@@ -41,13 +42,13 @@ func TestCloseReadyIssues_ClosesLabeledIssues(t *testing.T) {
 			"sightjack:ready": {"13", "5", "21"},
 		},
 	}
-	a := &Amadeus{
+	a := &session.Amadeus{
 		Logger:      &domain.NopLogger{},
 		IssueWriter: mock,
 	}
 
 	// when
-	a.closeReadyIssues(context.Background(), "sightjack:ready")
+	session.ExportCloseReadyIssues(a, context.Background(), "sightjack:ready")
 
 	// then: all 3 issues closed
 	if len(mock.closed) != 3 {
@@ -66,13 +67,13 @@ func TestCloseReadyIssues_EmptyList(t *testing.T) {
 	mock := &mockIssueWriter{
 		openIssues: map[string][]string{},
 	}
-	a := &Amadeus{
+	a := &session.Amadeus{
 		Logger:      &domain.NopLogger{},
 		IssueWriter: mock,
 	}
 
 	// when
-	a.closeReadyIssues(context.Background(), "sightjack:ready")
+	session.ExportCloseReadyIssues(a, context.Background(), "sightjack:ready")
 
 	// then: no close calls
 	if len(mock.closed) != 0 {
@@ -82,13 +83,13 @@ func TestCloseReadyIssues_EmptyList(t *testing.T) {
 
 func TestCloseReadyIssues_NilIssueWriter(t *testing.T) {
 	// given: IssueWriter is nil (no --base flag)
-	a := &Amadeus{
+	a := &session.Amadeus{
 		Logger:      &domain.NopLogger{},
 		IssueWriter: nil,
 	}
 
 	// when: should not panic
-	a.closeReadyIssues(context.Background(), "sightjack:ready")
+	session.ExportCloseReadyIssues(a, context.Background(), "sightjack:ready")
 }
 
 func TestCloseReadyIssues_EmptyLabel(t *testing.T) {
@@ -98,13 +99,13 @@ func TestCloseReadyIssues_EmptyLabel(t *testing.T) {
 			"sightjack:ready": {"1"},
 		},
 	}
-	a := &Amadeus{
+	a := &session.Amadeus{
 		Logger:      &domain.NopLogger{},
 		IssueWriter: mock,
 	}
 
 	// when
-	a.closeReadyIssues(context.Background(), "")
+	session.ExportCloseReadyIssues(a, context.Background(), "")
 
 	// then: no close calls (empty label = disabled)
 	if len(mock.closed) != 0 {
@@ -123,7 +124,7 @@ func TestCloseReadyIssues_CloseError_ContinuesOthers(t *testing.T) {
 	}
 	// Override CloseIssue to fail on first call only
 	mock.closeErr = nil
-	a := &Amadeus{
+	a := &session.Amadeus{
 		Logger: &domain.NopLogger{},
 		IssueWriter: &failOnceIssueWriter{
 			inner:     mock,
@@ -133,7 +134,7 @@ func TestCloseReadyIssues_CloseError_ContinuesOthers(t *testing.T) {
 	}
 
 	// when
-	a.closeReadyIssues(context.Background(), "sightjack:ready")
+	session.ExportCloseReadyIssues(a, context.Background(), "sightjack:ready")
 
 	// then: 2 of 3 issues closed (first one failed, others continued)
 	if len(mock.closed) != 2 {
@@ -146,13 +147,13 @@ func TestCloseReadyIssues_ListError_NoCloseCalls(t *testing.T) {
 	mock := &mockIssueWriter{
 		listErr: fmt.Errorf("gh list error"),
 	}
-	a := &Amadeus{
+	a := &session.Amadeus{
 		Logger:      &domain.NopLogger{},
 		IssueWriter: mock,
 	}
 
 	// when
-	a.closeReadyIssues(context.Background(), "sightjack:ready")
+	session.ExportCloseReadyIssues(a, context.Background(), "sightjack:ready")
 
 	// then: no close calls
 	if len(mock.closed) != 0 {
@@ -181,4 +182,3 @@ func (f *failOnceIssueWriter) CloseIssue(ctx context.Context, issueNumber, comme
 }
 
 // --- version test ---
-

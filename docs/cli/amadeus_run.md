@@ -42,18 +42,24 @@ amadeus run [path] [flags]
 ### Options
 
 ```
-      --approve-cmd string      external command for approval ({message} placeholder)
-      --auto-approve            skip approval gate
-      --base string             upstream branch for post-merge divergence check
-  -n, --dry-run                 generate prompt only (post-merge)
-  -f, --full                    force full calibration check
-  -h, --help                    help for run
-      --idle-timeout duration   idle timeout — exit after no D-Mail activity (0 = 24h safety cap, negative = disable) (default 30m0s)
-  -j, --json                    output as JSON
-      --no-merge                disable automatic PR merging (only effective with --base)
-      --notify-cmd string       external command for notifications ({title} and {message} placeholders)
-  -q, --quiet                   summary-only output
-      --review-cmd string       code review command after check (exit 0=pass, non-zero=comments)
+      --approve-cmd string                external command for approval ({message} placeholder)
+      --auto-approve                      skip approval gate
+      --base string                       upstream branch for post-merge divergence check
+      --collector-api-url string          override the Weave API base URL for the improvement collector
+      --collector-disable                 disable the improvement collector even when env vars are present
+      --collector-enable                  force-enable the improvement collector
+      --collector-feedback-type strings   restrict the improvement collector to specific feedback types
+      --collector-project-id string       override the Weave/W&B project id for the improvement collector
+      --collector-query-limit int         override the improvement collector query limit (0 = default)
+  -n, --dry-run                           generate prompt only (post-merge)
+  -f, --full                              force full calibration check
+  -h, --help                              help for run
+      --idle-timeout duration             idle timeout — exit after no D-Mail activity (0 = 24h safety cap, negative = disable) (default 30m0s)
+  -j, --json                              output as JSON
+      --no-merge                          disable automatic PR merging (only effective with --base)
+      --notify-cmd string                 external command for notifications ({title} and {message} placeholders)
+  -q, --quiet                             summary-only output
+      --review-cmd string                 code review command after check (exit 0=pass, non-zero=comments)
 ```
 
 ### Options inherited from parent commands
