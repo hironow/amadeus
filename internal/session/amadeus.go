@@ -32,10 +32,10 @@ type Amadeus struct {
 	ReviewCmd   string                  // code review command (empty = skip)
 	ClaudeCmd   string                  // Claude CLI command (set by cmd layer from config)
 	ClaudeModel string                  // Claude model for review fix (set by cmd layer from config)
-	PRReader      port.GitHubPRReader     // nil = skip PR convergence
-	PRWriter      port.GitHubPRWriter    // nil = skip PR label writes
-	PRPipeline    port.PRPipelineRunner   // nil = skip PR convergence (usecase-injected)
-	IssueWriter   port.GitHubIssueWriter  // nil = skip issue close
+	PRReader    port.GitHubPRReader     // nil = skip PR convergence
+	PRWriter    port.GitHubPRWriter     // nil = skip PR label writes
+	PRPipeline  port.PRPipelineRunner   // nil = skip PR convergence (usecase-injected)
+	IssueWriter port.GitHubIssueWriter  // nil = skip issue close
 	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
 	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
 	SeqAlloc    port.SeqAllocator       // global SeqNr (ADR S0040)
@@ -309,6 +309,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	if err != nil {
 		return err
 	}
+	a.writeImprovementOutcomeInsight(inboxDMails, currentCommit, len(dmails))
 
 	// nosemgrep: adr0003-otel-span-without-defer-end -- End() called explicitly before error return [permanent]
 	_, convSpan := platform.Tracer.Start(ctx, "phase.convergence_detection",

@@ -55,6 +55,11 @@ func ExportWriteConvergenceInsight(a *Amadeus, alert domain.ConvergenceAlert, se
 	a.writeConvergenceInsight(alert, sessionID)
 }
 
+// ExportWriteImprovementOutcomeInsight exposes writeImprovementOutcomeInsight for external tests.
+func ExportWriteImprovementOutcomeInsight(a *Amadeus, inboxDMails []domain.DMail, sessionID string, dmailCount int) {
+	a.writeImprovementOutcomeInsight(inboxDMails, sessionID, dmailCount)
+}
+
 // ExportHighScoringAxisDetails exposes highScoringAxisDetails for external tests.
 func ExportHighScoringAxisDetails(axes map[domain.Axis]domain.AxisScore) []string {
 	return highScoringAxisDetails(axes)

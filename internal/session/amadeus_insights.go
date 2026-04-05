@@ -85,6 +85,85 @@ func (a *Amadeus) writeConvergenceInsight(alert domain.ConvergenceAlert, session
 	}
 }
 
+func (a *Amadeus) writeImprovementOutcomeInsight(inboxDMails []domain.DMail, sessionID string, dmailCount int) {
+	if a.Insights == nil {
+		return
+	}
+	meta := latestImprovementMetadata(inboxDMails)
+	if meta.SchemaVersion == "" {
+		return
+	}
+	outcome := domain.ImprovementOutcomeResolved
+	if dmailCount > 0 {
+		outcome = domain.ImprovementOutcomeFailedAgain
+	}
+	entry := improvementOutcomeInsight(meta, outcome, sessionID)
+	if err := a.Insights.Append("improvement-loop.md", "improvement-loop", "amadeus", entry); err != nil {
+		a.Logger.Warn("insight write (improvement-loop): %v", err)
+	}
+}
+
+func latestImprovementMetadata(dmails []domain.DMail) domain.CorrectionMetadata {
+	for i := len(dmails) - 1; i >= 0; i-- {
+		if dmails[i].Kind != domain.KindReport {
+			continue
+		}
+		meta := domain.CorrectionMetadataFromMap(dmails[i].Metadata)
+		if meta.SchemaVersion != "" {
+			return meta
+		}
+	}
+	return domain.CorrectionMetadata{}
+}
+
+func improvementOutcomeInsight(meta domain.CorrectionMetadata, outcome domain.ImprovementOutcome, sessionID string) domain.InsightEntry {
+	meta.SchemaVersion = domain.ImprovementSchemaVersion
+	meta.Outcome = outcome
+	title := fmt.Sprintf("improvement-%s-%s", fallbackImprovementTitle(meta.CorrelationID), outcome)
+	what := fmt.Sprintf("Corrective rerun for %s ended as %s", fallbackFailureType(meta), outcome)
+	why := "Amadeus classified the next run using normalized corrective metadata from the inbound report"
+	how := "Use this outcome to compare before/after reruns and refine corrective routing"
+	if outcome == domain.ImprovementOutcomeResolved {
+		how = "Use this resolution to confirm the rerun fixed the prior corrective thread"
+	}
+	entry := domain.InsightEntry{
+		Title:       title,
+		What:        what,
+		Why:         why,
+		How:         how,
+		When:        fmt.Sprintf("Check on commit %s", sessionID),
+		Who:         fmt.Sprintf("amadeus improvement classifier (session-%s)", sessionID),
+		Constraints: fmt.Sprintf("improvement schema %s", meta.SchemaVersion),
+		Extra: map[string]string{
+			"outcome":      string(outcome),
+			"failure-type": fallbackFailureType(meta),
+		},
+	}
+	if meta.CorrelationID != "" {
+		entry.Extra["correlation-id"] = meta.CorrelationID
+	}
+	if meta.TraceID != "" {
+		entry.Extra["trace-id"] = meta.TraceID
+	}
+	if meta.CorrectiveAction != "" {
+		entry.Extra["corrective-action"] = meta.CorrectiveAction
+	}
+	return entry
+}
+
+func fallbackImprovementTitle(correlationID string) string {
+	if correlationID == "" {
+		return "uncorrelated"
+	}
+	return correlationID
+}
+
+func fallbackFailureType(meta domain.CorrectionMetadata) string {
+	if meta.FailureType == "" {
+		return string(domain.FailureTypeNone)
+	}
+	return string(meta.FailureType)
+}
 
 // highScoringAxisDetails returns detail strings for axes with score >= 50.
 func highScoringAxisDetails(axes map[domain.Axis]domain.AxisScore) []string {

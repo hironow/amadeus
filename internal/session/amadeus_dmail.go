@@ -70,6 +70,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 	// mis-threading feedback across different waves.
 	triggerRound := 0
 	var triggerWave *domain.WaveReference
+	triggerCorrection := domain.CorrectionMetadata{}
 	wavedReportCount := 0
 	for _, d := range inboxDMails {
 		if d.Kind == domain.KindReport {
@@ -79,6 +80,9 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 			if d.Wave != nil {
 				wavedReportCount++
 				triggerWave = d.Wave
+			}
+			if meta := domain.CorrectionMetadataFromMap(d.Metadata); meta.SchemaVersion != "" {
+				triggerCorrection = meta
 			}
 		}
 	}
@@ -124,16 +128,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				Action:        domain.DMailAction(candidate.Action),
 				Targets:       sanitized,
 				Wave:          triggerWave, // S01: propagate wave reference from triggering report
-				Metadata: domain.CorrectionMetadata{
-					FailureType:      failureTypeForCandidate(candidate),
-					SecondaryType:    strings.ToLower(candidate.Category),
-					TargetAgent:      targetAgentForKind(kind),
-					RecurrenceCount:  triggerRound,
-					CorrectiveAction: candidate.Action,
-					CorrelationID:    correlationIDForDMail(name, triggerWave),
-					TraceID:          span3.SpanContext().TraceID().String(),
-					Outcome:          domain.ImprovementOutcomePending,
-				}.Apply(map[string]string{
+				Metadata: dmailCorrectionMetadata(candidate, kind, name, triggerWave, triggerRound, triggerCorrection, span3).Apply(map[string]string{
 					"created_at":     now.Format(time.RFC3339),
 					"feedback_round": strconv.Itoa(nextRound),
 				}),
@@ -252,6 +247,38 @@ func targetAgentForKind(kind domain.DMailKind) string {
 	default:
 		return ""
 	}
+}
+
+func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, span trace.Span) domain.CorrectionMetadata {
+	meta := domain.CorrectionMetadata{
+		FailureType:      failureTypeForCandidate(candidate),
+		SecondaryType:    strings.ToLower(candidate.Category),
+		TargetAgent:      targetAgentForKind(kind),
+		RecurrenceCount:  triggerRound,
+		CorrectiveAction: candidate.Action,
+		CorrelationID:    correlationIDForDMail(name, wave),
+		TraceID:          span.SpanContext().TraceID().String(),
+		Outcome:          domain.ImprovementOutcomePending,
+	}
+	if trigger.SchemaVersion == "" {
+		return meta
+	}
+	meta.SchemaVersion = trigger.SchemaVersion
+	if trigger.FailureType != "" {
+		meta.FailureType = trigger.FailureType
+	}
+	if trigger.SecondaryType != "" {
+		meta.SecondaryType = trigger.SecondaryType
+	}
+	if trigger.CorrectiveAction != "" {
+		meta.CorrectiveAction = trigger.CorrectiveAction
+	}
+	if trigger.CorrelationID != "" {
+		meta.CorrelationID = trigger.CorrelationID
+	}
+	meta.RecurrenceCount = trigger.RecurrenceCount + 1
+	meta.Outcome = domain.ImprovementOutcomeFailedAgain
+	return meta
 }
 
 func correlationIDForDMail(name string, wave *domain.WaveReference) string {

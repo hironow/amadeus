@@ -134,3 +134,15 @@ func (m CorrectionMetadata) ImprovementEvent() ImprovementEvent {
 		Outcome:          m.Outcome,
 	}
 }
+
+func (m CorrectionMetadata) ForwardForRecheck() CorrectionMetadata {
+	forwarded := m
+	if forwarded.SchemaVersion == "" {
+		forwarded.SchemaVersion = ImprovementSchemaVersion
+	}
+	forwarded.TargetAgent = ""
+	if forwarded.Outcome == "" {
+		forwarded.Outcome = ImprovementOutcomePending
+	}
+	return forwarded
+}
