@@ -571,3 +571,125 @@ func TestRunCheck_FeedbackDMail_PreservesRetryRoutingMetadata(t *testing.T) {
 
 	t.Fatal("expected retry metadata with target agent")
 }
+
+func TestRunCheck_FeedbackDMail_EscalationKeepsHandoffOwner(t *testing.T) {
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
+
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
+
+	var driftErr *domain.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected feedback D-Mail")
+	}
+
+	for _, dmail := range dmails {
+		meta := domain.CorrectionMetadataFromMap(dmail.Metadata)
+		if meta.RoutingMode != domain.RoutingModeEscalate {
+			continue
+		}
+		if meta.TargetAgent == "" {
+			t.Fatal("TargetAgent = empty, want explicit handoff owner")
+		}
+		if meta.Severity != domain.SeverityHigh {
+			t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
+		}
+		return
+	}
+
+	t.Fatal("expected escalated corrective metadata")
+}
+
+func TestRunCheck_FeedbackDMail_ExplicitEscalationKeepsHandoffOwner(t *testing.T) {
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
+	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("escalate")}
+
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
+
+	var driftErr *domain.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected feedback D-Mail")
+	}
+
+	for _, dmail := range dmails {
+		meta := domain.CorrectionMetadataFromMap(dmail.Metadata)
+		if meta.CorrectiveAction != string(domain.ActionEscalate) {
+			continue
+		}
+		if meta.TargetAgent == "" {
+			t.Fatal("TargetAgent = empty, want explicit handoff owner")
+		}
+		if meta.RoutingMode != domain.RoutingModeEscalate {
+			t.Fatalf("RoutingMode = %q, want %q", meta.RoutingMode, domain.RoutingModeEscalate)
+		}
+		return
+	}
+
+	t.Fatal("expected explicit escalated corrective metadata")
+}
+
+func TestRunCheck_FeedbackDMail_ExplicitEscalationIsHighSeverity(t *testing.T) {
+	events := &fakeEventStore{}
+	projector := &fakeProjector{}
+	a := newGateTestAmadeus(t, &port.AutoApprover{}, &port.NopNotifier{})
+	a.Events = events
+	a.Projector = projector
+	cfg := a.Config
+	agg := domain.NewCheckAggregate(cfg)
+	a.Emitter = &testCheckEventEmitter{agg: agg, store: events, projector: projector}
+	a.State = &testCheckStateProvider{agg: agg}
+	a.Claude = &fakeClaude{response: claudeResponseWithDriftAndAction("escalate")}
+
+	err := a.RunCheck(context.Background(), domain.CheckOptions{}, nil, nil)
+
+	var driftErr *domain.DriftError
+	if !errors.As(err, &driftErr) {
+		t.Fatalf("expected DriftError, got: %v", err)
+	}
+
+	dmails := extractDMailsFromEvents(t, events.events)
+	if len(dmails) == 0 {
+		t.Fatal("expected feedback D-Mail")
+	}
+
+	for _, dmail := range dmails {
+		meta := domain.CorrectionMetadataFromMap(dmail.Metadata)
+		if meta.CorrectiveAction != string(domain.ActionEscalate) {
+			continue
+		}
+		if meta.Severity != domain.SeverityHigh {
+			t.Fatalf("Severity = %q, want %q", meta.Severity, domain.SeverityHigh)
+		}
+		if meta.RetryAllowed == nil || *meta.RetryAllowed {
+			t.Fatal("RetryAllowed = nil/true, want false")
+		}
+		return
+	}
+
+	t.Fatal("expected explicit escalated corrective metadata")
+}
