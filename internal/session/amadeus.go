@@ -176,7 +176,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	a.State.Restore(previous)
 
 	if a.Collector != nil {
-		if _, err := a.Collector.PollOnce(ctx, 100); err != nil && a.Logger != nil {
+		if _, err := a.Collector.PollOnce(ctx, 0); err != nil && a.Logger != nil {
 			a.Logger.Warn("improvement collector: %v", err)
 		}
 	}

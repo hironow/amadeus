@@ -60,6 +60,11 @@ func ExportWriteImprovementOutcomeInsight(a *Amadeus, inboxDMails []domain.DMail
 	a.writeImprovementOutcomeInsight(inboxDMails, sessionID, dmailCount)
 }
 
+// ExportCloseReadyIssues exposes closeReadyIssues for external tests.
+func ExportCloseReadyIssues(a *Amadeus, ctx context.Context, readyLabel string) {
+	a.closeReadyIssues(ctx, readyLabel)
+}
+
 // ExportHighScoringAxisDetails exposes highScoringAxisDetails for external tests.
 func ExportHighScoringAxisDetails(axes map[domain.Axis]domain.AxisScore) []string {
 	return highScoringAxisDetails(axes)

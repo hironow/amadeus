@@ -106,11 +106,17 @@ func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
 		Name: "pt-report-1",
 		Kind: domain.KindReport,
 		Metadata: map[string]string{
-			domain.MetadataFailureType:      string(domain.FailureTypeExecutionFailure),
-			domain.MetadataSeverity:         string(domain.SeverityHigh),
-			domain.MetadataCorrelationID:    "corr-1",
-			domain.MetadataTraceID:          "trace-1",
-			domain.MetadataCorrectiveAction: "retry",
+			domain.MetadataFailureType:         string(domain.FailureTypeExecutionFailure),
+			domain.MetadataSeverity:            string(domain.SeverityHigh),
+			domain.MetadataCorrelationID:       "corr-1",
+			domain.MetadataTraceID:             "trace-1",
+			domain.MetadataCorrectiveAction:    "retry",
+			domain.MetadataRoutingHistory:      "retry>escalate",
+			domain.MetadataOwnerHistory:        "paintress>sightjack",
+			domain.MetadataProviderState:       string(domain.ProviderStateWaiting),
+			domain.MetadataProviderReason:      domain.ProviderReasonRateLimit,
+			domain.MetadataProviderRetryBudget: "0",
+			domain.MetadataProviderResumeWhen:  domain.ResumeConditionProbeSucceeds,
 		},
 	}}
 
@@ -139,6 +145,18 @@ func TestWriteImprovementOutcomeInsight_CreatesFile(t *testing.T) {
 	}
 	if entry.Extra["severity"] != string(domain.SeverityHigh) {
 		t.Fatalf("severity = %q, want %q", entry.Extra["severity"], domain.SeverityHigh)
+	}
+	if entry.Extra["routing-history"] != "retry>escalate" {
+		t.Fatalf("routing-history = %q, want retry>escalate", entry.Extra["routing-history"])
+	}
+	if entry.Extra["owner-history"] != "paintress>sightjack" {
+		t.Fatalf("owner-history = %q, want paintress>sightjack", entry.Extra["owner-history"])
+	}
+	if entry.Extra["provider-state"] != string(domain.ProviderStateWaiting) {
+		t.Fatalf("provider-state = %q, want %q", entry.Extra["provider-state"], domain.ProviderStateWaiting)
+	}
+	if entry.Extra["provider-resume-when"] != domain.ResumeConditionProbeSucceeds {
+		t.Fatalf("provider-resume-when = %q, want %q", entry.Extra["provider-resume-when"], domain.ResumeConditionProbeSucceeds)
 	}
 }
 

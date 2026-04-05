@@ -104,6 +104,9 @@ func (s *HTTPImprovementFeedbackSource) QueryFeedback(ctx context.Context, query
 		if row.CreatedAt.Equal(query.CreatedAfter) && query.AfterFeedback != "" && row.ID <= query.AfterFeedback {
 			continue
 		}
+		if !improvementFeedbackTypeAllowed(query.FeedbackTypes, row.FeedbackType) {
+			continue
+		}
 		rows = append(rows, row)
 	}
 	return rows, nil
@@ -147,12 +150,32 @@ func decodeImprovementFeedbackRow(item map[string]any) (ImprovementFeedbackRow, 
 }
 
 func NewImprovementCollectorFromEnv(repoRoot string, ledger *InsightWriter, logger domain.Logger) (*ImprovementCollector, func() error, error) {
-	apiKey := strings.TrimSpace(os.Getenv("WANDB_API_KEY"))
-	projectID := improvementProjectIDFromEnv()
-	if apiKey == "" || projectID == "" || ledger == nil {
+	return NewImprovementCollector(repoRoot, domain.ImprovementCollectorConfig{}, ledger, logger)
+}
+
+func NewImprovementCollector(repoRoot string, cfg domain.ImprovementCollectorConfig, ledger *InsightWriter, logger domain.Logger) (*ImprovementCollector, func() error, error) {
+	if ledger == nil {
 		return nil, func() error { return nil }, nil
 	}
-	baseURL := strings.TrimSpace(os.Getenv("WEAVE_API_URL"))
+	apiKey := strings.TrimSpace(os.Getenv("WANDB_API_KEY"))
+	projectID := strings.TrimSpace(cfg.ProjectID)
+	if projectID == "" {
+		projectID = improvementProjectIDFromEnv()
+	}
+	baseURL := strings.TrimSpace(cfg.APIURL)
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(os.Getenv("WEAVE_API_URL"))
+	}
+	enabled := collectorEnabled(cfg.Enabled, apiKey, projectID)
+	if !enabled {
+		return nil, func() error { return nil }, nil
+	}
+	if apiKey == "" {
+		return nil, func() error { return nil }, fmt.Errorf("improvement collector: WANDB_API_KEY is required when collector is enabled")
+	}
+	if projectID == "" {
+		return nil, func() error { return nil }, fmt.Errorf("improvement collector: project id is required when collector is enabled")
+	}
 	source, err := NewHTTPImprovementFeedbackSource(baseURL, apiKey)
 	if err != nil {
 		return nil, func() error { return nil }, err
@@ -162,12 +185,21 @@ func NewImprovementCollectorFromEnv(repoRoot string, ledger *InsightWriter, logg
 		return nil, func() error { return nil }, err
 	}
 	return &ImprovementCollector{
-		ProjectID: projectID,
-		Source:    source,
-		Store:     store,
-		Ledger:    ledger,
-		Logger:    logger,
+		ProjectID:            projectID,
+		Source:               source,
+		Store:                store,
+		Ledger:               ledger,
+		Logger:               logger,
+		QueryLimit:           cfg.QueryLimit,
+		AllowedFeedbackTypes: append([]string(nil), cfg.FeedbackTypes...),
 	}, store.Close, nil
+}
+
+func collectorEnabled(explicit *bool, apiKey, projectID string) bool {
+	if explicit != nil {
+		return *explicit
+	}
+	return apiKey != "" && projectID != ""
 }
 
 func improvementProjectIDFromEnv() string {

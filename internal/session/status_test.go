@@ -162,6 +162,41 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 }
 
+func TestStatus_ProviderMetadata(t *testing.T) {
+	baseDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(baseDir, ".run"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := session.NewSQLiteCodingSessionStore(filepath.Join(baseDir, ".run", "sessions.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	record := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "model", baseDir)
+	record.Metadata = domain.ProviderStateSnapshot{
+		State:           domain.ProviderStatePaused,
+		Reason:          "provider_rate_limited",
+		RetryBudget:     0,
+		ResumeAt:        time.Date(2026, 4, 5, 16, 40, 0, 0, time.UTC),
+		ResumeCondition: "probe-succeeds",
+	}.ApplyMetadata(nil)
+	if err := store.Save(context.Background(), record); err != nil {
+		t.Fatal(err)
+	}
+
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
+
+	if report.ProviderState != string(domain.ProviderStatePaused) {
+		t.Fatalf("ProviderState = %q, want %q", report.ProviderState, domain.ProviderStatePaused)
+	}
+	if report.ProviderReason != "provider_rate_limited" {
+		t.Fatalf("ProviderReason = %q, want provider_rate_limited", report.ProviderReason)
+	}
+	if report.ProviderResumeWhen != "probe-succeeds" {
+		t.Fatalf("ProviderResumeWhen = %q, want probe-succeeds", report.ProviderResumeWhen)
+	}
+}
+
 func TestStatus_FormatText(t *testing.T) {
 	// given
 	report := domain.StatusReport{

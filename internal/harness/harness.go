@@ -26,6 +26,15 @@ var BuildPRConvergenceReport = policy.BuildPRConvergenceReport
 // BuildConvergenceDMail constructs a valid DMail from a PRConvergenceReport.
 var BuildConvergenceDMail = policy.BuildConvergenceDMail
 
+// CorrectionDecision is the deterministic routing decision for a corrective D-Mail.
+type CorrectionDecision = policy.CorrectionDecision
+
+// DetermineCorrectionDecision resolves corrective routing/action policy.
+var DetermineCorrectionDecision = policy.DetermineCorrectionDecision
+
+// CorrectiveTargetAgentForFailure resolves the owner for a corrective failure.
+var CorrectiveTargetAgentForFailure = policy.CorrectiveTargetAgentForFailure
+
 // IsPipelinePR checks if a PR was created by the 4-tool pipeline.
 var IsPipelinePR = policy.IsPipelinePR
 

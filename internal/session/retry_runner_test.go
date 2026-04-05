@@ -8,8 +8,12 @@ import (
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
 	"github.com/hironow/amadeus/internal/usecase/port"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 // fakeRunner is a test double for ClaudeRunner.
@@ -27,6 +31,59 @@ func (f *fakeRunner) Run(_ context.Context, _ string, _ io.Writer, opts ...port.
 		return "", errors.New("claude exit: non-zero")
 	}
 	return f.output, nil
+}
+
+func setupRetryRunnerTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+	prev := otel.GetTracerProvider()
+	oldTracer := platform.Tracer
+	otel.SetTracerProvider(tp)
+	platform.Tracer = tp.Tracer("amadeus-retry-test")
+	t.Cleanup(func() {
+		tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prev)
+		platform.Tracer = oldTracer
+	})
+	return exp
+}
+
+func findRetryRunnerSpan(spans tracetest.SpanStubs, name string) *tracetest.SpanStub {
+	for i := range spans {
+		if spans[i].Name == name {
+			return &spans[i]
+		}
+	}
+	return nil
+}
+
+func eventAttrString(span *tracetest.SpanStub, eventName, key string) string {
+	for _, event := range span.Events {
+		if event.Name != eventName {
+			continue
+		}
+		for _, attr := range event.Attributes {
+			if string(attr.Key) == key {
+				return attr.Value.AsString()
+			}
+		}
+	}
+	return ""
+}
+
+func eventAttrInt(span *tracetest.SpanStub, eventName, key string) int64 {
+	for _, event := range span.Events {
+		if event.Name != eventName {
+			continue
+		}
+		for _, attr := range event.Attributes {
+			if string(attr.Key) == key {
+				return attr.Value.AsInt64()
+			}
+		}
+	}
+	return 0
 }
 
 func TestRetryRunner_SucceedsFirstAttempt(t *testing.T) {
@@ -76,6 +133,39 @@ func TestRetryRunner_RetriesAndSucceeds(t *testing.T) {
 	}
 	if inner.calls != 3 {
 		t.Errorf("expected 3 calls, got %d", inner.calls)
+	}
+}
+
+func TestRetryRunner_RecordsProviderStateOnRetryEvent(t *testing.T) {
+	exporter := setupRetryRunnerTestTracer(t)
+
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	inner := &fakeRunner{failN: 1, output: "ok"}
+	runner := &session.RetryRunner{
+		Inner:          inner,
+		MaxAttempts:    2,
+		BaseDelay:      0,
+		Logger:         &domain.NopLogger{},
+		CircuitBreaker: cb,
+	}
+
+	ctx, span := platform.Tracer.Start(context.Background(), "retry-parent")
+	defer span.End()
+	_, err := runner.Run(ctx, "test", io.Discard)
+	span.End()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parent := findRetryRunnerSpan(exporter.GetSpans(), "retry-parent")
+	if parent == nil {
+		t.Fatal("missing retry-parent span")
+	}
+	if got := eventAttrString(parent, "claude.retry", domain.MetadataProviderState); got != string(domain.ProviderStateActive) {
+		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateActive)
+	}
+	if got := eventAttrInt(parent, "claude.retry", domain.MetadataProviderRetryBudget); got != 1 {
+		t.Fatalf("provider_retry_budget = %d, want 1", got)
 	}
 }
 
@@ -196,6 +286,46 @@ func TestRetryRunner_TimeoutStopsHangingInner(t *testing.T) {
 	}
 	if inner.calls > 5 {
 		t.Errorf("expected few calls before timeout, got %d", inner.calls)
+	}
+}
+
+func TestRetryRunner_RecordsProviderStateOnBlockedEvent(t *testing.T) {
+	exporter := setupRetryRunnerTestTracer(t)
+
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorRateLimit})
+
+	inner := &fakeRunner{output: "ok"}
+	runner := &session.RetryRunner{
+		Inner:          inner,
+		MaxAttempts:    3,
+		BaseDelay:      time.Millisecond,
+		Logger:         &domain.NopLogger{},
+		CircuitBreaker: cb,
+	}
+
+	baseCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	ctx, span := platform.Tracer.Start(baseCtx, "retry-blocked-parent")
+	defer span.End()
+	_, err := runner.Run(ctx, "test", io.Discard)
+	span.End()
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected DeadlineExceeded, got %v", err)
+	}
+
+	parent := findRetryRunnerSpan(exporter.GetSpans(), "retry-blocked-parent")
+	if parent == nil {
+		t.Fatal("missing retry-blocked-parent span")
+	}
+	if got := eventAttrString(parent, "claude.blocked", domain.MetadataProviderState); got != string(domain.ProviderStateWaiting) {
+		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateWaiting)
+	}
+	if got := eventAttrString(parent, "claude.blocked", domain.MetadataProviderReason); got != "rate_limit" {
+		t.Fatalf("provider_reason = %q, want rate_limit", got)
+	}
+	if got := eventAttrInt(parent, "claude.blocked", domain.MetadataProviderRetryBudget); got != 0 {
+		t.Fatalf("provider_retry_budget = %d, want 0", got)
 	}
 }
 

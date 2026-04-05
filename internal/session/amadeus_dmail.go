@@ -239,35 +239,17 @@ func failureTypeForCandidate(candidate domain.ClaudeDMailCandidate) domain.Failu
 	}
 }
 
-func targetAgentForKind(kind domain.DMailKind) string {
-	switch kind {
-	case domain.KindDesignFeedback:
-		return "sightjack"
-	case domain.KindImplFeedback:
-		return "paintress"
-	default:
-		return ""
-	}
-}
-
-func correctiveTargetAgentForFailure(kind domain.DMailKind, failureType domain.FailureType) string {
-	switch failureType {
-	case domain.FailureTypeScopeViolation, domain.FailureTypeMissingAcceptance:
-		return "sightjack"
-	case domain.FailureTypeExecutionFailure, domain.FailureTypeProviderFailure, domain.FailureTypeRoutingFailure:
-		return "paintress"
-	default:
-		return targetAgentForKind(kind)
-	}
-}
-
 func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, severity domain.Severity, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, span trace.Span) domain.CorrectionMetadata {
 	recurrenceCount := triggerRound
+	routingHistory := []string(nil)
+	ownerHistory := []string(nil)
 	meta := domain.CorrectionMetadata{
 		SchemaVersion:   domain.ImprovementSchemaVersion,
 		FailureType:     failureTypeForCandidate(candidate),
 		Severity:        domain.NormalizeSeverity(severity),
 		SecondaryType:   strings.ToLower(candidate.Category),
+		RoutingHistory:  routingHistory,
+		OwnerHistory:    ownerHistory,
 		RecurrenceCount: recurrenceCount,
 		CorrelationID:   correlationIDForDMail(name, wave),
 		TraceID:         span.SpanContext().TraceID().String(),
@@ -284,66 +266,35 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 		if trigger.CorrelationID != "" {
 			meta.CorrelationID = trigger.CorrelationID
 		}
+		meta.RoutingHistory = append([]string(nil), trigger.RoutingHistory...)
+		meta.OwnerHistory = append([]string(nil), trigger.OwnerHistory...)
+		if len(meta.RoutingHistory) == 0 && trigger.RoutingMode != "" {
+			meta.RoutingHistory = domain.AppendImprovementHistory(meta.RoutingHistory, string(domain.NormalizeRoutingMode(trigger.RoutingMode)))
+		}
+		if len(meta.OwnerHistory) == 0 && trigger.TargetAgent != "" {
+			meta.OwnerHistory = domain.AppendImprovementHistory(meta.OwnerHistory, trigger.TargetAgent)
+		}
 		recurrenceCount = trigger.RecurrenceCount + 1
 		meta.RecurrenceCount = recurrenceCount
 		meta.Outcome = domain.ImprovementOutcomeFailedAgain
 	}
-	action, routingMode, targetAgent, retryAllowed, escalationReason := correctionDecision(kind, severity, candidate, meta.FailureType, recurrenceCount, trigger)
-	meta.RoutingMode = routingMode
-	meta.TargetAgent = targetAgent
-	meta.CorrectiveAction = string(action)
-	meta.RetryAllowed = retryAllowed
-	meta.EscalationReason = escalationReason
-	if routingMode == domain.RoutingModeEscalate {
+	decision := harness.DetermineCorrectionDecision(kind, severity, domain.DMailAction(candidate.Action), meta.FailureType, recurrenceCount, trigger)
+	meta.RoutingMode = decision.RoutingMode
+	meta.TargetAgent = decision.TargetAgent
+	if decision.RoutingMode != "" {
+		meta.RoutingHistory = domain.AppendImprovementHistory(meta.RoutingHistory, string(domain.NormalizeRoutingMode(decision.RoutingMode)))
+	}
+	if decision.TargetAgent != "" {
+		meta.OwnerHistory = domain.AppendImprovementHistory(meta.OwnerHistory, decision.TargetAgent)
+	}
+	meta.CorrectiveAction = string(decision.Action)
+	meta.RetryAllowed = decision.RetryAllowed
+	meta.EscalationReason = decision.EscalationReason
+	if decision.RoutingMode == domain.RoutingModeEscalate {
 		meta.Severity = domain.SeverityHigh
 	}
-	meta.Outcome = correctionOutcome(action, trigger)
+	meta.Outcome = correctionOutcome(decision.Action, trigger)
 	return meta
-}
-
-func correctionDecision(kind domain.DMailKind, severity domain.Severity, candidate domain.ClaudeDMailCandidate, failureType domain.FailureType, recurrenceCount int, trigger domain.CorrectionMetadata) (domain.DMailAction, domain.RoutingMode, string, *bool, string) {
-	action := domain.DMailAction(candidate.Action)
-	explicitAction := action != ""
-	if action == "" {
-		action = domain.DefaultDMailAction(severity)
-	}
-	targetAgent := correctiveTargetAgentForFailure(kind, failureType)
-	defaultTarget := targetAgentForKind(kind)
-	if targetAgent == "" {
-		targetAgent = defaultTarget
-	}
-
-	if trigger.RetryAllowed != nil && !*trigger.RetryAllowed {
-		return domain.ActionEscalate, domain.RoutingModeEscalate, targetAgent, domain.BoolPtr(false), fallbackEscalationReason(trigger.EscalationReason)
-	}
-	switch {
-	case recurrenceCount >= 2:
-		return domain.ActionEscalate, domain.RoutingModeEscalate, targetAgent, domain.BoolPtr(false), "recurrence-threshold"
-	case explicitAction && action == domain.ActionEscalate:
-		return action, domain.RoutingModeEscalate, targetAgent, domain.BoolPtr(false), "candidate-requested-escalation"
-	case explicitAction:
-		routingMode := domain.RoutingModeRetry
-		if targetAgent != "" && defaultTarget != "" && targetAgent != defaultTarget {
-			routingMode = domain.RoutingModeReroute
-		}
-		return action, routingMode, targetAgent, domain.BoolPtr(true), ""
-	case domain.NormalizeSeverity(severity) == domain.SeverityHigh:
-		return domain.ActionEscalate, domain.RoutingModeEscalate, targetAgent, domain.BoolPtr(false), "high-severity"
-	case action == domain.ActionEscalate:
-		return action, domain.RoutingModeEscalate, targetAgent, domain.BoolPtr(false), "candidate-requested-escalation"
-	}
-	routingMode := domain.RoutingModeRetry
-	if targetAgent != "" && defaultTarget != "" && targetAgent != defaultTarget {
-		routingMode = domain.RoutingModeReroute
-	}
-	return action, routingMode, targetAgent, domain.BoolPtr(true), ""
-}
-
-func fallbackEscalationReason(reason string) string {
-	if reason == "" {
-		return "retry-disabled"
-	}
-	return reason
 }
 
 func correctionOutcome(action domain.DMailAction, trigger domain.CorrectionMetadata) domain.ImprovementOutcome {

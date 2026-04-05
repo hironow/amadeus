@@ -152,8 +152,27 @@ func improvementOutcomeInsight(meta domain.CorrectionMetadata, outcome domain.Im
 	if meta.RoutingMode != "" {
 		entry.Extra["routing-mode"] = string(domain.NormalizeRoutingMode(meta.RoutingMode))
 	}
+	if len(meta.RoutingHistory) > 0 {
+		entry.Extra["routing-history"] = domain.FormatImprovementHistory(meta.RoutingHistory)
+	}
+	if len(meta.OwnerHistory) > 0 {
+		entry.Extra["owner-history"] = domain.FormatImprovementHistory(meta.OwnerHistory)
+	}
 	if meta.Severity != "" {
 		entry.Extra["severity"] = string(domain.NormalizeSeverity(meta.Severity))
+	}
+	if meta.ProviderState != "" {
+		entry.Extra["provider-state"] = string(domain.NormalizeProviderState(meta.ProviderState))
+		entry.Extra["provider-retry-budget"] = strconv.Itoa(meta.ProviderRetryBudget)
+	}
+	if meta.ProviderReason != "" {
+		entry.Extra["provider-reason"] = meta.ProviderReason
+	}
+	if meta.ProviderResumeAt != "" {
+		entry.Extra["provider-resume-at"] = meta.ProviderResumeAt
+	}
+	if meta.ProviderResumeWhen != "" {
+		entry.Extra["provider-resume-when"] = meta.ProviderResumeWhen
 	}
 	if meta.RetryAllowed != nil {
 		entry.Extra["retry-allowed"] = strconv.FormatBool(*meta.RetryAllowed)

@@ -51,7 +51,7 @@ Key constraints enforced by semgrep (ERROR severity):
 - `harness/policy` must not import `harness/verifier` or `harness/filter` (most independent layer)
 - `domain` has no I/O, no `context.Context`
 
-Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, ADR S0007
+Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, `refs/opsx/semgrep-layer-contract.md`, ADR S0007
 
 ## Domain Primitives & Parse-Don't-Validate
 
