@@ -5,6 +5,14 @@ import (
 	"fmt"
 )
 
+// Outcome metric names for the self-improving loop.
+// These are the observable indicators defined in the remain-roadmap MVP success criteria.
+const (
+	MetricFirstPassSuccessRate = "first_pass_success_rate"
+	MetricRetriesToSuccess     = "retries_to_success"
+	MetricRecurrenceRate       = "recurrence_rate"
+)
+
 // SuccessRate calculates the clean check rate from a list of events.
 // A check with zero D-Mails generated is considered a success.
 // Only EventCheckCompleted events are considered.
