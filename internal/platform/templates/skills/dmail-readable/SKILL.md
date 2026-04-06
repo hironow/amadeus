@@ -6,6 +6,7 @@ metadata:
   dmail-schema-version: "1"
   consumes:
     - kind: report
+    - kind: stall-escalation
 ---
 
 Amadeus D-Mail readable skill.
