@@ -26,6 +26,7 @@ amadeus [flags]
 * [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
 * [amadeus dashboard](amadeus_dashboard.md)	 - Show TAP ecosystem divergence dashboard
 * [amadeus doctor](amadeus_doctor.md)	 - Run health checks
+* [amadeus improvement-stats](amadeus_improvement-stats.md)	 - Show improvement outcome statistics
 * [amadeus init](amadeus_init.md)	 - Initialize .gate directory
 * [amadeus install-hook](amadeus_install-hook.md)	 - Install post-merge git hook
 * [amadeus log](amadeus_log.md)	 - Show divergence log
