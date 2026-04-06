@@ -46,3 +46,9 @@ Each tool maintains its own copy in `docs/shared-adr/`. ADR IDs are referenced i
 | [S0033](S0033-loop-safety-audit-2026-03.md) | Loop Safety Audit (2026-03) | Accepted |
 | [S0034](S0034-session-usecase-boundary-clarification.md) | Session-Usecase Boundary Clarification | Accepted |
 | [S0035](S0035-dmail-wave-field-extension.md) | D-Mail Wave Field Extension | Accepted |
+| [S0036](S0036-cross-tool-correlation-protocol.md) | Cross-Tool Correlation Protocol | Accepted |
+| [S0037](S0037-coding-session-abstraction-layer.md) | AI Coding Session Abstraction Layer | Accepted |
+| [S0038](S0038-harness-layer.md) | Harness Layer (filter/verifier/policy) | Accepted |
+| [S0039](S0039-harness-evolution-loop.md) | Harness Evolution Loop | Accepted |
+| [S0040](S0040-event-store-snapshot-architecture.md) | Event Store Snapshot Architecture | Accepted |
+| [S0041](S0041-improvement-controller-in-amadeus.md) | Improvement Controller Placement (in amadeus) | Accepted |
