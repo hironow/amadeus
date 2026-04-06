@@ -218,7 +218,7 @@ service, violating the dependency direction defined in ADR-003.
 | Frontmatter Field | Type | Required | Description |
 |-------------------|------|----------|-------------|
 | `name` | string | Yes | Unique identifier (`{kind}-{NNN}`) |
-| `kind` | string | Yes | `design-feedback`, `implementation-feedback`, `specification`, `report`, `convergence`, or `ci-result` |
+| `kind` | string | Yes | `design-feedback`, `implementation-feedback`, `specification`, `report`, `convergence`, `ci-result`, or `stall-escalation` |
 | `description` | string | Yes | One-line summary |
 | `issues` | []string | No | Related Linear issue IDs |
 | `severity` | string | No | `high`, `medium`, or `low` |
