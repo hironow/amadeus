@@ -278,7 +278,7 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 		meta.RecurrenceCount = recurrenceCount
 		meta.Outcome = domain.ImprovementOutcomeFailedAgain
 	}
-	decision := harness.DetermineCorrectionDecision(kind, severity, domain.DMailAction(candidate.Action), meta.FailureType, recurrenceCount, trigger, currentProviderState())
+	decision := harness.DetermineCorrectionDecision(kind, severity, domain.DMailAction(candidate.Action), meta.FailureType, recurrenceCount, trigger, currentProviderState(), domain.DefaultRoutingPolicy())
 	meta.RoutingMode = decision.RoutingMode
 	meta.TargetAgent = decision.TargetAgent
 	if decision.RoutingMode != "" {

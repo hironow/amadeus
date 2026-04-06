@@ -54,8 +54,8 @@ func DetectOwnerLoop(ownerHistory []string) bool {
 // but with routing_mode=escalate. The receiving tool's existing approval gate
 // (sightjack convergence gate / paintress inbox HIGH-severity gate) handles
 // the human-in-the-loop handoff. No dedicated human endpoint is needed.
-func DetermineCorrectionDecision(kind domain.DMailKind, severity domain.Severity, candidateAction domain.DMailAction, failureType domain.FailureType, recurrenceCount int, trigger domain.CorrectionMetadata, providerSnapshot domain.ProviderStateSnapshot) CorrectionDecision {
-	targetAgent := CorrectiveTargetAgentForFailure(kind, failureType)
+func DetermineCorrectionDecision(kind domain.DMailKind, severity domain.Severity, candidateAction domain.DMailAction, failureType domain.FailureType, recurrenceCount int, trigger domain.CorrectionMetadata, providerSnapshot domain.ProviderStateSnapshot, routingPolicy domain.RoutingPolicy) CorrectionDecision {
+	targetAgent := correctiveTargetAgentFromPolicy(kind, failureType, routingPolicy)
 	defaultTarget := targetAgentForKind(kind)
 	if targetAgent == "" {
 		targetAgent = defaultTarget
@@ -95,7 +95,7 @@ func DetermineCorrectionDecision(kind domain.DMailKind, severity domain.Severity
 		}
 	}
 	switch {
-	case recurrenceCount >= 2:
+	case recurrenceCount >= routingPolicy.RecurrenceThreshold:
 		return CorrectionDecision{
 			Action:           domain.ActionEscalate,
 			RoutingMode:      domain.RoutingModeEscalate,
@@ -118,7 +118,7 @@ func DetermineCorrectionDecision(kind domain.DMailKind, severity domain.Severity
 			TargetAgent:  targetAgent,
 			RetryAllowed: domain.BoolPtr(true),
 		}
-	case domain.NormalizeSeverity(severity) == domain.SeverityHigh:
+	case routingPolicy.LookupSeverityAction(severity) == "escalate":
 		return CorrectionDecision{
 			Action:           domain.ActionEscalate,
 			RoutingMode:      domain.RoutingModeEscalate,
@@ -188,6 +188,15 @@ func providerStateGate(snapshot domain.ProviderStateSnapshot, targetAgent string
 		}
 	}
 	return nil
+}
+
+// correctiveTargetAgentFromPolicy resolves the target agent using the policy map,
+// falling back to the hardcoded CorrectiveTargetAgentForFailure if no policy override.
+func correctiveTargetAgentFromPolicy(kind domain.DMailKind, failureType domain.FailureType, policy domain.RoutingPolicy) string {
+	if agent := policy.LookupTargetAgent(failureType); agent != "" {
+		return agent
+	}
+	return CorrectiveTargetAgentForFailure(kind, failureType)
 }
 
 func targetAgentForKind(kind domain.DMailKind) string {

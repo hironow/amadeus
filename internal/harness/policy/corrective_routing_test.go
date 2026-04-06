@@ -17,7 +17,7 @@ func TestDetermineCorrectionDecision_ReroutesImplementationFeedbackToSightjackFo
 		domain.FailureTypeScopeViolation,
 		1,
 		domain.CorrectionMetadata{},
-		domain.ActiveProviderState(),
+		domain.ActiveProviderState(), domain.DefaultRoutingPolicy(),
 	)
 
 	if got.TargetAgent != "sightjack" {
@@ -39,7 +39,7 @@ func TestDetermineCorrectionDecision_EscalatesWhenRetryDisabled(t *testing.T) {
 		domain.FailureTypeExecutionFailure,
 		1,
 		domain.CorrectionMetadata{RetryAllowed: domain.BoolPtr(false)},
-		domain.ActiveProviderState(),
+		domain.ActiveProviderState(), domain.DefaultRoutingPolicy(),
 	)
 
 	if got.Action != domain.ActionEscalate {
@@ -61,7 +61,7 @@ func TestDetermineCorrectionDecision_EscalatesAfterRecurrenceThreshold(t *testin
 		domain.FailureTypeExecutionFailure,
 		2,
 		domain.CorrectionMetadata{},
-		domain.ActiveProviderState(),
+		domain.ActiveProviderState(), domain.DefaultRoutingPolicy(),
 	)
 
 	if got.Action != domain.ActionEscalate {
@@ -163,7 +163,7 @@ func TestDetermineCorrectionDecision_ProviderStateGate(t *testing.T) {
 				domain.FailureTypeExecutionFailure,
 				0, // no recurrence
 				domain.CorrectionMetadata{},
-				tt.snapshot,
+				tt.snapshot, domain.DefaultRoutingPolicy(),
 			)
 
 			if got.Action != tt.wantAction {
@@ -241,7 +241,7 @@ func TestDetermineCorrectionDecision_EscalatesOnOwnerLoop(t *testing.T) {
 		domain.CorrectionMetadata{
 			OwnerHistory: []string{"sightjack", "paintress", "sightjack", "paintress"},
 		},
-		domain.ActiveProviderState(),
+		domain.ActiveProviderState(), domain.DefaultRoutingPolicy(),
 	)
 
 	if got.Action != domain.ActionEscalate {
