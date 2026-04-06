@@ -96,3 +96,34 @@ func TestGetOutcomeStats(t *testing.T) {
 		}
 	}
 }
+
+func TestGetFailurePatterns(t *testing.T) {
+	// given
+	store := newTestImprovementStore(t)
+	ctx := context.Background()
+
+	_ = store.AppendOutcomeTransition(ctx, "c1", domain.ImprovementOutcomeResolved, "execution_failure")
+	_ = store.AppendOutcomeTransition(ctx, "c2", domain.ImprovementOutcomeFailedAgain, "execution_failure")
+	_ = store.AppendOutcomeTransition(ctx, "c3", domain.ImprovementOutcomeResolved, "scope_violation")
+
+	// when
+	patterns, err := store.GetFailurePatterns(ctx)
+
+	// then
+	if err != nil {
+		t.Fatalf("get patterns: %v", err)
+	}
+	if len(patterns) == 0 {
+		t.Fatal("expected non-empty patterns")
+	}
+	for _, p := range patterns {
+		if p.FailureType == "execution_failure" {
+			if p.TotalOccurrences != 2 {
+				t.Errorf("execution_failure total = %d, want 2", p.TotalOccurrences)
+			}
+			if p.ResolvedCount != 1 {
+				t.Errorf("execution_failure resolved = %d, want 1", p.ResolvedCount)
+			}
+		}
+	}
+}

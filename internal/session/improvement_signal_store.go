@@ -441,6 +441,48 @@ func (s *SQLiteImprovementCollectorStore) GetOutcomeStats(ctx context.Context) (
 	return result, nil
 }
 
+// FailurePatternSummary holds aggregated failure pattern data.
+type FailurePatternSummary struct {
+	FailureType      string
+	TotalOccurrences int
+	ResolvedCount    int
+	FailedAgainCount int
+}
+
+// GetFailurePatterns returns failure pattern summaries for the learning layer.
+func (s *SQLiteImprovementCollectorStore) GetFailurePatterns(ctx context.Context) ([]FailurePatternSummary, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("improvement collector store: nil db")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT failure_type,
+			COUNT(*) as total,
+			SUM(CASE WHEN outcome='resolved' THEN 1 ELSE 0 END) as resolved,
+			SUM(CASE WHEN outcome='failed_again' THEN 1 ELSE 0 END) as failed_again
+		FROM improvement_signal
+		WHERE failure_type != ''
+		GROUP BY failure_type
+		ORDER BY total DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("improvement collector store: query patterns: %w", err)
+	}
+	defer rows.Close()
+
+	var result []FailurePatternSummary
+	for rows.Next() {
+		var s FailurePatternSummary
+		if err := rows.Scan(&s.FailureType, &s.TotalOccurrences, &s.ResolvedCount, &s.FailedAgainCount); err != nil {
+			return nil, fmt.Errorf("improvement collector store: scan pattern: %w", err)
+		}
+		result = append(result, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("improvement collector store: iterate patterns: %w", err)
+	}
+	return result, nil
+}
+
 func marshalImprovementPayload(payload map[string]any) string {
 	if len(payload) == 0 {
 		return "{}"
