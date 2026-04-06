@@ -355,6 +355,92 @@ func saveImprovementSignal(ctx context.Context, conn *sql.Conn, signal Normalize
 	return nil
 }
 
+// AppendOutcomeTransition records an outcome transition as a new row (append-only).
+// This preserves history: the same correlation_id may have multiple rows showing
+// the transition from pending → failed_again → resolved.
+func (s *SQLiteImprovementCollectorStore) AppendOutcomeTransition(ctx context.Context, correlationID string, outcome domain.ImprovementOutcome, failureType string) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("improvement collector store: nil db")
+	}
+	now := time.Now().UTC()
+	dedupKey := fmt.Sprintf("outcome-%s-%s-%s", correlationID, outcome, now.Format(time.RFC3339Nano))
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO improvement_signal(
+			dedup_key, feedback_id, project_id, weave_ref, feedback_type, source_surface,
+			schema_version, failure_type, severity, secondary_type, target_agent,
+			routing_mode, routing_history, owner_history, recurrence_count,
+			corrective_action, retry_allowed, escalation_reason, correlation_id,
+			trace_id, outcome, ignored_reason, payload_json, created_at
+		) VALUES (?, '', '', '', 'outcome_transition', 'amadeus_recheck',
+			'1', ?, '', '', '',
+			'', '', '', 0,
+			'', '', '', ?,
+			'', ?, '', '{}', ?)
+	`, dedupKey, failureType, correlationID, string(outcome), now.Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("improvement collector store: append outcome: %w", err)
+	}
+	return nil
+}
+
+// OutcomeStats holds aggregated outcome counts for a failure type.
+type OutcomeStats struct {
+	FailureType string
+	Resolved    int
+	FailedAgain int
+	Escalated   int
+	Pending     int
+}
+
+// GetOutcomeStats returns outcome counts grouped by failure_type.
+func (s *SQLiteImprovementCollectorStore) GetOutcomeStats(ctx context.Context) ([]OutcomeStats, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("improvement collector store: nil db")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT failure_type, outcome, COUNT(*) as count
+		FROM improvement_signal
+		WHERE outcome != '' AND failure_type != ''
+		GROUP BY failure_type, outcome
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("improvement collector store: query stats: %w", err)
+	}
+	defer rows.Close()
+
+	statsMap := make(map[string]*OutcomeStats)
+	for rows.Next() {
+		var ft, outcome string
+		var count int
+		if err := rows.Scan(&ft, &outcome, &count); err != nil {
+			return nil, fmt.Errorf("improvement collector store: scan stats: %w", err)
+		}
+		if _, ok := statsMap[ft]; !ok {
+			statsMap[ft] = &OutcomeStats{FailureType: ft}
+		}
+		s := statsMap[ft]
+		switch domain.ImprovementOutcome(outcome) {
+		case domain.ImprovementOutcomeResolved:
+			s.Resolved = count
+		case domain.ImprovementOutcomeFailedAgain:
+			s.FailedAgain = count
+		case domain.ImprovementOutcomeEscalated:
+			s.Escalated = count
+		case domain.ImprovementOutcomePending:
+			s.Pending = count
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("improvement collector store: iterate stats: %w", err)
+	}
+
+	result := make([]OutcomeStats, 0, len(statsMap))
+	for _, v := range statsMap {
+		result = append(result, *v)
+	}
+	return result, nil
+}
+
 func marshalImprovementPayload(payload map[string]any) string {
 	if len(payload) == 0 {
 		return "{}"
