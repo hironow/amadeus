@@ -128,7 +128,7 @@ func TestRunPreMergePipeline_noPRs(t *testing.T) {
 		t.Fatalf("expected 0 dmails, got: %d", len(dmails))
 	}
 	if emitter.prConvergenceCheckedData != nil {
-		t.Error("expected no pr_convergence.checked event for empty PRs")
+		t.Error("expected no pr.convergence.checked event for empty PRs")
 	}
 }
 
@@ -159,7 +159,7 @@ func TestRunPreMergePipeline_singleChain(t *testing.T) {
 		t.Errorf("expected 1 emitted dmail, got: %d", len(emitter.dmailsGenerated))
 	}
 	if emitter.prConvergenceCheckedData == nil {
-		t.Fatal("expected pr_convergence.checked event")
+		t.Fatal("expected pr.convergence.checked event")
 	}
 	if emitter.prConvergenceCheckedData.TotalOpenPRs != 3 {
 		t.Errorf("expected TotalOpenPRs=3, got %d", emitter.prConvergenceCheckedData.TotalOpenPRs)
@@ -188,7 +188,7 @@ func TestRunPreMergePipeline_withConflict(t *testing.T) {
 		t.Errorf("expected severity %q, got %q", domain.SeverityHigh, dmails[0].Severity)
 	}
 	if emitter.prConvergenceCheckedData == nil {
-		t.Fatal("expected pr_convergence.checked event")
+		t.Fatal("expected pr.convergence.checked event")
 	}
 	if emitter.prConvergenceCheckedData.ConflictPRs != 1 {
 		t.Errorf("expected ConflictPRs=1, got %d", emitter.prConvergenceCheckedData.ConflictPRs)
@@ -225,7 +225,7 @@ func TestRunPreMergePipeline_manyPRs(t *testing.T) {
 		t.Errorf("expected 3 dmails, got %d", len(dmails))
 	}
 	if emitter.prConvergenceCheckedData == nil {
-		t.Fatal("expected pr_convergence.checked event")
+		t.Fatal("expected pr.convergence.checked event")
 	}
 	data := emitter.prConvergenceCheckedData
 	if data.TotalOpenPRs != 50 {
@@ -255,7 +255,7 @@ func TestRunPreMergePipeline_singleMergeablePR(t *testing.T) {
 		t.Fatalf("expected 0 dmails, got: %d", len(dmails))
 	}
 	if emitter.prConvergenceCheckedData == nil {
-		t.Fatal("expected pr_convergence.checked event")
+		t.Fatal("expected pr.convergence.checked event")
 	}
 	if emitter.prConvergenceCheckedData.DMails != 0 {
 		t.Errorf("expected DMails=0, got %d", emitter.prConvergenceCheckedData.DMails)

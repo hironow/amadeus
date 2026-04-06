@@ -3,6 +3,7 @@ package domain_test
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -704,5 +705,15 @@ func TestValidateEvent_RejectsFutureSchema(t *testing.T) {
 	}
 	if err != nil && !strings.Contains(err.Error(), "schema_version") {
 		t.Errorf("error should mention schema_version, got: %v", err)
+	}
+}
+
+func TestAllEventTypes_NoDotCaseViolation(t *testing.T) {
+	// Contract: every EventType constant MUST be pure dot.case (no underscores).
+	dotCaseRe := regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$`)
+	for et := range domain.AllValidEventTypes() {
+		if !dotCaseRe.MatchString(string(et)) {
+			t.Errorf("EventType %q violates dot.case naming convention", et)
+		}
 	}
 }

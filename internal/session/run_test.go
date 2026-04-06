@@ -361,7 +361,7 @@ func TestRun_inboxTriggerPreMerge(t *testing.T) {
 
 	// Verify PR convergence was checked: once on startup + once on D-Mail arrival
 	if emitter.prConvergenceCalls != 2 {
-		t.Errorf("expected 2 pr_convergence.checked events (initial + inbox), got %d", emitter.prConvergenceCalls)
+		t.Errorf("expected 2 pr.convergence.checked events (initial + inbox), got %d", emitter.prConvergenceCalls)
 	}
 
 	// Verify at least 1 implementation-feedback D-Mail generated
@@ -432,7 +432,7 @@ func TestRun_baseBranchOverridesCurrentBranch(t *testing.T) {
 
 	// PR convergence must find chains (proves integrationBranch="main" was used)
 	if emitter.prConvergenceCalls < 1 {
-		t.Errorf("expected at least 1 pr_convergence.checked event, got %d", emitter.prConvergenceCalls)
+		t.Errorf("expected at least 1 pr.convergence.checked event, got %d", emitter.prConvergenceCalls)
 	}
 
 	// Implementation-feedback D-Mails must be generated from the chain
@@ -490,7 +490,7 @@ func TestRun_noPRReaderSkipsPreMerge(t *testing.T) {
 
 	// But no PR convergence events (pre-merge skipped)
 	if emitter.prConvergenceCalls != 0 {
-		t.Errorf("expected 0 pr_convergence.checked events, got %d", emitter.prConvergenceCalls)
+		t.Errorf("expected 0 pr.convergence.checked events, got %d", emitter.prConvergenceCalls)
 	}
 
 	// And no D-Mails generated (no pre-merge, no post-merge)

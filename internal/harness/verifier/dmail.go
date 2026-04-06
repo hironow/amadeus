@@ -8,15 +8,8 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-// validKinds is the set of valid DMailKind values per schema v1.
-var validKinds = map[domain.DMailKind]bool{
-	domain.KindDesignFeedback: true,
-	domain.KindImplFeedback:   true,
-	domain.KindSpecification:  true,
-	domain.KindReport:         true,
-	domain.KindConvergence:    true,
-	domain.KindCIResult:       true,
-}
+// validKinds references the canonical set from domain to prevent drift.
+var validKinds = domain.ValidDMailKinds
 
 // validSeverities is the set of valid Severity values per schema v1.
 var validSeverities = map[domain.Severity]bool{

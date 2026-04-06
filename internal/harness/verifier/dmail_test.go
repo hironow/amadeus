@@ -24,7 +24,7 @@ func TestValidateDMail_Valid(t *testing.T) {
 }
 
 func TestValidateDMail_AllKinds(t *testing.T) {
-	for _, kind := range []domain.DMailKind{domain.KindDesignFeedback, domain.KindImplFeedback, domain.KindSpecification, domain.KindReport, domain.KindConvergence, domain.KindCIResult} {
+	for _, kind := range []domain.DMailKind{domain.KindDesignFeedback, domain.KindImplFeedback, domain.KindSpecification, domain.KindReport, domain.KindConvergence, domain.KindCIResult, domain.KindStallEscalation} {
 		dmail := domain.DMail{
 			SchemaVersion: domain.DMailSchemaVersion,
 			Name:          "test-001",

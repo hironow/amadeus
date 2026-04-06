@@ -25,7 +25,7 @@ type EventType string
 const (
 	EventCheckCompleted       EventType = "check.completed"
 	EventBaselineUpdated      EventType = "baseline.updated"
-	EventForceFullNextSet     EventType = "force_full_next.set"
+	EventForceFullNextSet     EventType = "force.full.next.set"
 	EventDMailGenerated       EventType = "dmail.generated"
 	EventInboxConsumed        EventType = "inbox.consumed"
 	EventDMailCommented       EventType = "dmail.commented"
@@ -33,9 +33,9 @@ const (
 	EventArchivePruned        EventType = "archive.pruned"
 	EventRunStarted           EventType = "run.started"
 	EventRunStopped           EventType = "run.stopped"
-	EventPRConvergenceChecked EventType = "pr_convergence.checked"
+	EventPRConvergenceChecked EventType = "pr.convergence.checked"
 	EventPRMerged             EventType = "pr.merged"
-	EventPRMergeSkipped       EventType = "pr.merge_skipped"
+	EventPRMergeSkipped       EventType = "pr.merge.skipped"
 	EventSystemCutover        EventType = "system.cutover"
 )
 
@@ -55,6 +55,11 @@ var validEventTypes = map[EventType]bool{
 	EventPRMerged:             true,
 	EventPRMergeSkipped:       true,
 	EventSystemCutover:        true,
+}
+
+// AllValidEventTypes returns the canonical event type set (for testing/validation).
+func AllValidEventTypes() map[EventType]bool {
+	return validEventTypes
 }
 
 // ValidEventType returns true if the given EventType is recognized.
