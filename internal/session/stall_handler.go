@@ -16,16 +16,16 @@ func ExtractStallEscalations(dmails []domain.DMail) []domain.DMail {
 	return stalls
 }
 
-// handleStallEscalations processes stall-escalation D-Mails received from sightjack.
+// HandleStallEscalations processes stall-escalation D-Mails received from sightjack.
 // Logs each stall event with metadata for operator visibility.
 // Returns the count of stalls handled.
-func (a *Amadeus) handleStallEscalations(stalls []domain.DMail) int {
+func HandleStallEscalations(stalls []domain.DMail, logger domain.Logger) int {
 	for _, s := range stalls {
 		waveID := s.Metadata["wave_id"]
 		cluster := s.Metadata["cluster_name"]
 		fp := s.Metadata["error_fingerprint"]
 		count := s.Metadata["failure_count"]
-		a.Logger.Warn("[STALL] Wave %s:%s stalled (fingerprint=%s, failures=%s): %s",
+		logger.Warn("[STALL] Wave %s:%s stalled (fingerprint=%s, failures=%s): %s",
 			cluster, waveID, fp, count, s.Description)
 	}
 	return len(stalls)

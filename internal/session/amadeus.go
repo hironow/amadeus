@@ -202,7 +202,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 		// Handle stall-escalation D-Mails from sightjack (SPEC-001).
 		if stalls := ExtractStallEscalations(inboxDMails); len(stalls) > 0 {
-			a.handleStallEscalations(stalls)
+			HandleStallEscalations(stalls, a.Logger)
 		}
 	}
 
