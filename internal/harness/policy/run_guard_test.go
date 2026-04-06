@@ -8,7 +8,7 @@ import (
 	"github.com/hironow/amadeus/internal/harness/policy"
 )
 
-// fakeRunLockStore is a test double for port.RunLockStore.
+// fakeRunLockStore is a test double for policy.RunLockAcquirer.
 type fakeRunLockStore struct {
 	held      bool
 	holder    string
@@ -28,12 +28,6 @@ func (f *fakeRunLockStore) Release(_ context.Context, _ string, _ string) error 
 	f.held = false
 	return nil
 }
-
-func (f *fakeRunLockStore) IsHeld(_ context.Context, _ string) (bool, string, error) {
-	return f.held, f.holder, nil
-}
-
-func (f *fakeRunLockStore) Close() error { return nil }
 
 func TestRunGuard_AllowRun_Succeeds(t *testing.T) {
 	// given

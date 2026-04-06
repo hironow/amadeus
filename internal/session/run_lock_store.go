@@ -31,7 +31,7 @@ func NewSQLiteRunLockStore(dbPath string) (*SQLiteRunLockStore, error) {
 		return nil, fmt.Errorf("run lock store: create dir: %w", err)
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", dbPath) // nosemgrep: d4-sql-open-without-defer-close -- stored in struct, closed via Close() [permanent]
 	if err != nil {
 		return nil, fmt.Errorf("run lock store: open db: %w", err)
 	}
