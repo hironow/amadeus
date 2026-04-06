@@ -226,6 +226,21 @@ type CheckStateProvider interface {
 	Restore(result domain.CheckResult)
 }
 
+// RunLockStore provides cross-process run locking backed by persistent storage.
+// Prevents duplicate runs when multiple CLI instances target the same state directory.
+type RunLockStore interface {
+	// TryAcquire attempts to acquire a lock for the given run key.
+	// Returns (true, "", nil) if acquired, (false, holder, nil) if already held.
+	// Stale locks (past expires_at) are automatically cleaned up.
+	TryAcquire(ctx context.Context, runKey string, ttl time.Duration) (acquired bool, holder string, err error)
+	// Release releases a lock previously acquired by this holder.
+	Release(ctx context.Context, runKey string, holder string) error
+	// IsHeld returns whether the lock is currently held and by whom.
+	IsHeld(ctx context.Context, runKey string) (held bool, holder string, err error)
+	// Close releases database resources.
+	Close() error
+}
+
 // Orchestrator is the session-layer I/O orchestration interface.
 // Implemented by session.Amadeus; injected into usecase by cmd (composition root).
 type Orchestrator interface {
