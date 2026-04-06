@@ -90,6 +90,29 @@ Claude subprocess uses layered isolation to prevent parent session context (266+
 
 Ref: ADR S0035, `internal/cmd/doctor_checks.go`
 
+## Harness Inventory (Track A)
+
+amadeus harness sub-packages and their current function count:
+
+| Sub-package | Functions | Role |
+|-------------|-----------|------|
+| `harness/policy` | `DetermineCorrectionDecision`, `CorrectiveTargetAgentForFailure`, `DetectOwnerLoop`, `providerStateGate`, `EvaluateExhaustion`, `RunGuard` | Deterministic decisions (routing, exhaustion, run locking) |
+| `harness/verifier` | Provider error classification, D-Mail schema validation | Validation rules |
+| `harness/filter` | `PromptRegistry`, response schemas, GEPA scaffold | LLM action spaces |
+
+Ref: ADR S0038, S0039, `refs/opsx/semgrep-layer-contract.md`
+
+## Improvement Controller (Track D3/F)
+
+The improvement controller (Weave feedback collector, normalized signal store, corrective policy generation) resides in amadeus session layer. This is an intentional placement decision (ADR S0041).
+
+Key components:
+- `session/improvement_collector.go` — Weave feedback polling + normalization
+- `session/improvement_signal_store.go` — SQLite sink + outcome transition + aggregation
+- `session/improvement_weave_source.go` — HTTP adapter for Weave API
+
+Ref: ADR S0041
+
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.
