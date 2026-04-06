@@ -77,6 +77,60 @@ func ActiveProviderState() ProviderStateSnapshot {
 	}
 }
 
+// RetryBudgetTracker tracks remaining retry budget with exhaustion detection.
+// Pure domain type: no I/O, no sync (caller manages concurrency).
+type RetryBudgetTracker struct {
+	initial  int
+	consumed int
+}
+
+// NewRetryBudgetTracker creates a tracker with the given initial budget.
+func NewRetryBudgetTracker(initial int) *RetryBudgetTracker {
+	if initial < 0 {
+		initial = 0
+	}
+	return &RetryBudgetTracker{initial: initial}
+}
+
+// Consume decrements the remaining budget by one.
+// Returns true if budget was available, false if already exhausted.
+func (t *RetryBudgetTracker) Consume() bool {
+	if t.consumed >= t.initial {
+		return false
+	}
+	t.consumed++
+	return true
+}
+
+// Remaining returns the number of retries still available.
+func (t *RetryBudgetTracker) Remaining() int {
+	r := t.initial - t.consumed
+	if r < 0 {
+		return 0
+	}
+	return r
+}
+
+// Exhausted returns true if no retry budget remains.
+func (t *RetryBudgetTracker) Exhausted() bool {
+	return t.consumed >= t.initial
+}
+
+// Reset replaces the budget with a new initial value and clears consumed count.
+func (t *RetryBudgetTracker) Reset(initial int) {
+	if initial < 0 {
+		initial = 0
+	}
+	t.initial = initial
+	t.consumed = 0
+}
+
+// Snapshot returns the current remaining budget as an int,
+// suitable for ProviderStateSnapshot.RetryBudget.
+func (t *RetryBudgetTracker) Snapshot() int {
+	return t.Remaining()
+}
+
 func (s ProviderStateSnapshot) ApplyMetadata(meta map[string]string) map[string]string {
 	cp := make(map[string]string, len(meta)+5)
 	for k, v := range meta {
