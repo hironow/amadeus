@@ -199,6 +199,11 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 			return consumeErr
 		}
 		inboxSpan.End()
+
+		// Handle stall-escalation D-Mails from sightjack (SPEC-001).
+		if stalls := ExtractStallEscalations(inboxDMails); len(stalls) > 0 {
+			a.handleStallEscalations(stalls)
+		}
 	}
 
 	report, fullCheck, wasForced, err := a.detectShift(ctx, previous, opts.Full, opts.Quiet)

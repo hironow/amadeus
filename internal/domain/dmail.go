@@ -30,6 +30,8 @@ const (
 	KindConvergence DMailKind = "convergence"
 	// KindCIResult is produced by CI/CD pipeline integrations.
 	KindCIResult DMailKind = "ci-result"
+	// KindStallEscalation is produced when a wave is stalled due to repeated structural errors.
+	KindStallEscalation DMailKind = "stall-escalation"
 )
 
 // DMailAction represents a recommended follow-up action for a D-Mail.
