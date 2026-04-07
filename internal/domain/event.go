@@ -57,9 +57,13 @@ var validEventTypes = map[EventType]bool{
 	EventSystemCutover:        true,
 }
 
-// AllValidEventTypes returns the canonical event type set (for testing/validation).
+// AllValidEventTypes returns a copy of the canonical event type set (for testing/validation).
 func AllValidEventTypes() map[EventType]bool {
-	return validEventTypes
+	cp := make(map[EventType]bool, len(validEventTypes))
+	for k, v := range validEventTypes {
+		cp[k] = v
+	}
+	return cp
 }
 
 // ValidEventType returns true if the given EventType is recognized.
