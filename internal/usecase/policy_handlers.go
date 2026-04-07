@@ -52,8 +52,10 @@ func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier 
 		return nil
 	})
 
-	// POLICY: dmail.generated → dispatch improvement task (if corrective metadata present).
-	// Also observation: debug log + metrics.
+	// POLICY: dmail.generated → dispatch improvement task on escalation only.
+	// Improvement tasks are created only when routing_mode=escalate (escalation
+	// or recurrence threshold exceeded). retry/reroute D-Mails are not dispatched
+	// as improvement tasks — they follow the normal delivery path.
 	engine.Register(domain.EventDMailGenerated, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail generated (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "dmail.generated", "handled")
@@ -64,7 +66,7 @@ func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier 
 			return nil
 		}
 		meta := domain.CorrectionMetadataFromMap(data.DMail.Metadata)
-		if !meta.IsImprovement() || meta.CorrelationID == "" {
+		if meta.RoutingMode != domain.RoutingModeEscalate || meta.CorrelationID == "" {
 			return nil
 		}
 		task := domain.NewImprovementTask(
