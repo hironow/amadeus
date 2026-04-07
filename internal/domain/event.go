@@ -187,7 +187,7 @@ type RunStoppedData struct {
 	Reason string `json:"reason"`
 }
 
-// PRConvergenceCheckedData is the payload for pr_convergence.checked events.
+// PRConvergenceCheckedData is the payload for pr.convergence.checked events.
 type PRConvergenceCheckedData struct {
 	IntegrationBranch string `json:"integration_branch"`
 	TotalOpenPRs      int    `json:"total_open_prs"`
@@ -203,7 +203,7 @@ type PRMergedData struct {
 	Method   string `json:"method"` // "squash" or "merge"
 }
 
-// PRMergeSkippedData is the payload for pr.merge_skipped events.
+// PRMergeSkippedData is the payload for pr.merge.skipped events.
 type PRMergeSkippedData struct {
 	PRNumber string   `json:"pr_number"`
 	Title    string   `json:"title"`

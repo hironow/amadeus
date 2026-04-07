@@ -124,7 +124,7 @@ All state mutations flow through the `emit()` method, which appends events to th
 |---|---|---|
 | `check.completed` | `.run/latest.json` | Divergence check result |
 | `baseline.updated` | `.run/baseline.json` | Full calibration baseline |
-| `force_full_next.set` | `.run/latest.json` | Deferred full scan flag |
+| `force.full.next.set` | `.run/latest.json` | Deferred full scan flag |
 | `dmail.generated` | `archive/` + `outbox/` | D-Mail creation |
 | `inbox.consumed` | `.run/consumed.json` | Inbox D-Mail processed |
 | `dmail.commented` | `.run/sync.json` | D-Mail posted as comment |
@@ -132,7 +132,7 @@ All state mutations flow through the `emit()` method, which appends events to th
 | `archive.pruned` | `archive/` (file removal) | Archive cleanup |
 | `run.started` | (informational only) | Daemon started |
 | `run.stopped` | (informational only) | Daemon stopped |
-| `pr_convergence.checked` | (informational only) | PR convergence pipeline completed |
+| `pr.convergence.checked` | (informational only) | PR convergence pipeline completed |
 
 ### Rebuild
 
