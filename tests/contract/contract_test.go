@@ -1,23 +1,23 @@
 //go:build contract
 
-package domain
-
-// white-box-reason: contract validation: tests unexported golden file enumeration
+package contract_test
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
-const contractGoldenDir = "testdata/contract"
+const goldenDir = "testdata/golden"
 
-func contractGoldenFiles(t *testing.T) []string {
+func goldenFiles(t *testing.T) []string {
 	t.Helper()
-	entries, err := os.ReadDir(contractGoldenDir)
+	entries, err := os.ReadDir(goldenDir)
 	if err != nil {
-		t.Fatalf("read contract golden dir: %v", err)
+		t.Fatalf("read golden dir: %v", err)
 	}
 	var files []string
 	for _, e := range entries {
@@ -26,28 +26,27 @@ func contractGoldenFiles(t *testing.T) []string {
 		}
 	}
 	if len(files) == 0 {
-		t.Fatal("no contract golden files found")
+		t.Fatal("no golden files found")
 	}
 	return files
 }
 
-func readContractGolden(t *testing.T, name string) []byte {
+func readGolden(t *testing.T, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(contractGoldenDir, name))
+	data, err := os.ReadFile(filepath.Join(goldenDir, name))
 	if err != nil {
-		t.Fatalf("read contract golden %s: %v", name, err)
+		t.Fatalf("read golden %s: %v", name, err)
 	}
 	return data
 }
 
 // TestContract_ParseDMail verifies that amadeus's ParseDMail can
-// parse all cross-tool golden files. Amadeus is Postel-liberal at
-// the parse level — unknown kinds and future schemas parse without error.
+// parse all cross-tool golden files.
 func TestContract_ParseDMail(t *testing.T) {
-	for _, name := range contractGoldenFiles(t) {
+	for _, name := range goldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
-			data := readContractGolden(t, name)
-			dm, err := ParseDMail(data)
+			data := readGolden(t, name)
+			dm, err := domain.ParseDMail(data)
 			if err != nil {
 				t.Fatalf("ParseDMail error: %v", err)
 			}
@@ -67,35 +66,33 @@ func TestContract_ParseDMail(t *testing.T) {
 	}
 }
 
-// TestContract_ValidateDMailRejectsEdgeCases verifies that amadeus's
-// strict validation rejects D-Mails with unknown kinds or future schemas.
+// TestContract_ValidateDMailRejectsEdgeCases verifies strict validation
+// rejects D-Mails with unknown kinds or future schemas.
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
-	// unknown-kind.md has kind "advisory" — should be rejected by ValidateKind
-	data := readContractGolden(t, "unknown-kind.md")
-	dm, err := ParseDMail(data)
+	data := readGolden(t, "unknown-kind.md")
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := ValidateKind(dm.Kind); err == nil {
+	if err := domain.ValidateKind(dm.Kind); err == nil {
 		t.Error("expected ValidateKind to reject unknown kind 'advisory', but it passed")
 	}
 
-	// future-schema.md has dmail-schema-version "2" — should differ from supported version
-	data = readContractGolden(t, "future-schema.md")
-	dm, err = ParseDMail(data)
+	data = readGolden(t, "future-schema.md")
+	dm, err = domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if dm.SchemaVersion == DMailSchemaVersion {
-		t.Errorf("expected future schema %q to differ from supported %q", dm.SchemaVersion, DMailSchemaVersion)
+	if dm.SchemaVersion == domain.DMailSchemaVersion {
+		t.Errorf("expected future schema %q to differ from supported %q", dm.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
 // TestContract_TargetsFieldPreserved verifies that amadeus's ParseDMail
-// preserves the targets field which is amadeus-specific.
+// preserves the targets field.
 func TestContract_TargetsFieldPreserved(t *testing.T) {
-	data := readContractGolden(t, "amadeus-convergence.md")
-	dm, err := ParseDMail(data)
+	data := readGolden(t, "amadeus-convergence.md")
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
@@ -110,15 +107,15 @@ func TestContract_TargetsFieldPreserved(t *testing.T) {
 	}
 }
 
-// TestContract_CorrectiveMetadataRoundTrip verifies that corrective-feedback.md
+// TestContract_CorrectiveMetadataRoundTrip verifies corrective-feedback.md
 // golden file parses correctly and CorrectionMetadataFromMap extracts all fields.
 func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
-	data := readContractGolden(t, "corrective-feedback.md")
-	dm, err := ParseDMail(data)
+	data := readGolden(t, "corrective-feedback.md")
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	meta := CorrectionMetadataFromMap(dm.Metadata)
+	meta := domain.CorrectionMetadataFromMap(dm.Metadata)
 	if !meta.IsImprovement() {
 		t.Fatal("expected IsImprovement() = true for corrective-feedback.md")
 	}
