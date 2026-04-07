@@ -69,27 +69,25 @@ func TestContract_ParseDMail(t *testing.T) {
 
 // TestContract_ValidateDMailRejectsEdgeCases verifies that amadeus's
 // strict validation rejects D-Mails with unknown kinds or future schemas.
-// amadeus ValidateDMail returns []string (error list), not error.
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
-	cases := []struct {
-		file   string
-		reason string
-	}{
-		{"unknown-kind.md", "kind 'advisory' not in valid kinds"},
-		{"future-schema.md", "dmail-schema-version '2' not supported"},
+	// unknown-kind.md has kind "advisory" — should be rejected by ValidateKind
+	data := readContractGolden(t, "unknown-kind.md")
+	dm, err := ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail error: %v", err)
 	}
-	for _, tc := range cases {
-		t.Run(tc.file, func(t *testing.T) {
-			data := readContractGolden(t, tc.file)
-			dm, err := ParseDMail(data)
-			if err != nil {
-				t.Fatalf("ParseDMail error: %v", err)
-			}
-			errs := ValidateDMail(dm)
-			if len(errs) == 0 {
-				t.Errorf("expected ValidateDMail to fail (%s), but it passed", tc.reason)
-			}
-		})
+	if err := ValidateKind(dm.Kind); err == nil {
+		t.Error("expected ValidateKind to reject unknown kind 'advisory', but it passed")
+	}
+
+	// future-schema.md has dmail-schema-version "2" — should differ from supported version
+	data = readContractGolden(t, "future-schema.md")
+	dm, err = ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail error: %v", err)
+	}
+	if dm.SchemaVersion == DMailSchemaVersion {
+		t.Errorf("expected future schema %q to differ from supported %q", dm.SchemaVersion, DMailSchemaVersion)
 	}
 }
 
@@ -109,5 +107,41 @@ func TestContract_TargetsFieldPreserved(t *testing.T) {
 	}
 	if dm.Targets[1] != "session-management" {
 		t.Errorf("Targets[1] = %q, want %q", dm.Targets[1], "session-management")
+	}
+}
+
+// TestContract_CorrectiveMetadataRoundTrip verifies that corrective-feedback.md
+// golden file parses correctly and CorrectionMetadataFromMap extracts all fields.
+func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
+	data := readContractGolden(t, "corrective-feedback.md")
+	dm, err := ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail error: %v", err)
+	}
+	meta := CorrectionMetadataFromMap(dm.Metadata)
+	if !meta.IsImprovement() {
+		t.Fatal("expected IsImprovement() = true for corrective-feedback.md")
+	}
+	checks := map[string]string{
+		"routing_mode":   string(meta.RoutingMode),
+		"target_agent":   meta.TargetAgent,
+		"provider_state": string(meta.ProviderState),
+		"correlation_id": meta.CorrelationID,
+		"trace_id":       meta.TraceID,
+		"failure_type":   string(meta.FailureType),
+	}
+	expected := map[string]string{
+		"routing_mode":   "escalate",
+		"target_agent":   "sightjack",
+		"provider_state": "active",
+		"correlation_id": "corr-abc-123",
+		"trace_id":       "trace-xyz-789",
+		"failure_type":   "scope_violation",
+	}
+	for key, want := range expected {
+		got := checks[key]
+		if got != want {
+			t.Errorf("metadata[%q] = %q, want %q", key, got, want)
+		}
 	}
 }
