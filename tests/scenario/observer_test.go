@@ -317,7 +317,7 @@ func (o *Observer) AssertIdempotencyKey(path string) {
 
 // --- Check aggregate + config validation helpers (proposals 061, 064) ---
 
-// AssertForceFullNextInJSONL scans .gate/events/*.jsonl for force_full_next.set
+// AssertForceFullNextInJSONL scans .gate/events/*.jsonl for force.full.next.set
 // event, indicating that a divergence jump was detected and the next check
 // should be promoted to full calibration.
 func (o *Observer) AssertForceFullNextInJSONL() {
@@ -332,11 +332,11 @@ func (o *Observer) AssertForceFullNextInJSONL() {
 			continue
 		}
 		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
-		if strings.Contains(string(data), `"force_full_next"`) {
+		if strings.Contains(string(data), `"force.full.next.set"`) {
 			return
 		}
 	}
-	o.t.Error("no force_full_next event found in .gate/events/*.jsonl")
+	o.t.Error("no force.full.next.set event found in .gate/events/*.jsonl")
 }
 
 // --- Fan-out content parity helpers (proposal 067) ---

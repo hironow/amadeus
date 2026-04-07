@@ -34,6 +34,23 @@ const (
 	KindStallEscalation DMailKind = "stall-escalation"
 )
 
+// ValidDMailKinds is the canonical set of valid D-Mail kinds (schema v1).
+// Used by verifiers to avoid maintaining a separate copy.
+var ValidDMailKinds = map[DMailKind]bool{
+	KindDesignFeedback:  true,
+	KindImplFeedback:    true,
+	KindSpecification:   true,
+	KindReport:          true,
+	KindConvergence:     true,
+	KindCIResult:        true,
+	KindStallEscalation: true,
+}
+
+// IsValidDMailKind returns true if the kind is in the canonical set.
+func IsValidDMailKind(kind DMailKind) bool {
+	return ValidDMailKinds[kind]
+}
+
 // DMailAction represents a recommended follow-up action for a D-Mail.
 type DMailAction string
 

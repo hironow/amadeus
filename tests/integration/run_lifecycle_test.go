@@ -281,7 +281,7 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 	// Verify PR convergence was checked (pre-merge pipeline ran)
 	prConvergenceCount := countEventsByType(events, domain.EventPRConvergenceChecked)
 	if prConvergenceCount < 1 {
-		t.Errorf("expected at least 1 pr_convergence.checked event, got %d", prConvergenceCount)
+		t.Errorf("expected at least 1 pr.convergence.checked event, got %d", prConvergenceCount)
 	}
 
 	// Verify inbox directory is empty (consumed)

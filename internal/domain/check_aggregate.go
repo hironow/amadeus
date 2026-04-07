@@ -107,7 +107,7 @@ func (a *CheckAggregate) RecordInboxConsumed(data InboxConsumedData, now time.Ti
 	return NewEvent(EventInboxConsumed, data, now)
 }
 
-// RecordForceFullNextSet produces a force_full_next.set event and sets the flag.
+// RecordForceFullNextSet produces a force.full.next.set event and sets the flag.
 func (a *CheckAggregate) RecordForceFullNextSet(prevDiv, currDiv float64, now time.Time) (Event, error) {
 	a.forceFullNext = true
 	return NewEvent(EventForceFullNextSet, ForceFullNextSetData{
@@ -143,7 +143,7 @@ func (a *CheckAggregate) RecordRunStopped(data RunStoppedData, now time.Time) (E
 	return NewEvent(EventRunStopped, data, now)
 }
 
-// RecordPRConvergenceChecked produces a pr_convergence.checked event.
+// RecordPRConvergenceChecked produces a pr.convergence.checked event.
 func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedData, now time.Time) (Event, error) {
 	return NewEvent(EventPRConvergenceChecked, data, now)
 }
@@ -153,7 +153,7 @@ func (a *CheckAggregate) RecordPRMerged(data PRMergedData, now time.Time) (Event
 	return NewEvent(EventPRMerged, data, now)
 }
 
-// RecordPRMergeSkipped produces a pr.merge_skipped event.
+// RecordPRMergeSkipped produces a pr.merge.skipped event.
 func (a *CheckAggregate) RecordPRMergeSkipped(data PRMergeSkippedData, now time.Time) (Event, error) {
 	return NewEvent(EventPRMergeSkipped, data, now)
 }

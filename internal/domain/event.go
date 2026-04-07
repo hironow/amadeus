@@ -25,7 +25,7 @@ type EventType string
 const (
 	EventCheckCompleted       EventType = "check.completed"
 	EventBaselineUpdated      EventType = "baseline.updated"
-	EventForceFullNextSet     EventType = "force_full_next.set"
+	EventForceFullNextSet     EventType = "force.full.next.set"
 	EventDMailGenerated       EventType = "dmail.generated"
 	EventInboxConsumed        EventType = "inbox.consumed"
 	EventDMailCommented       EventType = "dmail.commented"
@@ -33,9 +33,9 @@ const (
 	EventArchivePruned        EventType = "archive.pruned"
 	EventRunStarted           EventType = "run.started"
 	EventRunStopped           EventType = "run.stopped"
-	EventPRConvergenceChecked EventType = "pr_convergence.checked"
+	EventPRConvergenceChecked EventType = "pr.convergence.checked"
 	EventPRMerged             EventType = "pr.merged"
-	EventPRMergeSkipped       EventType = "pr.merge_skipped"
+	EventPRMergeSkipped       EventType = "pr.merge.skipped"
 	EventSystemCutover        EventType = "system.cutover"
 )
 
@@ -55,6 +55,15 @@ var validEventTypes = map[EventType]bool{
 	EventPRMerged:             true,
 	EventPRMergeSkipped:       true,
 	EventSystemCutover:        true,
+}
+
+// AllValidEventTypes returns a copy of the canonical event type set (for testing/validation).
+func AllValidEventTypes() map[EventType]bool {
+	cp := make(map[EventType]bool, len(validEventTypes))
+	for k, v := range validEventTypes {
+		cp[k] = v
+	}
+	return cp
 }
 
 // ValidEventType returns true if the given EventType is recognized.
@@ -182,7 +191,7 @@ type RunStoppedData struct {
 	Reason string `json:"reason"`
 }
 
-// PRConvergenceCheckedData is the payload for pr_convergence.checked events.
+// PRConvergenceCheckedData is the payload for pr.convergence.checked events.
 type PRConvergenceCheckedData struct {
 	IntegrationBranch string `json:"integration_branch"`
 	TotalOpenPRs      int    `json:"total_open_prs"`
@@ -198,7 +207,7 @@ type PRMergedData struct {
 	Method   string `json:"method"` // "squash" or "merge"
 }
 
-// PRMergeSkippedData is the payload for pr.merge_skipped events.
+// PRMergeSkippedData is the payload for pr.merge.skipped events.
 type PRMergeSkippedData struct {
 	PRNumber string   `json:"pr_number"`
 	Title    string   `json:"title"`
