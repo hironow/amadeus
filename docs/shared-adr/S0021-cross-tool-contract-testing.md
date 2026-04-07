@@ -1,7 +1,7 @@
 # S0021. Cross-Tool Contract Testing
 
 **Date:** 2026-03-02
-**Status:** Accepted
+**Status:** Superseded by S0042
 
 ## Context
 
