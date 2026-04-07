@@ -93,9 +93,9 @@ func (p *fakeProjector) Apply(event domain.Event) error {
 	p.applied = append(p.applied, event)
 	return nil
 }
-func (p *fakeProjector) Rebuild(_ []domain.Event) error {
-	return nil
-}
+func (p *fakeProjector) Rebuild(_ []domain.Event) error       { return nil }
+func (p *fakeProjector) Serialize() ([]byte, error)           { return nil, nil }
+func (p *fakeProjector) Deserialize(_ []byte) error           { return nil }
 
 // testCheckEventEmitter implements port.CheckEventEmitter for session tests.
 // It wraps the aggregate + event store + projector without usecase import.
