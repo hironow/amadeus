@@ -48,7 +48,7 @@ func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	}
 
 	// when: RunCheck will fail at Git operations (not configured), but wiring happens first
-	_ = usecase.RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	_ = usecase.RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	// then: emitter and state should have been injected
 	if a.Emitter == nil {

@@ -41,7 +41,8 @@ type Amadeus struct {
 	SeqAlloc    port.SeqAllocator       // global SeqNr (ADR S0040)
 	Insights    *InsightWriter          // nil = skip insight generation
 	Collector   *ImprovementCollector   // nil = skip external improvement signal ingestion
-	Policy      domain.RoutingPolicy    // corrective routing policy (loaded from YAML, fallback = default)
+	Policy      domain.RoutingPolicy              // corrective routing policy (loaded from YAML, fallback = default)
+	Dispatcher  port.ImprovementTaskDispatcher   // never nil — use NopImprovementTaskDispatcher for dry-run/tests
 
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.

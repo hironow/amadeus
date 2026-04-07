@@ -16,7 +16,9 @@ import (
 // The ExecuteCheckCommand is already valid by construction (parse-don't-validate).
 func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions,
 	pipeline port.Orchestrator, cfg domain.Config, logger domain.Logger,
-	notifier port.Notifier, metrics port.PolicyMetrics) error {
+	notifier port.Notifier, metrics port.PolicyMetrics,
+	dispatcher port.ImprovementTaskDispatcher,
+) error {
 	// Create aggregate with config
 	agg := domain.NewCheckAggregate(cfg)
 
@@ -28,7 +30,7 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	if metrics == nil {
 		metrics = &port.NopPolicyMetrics{}
 	}
-	registerCheckPolicies(engine, logger, notifier, metrics)
+	registerCheckPolicies(engine, logger, notifier, metrics, dispatcher)
 
 	// Create EventEmitter + StateManager wrapping the aggregate
 	emitter := NewCheckEventEmitter(agg, pipeline.EventStore(), pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger)

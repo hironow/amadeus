@@ -10,8 +10,8 @@ import (
 )
 
 // ExportRegisterCheckPolicies exposes registerCheckPolicies for external tests.
-var ExportRegisterCheckPolicies = func(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
-	registerCheckPolicies(engine, logger, notifier, metrics)
+var ExportRegisterCheckPolicies = func(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics, dispatcher port.ImprovementTaskDispatcher) {
+	registerCheckPolicies(engine, logger, notifier, metrics, dispatcher)
 }
 
 // ExportPolicyHandler is a type alias for external tests.

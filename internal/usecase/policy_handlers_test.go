@@ -45,7 +45,7 @@ func TestPolicyHandler_CheckCompleted_InfoOutput(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -79,7 +79,7 @@ func TestPolicyHandler_CheckCompleted_NotifiesSideEffect(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -116,7 +116,7 @@ func TestPolicyHandler_ConvergenceDetected_RecordsMetrics(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",
@@ -146,7 +146,7 @@ func TestPolicyHandler_InboxConsumed_RecordsMetrics(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventInboxConsumed, map[string]string{
 		"kind": "specification",
@@ -176,7 +176,7 @@ func TestPolicyHandler_DMailGenerated_RecordsMetrics(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventDMailGenerated, map[string]string{
 		"kind": "design-feedback",
@@ -206,7 +206,7 @@ func TestPolicyHandler_ConvergenceDetected_NotifiesSideEffect(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",

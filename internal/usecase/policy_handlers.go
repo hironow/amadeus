@@ -12,7 +12,7 @@ import (
 
 // registerCheckPolicies registers POLICY handlers for check events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
-func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
+func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics, dispatcher port.ImprovementTaskDispatcher) {
 	engine.Register(domain.EventCheckCompleted, func(ctx context.Context, event domain.Event) error {
 		var data domain.CheckCompletedData
 		if err := json.Unmarshal(event.Data, &data); err != nil {
@@ -52,11 +52,34 @@ func registerCheckPolicies(engine *PolicyEngine, logger domain.Logger, notifier 
 		return nil
 	})
 
-	// POLICY CONTRACT: observation-only — debug log + metrics.
-	// D-Mail generation is an intermediate step before delivery.
+	// POLICY: dmail.generated → dispatch improvement task (if corrective metadata present).
+	// Also observation: debug log + metrics.
 	engine.Register(domain.EventDMailGenerated, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail generated (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "dmail.generated", "handled")
+
+		var data domain.DMailGeneratedData
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			logger.Debug("policy: dmail generated parse error: %v", err)
+			return nil
+		}
+		meta := domain.CorrectionMetadataFromMap(data.DMail.Metadata)
+		if !meta.IsImprovement() || meta.CorrelationID == "" {
+			return nil
+		}
+		task := domain.NewImprovementTask(
+			data.DMail.Name,
+			meta.TargetAgent,
+			meta.CorrectiveAction,
+			meta.FailureType,
+			meta.Severity,
+			30*time.Minute,
+		)
+		if dispatchErr := dispatcher.Dispatch(ctx, task, meta.CorrelationID); dispatchErr != nil {
+			logger.Debug("policy: improvement task dispatch: %v", dispatchErr)
+		} else {
+			metrics.RecordPolicyEvent(ctx, "improvement.task.dispatched", "handled")
+		}
 		return nil
 	})
 }
