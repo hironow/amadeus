@@ -241,6 +241,21 @@ type RunLockStore interface {
 	Close() error
 }
 
+// ImprovementTaskDispatcher dispatches improvement tasks with dedup.
+// Implemented by session.ImprovementTaskDispatcher (SQLite-backed).
+type ImprovementTaskDispatcher interface {
+	Dispatch(ctx context.Context, task domain.ImprovementTask, correlationID string) error
+	Close() error
+}
+
+// NopImprovementTaskDispatcher is a no-op dispatcher for dry-run and tests.
+type NopImprovementTaskDispatcher struct{}
+
+func (NopImprovementTaskDispatcher) Dispatch(context.Context, domain.ImprovementTask, string) error {
+	return nil
+}
+func (NopImprovementTaskDispatcher) Close() error { return nil }
+
 // Orchestrator is the session-layer I/O orchestration interface.
 // Implemented by session.Amadeus; injected into usecase by cmd (composition root).
 type Orchestrator interface {

@@ -45,7 +45,7 @@ func TestPolicyHandler_CheckCompleted_InfoOutput(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -79,7 +79,7 @@ func TestPolicyHandler_CheckCompleted_NotifiesSideEffect(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventCheckCompleted, domain.CheckCompletedData{
 		Result: domain.CheckResult{
@@ -116,7 +116,7 @@ func TestPolicyHandler_ConvergenceDetected_RecordsMetrics(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",
@@ -146,7 +146,7 @@ func TestPolicyHandler_InboxConsumed_RecordsMetrics(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventInboxConsumed, map[string]string{
 		"kind": "specification",
@@ -176,7 +176,7 @@ func TestPolicyHandler_DMailGenerated_RecordsMetrics(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyPolicyMetrics{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, spy, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventDMailGenerated, map[string]string{
 		"kind": "design-feedback",
@@ -206,7 +206,7 @@ func TestPolicyHandler_ConvergenceDetected_NotifiesSideEffect(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
 	engine := usecase.NewPolicyEngine(logger)
-	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+	usecase.ExportRegisterCheckPolicies(engine, logger, spy, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	ev, err := domain.NewEvent(domain.EventConvergenceDetected, map[string]string{
 		"status": "converged",
@@ -228,5 +228,126 @@ func TestPolicyHandler_ConvergenceDetected_NotifiesSideEffect(t *testing.T) {
 	}
 	if !strings.Contains(call.message, "Convergence") {
 		t.Errorf("expected message to contain 'Convergence', got: %s", call.message)
+	}
+}
+
+// --- ImprovementTaskDispatcher dispatch condition tests ---
+
+type spyDispatcher struct {
+	calls []domain.ImprovementTask
+}
+
+func (s *spyDispatcher) Dispatch(_ context.Context, task domain.ImprovementTask, _ string) error {
+	s.calls = append(s.calls, task)
+	return nil
+}
+
+func (s *spyDispatcher) Close() error { return nil }
+
+func TestPolicyHandler_DMailGenerated_EscalateDispatchesTask(t *testing.T) {
+	// given — D-Mail with routing_mode=escalate
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyDispatcher{}
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{
+		DMail: domain.DMail{
+			Name:        "fb-escalate-001",
+			Kind:        domain.KindImplFeedback,
+			Description: "Escalated feedback",
+			Metadata: map[string]string{
+				"routing_mode":   "escalate",
+				"target_agent":   "sightjack",
+				"correlation_id": "corr-001",
+				"failure_type":   "scope_violation",
+			},
+		},
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then: dispatcher should have been called
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 dispatch call for escalate, got %d", len(spy.calls))
+	}
+	if spy.calls[0].TargetAgent != "sightjack" {
+		t.Errorf("target_agent = %q, want %q", spy.calls[0].TargetAgent, "sightjack")
+	}
+	if spy.calls[0].FailureType != domain.FailureTypeScopeViolation {
+		t.Errorf("failure_type = %q, want %q", spy.calls[0].FailureType, domain.FailureTypeScopeViolation)
+	}
+}
+
+func TestPolicyHandler_DMailGenerated_RetryDoesNotDispatch(t *testing.T) {
+	// given — D-Mail with routing_mode=retry (not escalate)
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyDispatcher{}
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{
+		DMail: domain.DMail{
+			Name:        "fb-retry-001",
+			Kind:        domain.KindImplFeedback,
+			Description: "Retry feedback",
+			Metadata: map[string]string{
+				"routing_mode":   "retry",
+				"target_agent":   "paintress",
+				"correlation_id": "corr-002",
+				"failure_type":   "execution_failure",
+			},
+		},
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then: dispatcher should NOT have been called
+	if len(spy.calls) != 0 {
+		t.Errorf("expected 0 dispatch calls for retry, got %d", len(spy.calls))
+	}
+}
+
+func TestPolicyHandler_DMailGenerated_RerouteDoesNotDispatch(t *testing.T) {
+	// given — D-Mail with routing_mode=reroute (not escalate)
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyDispatcher{}
+	engine := usecase.NewPolicyEngine(logger)
+	usecase.ExportRegisterCheckPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventDMailGenerated, domain.DMailGeneratedData{
+		DMail: domain.DMail{
+			Name:        "fb-reroute-001",
+			Kind:        domain.KindDesignFeedback,
+			Description: "Reroute feedback",
+			Metadata: map[string]string{
+				"routing_mode":   "reroute",
+				"target_agent":   "sightjack",
+				"correlation_id": "corr-003",
+				"failure_type":   "routing_failure",
+			},
+		},
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then: dispatcher should NOT have been called
+	if len(spy.calls) != 0 {
+		t.Errorf("expected 0 dispatch calls for reroute, got %d", len(spy.calls))
 	}
 }

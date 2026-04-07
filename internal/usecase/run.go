@@ -20,6 +20,7 @@ func Run(ctx context.Context, _ domain.ExecuteRunCommand, opts domain.RunOptions
 	pipeline port.Orchestrator, cfg domain.Config, logger domain.Logger,
 	notifier port.Notifier, metrics port.PolicyMetrics,
 	prReader port.GitHubPRReader, stateReader port.StateReader,
+	dispatcher port.ImprovementTaskDispatcher,
 ) error {
 	// Validate event store availability
 	store := pipeline.EventStore()
@@ -38,7 +39,7 @@ func Run(ctx context.Context, _ domain.ExecuteRunCommand, opts domain.RunOptions
 	if metrics == nil {
 		metrics = &port.NopPolicyMetrics{}
 	}
-	registerCheckPolicies(engine, logger, notifier, metrics)
+	registerCheckPolicies(engine, logger, notifier, metrics, dispatcher)
 
 	// Create EventEmitter + StateProvider wrapping the aggregate
 	emitter := NewCheckEventEmitter(agg, store, pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger)
