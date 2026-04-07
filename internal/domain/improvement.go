@@ -362,7 +362,13 @@ func parseImprovementHistory(raw string) []string {
 	if raw == "" {
 		return nil
 	}
-	parts := strings.Split(raw, ">")
+	// Canonical delimiter is ">". Fall back to "," for legacy data
+	// that used comma-separated values (Postel's Law: liberal parse).
+	delimiter := ">"
+	if !strings.Contains(raw, ">") && strings.Contains(raw, ",") {
+		delimiter = ","
+	}
+	parts := strings.Split(raw, delimiter)
 	out := make([]string, 0, len(parts))
 	for _, part := range parts {
 		part = strings.TrimSpace(part)

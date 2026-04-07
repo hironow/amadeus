@@ -141,4 +141,24 @@ func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
 			t.Errorf("metadata[%q] = %q, want %q", key, got, want)
 		}
 	}
+
+	// Semantic history check: raw metadata string must use canonical ">" delimiter
+	// and match domain semantics (owner=agents, routing=modes).
+	rawOwner := dm.Metadata["owner_history"]
+	if rawOwner != "amadeus>sightjack" {
+		t.Errorf("owner_history raw = %q, want %q", rawOwner, "amadeus>sightjack")
+	}
+	rawRouting := dm.Metadata["routing_history"]
+	if rawRouting != "retry>escalate" {
+		t.Errorf("routing_history raw = %q, want %q", rawRouting, "retry>escalate")
+	}
+	// Parse roundtrip must produce same list
+	parsedOwner := domain.ParseImprovementHistory(rawOwner)
+	if len(parsedOwner) != 2 || parsedOwner[0] != "amadeus" || parsedOwner[1] != "sightjack" {
+		t.Errorf("ParseImprovementHistory(owner) = %v, want [amadeus sightjack]", parsedOwner)
+	}
+	parsedRouting := domain.ParseImprovementHistory(rawRouting)
+	if len(parsedRouting) != 2 || parsedRouting[0] != "retry" || parsedRouting[1] != "escalate" {
+		t.Errorf("ParseImprovementHistory(routing) = %v, want [retry escalate]", parsedRouting)
+	}
 }
