@@ -118,7 +118,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 					sanitized = append(sanitized, req)
 				}
 			}
-			correctionMeta := dmailCorrectionMetadata(candidate, kind, name, meterResult.Divergence.Severity, triggerWave, triggerRound, triggerCorrection, span3)
+			correctionMeta := dmailCorrectionMetadata(candidate, kind, name, meterResult.Divergence.Severity, triggerWave, triggerRound, triggerCorrection, a.Policy, span3)
 			dmail := domain.DMail{
 				SchemaVersion: domain.DMailSchemaVersion,
 				Name:          name,
@@ -239,7 +239,7 @@ func failureTypeForCandidate(candidate domain.ClaudeDMailCandidate) domain.Failu
 	}
 }
 
-func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, severity domain.Severity, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, span trace.Span) domain.CorrectionMetadata {
+func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.DMailKind, name string, severity domain.Severity, wave *domain.WaveReference, triggerRound int, trigger domain.CorrectionMetadata, policy domain.RoutingPolicy, span trace.Span) domain.CorrectionMetadata {
 	recurrenceCount := triggerRound
 	routingHistory := []string(nil)
 	ownerHistory := []string(nil)
@@ -278,7 +278,7 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 		meta.RecurrenceCount = recurrenceCount
 		meta.Outcome = domain.ImprovementOutcomeFailedAgain
 	}
-	decision := harness.DetermineCorrectionDecision(kind, severity, domain.DMailAction(candidate.Action), meta.FailureType, recurrenceCount, trigger, currentProviderState(), domain.DefaultRoutingPolicy())
+	decision := harness.DetermineCorrectionDecision(kind, severity, domain.DMailAction(candidate.Action), meta.FailureType, recurrenceCount, trigger, currentProviderState(), policy)
 	meta.RoutingMode = decision.RoutingMode
 	meta.TargetAgent = decision.TargetAgent
 	if decision.RoutingMode != "" {
