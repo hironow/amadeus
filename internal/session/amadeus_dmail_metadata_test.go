@@ -19,6 +19,7 @@ func TestDMailCorrectionMetadata_AllowsRetryForFirstMediumPass(t *testing.T) {
 		nil,
 		1,
 		domain.CorrectionMetadata{},
+		domain.DefaultRoutingPolicy(),
 		trace.SpanFromContext(context.Background()),
 	)
 
@@ -63,6 +64,7 @@ func TestDMailCorrectionMetadata_EscalatesHighSeverity(t *testing.T) {
 		nil,
 		1,
 		domain.CorrectionMetadata{},
+		domain.DefaultRoutingPolicy(),
 		trace.SpanFromContext(context.Background()),
 	)
 
@@ -104,6 +106,7 @@ func TestDMailCorrectionMetadata_EscalatesAfterRecurrenceThreshold(t *testing.T)
 			RecurrenceCount: 1,
 			RetryAllowed:    domain.BoolPtr(true),
 		},
+		domain.DefaultRoutingPolicy(),
 		trace.SpanFromContext(context.Background()),
 	)
 
@@ -154,6 +157,7 @@ func TestDMailCorrectionMetadata_PreservesLegacyTriggerSchemaAsV1(t *testing.T) 
 			RecurrenceCount: 1,
 			RetryAllowed:    domain.BoolPtr(true),
 		},
+		domain.DefaultRoutingPolicy(),
 		trace.SpanFromContext(context.Background()),
 	)
 
@@ -177,6 +181,7 @@ func TestDMailCorrectionMetadata_ReroutesImplementationFeedbackToSightjackForDes
 		nil,
 		1,
 		domain.CorrectionMetadata{},
+		domain.DefaultRoutingPolicy(),
 		trace.SpanFromContext(context.Background()),
 	)
 
@@ -203,6 +208,7 @@ func TestDMailCorrectionMetadata_EscalatedDesignFailureKeepsSightjackAsHandoffOw
 		nil,
 		1,
 		domain.CorrectionMetadata{},
+		domain.DefaultRoutingPolicy(),
 		trace.SpanFromContext(context.Background()),
 	)
 

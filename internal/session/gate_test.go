@@ -310,6 +310,7 @@ func newGateTestAmadeus(t *testing.T, approver port.Approver, notifier port.Noti
 		Notifier: notifier,
 		Emitter:  emitter,
 		State:    state,
+		Policy:   domain.DefaultRoutingPolicy(),
 	}
 	return a
 }

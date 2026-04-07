@@ -210,6 +210,12 @@ If [path] is omitted, the current working directory is used. Requires
 			}
 			defer closeCollector()
 
+			routingPolicy, policyErr := session.LoadRoutingPolicy(divRoot)
+			if policyErr != nil {
+				logger.Warn("routing policy load: %v (using default)", policyErr)
+				routingPolicy = domain.DefaultRoutingPolicy()
+			}
+
 			a := &session.Amadeus{
 				Config:      cfg,
 				Store:       store,
@@ -231,6 +237,7 @@ If [path] is omitted, the current working directory is used. Requires
 				SeqAlloc:    seqAlloc,
 				Insights:    insightWriter,
 				Collector:   collector,
+				Policy:      routingPolicy,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
