@@ -8,8 +8,7 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-// validKinds references the canonical set from domain to prevent drift.
-var validKinds = domain.ValidDMailKinds
+// Kind validation uses domain.ValidateKind as the single canonical path.
 
 // validSeverities is the set of valid Severity values per schema v1.
 var validSeverities = map[domain.Severity]bool{
@@ -39,8 +38,8 @@ func ValidateDMail(dmail domain.DMail) []string {
 	}
 	if dmail.Kind == "" {
 		errs = append(errs, "kind is required")
-	} else if !validKinds[dmail.Kind] {
-		errs = append(errs, fmt.Sprintf("invalid kind: %q", dmail.Kind))
+	} else if err := domain.ValidateKind(dmail.Kind); err != nil {
+		errs = append(errs, err.Error())
 	}
 	if dmail.Description == "" {
 		errs = append(errs, "description is required")

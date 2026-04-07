@@ -78,6 +78,26 @@ func (p *Projector) Rebuild(events []domain.Event) error {
 	return nil
 }
 
+// Serialize returns the current projection state as JSON.
+// Amadeus projections are file-backed, so this serializes the latest check result.
+func (p *Projector) Serialize() ([]byte, error) {
+	latest, err := p.Store.LoadLatest()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(latest)
+}
+
+// Deserialize restores projection state from JSON.
+// Amadeus projections are file-backed, so this saves the deserialized state as latest.
+func (p *Projector) Deserialize(data []byte) error {
+	var latest domain.CheckResult
+	if err := json.Unmarshal(data, &latest); err != nil {
+		return err
+	}
+	return p.Store.SaveLatest(latest)
+}
+
 func (p *Projector) applyCheckCompleted(event domain.Event) error {
 	var data domain.CheckCompletedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {

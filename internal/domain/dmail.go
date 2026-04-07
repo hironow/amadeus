@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -49,6 +50,17 @@ var ValidDMailKinds = map[DMailKind]bool{
 // IsValidDMailKind returns true if the kind is in the canonical set.
 func IsValidDMailKind(kind DMailKind) bool {
 	return ValidDMailKinds[kind]
+}
+
+// ErrDMailKindInvalid is returned when a D-Mail kind is not in the canonical set.
+var ErrDMailKindInvalid = errors.New("dmail: invalid kind")
+
+// ValidateKind checks that kind is one of the allowed D-Mail kinds.
+func ValidateKind(kind DMailKind) error {
+	if !IsValidDMailKind(kind) {
+		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
+	}
+	return nil
 }
 
 // DMailAction represents a recommended follow-up action for a D-Mail.
