@@ -229,6 +229,9 @@ If [path] is omitted, the current working directory is used. Requires
 				dispatcher = d
 			}
 
+			streamBus := platform.NewInProcessSessionBus()
+			defer streamBus.Close()
+
 			a := &session.Amadeus{
 				Config:      cfg,
 				Store:       store,
@@ -252,6 +255,7 @@ If [path] is omitted, the current working directory is used. Requires
 				Collector:   collector,
 				Policy:      routingPolicy,
 				Dispatcher:  dispatcher,
+				StreamBus:   streamBus,
 			}
 
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT

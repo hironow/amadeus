@@ -44,6 +44,9 @@ type Amadeus struct {
 	Policy      domain.RoutingPolicy              // corrective routing policy (loaded from YAML, fallback = default)
 	Dispatcher  port.ImprovementTaskDispatcher   // never nil — use NopImprovementTaskDispatcher for dry-run/tests
 
+	// StreamBus publishes live session stream events. nil = no streaming.
+	StreamBus port.SessionStreamPublisher
+
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.
 	InboxCh <-chan domain.DMail
@@ -55,7 +58,7 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
-	adapter := &ClaudeAdapter{ClaudeCmd: a.ClaudeCmd, Model: a.ClaudeModel, Logger: a.Logger}
+	adapter := &ClaudeAdapter{ClaudeCmd: a.ClaudeCmd, Model: a.ClaudeModel, Logger: a.Logger, StreamBus: a.StreamBus, ToolName: "amadeus"}
 	dbPath := filepath.Join(a.RepoDir, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)
 	if err != nil {
