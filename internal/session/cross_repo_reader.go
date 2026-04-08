@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -60,7 +61,7 @@ func (r *FileCrossRepoReader) ReadToolSnapshot(tool domain.ToolName, stateDir st
 	store := eventsource.NewFileEventStore(eventsDir, r.logger)
 
 	// Load all events to find the latest check (not limited to 7 days).
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 	if err != nil {
 		r.logger.Warn("failed to load events for %s: %v", tool, err)
 		return snap, nil

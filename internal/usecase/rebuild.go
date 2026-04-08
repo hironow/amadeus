@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -9,10 +10,10 @@ import (
 
 // Rebuild replays events to regenerate projection files.
 // The RebuildCommand is already valid by construction (parse-don't-validate).
-func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
+func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
 	_ = cmd // command validated by construction; no fields accessed here
 
-	allEvents, _, err := events.LoadAll()
+	allEvents, _, err := events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
 	}

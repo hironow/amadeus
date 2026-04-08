@@ -2,6 +2,7 @@ package eventsource
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +30,7 @@ func NewFileEventStore(dir string, logger domain.Logger) *FileEventStore {
 
 // Append persists events as JSONL lines to the daily file based on each event's timestamp.
 // All events are validated before any writes occur; if any event is invalid, the entire batch is rejected.
-func (s *FileEventStore) Append(events ...domain.Event) (domain.AppendResult, error) {
+func (s *FileEventStore) Append(_ context.Context, events ...domain.Event) (domain.AppendResult, error) {
 	for _, ev := range events {
 		if err := domain.ValidateEvent(ev); err != nil {
 			return domain.AppendResult{}, fmt.Errorf("validate event %s: %w", ev.ID, err)
@@ -79,12 +80,12 @@ func (s *FileEventStore) Append(events ...domain.Event) (domain.AppendResult, er
 }
 
 // LoadAll reads all JSONL files in lexicographic order and returns events chronologically.
-func (s *FileEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
+func (s *FileEventStore) LoadAll(_ context.Context) ([]domain.Event, domain.LoadResult, error) {
 	return s.loadEvents(time.Time{})
 }
 
 // LoadSince returns events with timestamps strictly after the given time.
-func (s *FileEventStore) LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error) {
+func (s *FileEventStore) LoadSince(_ context.Context, after time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return s.loadEvents(after)
 }
 
@@ -94,7 +95,7 @@ func (s *FileEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 // overlap with global SeqNr space; callers must use afterSeqNr >= cutover SeqNr
 // to avoid double-replaying legacy events.
 // Events with SeqNr == 0 are always excluded.
-func (s *FileEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
+func (s *FileEventStore) LoadAfterSeqNr(_ context.Context, afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
 	all, result, err := s.loadEvents(time.Time{})
 	if err != nil {
 		return nil, result, err
@@ -113,7 +114,7 @@ func (s *FileEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, doma
 
 // LatestSeqNr returns the highest SeqNr across all persisted events.
 // Returns 0 if no events exist or none have a SeqNr assigned.
-func (s *FileEventStore) LatestSeqNr() (uint64, error) {
+func (s *FileEventStore) LatestSeqNr(_ context.Context) (uint64, error) {
 	all, _, err := s.loadEvents(time.Time{})
 	if err != nil {
 		return 0, err

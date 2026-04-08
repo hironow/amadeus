@@ -179,7 +179,7 @@ func TestRunLifecycle_StartAndStop(t *testing.T) {
 	}
 
 	// then: verify run.started and run.stopped events in event store
-	events, _, loadErr := eventStore.LoadAll()
+	events, _, loadErr := eventStore.LoadAll(context.Background())
 	if loadErr != nil {
 		t.Fatalf("LoadAll: %v", loadErr)
 	}
@@ -259,7 +259,7 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 	}
 
 	// then: verify events in the real event store
-	events, _, loadErr := eventStore.LoadAll()
+	events, _, loadErr := eventStore.LoadAll(context.Background())
 	if loadErr != nil {
 		t.Fatalf("LoadAll: %v", loadErr)
 	}

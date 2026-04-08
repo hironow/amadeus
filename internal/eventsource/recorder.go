@@ -9,8 +9,8 @@ import (
 )
 
 type eventStore interface {
-	Append(events ...domain.Event) (domain.AppendResult, error)
-	LoadAll() ([]domain.Event, domain.LoadResult, error)
+	Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error)
+	LoadAll(ctx context.Context) ([]domain.Event, domain.LoadResult, error)
 }
 
 // SessionRecorder wraps an event store and automatically sets CorrelationID
@@ -27,7 +27,7 @@ type SessionRecorder struct {
 // NewSessionRecorder creates a SessionRecorder that resumes causation chaining
 // from the last event already in the store.
 func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
 	}
@@ -68,7 +68,7 @@ func (r *SessionRecorder) Record(ev domain.Event) error {
 		}
 		ev.SeqNr = seq
 	}
-	if _, err := r.store.Append(ev); err != nil {
+	if _, err := r.store.Append(context.Background(), ev); err != nil {
 		return err
 	}
 	r.prevID = ev.ID

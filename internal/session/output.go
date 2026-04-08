@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -154,7 +155,7 @@ func (a *Amadeus) loadCheckHistory() ([]domain.CheckResult, error) {
 	if a.Events == nil {
 		return nil, nil
 	}
-	events, _, err := a.Events.LoadAll()
+	events, _, err := a.Events.LoadAll(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("load events: %w", err)
 	}

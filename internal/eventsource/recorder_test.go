@@ -3,6 +3,7 @@ package eventsource
 // white-box-reason: tests SessionRecorder internals (prevID chaining, session-scoped causation) that require access to unexported eventStore interface
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func TestSessionRecorder_SetsCausationChain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -58,7 +59,7 @@ func TestSessionRecorder_ResumesPrevID(t *testing.T) {
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
 	rec2.Record(ev2)
 
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if events[1].CausationID != events[0].ID {
 		t.Errorf("resumed recorder should chain: CausationID = %q, want %q",
 			events[1].CausationID, events[0].ID)
@@ -78,7 +79,7 @@ func TestSessionRecorder_DifferentSession_NoCausation(t *testing.T) {
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
 	rec2.Record(ev2)
 
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if events[1].CausationID != "" {
 		t.Errorf("different session should have empty CausationID, got %q", events[1].CausationID)
 	}

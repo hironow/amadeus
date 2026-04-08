@@ -27,7 +27,7 @@ func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.St
 	// Load all events for check stats
 	store := NewEventStore(gateDir, logger)
 
-	allEvents, _, err := store.LoadAll()
+	allEvents, _, err := store.LoadAll(ctx)
 	if err != nil || len(allEvents) == 0 {
 		return report
 	}

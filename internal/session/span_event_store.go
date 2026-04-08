@@ -22,12 +22,12 @@ func NewSpanEventStore(inner port.EventStore) port.EventStore {
 	return &SpanEventStore{inner: inner}
 }
 
-func (s *SpanEventStore) Append(events ...domain.Event) (domain.AppendResult, error) {
-	_, span := platform.Tracer.Start(context.Background(), "eventsource.append")
+func (s *SpanEventStore) Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.append")
 	defer span.End()
 
 	span.SetAttributes(attribute.Int("event.count.in", len(events)))
-	result, err := s.inner.Append(events...)
+	result, err := s.inner.Append(ctx, events...)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.append"))
@@ -37,11 +37,11 @@ func (s *SpanEventStore) Append(events ...domain.Event) (domain.AppendResult, er
 	return result, nil
 }
 
-func (s *SpanEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
-	_, span := platform.Tracer.Start(context.Background(), "eventsource.load_all")
+func (s *SpanEventStore) LoadAll(ctx context.Context) ([]domain.Event, domain.LoadResult, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_all")
 	defer span.End()
 
-	events, result, err := s.inner.LoadAll()
+	events, result, err := s.inner.LoadAll(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all"))
@@ -55,11 +55,11 @@ func (s *SpanEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
 	return events, result, nil
 }
 
-func (s *SpanEventStore) LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error) {
-	_, span := platform.Tracer.Start(context.Background(), "eventsource.load_since")
+func (s *SpanEventStore) LoadSince(ctx context.Context, after time.Time) ([]domain.Event, domain.LoadResult, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_since")
 	defer span.End()
 
-	events, result, err := s.inner.LoadSince(after)
+	events, result, err := s.inner.LoadSince(ctx, after)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_since"))
@@ -73,12 +73,12 @@ func (s *SpanEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 	return events, result, nil
 }
 
-func (s *SpanEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
-	_, span := platform.Tracer.Start(context.Background(), "eventsource.load_after_seq_nr")
+func (s *SpanEventStore) LoadAfterSeqNr(ctx context.Context, afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_after_seq_nr")
 	defer span.End()
 
 	span.SetAttributes(attribute.Int64("event.after_seq_nr", int64(afterSeqNr)))
-	events, result, err := s.inner.LoadAfterSeqNr(afterSeqNr)
+	events, result, err := s.inner.LoadAfterSeqNr(ctx, afterSeqNr)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_after_seq_nr"))
@@ -88,11 +88,11 @@ func (s *SpanEventStore) LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, doma
 	return events, result, nil
 }
 
-func (s *SpanEventStore) LatestSeqNr() (uint64, error) {
-	_, span := platform.Tracer.Start(context.Background(), "eventsource.latest_seq_nr")
+func (s *SpanEventStore) LatestSeqNr(ctx context.Context) (uint64, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.latest_seq_nr")
 	defer span.End()
 
-	seqNr, err := s.inner.LatestSeqNr()
+	seqNr, err := s.inner.LatestSeqNr(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.latest_seq_nr"))

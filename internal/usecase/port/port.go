@@ -59,21 +59,21 @@ func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
 // EventStore is the append-only event persistence interface.
 type EventStore interface {
 	// Append persists one or more events. Validation is performed before any writes.
-	Append(events ...domain.Event) (domain.AppendResult, error)
+	Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error)
 
 	// LoadAll returns all events in chronological order.
-	LoadAll() ([]domain.Event, domain.LoadResult, error)
+	LoadAll(ctx context.Context) ([]domain.Event, domain.LoadResult, error)
 
 	// LoadSince returns events with timestamps after the given time.
-	LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error)
+	LoadSince(ctx context.Context, after time.Time) ([]domain.Event, domain.LoadResult, error)
 
 	// LoadAfterSeqNr returns all events with SeqNr > afterSeqNr,
 	// ordered by SeqNr ascending. Used for snapshot-based recovery.
-	LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error)
+	LoadAfterSeqNr(ctx context.Context, afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error)
 
 	// LatestSeqNr returns the highest recorded SeqNr across all events.
 	// Returns 0 if no events have a SeqNr assigned.
-	LatestSeqNr() (uint64, error)
+	LatestSeqNr(ctx context.Context) (uint64, error)
 }
 
 // SnapshotStore persists materialized projection state at a known SeqNr.

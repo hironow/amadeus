@@ -79,7 +79,7 @@ func ExecutePrune(ctx context.Context, result *PruneResult, eventStore port.Even
 	if evErr != nil {
 		return totalCount, fmt.Errorf("pruned %d file(s) but failed to create archive.pruned event: %w", totalCount, evErr)
 	}
-	if _, appendErr := eventStore.Append(ev); appendErr != nil {
+	if _, appendErr := eventStore.Append(ctx, ev); appendErr != nil {
 		return totalCount, fmt.Errorf("pruned %d file(s) but failed to record archive.pruned event: %w", totalCount, appendErr)
 	}
 
