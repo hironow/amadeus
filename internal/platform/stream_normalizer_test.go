@@ -3,6 +3,7 @@ package platform_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -136,9 +137,9 @@ func TestStreamNormalizer_RawTruncation(t *testing.T) {
 	}
 }
 
-func TestStreamNormalizer_Result(t *testing.T) {
+func TestStreamNormalizer_Result_SavesUsageForSessionEnd(t *testing.T) {
 	t.Parallel()
-	n := platform.NewStreamNormalizer("sightjack", domain.ProviderClaudeCode)
+	n := platform.NewStreamNormalizer("amadeus", domain.ProviderClaudeCode)
 	msg := &platform.StreamMessage{
 		Type:      "result",
 		SessionID: "sess-1",
@@ -148,12 +149,19 @@ func TestStreamNormalizer_Result(t *testing.T) {
 		Duration:  12000,
 	}
 	raw, _ := json.Marshal(msg)
+
 	ev := n.Normalize(msg, raw)
-	if ev == nil {
-		t.Fatal("expected session_end event")
+	if ev != nil {
+		t.Fatalf("normalizeResult should return nil, got type=%s", ev.Type)
 	}
-	if ev.Type != domain.StreamSessionEnd {
-		t.Errorf("Type = %q, want %q", ev.Type, domain.StreamSessionEnd)
+
+	endEv := n.SessionEnd("provider-1", nil)
+	if endEv.Type != domain.StreamSessionEnd {
+		t.Errorf("Type = %q, want %q", endEv.Type, domain.StreamSessionEnd)
+	}
+	data := string(endEv.Data)
+	if !strings.Contains(data, "1000") {
+		t.Errorf("SessionEnd should contain saved input_tokens, got: %s", data)
 	}
 }
 

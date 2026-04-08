@@ -22,6 +22,9 @@ type StreamNormalizer struct {
 	codingSessionID   string            // our CodingSessionRecord.ID
 	subagents         map[string]string // tool_use_id -> subagent_id
 	lastErr           error             // cached for SessionEnd
+	lastUsage         *Usage            // saved from result message for SessionEnd
+	lastCost          float64           // saved from result message for SessionEnd
+	lastDuration      int64             // saved from result message for SessionEnd (ms)
 }
 
 // NewStreamNormalizer creates a normalizer for the given tool and provider.
@@ -80,11 +83,24 @@ func (n *StreamNormalizer) Normalize(msg *StreamMessage, raw json.RawMessage) *d
 	return ev
 }
 
-// SessionEnd creates a session_end event for any exit path (normal or abnormal).
+// SessionEnd creates the single authoritative session_end event. It includes
+// usage/cost/duration data saved from the result message (if any) and error
+// information from the run. This is the ONLY place session_end is emitted;
+// normalizeResult() saves data but does not emit.
 func (n *StreamNormalizer) SessionEnd(providerSessionID string, runErr error) domain.SessionStreamEvent {
 	data := map[string]any{}
 	if runErr != nil {
 		data["error"] = runErr.Error()
+	}
+	if n.lastUsage != nil {
+		data["input_tokens"] = n.lastUsage.InputTokens
+		data["output_tokens"] = n.lastUsage.OutputTokens
+	}
+	if n.lastCost > 0 {
+		data["cost_usd"] = n.lastCost
+	}
+	if n.lastDuration > 0 {
+		data["duration_ms"] = n.lastDuration
 	}
 	dataJSON, _ := json.Marshal(data)
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSessionEnd, dataJSON)
@@ -189,21 +205,23 @@ func (n *StreamNormalizer) normalizeToolResult(msg *StreamMessage) *domain.Sessi
 	return &ev
 }
 
+// normalizeResult saves usage/cost/duration from the result message for
+// inclusion in the single session_end event emitted by SessionEnd().
+// Returns nil — does NOT emit session_end (prevents double-send).
 func (n *StreamNormalizer) normalizeResult(msg *StreamMessage) *domain.SessionStreamEvent {
-	data := map[string]any{}
 	if msg.Usage != nil {
-		data["input_tokens"] = msg.Usage.InputTokens
-		data["output_tokens"] = msg.Usage.OutputTokens
+		n.lastUsage = msg.Usage
 	}
 	if msg.TotalCost > 0 {
-		data["cost_usd"] = msg.TotalCost
+		n.lastCost = msg.TotalCost
 	}
 	if msg.Duration > 0 {
-		data["duration_ms"] = msg.Duration
+		n.lastDuration = msg.Duration
 	}
-	dataJSON, _ := json.Marshal(data)
-	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSessionEnd, dataJSON)
-	return &ev
+	if n.sessionID == "" && msg.SessionID != "" {
+		n.sessionID = msg.SessionID
+	}
+	return nil
 }
 
 func (n *StreamNormalizer) normalizeHookStart(msg *StreamMessage) *domain.SessionStreamEvent {

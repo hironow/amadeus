@@ -37,6 +37,8 @@ func (a *SessionTrackingAdapter) RunSession(ctx context.Context, prompt string, 
 	// Persist running state (best-effort: if store fails, continue anyway)
 	_ = a.store.Save(ctx, rec)
 
+	// Inject CodingSessionID so stream events can be correlated with this record.
+	opts = append(opts, port.WithCodingSessionID(rec.ID))
 	result, runErr := a.inner.RunDetailed(ctx, prompt, w, opts...)
 
 	// Circuit breaker: classify provider error from stderr
