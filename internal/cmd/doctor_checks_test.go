@@ -1169,3 +1169,45 @@ func TestDoctor_WaveMode_SkipsLinearMCP(t *testing.T) {
 	// linear-mcp check might be skipped entirely if claude is not available
 	// That's acceptable — the check is conditional on claude being found
 }
+
+func TestCheckEventStore_CorruptLines(t *testing.T) {
+	// given: event dir with corrupt JSONL
+	gateRoot := t.TempDir()
+	eventsDir := filepath.Join(gateRoot, "events")
+	os.MkdirAll(eventsDir, 0755)
+
+	validEvent := `{"type":"check.completed","data":{},"timestamp":"2026-04-08T00:00:00Z","schema_version":1}`
+	corruptLine := `{not valid json`
+	os.WriteFile(filepath.Join(eventsDir, "2026-04-08.jsonl"),
+		[]byte(validEvent+"\n"+corruptLine+"\n"+validEvent+"\n"), 0644)
+
+	// when
+	check := checkEventStore(gateRoot)
+
+	// then
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %s: %s", check.Status.StatusLabel(), check.Message)
+	}
+	if !strings.Contains(check.Message, "1 corrupt line") {
+		t.Errorf("expected '1 corrupt line' in message: %q", check.Message)
+	}
+}
+
+func TestCheckEventStore_Clean(t *testing.T) {
+	// given: clean event dir
+	gateRoot := t.TempDir()
+	eventsDir := filepath.Join(gateRoot, "events")
+	os.MkdirAll(eventsDir, 0755)
+
+	validEvent := `{"type":"check.completed","data":{},"timestamp":"2026-04-08T00:00:00Z","schema_version":1}`
+	os.WriteFile(filepath.Join(eventsDir, "2026-04-08.jsonl"),
+		[]byte(validEvent+"\n"), 0644)
+
+	// when
+	check := checkEventStore(gateRoot)
+
+	// then
+	if check.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %s: %s", check.Status.StatusLabel(), check.Message)
+	}
+}
