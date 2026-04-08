@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: cobra command construction: tests run command bootstrap and flag wiring
+
 import (
 	"os"
 	"os/exec"
