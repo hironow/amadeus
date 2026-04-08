@@ -71,6 +71,9 @@ func TestSessionStream_NormalizerBusPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectAll: %v", err)
 	}
+	// Emit session_end via SessionEnd (normalizeResult no longer emits it)
+	endEv := normalizer.SessionEnd("fake-sess-001", nil)
+	bus.Publish(ctx, endEv)
 
 	// then: drain events from subscriber
 	var events []domain.SessionStreamEvent
