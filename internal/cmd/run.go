@@ -232,6 +232,14 @@ If [path] is omitted, the current working directory is used. Requires
 			streamBus := platform.NewInProcessSessionBus()
 			defer streamBus.Close()
 
+			// Production subscriber: bridge stream events to logger.
+			sub := streamBus.Subscribe(64)
+			go func() {
+				for ev := range sub.C() {
+					logger.Debug("stream: %s [%s] session=%s", ev.Type, ev.Tool, ev.SessionID)
+				}
+			}()
+
 			a := &session.Amadeus{
 				Config:      cfg,
 				Store:       store,
