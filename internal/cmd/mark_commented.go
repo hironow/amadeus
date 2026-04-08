@@ -72,7 +72,7 @@ func newMarkCommentedCommand() *cobra.Command {
 				Emitter:   emitter,
 			}
 
-			if err := a.MarkCommented(dmailName, issueID); err != nil {
+			if err := a.MarkCommented(cmd.Context(), dmailName, issueID); err != nil {
 				return fmt.Errorf("mark commented: %w", err)
 			}
 
