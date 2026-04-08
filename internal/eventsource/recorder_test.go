@@ -11,20 +11,21 @@ import (
 )
 
 func TestSessionRecorder_SetsCausationChain(t *testing.T) {
+	ctx := context.Background()
 	dir := t.TempDir()
 	store := NewFileEventStore(dir, &domain.NopLogger{})
-	rec, err := NewSessionRecorder(store, "session-1")
+	rec, err := NewSessionRecorder(ctx, store, "session-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
-	if err := rec.Record(ev1); err != nil {
+	if err := rec.Record(ctx, ev1); err != nil {
 		t.Fatal(err)
 	}
 
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
-	if err := rec.Record(ev2); err != nil {
+	if err := rec.Record(ctx, ev2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,17 +48,18 @@ func TestSessionRecorder_SetsCausationChain(t *testing.T) {
 }
 
 func TestSessionRecorder_ResumesPrevID(t *testing.T) {
+	ctx := context.Background()
 	dir := t.TempDir()
 	store := NewFileEventStore(dir, &domain.NopLogger{})
 
-	rec1, _ := NewSessionRecorder(store, "s1")
+	rec1, _ := NewSessionRecorder(ctx, store, "s1")
 	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
-	rec1.Record(ev1)
+	rec1.Record(ctx, ev1)
 
 	// Same session ID should resume CausationID chain
-	rec2, _ := NewSessionRecorder(store, "s1")
+	rec2, _ := NewSessionRecorder(ctx, store, "s1")
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
-	rec2.Record(ev2)
+	rec2.Record(ctx, ev2)
 
 	events, _, _ := store.LoadAll(context.Background())
 	if events[1].CausationID != events[0].ID {
@@ -67,17 +69,18 @@ func TestSessionRecorder_ResumesPrevID(t *testing.T) {
 }
 
 func TestSessionRecorder_DifferentSession_NoCausation(t *testing.T) {
+	ctx := context.Background()
 	dir := t.TempDir()
 	store := NewFileEventStore(dir, &domain.NopLogger{})
 
-	rec1, _ := NewSessionRecorder(store, "s1")
+	rec1, _ := NewSessionRecorder(ctx, store, "s1")
 	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
-	rec1.Record(ev1)
+	rec1.Record(ctx, ev1)
 
 	// Different session should NOT chain to s1's event
-	rec2, _ := NewSessionRecorder(store, "s2")
+	rec2, _ := NewSessionRecorder(ctx, store, "s2")
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
-	rec2.Record(ev2)
+	rec2.Record(ctx, ev2)
 
 	events, _, _ := store.LoadAll(context.Background())
 	if events[1].CausationID != "" {

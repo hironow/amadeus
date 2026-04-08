@@ -264,8 +264,8 @@ type Orchestrator interface {
 	// SetPRPipeline injects the PR convergence pipeline runner.
 	SetPRPipeline(runner PRPipelineRunner)
 	PrintSync() error
-	PrintLog() error
-	PrintLogJSON() error
+	PrintLog(ctx context.Context) error
+	PrintLogJSON(ctx context.Context) error
 	MarkCommented(ctx context.Context, dmailName, issueID string) error
 	// EventStore returns the event persistence store.
 	EventStore() EventStore

@@ -76,9 +76,9 @@ structured JSON for piping into downstream commands.`,
 			}
 
 			if jsonOut {
-				return a.PrintLogJSON()
+				return a.PrintLogJSON(cmd.Context())
 			}
-			return a.PrintLog()
+			return a.PrintLog(cmd.Context())
 		},
 	}
 

@@ -121,7 +121,7 @@ func (e *testCheckEventEmitter) emit(events ...domain.Event) error {
 	return nil
 }
 
-func (e *testCheckEventEmitter) EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitInboxConsumed(_ context.Context, data domain.InboxConsumedData, now time.Time) error {
 	ev, err := e.agg.RecordInboxConsumed(data, now)
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func (e *testCheckEventEmitter) EmitInboxConsumed(data domain.InboxConsumedData,
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error {
+func (e *testCheckEventEmitter) EmitForceFullNextSet(_ context.Context, prevDiv, currDiv float64, now time.Time) error {
 	ev, err := e.agg.RecordForceFullNextSet(prevDiv, currDiv, now)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (e *testCheckEventEmitter) EmitForceFullNextSet(prevDiv, currDiv float64, n
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitDMailGenerated(dmail domain.DMail, now time.Time) error {
+func (e *testCheckEventEmitter) EmitDMailGenerated(_ context.Context, dmail domain.DMail, now time.Time) error {
 	ev, err := e.agg.RecordDMailGenerated(dmail, now)
 	if err != nil {
 		return err
@@ -145,7 +145,7 @@ func (e *testCheckEventEmitter) EmitDMailGenerated(dmail domain.DMail, now time.
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error {
+func (e *testCheckEventEmitter) EmitConvergenceDetected(_ context.Context, alert domain.ConvergenceAlert, now time.Time) error {
 	ev, err := e.agg.RecordConvergenceDetected(alert, now)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func (e *testCheckEventEmitter) EmitConvergenceDetected(alert domain.Convergence
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitDMailCommented(dmailName, issueID string, now time.Time) error {
+func (e *testCheckEventEmitter) EmitDMailCommented(_ context.Context, dmailName, issueID string, now time.Time) error {
 	ev, err := e.agg.RecordDMailCommented(dmailName, issueID, now)
 	if err != nil {
 		return err
@@ -161,7 +161,7 @@ func (e *testCheckEventEmitter) EmitDMailCommented(dmailName, issueID string, no
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Time) error {
+func (e *testCheckEventEmitter) EmitCheck(_ context.Context, result domain.CheckResult, now time.Time) error {
 	events, err := e.agg.RecordCheck(result, now)
 	if err != nil {
 		return err
@@ -169,7 +169,7 @@ func (e *testCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Ti
 	return e.emit(events...)
 }
 
-func (e *testCheckEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitRunStarted(_ context.Context, data domain.RunStartedData, now time.Time) error {
 	ev, err := e.agg.RecordRunStarted(data, now)
 	if err != nil {
 		return err
@@ -177,7 +177,7 @@ func (e *testCheckEventEmitter) EmitRunStarted(data domain.RunStartedData, now t
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitRunStopped(_ context.Context, data domain.RunStoppedData, now time.Time) error {
 	ev, err := e.agg.RecordRunStopped(data, now)
 	if err != nil {
 		return err
@@ -185,15 +185,17 @@ func (e *testCheckEventEmitter) EmitRunStopped(data domain.RunStoppedData, now t
 	return e.emit(ev)
 }
 
-func (e *testCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitPRConvergenceChecked(_ context.Context, data domain.PRConvergenceCheckedData, now time.Time) error {
 	ev, err := e.agg.RecordPRConvergenceChecked(data, now)
 	if err != nil {
 		return err
 	}
 	return e.emit(ev)
 }
-func (e *testCheckEventEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error { return nil }
-func (e *testCheckEventEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
+func (e *testCheckEventEmitter) EmitPRMerged(_ context.Context, _ domain.PRMergedData, _ time.Time) error {
+	return nil
+}
+func (e *testCheckEventEmitter) EmitPRMergeSkipped(_ context.Context, _ domain.PRMergeSkippedData, _ time.Time) error {
 	return nil
 }
 

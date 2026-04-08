@@ -178,8 +178,8 @@ func (a *Amadeus) loadCheckHistory(ctx context.Context) ([]domain.CheckResult, e
 }
 
 // PrintLog renders the history and D-Mail log to DataOut.
-func (a *Amadeus) PrintLog() error {
-	history, err := a.loadCheckHistory()
+func (a *Amadeus) PrintLog(ctx context.Context) error {
+	history, err := a.loadCheckHistory(ctx)
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}
@@ -286,8 +286,8 @@ type dmailJSONView struct {
 }
 
 // PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
-func (a *Amadeus) PrintLogJSON() error {
-	history, err := a.loadCheckHistory()
+func (a *Amadeus) PrintLogJSON(ctx context.Context) error {
+	history, err := a.loadCheckHistory(ctx)
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}

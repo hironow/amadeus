@@ -38,46 +38,46 @@ type testInternalCheckEventEmitter struct {
 	agg *domain.CheckAggregate
 }
 
-func (e *testInternalCheckEventEmitter) EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitInboxConsumed(_ context.Context, data domain.InboxConsumedData, now time.Time) error {
 	_, err := e.agg.RecordInboxConsumed(data, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitForceFullNextSet(_ context.Context, prevDiv, currDiv float64, now time.Time) error {
 	_, err := e.agg.RecordForceFullNextSet(prevDiv, currDiv, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitDMailGenerated(dmail domain.DMail, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitDMailGenerated(_ context.Context, dmail domain.DMail, now time.Time) error {
 	_, err := e.agg.RecordDMailGenerated(dmail, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitConvergenceDetected(_ context.Context, alert domain.ConvergenceAlert, now time.Time) error {
 	_, err := e.agg.RecordConvergenceDetected(alert, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitDMailCommented(dmailName, issueID string, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitDMailCommented(_ context.Context, dmailName, issueID string, now time.Time) error {
 	_, err := e.agg.RecordDMailCommented(dmailName, issueID, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitCheck(result domain.CheckResult, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitCheck(_ context.Context, result domain.CheckResult, now time.Time) error {
 	_, err := e.agg.RecordCheck(result, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitRunStarted(_ context.Context, data domain.RunStartedData, now time.Time) error {
 	_, err := e.agg.RecordRunStarted(data, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitRunStopped(_ context.Context, data domain.RunStoppedData, now time.Time) error {
 	_, err := e.agg.RecordRunStopped(data, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitPRConvergenceChecked(_ context.Context, data domain.PRConvergenceCheckedData, now time.Time) error {
 	_, err := e.agg.RecordPRConvergenceChecked(data, now)
 	return err
 }
-func (e *testInternalCheckEventEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitPRMerged(_ context.Context, _ domain.PRMergedData, _ time.Time) error {
 	return nil
 }
-func (e *testInternalCheckEventEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
+func (e *testInternalCheckEventEmitter) EmitPRMergeSkipped(_ context.Context, _ domain.PRMergeSkippedData, _ time.Time) error {
 	return nil
 }
 

@@ -24,7 +24,7 @@ func ReadCrossRepoSnapshot(ctx context.Context, toolStateDirs map[domain.ToolNam
 			continue
 		}
 
-		snap, err := reader.ReadToolSnapshot(tool, stateDir)
+		snap, err := reader.ReadToolSnapshot(ctx, tool, stateDir)
 		if err != nil {
 			// Non-fatal: mark as unavailable and continue
 			snapshots = append(snapshots, domain.ToolSnapshot{
