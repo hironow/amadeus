@@ -603,13 +603,21 @@ func checkEventStore(gateRoot string) domain.DoctorCheck {
 			Hint:    `run "amadeus init" to create the events directory`,
 		}
 	}
-	count, err := countEventStoreEntries(eventsDir)
+	count, corruptCount, err := countEventStoreEntries(eventsDir)
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "Event Store",
 			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("parse error: %v", err),
+			Message: fmt.Sprintf("event store read error: %v", err),
 			Hint:    "check event files in .gate/events/ for corruption",
+		}
+	}
+	if corruptCount > 0 {
+		return domain.DoctorCheck{
+			Name:    "Event Store",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d event(s) loaded, %d corrupt line(s) skipped", count, corruptCount),
+			Hint:    "corrupt lines are skipped during replay — review JSONL files in .gate/events/",
 		}
 	}
 	return domain.DoctorCheck{
@@ -621,19 +629,18 @@ func checkEventStore(gateRoot string) domain.DoctorCheck {
 
 // countEventStoreEntries reads all .jsonl files in the events directory
 // and counts valid event entries. Returns an error if any line fails to parse.
-func countEventStoreEntries(eventsDir string) (int, error) {
-	entries, err := os.ReadDir(eventsDir)
-	if err != nil {
-		return 0, fmt.Errorf("read events dir: %w", err)
+func countEventStoreEntries(eventsDir string) (count int, corruptCount int, err error) {
+	entries, readErr := os.ReadDir(eventsDir)
+	if readErr != nil {
+		return 0, 0, fmt.Errorf("read events dir: %w", readErr)
 	}
-	count := 0
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".jsonl") {
 			continue
 		}
-		data, readErr := os.ReadFile(filepath.Join(eventsDir, e.Name()))
-		if readErr != nil {
-			return 0, fmt.Errorf("read %s: %w", e.Name(), readErr)
+		data, fileErr := os.ReadFile(filepath.Join(eventsDir, e.Name()))
+		if fileErr != nil {
+			return 0, 0, fmt.Errorf("read %s: %w", e.Name(), fileErr)
 		}
 		for _, line := range strings.Split(string(data), "\n") {
 			line = strings.TrimSpace(line)
@@ -642,12 +649,13 @@ func countEventStoreEntries(eventsDir string) (int, error) {
 			}
 			var ev domain.Event
 			if parseErr := json.Unmarshal([]byte(line), &ev); parseErr != nil {
-				return 0, fmt.Errorf("parse %s: %w", e.Name(), parseErr)
+				corruptCount++
+				continue
 			}
 			count++
 		}
 	}
-	return count, nil
+	return count, corruptCount, nil
 }
 
 // checkDMailSchema validates all D-Mails in archive/ conform to schema v1.
