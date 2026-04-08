@@ -588,6 +588,15 @@ func runDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 
 // checkDeadLetters reports outbox items that have exceeded max retry count.
 func checkDeadLetters(repoRoot string) domain.DoctorCheck {
+	// Check DB file exists before opening (avoid creating dirs/DB as side effect)
+	dbPath := filepath.Join(repoRoot, domain.StateDir, ".run", "outbox.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: "no outbox DB",
+		}
+	}
 	store, err := session.NewOutboxStoreForDir(repoRoot)
 	if err != nil {
 		return domain.DoctorCheck{
