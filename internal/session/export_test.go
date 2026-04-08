@@ -76,3 +76,6 @@ func ExportSetMaxWaitDuration(d time.Duration) func() {
 	maxWaitDuration = d
 	return func() { maxWaitDuration = old }
 }
+
+// ExportBuildIsolationFlags exposes buildIsolationFlags for contract testing.
+func ExportBuildIsolationFlags(cfg EnterConfig) []string { return buildIsolationFlags(cfg) }
