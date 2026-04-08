@@ -101,7 +101,7 @@ func (a *Amadeus) SeqAllocator() port.SeqAllocator {
 
 // autoRebuildIfNeeded checks if projections are missing but events exist,
 // and rebuilds projections from the event store if so.
-func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
+func (a *Amadeus) autoRebuildIfNeeded(ctx context.Context, quiet bool) error {
 	if a.Events == nil || a.Projector == nil {
 		return nil
 	}
@@ -113,7 +113,7 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	if !projectionEmpty {
 		return nil // projections exist, no rebuild needed
 	}
-	events, _, err := a.Events.LoadAll(context.Background())
+	events, _, err := a.Events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events for auto-rebuild: %w", err)
 	}
@@ -167,7 +167,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	// Auto-rebuild is a state-mutating operation (clears and rewrites projection
 	// directories), so it must be skipped in dry-run mode.
 	if !opts.DryRun {
-		if err := a.autoRebuildIfNeeded(opts.Quiet); err != nil {
+		if err := a.autoRebuildIfNeeded(ctx, opts.Quiet); err != nil {
 			return fmt.Errorf("auto-rebuild: %w", err)
 		}
 	}

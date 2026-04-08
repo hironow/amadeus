@@ -28,7 +28,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 	defer span.End()
 
 	// Auto-rebuild projections if needed
-	if err := a.autoRebuildIfNeeded(opts.Quiet); err != nil {
+	if err := a.autoRebuildIfNeeded(ctx, opts.Quiet); err != nil {
 		return fmt.Errorf("auto-rebuild: %w", err)
 	}
 
