@@ -123,7 +123,7 @@ func (a *Amadeus) closePipelineOrphan(ctx context.Context, pr domain.PRState) {
 
 	if a.Emitter != nil {
 		now := time.Now().UTC()
-		_ = a.emitMergeSkipped(pr, []string{"pipeline orphan: base branch " + pr.BaseBranch() + " is stale"}, now)
+		_ = a.emitMergeSkipped(ctx, pr, []string{"pipeline orphan: base branch " + pr.BaseBranch() + " is stale"}, now)
 	}
 }
 
@@ -135,11 +135,11 @@ func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 	if !mc.readiness.Ready {
 		a.Logger.Info("auto-merge: skip %s (%s) — %v", mc.pr.Number(), mc.pr.Title(), mc.readiness.BlockReasons)
 		if a.Emitter != nil {
-			_ = a.emitMergeSkipped(mc.pr, mc.readiness.BlockReasons, now)
+			_ = a.emitMergeSkipped(ctx, mc.pr, mc.readiness.BlockReasons, now)
 		}
 		// Generate D-Mail for conflicting PRs so paintress can fix them
 		if mc.readiness.Mergeable == "CONFLICTING" && a.Emitter != nil {
-			a.emitConflictDMail(mc.pr, now)
+			a.emitConflictDMail(ctx, mc.pr, now)
 		}
 		return false
 	}
@@ -149,14 +149,14 @@ func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 	if err := a.PRWriter.MergePR(ctx, mc.pr.Number(), mc.method); err != nil {
 		a.Logger.Warn("auto-merge: merge failed for %s: %v", mc.pr.Number(), err)
 		if a.Emitter != nil {
-			_ = a.emitMergeSkipped(mc.pr, []string{err.Error()}, now)
+			_ = a.emitMergeSkipped(ctx, mc.pr, []string{err.Error()}, now)
 		}
 		return false
 	}
 
 	domain.LogBanner(a.Logger, domain.BannerSend, "merge", mc.pr.Number(), mc.pr.Title())
 	if a.Emitter != nil {
-		_ = a.emitMerged(mc.pr, mc.method, now)
+		_ = a.emitMerged(ctx, mc.pr, mc.method, now)
 	}
 
 	// Remove review label from merged PR (cleanup)
@@ -166,8 +166,8 @@ func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 	return true
 }
 
-func (a *Amadeus) emitMerged(pr domain.PRState, method domain.MergeMethod, now time.Time) error {
-	return a.Emitter.EmitPRMerged(domain.PRMergedData{
+func (a *Amadeus) emitMerged(ctx context.Context, pr domain.PRState, method domain.MergeMethod, now time.Time) error {
+	return a.Emitter.EmitPRMerged(ctx, domain.PRMergedData{
 		PRNumber: pr.Number(),
 		Title:    pr.Title(),
 		Method:   string(method),
@@ -176,7 +176,7 @@ func (a *Amadeus) emitMerged(pr domain.PRState, method domain.MergeMethod, now t
 
 // emitConflictDMail generates a KindImplFeedback D-Mail for a conflicting PR.
 // The D-Mail is routed to paintress via the outbox → phonewave path.
-func (a *Amadeus) emitConflictDMail(pr domain.PRState, now time.Time) {
+func (a *Amadeus) emitConflictDMail(ctx context.Context, pr domain.PRState, now time.Time) {
 	name := fmt.Sprintf("am-conflict-%s-%s", pr.Number(), pr.HeadSHAShort())
 	dmail := domain.DMail{
 		SchemaVersion: domain.DMailSchemaVersion,
@@ -200,13 +200,13 @@ func (a *Amadeus) emitConflictDMail(pr domain.PRState, now time.Time) {
 		return
 	}
 	domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
-	if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
+	if err := a.Emitter.EmitDMailGenerated(ctx, dmail, now); err != nil {
 		a.Logger.Warn("auto-merge: emit conflict D-Mail for %s: %v", pr.Number(), err)
 	}
 }
 
-func (a *Amadeus) emitMergeSkipped(pr domain.PRState, reasons []string, now time.Time) error {
-	return a.Emitter.EmitPRMergeSkipped(domain.PRMergeSkippedData{
+func (a *Amadeus) emitMergeSkipped(ctx context.Context, pr domain.PRState, reasons []string, now time.Time) error {
+	return a.Emitter.EmitPRMergeSkipped(ctx, domain.PRMergeSkippedData{
 		PRNumber: pr.Number(),
 		Title:    pr.Title(),
 		Reasons:  reasons,

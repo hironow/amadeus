@@ -151,11 +151,11 @@ func (a *Amadeus) PrintCheckOutputQuiet(result domain.CheckResult, dmails []doma
 }
 
 // loadCheckHistory returns CheckResults extracted from the event store.
-func (a *Amadeus) loadCheckHistory() ([]domain.CheckResult, error) {
+func (a *Amadeus) loadCheckHistory(ctx context.Context) ([]domain.CheckResult, error) {
 	if a.Events == nil {
 		return nil, nil
 	}
-	events, _, err := a.Events.LoadAll(context.Background())
+	events, _, err := a.Events.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load events: %w", err)
 	}
