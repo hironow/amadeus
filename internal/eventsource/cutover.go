@@ -44,9 +44,12 @@ func RunCutover(
 	}
 
 	// Step 2: Load all existing events
-	events, _, err := store.LoadAll(ctx)
+	events, loadResult, err := store.LoadAll(ctx)
 	if err != nil {
 		return CutoverResult{}, fmt.Errorf("cutover: load all events: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 {
+		logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 
 	// No existing events = fresh install. Skip cutover — no migration needed.

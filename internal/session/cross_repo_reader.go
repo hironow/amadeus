@@ -61,10 +61,13 @@ func (r *FileCrossRepoReader) ReadToolSnapshot(ctx context.Context, tool domain.
 	store := eventsource.NewFileEventStore(eventsDir, r.logger)
 
 	// Load all events to find the latest check (not limited to 7 days).
-	events, _, err := store.LoadAll(ctx)
+	events, loadResult, err := store.LoadAll(ctx)
 	if err != nil {
 		r.logger.Warn("failed to load events for %s: %v", tool, err)
 		return snap, nil
+	}
+	if loadResult.CorruptLineCount > 0 {
+		r.logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 
 	// Find the latest check.completed event (scan in reverse).

@@ -159,6 +159,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 					a.Logger.Warn("session_end dropped (invalid): %v", vErr)
 				}
 			} else {
+				// Use Background: caller ctx may be cancelled, but session_end must still publish.
 				a.StreamBus.Publish(context.Background(), endEvent)
 			}
 		}()

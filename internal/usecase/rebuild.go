@@ -13,9 +13,12 @@ import (
 func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
 	_ = cmd // command validated by construction; no fields accessed here
 
-	allEvents, _, err := events.LoadAll(ctx)
+	allEvents, loadResult, err := events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 {
+		logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 
 	// #116: Trim check history before event replay to prevent unbounded growth.
