@@ -17,7 +17,7 @@ func TestRunCutover_FirstRun(t *testing.T) {
 	store := eventsource.NewFileEventStore(eventsDir, &domain.NopLogger{})
 	for i := 0; i < 3; i++ {
 		ev, _ := domain.NewEvent(domain.EventCheckCompleted, nil, time.Now())
-		if _, err := store.Append(ev); err != nil {
+		if _, err := store.Append(context.Background(), ev); err != nil {
 			t.Fatalf("append: %v", err)
 		}
 	}
@@ -60,7 +60,7 @@ func TestRunCutover_FirstRun(t *testing.T) {
 	}
 
 	// Verify cutover event was appended with SeqNr=1
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	lastEvent := events[len(events)-1]
 	if lastEvent.Type != domain.EventSystemCutover {
 		t.Errorf("expected last event type system.cutover, got %s", lastEvent.Type)

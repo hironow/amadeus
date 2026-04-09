@@ -37,7 +37,7 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) ([]domain.DMail,
 	now := time.Now().UTC()
 	for _, d := range consumed {
 		domain.LogBanner(a.Logger, domain.BannerRecv, string(d.Kind), d.Name, d.Description)
-		if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
+		if err := a.Emitter.EmitInboxConsumed(ctx, domain.InboxConsumedData{
 			Name:   d.Name,
 			Kind:   d.Kind,
 			Source: d.Name + ".md",
@@ -143,7 +143,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				continue
 			}
 			domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
-			if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
+			if err := a.Emitter.EmitDMailGenerated(ctx, dmail, now); err != nil {
 				span3.End()
 				return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
 			}
@@ -162,7 +162,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 // detectConvergence runs Phase 4: World Line Convergence detection.
 // Analyzes all D-Mails for recurring patterns, emits convergence events,
 // and generates convergence D-Mails for uncovered alerts.
-func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, []domain.DMail, error) {
+func (a *Amadeus) detectConvergence(ctx context.Context, now time.Time) ([]domain.ConvergenceAlert, []domain.DMail, error) {
 	allDMails, convergenceErr := a.Store.LoadAllDMails()
 	if convergenceErr != nil {
 		return nil, nil, nil // tolerate load failure
@@ -170,11 +170,11 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 	allDMails = domain.FilterByTTL(allDMails, now)
 	convergenceAlerts := a.Config.DetectConvergence(allDMails, now)
 	for _, alert := range convergenceAlerts {
-		if err := a.Emitter.EmitConvergenceDetected(alert, now); err != nil {
+		if err := a.Emitter.EmitConvergenceDetected(ctx, alert, now); err != nil {
 			return nil, nil, fmt.Errorf("phase 4 (emit convergence event): %w", err)
 		}
 	}
-	saved, saveErr := a.saveConvergenceDMails(convergenceAlerts)
+	saved, saveErr := a.saveConvergenceDMails(ctx, convergenceAlerts)
 	if saveErr != nil {
 		return convergenceAlerts, nil, saveErr
 	}
@@ -185,7 +185,7 @@ func (a *Amadeus) detectConvergence(now time.Time) ([]domain.ConvergenceAlert, [
 // Skips alerts whose target already has an existing convergence D-Mail in the archive
 // to prevent duplicate messages on repeated runs.
 // Returns the saved D-Mails and any error encountered during naming or writing.
-func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]domain.DMail, error) {
+func (a *Amadeus) saveConvergenceDMails(ctx context.Context, alerts []domain.ConvergenceAlert) ([]domain.DMail, error) {
 	// Load existing D-Mails for dedup (I/O)
 	allDMails, err := a.Store.LoadAllDMails()
 	if err != nil {
@@ -207,7 +207,7 @@ func (a *Amadeus) saveConvergenceDMails(alerts []domain.ConvergenceAlert) ([]dom
 		}
 		cd.Name = cdName
 		domain.LogBanner(a.Logger, domain.BannerSend, string(cd.Kind), cd.Name, cd.Description)
-		if err := a.Emitter.EmitDMailGenerated(cd, time.Now().UTC()); err != nil {
+		if err := a.Emitter.EmitDMailGenerated(ctx, cd, time.Now().UTC()); err != nil {
 			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}
 		saved = append(saved, cd)

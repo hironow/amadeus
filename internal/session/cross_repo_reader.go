@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -28,7 +29,7 @@ func NewFileCrossRepoReader(logger domain.Logger) *FileCrossRepoReader {
 // ReadToolSnapshot reads the latest divergence state for the given tool.
 // stateDir is the absolute path to the tool's state directory (e.g. /repo/.gate).
 // Returns Available=false if the state dir doesn't exist.
-func (r *FileCrossRepoReader) ReadToolSnapshot(tool domain.ToolName, stateDir string) (domain.ToolSnapshot, error) {
+func (r *FileCrossRepoReader) ReadToolSnapshot(ctx context.Context, tool domain.ToolName, stateDir string) (domain.ToolSnapshot, error) {
 	snap := domain.ToolSnapshot{
 		Tool:      tool,
 		Available: false,
@@ -60,7 +61,7 @@ func (r *FileCrossRepoReader) ReadToolSnapshot(tool domain.ToolName, stateDir st
 	store := eventsource.NewFileEventStore(eventsDir, r.logger)
 
 	// Load all events to find the latest check (not limited to 7 days).
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(ctx)
 	if err != nil {
 		r.logger.Warn("failed to load events for %s: %v", tool, err)
 		return snap, nil

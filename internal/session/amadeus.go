@@ -124,7 +124,7 @@ func (a *Amadeus) SeqAllocator() port.SeqAllocator {
 
 // autoRebuildIfNeeded checks if projections are missing but events exist,
 // and rebuilds projections from the event store if so.
-func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
+func (a *Amadeus) autoRebuildIfNeeded(ctx context.Context, quiet bool) error {
 	if a.Events == nil || a.Projector == nil {
 		return nil
 	}
@@ -136,7 +136,7 @@ func (a *Amadeus) autoRebuildIfNeeded(quiet bool) error {
 	if !projectionEmpty {
 		return nil // projections exist, no rebuild needed
 	}
-	events, _, err := a.Events.LoadAll()
+	events, _, err := a.Events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events for auto-rebuild: %w", err)
 	}
@@ -190,7 +190,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 	// Auto-rebuild is a state-mutating operation (clears and rewrites projection
 	// directories), so it must be skipped in dry-run mode.
 	if !opts.DryRun {
-		if err := a.autoRebuildIfNeeded(opts.Quiet); err != nil {
+		if err := a.autoRebuildIfNeeded(ctx, opts.Quiet); err != nil {
 			return fmt.Errorf("auto-rebuild: %w", err)
 		}
 	}
@@ -256,7 +256,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		noShiftResult.PRsEvaluated = nil
 		noShiftResult.DMails = nil
 		noShiftResult.ConvergenceAlerts = nil
-		if err := a.Emitter.EmitCheck(noShiftResult, now); err != nil {
+		if err := a.Emitter.EmitCheck(ctx, noShiftResult, now); err != nil {
 			return fmt.Errorf("emit check (no shift): %w", err)
 		}
 		platform.RecordCheck(ctx, "clean")
@@ -335,7 +335,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 			Axes:       meterResult.Divergence.Axes,
 			GateDenied: true,
 		}
-		if err := a.Emitter.EmitCheck(gateDeniedResult, now); err != nil {
+		if err := a.Emitter.EmitCheck(ctx, gateDeniedResult, now); err != nil {
 			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
 		platform.RecordCheck(ctx, "drift")
@@ -358,7 +358,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 			attribute.String("phase.name", "convergence_detection"),
 		),
 	)
-	convergenceAlerts, convergenceDMails, err := a.detectConvergence(now)
+	convergenceAlerts, convergenceDMails, err := a.detectConvergence(ctx, now)
 	convSpan.End()
 	if err != nil {
 		return err
@@ -398,7 +398,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		ADRAlignment:      meterResult.Divergence.ADRAlignment, // E19: per-ADR scores
 	}
 
-	if err := a.Emitter.EmitCheck(result, now); err != nil {
+	if err := a.Emitter.EmitCheck(ctx, result, now); err != nil {
 		return fmt.Errorf("emit check completed: %w", err)
 	}
 	if len(dmails) > 0 {
@@ -439,6 +439,6 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 }
 
 // MarkCommented records that a D-Mail x Issue pair has been posted as a comment.
-func (a *Amadeus) MarkCommented(dmailName, issueID string) error {
-	return a.Emitter.EmitDMailCommented(dmailName, issueID, time.Now().UTC())
+func (a *Amadeus) MarkCommented(ctx context.Context, dmailName, issueID string) error {
+	return a.Emitter.EmitDMailCommented(ctx, dmailName, issueID, time.Now().UTC())
 }

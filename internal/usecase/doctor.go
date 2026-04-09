@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -9,8 +10,8 @@ import (
 
 // ComputeSuccessRate loads all events from the event store and returns
 // the success rate, clean count, and total check count.
-func ComputeSuccessRate(store port.EventStore) (rate float64, clean int, total int, err error) {
-	events, _, loadErr := store.LoadAll()
+func ComputeSuccessRate(ctx context.Context, store port.EventStore) (rate float64, clean int, total int, err error) {
+	events, _, loadErr := store.LoadAll(ctx)
 	if loadErr != nil {
 		return 0, 0, 0, loadErr
 	}

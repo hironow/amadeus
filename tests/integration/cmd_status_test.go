@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -123,7 +124,7 @@ func TestStatusCmd_JSONOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Append(ev); err != nil {
+	if _, err := store.Append(context.Background(), ev); err != nil {
 		t.Fatal(err)
 	}
 

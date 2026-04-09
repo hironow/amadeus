@@ -59,21 +59,21 @@ func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
 // EventStore is the append-only event persistence interface.
 type EventStore interface {
 	// Append persists one or more events. Validation is performed before any writes.
-	Append(events ...domain.Event) (domain.AppendResult, error)
+	Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error)
 
 	// LoadAll returns all events in chronological order.
-	LoadAll() ([]domain.Event, domain.LoadResult, error)
+	LoadAll(ctx context.Context) ([]domain.Event, domain.LoadResult, error)
 
 	// LoadSince returns events with timestamps after the given time.
-	LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error)
+	LoadSince(ctx context.Context, after time.Time) ([]domain.Event, domain.LoadResult, error)
 
 	// LoadAfterSeqNr returns all events with SeqNr > afterSeqNr,
 	// ordered by SeqNr ascending. Used for snapshot-based recovery.
-	LoadAfterSeqNr(afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error)
+	LoadAfterSeqNr(ctx context.Context, afterSeqNr uint64) ([]domain.Event, domain.LoadResult, error)
 
 	// LatestSeqNr returns the highest recorded SeqNr across all events.
 	// Returns 0 if no events have a SeqNr assigned.
-	LatestSeqNr() (uint64, error)
+	LatestSeqNr(ctx context.Context) (uint64, error)
 }
 
 // SnapshotStore persists materialized projection state at a known SeqNr.
@@ -202,17 +202,17 @@ type ArchiveOps interface {
 // Implemented in usecase layer, injected into session by usecase.RunCheck.
 // Emit chain: agg.Record*() → store.Append() → projector.Apply() → dispatch (best-effort).
 type CheckEventEmitter interface {
-	EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error
-	EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error
-	EmitDMailGenerated(dmail domain.DMail, now time.Time) error
-	EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error
-	EmitDMailCommented(dmailName, issueID string, now time.Time) error
-	EmitCheck(result domain.CheckResult, now time.Time) error
-	EmitRunStarted(data domain.RunStartedData, now time.Time) error
-	EmitRunStopped(data domain.RunStoppedData, now time.Time) error
-	EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error
-	EmitPRMerged(data domain.PRMergedData, now time.Time) error
-	EmitPRMergeSkipped(data domain.PRMergeSkippedData, now time.Time) error
+	EmitInboxConsumed(ctx context.Context, data domain.InboxConsumedData, now time.Time) error
+	EmitForceFullNextSet(ctx context.Context, prevDiv, currDiv float64, now time.Time) error
+	EmitDMailGenerated(ctx context.Context, dmail domain.DMail, now time.Time) error
+	EmitConvergenceDetected(ctx context.Context, alert domain.ConvergenceAlert, now time.Time) error
+	EmitDMailCommented(ctx context.Context, dmailName, issueID string, now time.Time) error
+	EmitCheck(ctx context.Context, result domain.CheckResult, now time.Time) error
+	EmitRunStarted(ctx context.Context, data domain.RunStartedData, now time.Time) error
+	EmitRunStopped(ctx context.Context, data domain.RunStoppedData, now time.Time) error
+	EmitPRConvergenceChecked(ctx context.Context, data domain.PRConvergenceCheckedData, now time.Time) error
+	EmitPRMerged(ctx context.Context, data domain.PRMergedData, now time.Time) error
+	EmitPRMergeSkipped(ctx context.Context, data domain.PRMergeSkippedData, now time.Time) error
 }
 
 // CheckStateProvider provides aggregate state read/write without exposing the aggregate type.
@@ -264,9 +264,9 @@ type Orchestrator interface {
 	// SetPRPipeline injects the PR convergence pipeline runner.
 	SetPRPipeline(runner PRPipelineRunner)
 	PrintSync() error
-	PrintLog() error
-	PrintLogJSON() error
-	MarkCommented(dmailName, issueID string) error
+	PrintLog(ctx context.Context) error
+	PrintLogJSON(ctx context.Context) error
+	MarkCommented(ctx context.Context, dmailName, issueID string) error
 	// EventStore returns the event persistence store.
 	EventStore() EventStore
 	// EventApplier returns the projection applier.

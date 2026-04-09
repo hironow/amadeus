@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -150,11 +151,11 @@ func (a *Amadeus) PrintCheckOutputQuiet(result domain.CheckResult, dmails []doma
 }
 
 // loadCheckHistory returns CheckResults extracted from the event store.
-func (a *Amadeus) loadCheckHistory() ([]domain.CheckResult, error) {
+func (a *Amadeus) loadCheckHistory(ctx context.Context) ([]domain.CheckResult, error) {
 	if a.Events == nil {
 		return nil, nil
 	}
-	events, _, err := a.Events.LoadAll()
+	events, _, err := a.Events.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load events: %w", err)
 	}
@@ -177,8 +178,8 @@ func (a *Amadeus) loadCheckHistory() ([]domain.CheckResult, error) {
 }
 
 // PrintLog renders the history and D-Mail log to DataOut.
-func (a *Amadeus) PrintLog() error {
-	history, err := a.loadCheckHistory()
+func (a *Amadeus) PrintLog(ctx context.Context) error {
+	history, err := a.loadCheckHistory(ctx)
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}
@@ -285,8 +286,8 @@ type dmailJSONView struct {
 }
 
 // PrintLogJSON writes the history and D-Mail log as JSON to DataOut.
-func (a *Amadeus) PrintLogJSON() error {
-	history, err := a.loadCheckHistory()
+func (a *Amadeus) PrintLogJSON(ctx context.Context) error {
+	history, err := a.loadCheckHistory(ctx)
 	if err != nil {
 		return fmt.Errorf("load history: %w", err)
 	}

@@ -772,7 +772,7 @@ func checkDMailSchema(gateRoot string) domain.DoctorCheck {
 // checkSuccessRate calculates and reports the event-based success rate.
 func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheck {
 	eventStore := session.NewEventStore(gateDir, logger)
-	rate, clean, total, err := usecase.ComputeSuccessRate(eventStore)
+	rate, clean, total, err := usecase.ComputeSuccessRate(context.Background(), eventStore)
 	if err != nil || total == 0 {
 		return domain.DoctorCheck{
 			Name:    "success-rate",

@@ -44,7 +44,7 @@ func RunCutover(
 	}
 
 	// Step 2: Load all existing events
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(ctx)
 	if err != nil {
 		return CutoverResult{}, fmt.Errorf("cutover: load all events: %w", err)
 	}
@@ -84,7 +84,7 @@ func RunCutover(
 		return CutoverResult{}, fmt.Errorf("cutover: alloc seq nr: %w", err)
 	}
 	cutoverEvent.SeqNr = seq
-	if _, err := store.Append(cutoverEvent); err != nil {
+	if _, err := store.Append(ctx, cutoverEvent); err != nil {
 		return CutoverResult{}, fmt.Errorf("cutover: append cutover event: %w", err)
 	}
 

@@ -47,7 +47,7 @@ func newRebuildCommand() *cobra.Command {
 			if rpErr != nil {
 				return rpErr
 			}
-			return usecase.Rebuild(domain.NewRebuildCommand(rp), eventStore, projector, logger)
+			return usecase.Rebuild(cmd.Context(), domain.NewRebuildCommand(rp), eventStore, projector, logger)
 		},
 	}
 
