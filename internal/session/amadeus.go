@@ -136,9 +136,12 @@ func (a *Amadeus) autoRebuildIfNeeded(ctx context.Context, quiet bool) error {
 	if !projectionEmpty {
 		return nil // projections exist, no rebuild needed
 	}
-	events, _, err := a.Events.LoadAll(ctx)
+	events, loadResult, err := a.Events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events for auto-rebuild: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 {
+		a.Logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 	if len(events) == 0 {
 		return nil // no events to replay

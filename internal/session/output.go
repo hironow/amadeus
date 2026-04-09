@@ -155,9 +155,12 @@ func (a *Amadeus) loadCheckHistory(ctx context.Context) ([]domain.CheckResult, e
 	if a.Events == nil {
 		return nil, nil
 	}
-	events, _, err := a.Events.LoadAll(ctx)
+	events, loadResult, err := a.Events.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load events: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 {
+		a.Logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 	var results []domain.CheckResult
 	for _, ev := range events {

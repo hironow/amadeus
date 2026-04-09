@@ -27,9 +27,12 @@ func Status(ctx context.Context, gateDir string, logger domain.Logger) domain.St
 	// Load all events for check stats
 	store := NewEventStore(gateDir, logger)
 
-	allEvents, _, err := store.LoadAll(ctx)
+	allEvents, loadResult, err := store.LoadAll(ctx)
 	if err != nil || len(allEvents) == 0 {
 		return report
+	}
+	if loadResult.CorruptLineCount > 0 {
+		logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 
 	// Count check events and compute success rate
