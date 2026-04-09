@@ -597,7 +597,8 @@ func checkDeadLetters(repoRoot string) domain.DoctorCheck {
 			Message: "no outbox DB",
 		}
 	}
-	store, err := session.NewOutboxStoreForDir(repoRoot)
+	divRoot := filepath.Join(repoRoot, domain.StateDir)
+	store, err := session.NewOutboxStoreForDir(divRoot)
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "dead-letters",
@@ -620,7 +621,7 @@ func checkDeadLetters(repoRoot string) domain.DoctorCheck {
 			Name:    "dead-letters",
 			Status:  domain.CheckWarn,
 			Message: fmt.Sprintf("%d dead-lettered outbox item(s)", count),
-			Hint:    "these items failed delivery 3+ times and are permanently stuck — inspect outbox.db in .gate/.run/ or wait for automatic expiry",
+			Hint:    "run 'amadeus dead-letters purge --execute' to remove",
 		}
 	}
 	return domain.DoctorCheck{

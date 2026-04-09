@@ -122,6 +122,7 @@ func NewRootCommand() *cobra.Command {
 		newMCPConfigCommand(),
 		newDashboardCommand(),
 		newSessionsCmd(),
+		newDeadLettersCommand(),
 	)
 
 	return cmd
