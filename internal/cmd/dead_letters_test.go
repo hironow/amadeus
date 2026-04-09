@@ -186,7 +186,7 @@ func TestDeadLettersPurge_JSONOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var result struct {
-		Count  int `json:"count"`
+		Count  int `json:"dead_letters"`
 		Purged int `json:"purged"`
 	}
 	if jsonErr := json.Unmarshal(stdout.Bytes(), &result); jsonErr != nil {

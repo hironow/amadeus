@@ -63,7 +63,7 @@ Pass --execute to actually delete them.`,
 			if _, statErr := os.Stat(dbPath); statErr != nil {
 				if outputFmt == "json" {
 					data, jsonErr := json.Marshal(struct {
-						Count  int `json:"count"`
+						Count  int `json:"dead_letters"`
 						Purged int `json:"purged"`
 					}{Count: 0, Purged: 0})
 					if jsonErr != nil {
@@ -91,7 +91,7 @@ Pass --execute to actually delete them.`,
 
 			if outputFmt == "json" {
 				out := struct {
-					Count  int `json:"count"`
+					Count  int `json:"dead_letters"`
 					Purged int `json:"purged"`
 				}{Count: count, Purged: 0}
 				if execute && count > 0 {
