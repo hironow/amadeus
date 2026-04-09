@@ -266,6 +266,8 @@ If [path] is omitted, the current working directory is used. Requires
 				StreamBus:   streamBus,
 			}
 
+			defer a.CloseRunner()
+
 			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
 			rp, rpErr := domain.NewRepoPath(repoRoot)
 			if rpErr != nil {

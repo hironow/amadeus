@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -50,25 +51,47 @@ type Amadeus struct {
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.
 	InboxCh <-chan domain.DMail
+
+	// trackedRunner is the lazily-initialized default runner. Built once on first
+	// call to claudeRunner() and reused for all subsequent calls (divergence scoring,
+	// PR review, review gate). The underlying session store is closed by CloseRunner().
+	trackedRunner     port.ClaudeRunner
+	trackedRunnerOnce sync.Once
+	sessionStore      *SQLiteCodingSessionStore // nil when tracking unavailable; closed by CloseRunner()
 }
 
-// claudeRunner returns the configured ClaudeRunner, falling back to the default Claude runner if nil.
-// When using the default, wraps with SessionTrackingAdapter for session persistence.
+// claudeRunner returns the configured ClaudeRunner, falling back to a lazily-initialized
+// default runner with session tracking. The runner is built once and reused, so the
+// underlying sessions.db connection is not duplicated across calls.
 func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}
-	adapter := &ClaudeAdapter{ClaudeCmd: a.ClaudeCmd, Model: a.ClaudeModel, Logger: a.Logger, StreamBus: a.StreamBus, ToolName: "amadeus"}
-	dbPath := filepath.Join(a.RepoDir, domain.StateDir, ".run", "sessions.db")
-	store, err := NewSQLiteCodingSessionStore(dbPath)
-	if err != nil {
-		if a.Logger != nil {
-			a.Logger.Debug("session tracking unavailable: %v", err)
+	a.trackedRunnerOnce.Do(func() {
+		adapter := &ClaudeAdapter{ClaudeCmd: a.ClaudeCmd, Model: a.ClaudeModel, Logger: a.Logger, StreamBus: a.StreamBus, ToolName: "amadeus"}
+		dbPath := filepath.Join(a.RepoDir, domain.StateDir, ".run", "sessions.db")
+		store, err := NewSQLiteCodingSessionStore(dbPath)
+		if err != nil {
+			if a.Logger != nil {
+				a.Logger.Debug("session tracking unavailable: %v", err)
+			}
+			a.trackedRunner = adapter
+			return
 		}
-		return adapter
+		a.sessionStore = store
+		a.trackedRunner = NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
+	})
+	return a.trackedRunner
+}
+
+// CloseRunner closes the underlying session store opened by claudeRunner().
+// Call this when the Amadeus instance is no longer needed (e.g. defer after construction).
+// Safe to call multiple times or when no runner was created.
+func (a *Amadeus) CloseRunner() {
+	if a.sessionStore != nil {
+		a.sessionStore.Close()
+		a.sessionStore = nil
 	}
-	// Store lives for the duration of this Run; closed when amadeus exits.
-	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
 }
 
 // runPreMergePipeline delegates to the PRPipeline port (usecase-injected).
