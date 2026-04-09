@@ -66,6 +66,10 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	)
 	defer span.End()
 
+	// publishCtx preserves trace/span info but detaches the cancel signal,
+	// ensuring session_end events are published even when ctx is cancelled.
+	publishCtx := context.WithoutCancel(ctx)
+
 	// Apply per-call timeout only when the caller has not already set a deadline.
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline && a.TimeoutSec > 0 {
 		timeout := time.Duration(a.TimeoutSec) * time.Second
@@ -153,14 +157,14 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		normalizer.SetCodingSessionID(rc.CodingSessionID)
 		defer func() {
 			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
-			// Use Background: ctx may be cancelled, but session_end must still publish.
+			// publishCtx is cancel-safe but retains trace info for connected spans.
 			if vErr := domain.ValidateSessionStreamEvent(endEvent); vErr != nil {
 				if a.Logger != nil {
 					a.Logger.Warn("session_end dropped (invalid): %v", vErr)
 				}
 			} else {
-				// Use Background: caller ctx may be cancelled, but session_end must still publish.
-				a.StreamBus.Publish(context.Background(), endEvent)
+				// publishCtx preserves trace spans but is cancel-safe.
+				a.StreamBus.Publish(publishCtx, endEvent)
 			}
 		}()
 	}

@@ -14,7 +14,8 @@ func TestSessionRecorder_SetsCausationChain(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	store := NewFileEventStore(dir, &domain.NopLogger{})
-	rec, err := NewSessionRecorder(ctx, store, "session-1")
+	nopLog := &domain.NopLogger{}
+	rec, err := NewSessionRecorder(ctx, store, "session-1", nopLog)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,12 +53,13 @@ func TestSessionRecorder_ResumesPrevID(t *testing.T) {
 	dir := t.TempDir()
 	store := NewFileEventStore(dir, &domain.NopLogger{})
 
-	rec1, _ := NewSessionRecorder(ctx, store, "s1")
+	nopLog := &domain.NopLogger{}
+	rec1, _ := NewSessionRecorder(ctx, store, "s1", nopLog)
 	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
 	rec1.Record(ctx, ev1)
 
 	// Same session ID should resume CausationID chain
-	rec2, _ := NewSessionRecorder(ctx, store, "s1")
+	rec2, _ := NewSessionRecorder(ctx, store, "s1", nopLog)
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
 	rec2.Record(ctx, ev2)
 
@@ -73,12 +75,13 @@ func TestSessionRecorder_DifferentSession_NoCausation(t *testing.T) {
 	dir := t.TempDir()
 	store := NewFileEventStore(dir, &domain.NopLogger{})
 
-	rec1, _ := NewSessionRecorder(ctx, store, "s1")
+	nopLog := &domain.NopLogger{}
+	rec1, _ := NewSessionRecorder(ctx, store, "s1", nopLog)
 	ev1, _ := domain.NewEvent(domain.EventRunStarted, map[string]string{}, time.Now())
 	rec1.Record(ctx, ev1)
 
 	// Different session should NOT chain to s1's event
-	rec2, _ := NewSessionRecorder(ctx, store, "s2")
+	rec2, _ := NewSessionRecorder(ctx, store, "s2", nopLog)
 	ev2, _ := domain.NewEvent(domain.EventRunStopped, map[string]string{}, time.Now())
 	rec2.Record(ctx, ev2)
 
