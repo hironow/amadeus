@@ -597,7 +597,8 @@ func checkDeadLetters(repoRoot string) domain.DoctorCheck {
 			Message: "no outbox DB",
 		}
 	}
-	store, err := session.NewOutboxStoreForDir(repoRoot)
+	divRoot := filepath.Join(repoRoot, domain.StateDir)
+	store, err := session.NewOutboxStoreForDir(divRoot)
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "dead-letters",
