@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -83,7 +82,7 @@ Pass --execute to actually delete them.`,
 			}
 			defer store.Close()
 
-			ctx := context.Background()
+			ctx := cmd.Context()
 
 			count, countErr := store.DeadLetterCount(ctx)
 			if countErr != nil {

@@ -25,6 +25,7 @@ amadeus [flags]
 * [amadeus clean](amadeus_clean.md)	 - Remove state directory (.gate/)
 * [amadeus config](amadeus_config.md)	 - View or update amadeus configuration
 * [amadeus dashboard](amadeus_dashboard.md)	 - Show TAP ecosystem divergence dashboard
+* [amadeus dead-letters](amadeus_dead-letters.md)	 - Manage dead-lettered outbox items
 * [amadeus doctor](amadeus_doctor.md)	 - Run health checks
 * [amadeus improvement-stats](amadeus_improvement-stats.md)	 - Show improvement outcome statistics
 * [amadeus init](amadeus_init.md)	 - Initialize .gate directory
