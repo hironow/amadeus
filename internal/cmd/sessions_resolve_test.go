@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: tests resolveSessionsDir which is an unexported helper used by sessions commands
+
 import (
 	"os"
 	"path/filepath"

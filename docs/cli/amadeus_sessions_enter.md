@@ -10,6 +10,7 @@ amadeus sessions enter [session-record-id] [flags]
 
 ```
   -h, --help                 help for enter
+      --path string          Repository root path
       --provider-id string   Resume by provider session ID directly
 ```
 
