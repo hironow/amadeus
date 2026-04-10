@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"text/tabwriter"
 
@@ -40,8 +39,11 @@ func newSessionsListCmd() *cobra.Command {
 		Short: "List recorded coding sessions",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			logger := cmd.Context().Value(loggerKey).(domain.Logger)
-			repoRoot := resolveRepoRoot(cmd)
-			dbPath := filepath.Join(repoRoot, domain.StateDir, ".run", "sessions.db")
+			_, stateDirPath, err := resolveSessionsDir(cmd)
+			if err != nil {
+				return err
+			}
+			dbPath := filepath.Join(stateDirPath, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
 			if err != nil {
@@ -86,6 +88,7 @@ func newSessionsListCmd() *cobra.Command {
 	}
 	listCmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (running, completed, failed, abandoned)")
 	listCmd.Flags().IntVar(&limit, "limit", 20, "Max results")
+	listCmd.Flags().String("path", "", "Repository root path")
 	return listCmd
 }
 
@@ -96,8 +99,11 @@ func newSessionsEnterCmd() *cobra.Command {
 		Short: "Re-enter an AI coding session interactively",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot := resolveRepoRoot(cmd)
-			dbPath := filepath.Join(repoRoot, domain.StateDir, ".run", "sessions.db")
+			repoRoot, stateDirPath, resolveErr := resolveSessionsDir(cmd)
+			if resolveErr != nil {
+				return resolveErr
+			}
+			dbPath := filepath.Join(stateDirPath, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
 			if err != nil {
@@ -109,31 +115,31 @@ func newSessionsEnterCmd() *cobra.Command {
 			if len(args) == 1 {
 				rec, err = store.Load(cmd.Context(), args[0])
 				if err != nil {
-					return fmt.Errorf("load session %q: %w", args[0], err)
+					return fmt.Errorf("load session %s: %w", args[0], err)
 				}
 			} else if providerID != "" {
 				rec, err = store.LatestByProviderSessionID(cmd.Context(), domain.ProviderClaudeCode, providerID)
 				if err != nil {
-					return fmt.Errorf("find session by provider ID %q: %w", providerID, err)
+					return fmt.Errorf("find session by provider ID %s: %w", providerID, err)
 				}
 			} else {
 				return fmt.Errorf("provide a session record ID or --provider-id")
 			}
 
 			if rec.ProviderSessionID == "" {
-				return fmt.Errorf("session %q has no provider session ID", rec.ID)
+				return fmt.Errorf("session %s has no provider session ID", rec.ID)
 			}
 			if rec.WorkDir == "" {
-				return fmt.Errorf("session %q has no WorkDir recorded", rec.ID)
+				return fmt.Errorf("session %s has no work directory recorded", rec.ID)
 			}
 
-			configPath, _ := cmd.Flags().GetString("config")
-			if configPath == "" {
-				configPath = filepath.Join(repoRoot, domain.StateDir, "config.yaml")
+			configPath := filepath.Join(stateDirPath, "config.yaml")
+			if f := cmd.Flags().Lookup("config"); f != nil && cmd.Flags().Changed("config") {
+				configPath, _ = cmd.Flags().GetString("config")
 			}
 			cfg, err := loadConfig(configPath)
 			if err != nil {
-				return fmt.Errorf("load config %q: %w", configPath, err)
+				return fmt.Errorf("load config %s: %w", configPath, err)
 			}
 
 			enterCfg := session.EnterConfig{
@@ -149,17 +155,6 @@ func newSessionsEnterCmd() *cobra.Command {
 		},
 	}
 	enterCmd.Flags().StringVar(&providerID, "provider-id", "", "Resume by provider session ID directly")
+	enterCmd.Flags().String("path", "", "Repository root path")
 	return enterCmd
-}
-
-// resolveRepoRoot returns the repo root from the config flag or cwd.
-func resolveRepoRoot(cmd *cobra.Command) string {
-	configPath, _ := cmd.Flags().GetString("config")
-	if configPath != "" {
-		// Config path is relative to repo root (e.g. .gate/config.yaml)
-		abs, _ := filepath.Abs(filepath.Dir(filepath.Dir(configPath)))
-		return abs
-	}
-	cwd, _ := os.Getwd()
-	return cwd
 }
