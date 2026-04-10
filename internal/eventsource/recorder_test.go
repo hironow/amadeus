@@ -4,11 +4,25 @@ package eventsource
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 )
+
+// warnCapture captures Warn calls for assertion.
+type warnCapture struct {
+	domain.NopLogger
+	warns []string
+}
+
+func (w *warnCapture) Warn(format string, args ...any) {
+	w.warns = append(w.warns, fmt.Sprintf(format, args...))
+}
 
 func TestSessionRecorder_SetsCausationChain(t *testing.T) {
 	ctx := context.Background()
@@ -88,5 +102,39 @@ func TestSessionRecorder_DifferentSession_NoCausation(t *testing.T) {
 	events, _, _ := store.LoadAll(context.Background())
 	if events[1].CausationID != "" {
 		t.Errorf("different session should have empty CausationID, got %q", events[1].CausationID)
+	}
+}
+
+func TestSessionRecorder_WarnsOnCorruptLines(t *testing.T) {
+	// given: a store directory with one valid and one corrupt JSONL line
+	dir := t.TempDir()
+	validLine := `{"type":"run.started","aggregate_id":"test","seq_nr":1,"timestamp":"2026-01-01T00:00:00Z"}`
+	corruptLine := `{CORRUPT`
+	if err := os.WriteFile(
+		filepath.Join(dir, "2026-01-01.jsonl"),
+		[]byte(validLine+"\n"+corruptLine+"\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: create recorder with warn-capturing logger
+	logger := &warnCapture{}
+	store := NewFileEventStore(dir, logger)
+	_, err := NewSessionRecorder(context.Background(), store, "test-session", logger)
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
+
+	// then: logger.Warn was called with message containing "corrupt"
+	found := false
+	for _, w := range logger.warns {
+		if strings.Contains(strings.ToLower(w), "corrupt") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning about corrupt lines, got warns: %v", logger.warns)
 	}
 }

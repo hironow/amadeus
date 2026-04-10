@@ -14,8 +14,8 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// Compile-time check that Projector implements domain.EventApplier.
-var _ domain.EventApplier = (*Projector)(nil)
+// Compile-time check that Projector implements port.ContextEventApplier.
+var _ port.ContextEventApplier = (*Projector)(nil)
 
 // Projector applies domain events to update materialized projection files.
 type Projector struct {
@@ -25,7 +25,7 @@ type Projector struct {
 }
 
 // Apply processes a single event and updates the relevant projections.
-func (p *Projector) Apply(event domain.Event) error {
+func (p *Projector) Apply(ctx context.Context, event domain.Event) error {
 	switch event.Type {
 	case domain.EventCheckCompleted:
 		return p.applyCheckCompleted(event)
@@ -34,7 +34,7 @@ func (p *Projector) Apply(event domain.Event) error {
 	case domain.EventForceFullNextSet:
 		return p.applyForceFullNextSet(event)
 	case domain.EventDMailGenerated:
-		return p.applyDMailGenerated(event)
+		return p.applyDMailGenerated(ctx, event)
 	case domain.EventInboxConsumed:
 		return p.applyInboxConsumed(event)
 	case domain.EventDMailCommented:
@@ -55,7 +55,7 @@ func (p *Projector) Apply(event domain.Event) error {
 // so that rebuilt state exactly reflects the event stream.
 // NOTE: Inbox-sourced D-Mails (consumed via ScanInbox) are NOT reconstructed
 // because inbox.consumed events contain only metadata, not the full D-Mail content.
-func (p *Projector) Rebuild(events []domain.Event) error {
+func (p *Projector) Rebuild(ctx context.Context, events []domain.Event) error {
 	// Clear all projection directories
 	for _, sub := range []string{".run", "archive", "outbox"} {
 		dir := filepath.Join(p.Store.Root, sub)
@@ -71,7 +71,7 @@ func (p *Projector) Rebuild(events []domain.Event) error {
 	defer func() { p.rebuilding = false }()
 
 	for _, ev := range events {
-		if err := p.Apply(ev); err != nil {
+		if err := p.Apply(ctx, ev); err != nil {
 			return fmt.Errorf("rebuild event %s (%s): %w", ev.ID, ev.Type, err)
 		}
 	}
@@ -130,7 +130,7 @@ func (p *Projector) applyForceFullNextSet(event domain.Event) error {
 	return p.Store.SaveLatest(latest)
 }
 
-func (p *Projector) applyDMailGenerated(event domain.Event) error {
+func (p *Projector) applyDMailGenerated(ctx context.Context, event domain.Event) error {
 	var data domain.DMailGeneratedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailGeneratedData: %w", err)
@@ -145,7 +145,6 @@ func (p *Projector) applyDMailGenerated(event domain.Event) error {
 	if err != nil {
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
-	ctx := context.Background()
 	filename := data.DMail.Name + ".md"
 	if err := p.OutboxStore.Stage(ctx, filename, marshaledData); err != nil {
 		return fmt.Errorf("stage dmail: %w", err)

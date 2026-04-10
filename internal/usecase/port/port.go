@@ -56,6 +56,16 @@ type NopPolicyMetrics struct{}
 
 func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
 
+// ContextEventApplier extends domain.EventApplier with context propagation.
+// domain.EventApplier is ctx-free (pure domain); this port interface adds ctx
+// so that session-layer implementations can propagate trace/cancel.
+type ContextEventApplier interface {
+	Apply(ctx context.Context, event domain.Event) error
+	Rebuild(ctx context.Context, events []domain.Event) error
+	Serialize() ([]byte, error)
+	Deserialize(data []byte) error
+}
+
 // EventStore is the append-only event persistence interface.
 type EventStore interface {
 	// Append persists one or more events. Validation is performed before any writes.
@@ -269,8 +279,8 @@ type Orchestrator interface {
 	MarkCommented(ctx context.Context, dmailName, issueID string) error
 	// EventStore returns the event persistence store.
 	EventStore() EventStore
-	// EventApplier returns the projection applier.
-	EventApplier() domain.EventApplier
+	// EventApplier returns the projection applier (ctx-aware port interface).
+	EventApplier() ContextEventApplier
 	// SeqAllocator returns the global SeqNr allocator (ADR S0040). May return nil.
 	SeqAllocator() SeqAllocator
 }

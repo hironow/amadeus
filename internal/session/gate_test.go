@@ -89,31 +89,31 @@ type fakeProjector struct {
 	applied []domain.Event
 }
 
-func (p *fakeProjector) Apply(event domain.Event) error {
+func (p *fakeProjector) Apply(_ context.Context, event domain.Event) error {
 	p.applied = append(p.applied, event)
 	return nil
 }
-func (p *fakeProjector) Rebuild(_ []domain.Event) error       { return nil }
-func (p *fakeProjector) Serialize() ([]byte, error)           { return nil, nil }
-func (p *fakeProjector) Deserialize(_ []byte) error           { return nil }
+func (p *fakeProjector) Rebuild(_ context.Context, _ []domain.Event) error { return nil }
+func (p *fakeProjector) Serialize() ([]byte, error)                        { return nil, nil }
+func (p *fakeProjector) Deserialize(_ []byte) error                        { return nil }
 
 // testCheckEventEmitter implements port.CheckEventEmitter for session tests.
 // It wraps the aggregate + event store + projector without usecase import.
 type testCheckEventEmitter struct {
 	agg       *domain.CheckAggregate
 	store     port.EventStore
-	projector domain.EventApplier
+	projector port.ContextEventApplier
 }
 
-func (e *testCheckEventEmitter) emit(events ...domain.Event) error {
+func (e *testCheckEventEmitter) emit(ctx context.Context, events ...domain.Event) error {
 	if e.store != nil {
-		if _, err := e.store.Append(context.Background(), events...); err != nil {
+		if _, err := e.store.Append(ctx, events...); err != nil {
 			return err
 		}
 	}
 	if e.projector != nil {
 		for _, ev := range events {
-			if err := e.projector.Apply(ev); err != nil {
+			if err := e.projector.Apply(ctx, ev); err != nil {
 				return err
 			}
 		}
@@ -121,76 +121,76 @@ func (e *testCheckEventEmitter) emit(events ...domain.Event) error {
 	return nil
 }
 
-func (e *testCheckEventEmitter) EmitInboxConsumed(_ context.Context, data domain.InboxConsumedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitInboxConsumed(ctx context.Context, data domain.InboxConsumedData, now time.Time) error {
 	ev, err := e.agg.RecordInboxConsumed(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitForceFullNextSet(_ context.Context, prevDiv, currDiv float64, now time.Time) error {
+func (e *testCheckEventEmitter) EmitForceFullNextSet(ctx context.Context, prevDiv, currDiv float64, now time.Time) error {
 	ev, err := e.agg.RecordForceFullNextSet(prevDiv, currDiv, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitDMailGenerated(_ context.Context, dmail domain.DMail, now time.Time) error {
+func (e *testCheckEventEmitter) EmitDMailGenerated(ctx context.Context, dmail domain.DMail, now time.Time) error {
 	ev, err := e.agg.RecordDMailGenerated(dmail, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitConvergenceDetected(_ context.Context, alert domain.ConvergenceAlert, now time.Time) error {
+func (e *testCheckEventEmitter) EmitConvergenceDetected(ctx context.Context, alert domain.ConvergenceAlert, now time.Time) error {
 	ev, err := e.agg.RecordConvergenceDetected(alert, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitDMailCommented(_ context.Context, dmailName, issueID string, now time.Time) error {
+func (e *testCheckEventEmitter) EmitDMailCommented(ctx context.Context, dmailName, issueID string, now time.Time) error {
 	ev, err := e.agg.RecordDMailCommented(dmailName, issueID, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitCheck(_ context.Context, result domain.CheckResult, now time.Time) error {
+func (e *testCheckEventEmitter) EmitCheck(ctx context.Context, result domain.CheckResult, now time.Time) error {
 	events, err := e.agg.RecordCheck(result, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(events...)
+	return e.emit(ctx, events...)
 }
 
-func (e *testCheckEventEmitter) EmitRunStarted(_ context.Context, data domain.RunStartedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitRunStarted(ctx context.Context, data domain.RunStartedData, now time.Time) error {
 	ev, err := e.agg.RecordRunStarted(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitRunStopped(_ context.Context, data domain.RunStoppedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitRunStopped(ctx context.Context, data domain.RunStoppedData, now time.Time) error {
 	ev, err := e.agg.RecordRunStopped(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 
-func (e *testCheckEventEmitter) EmitPRConvergenceChecked(_ context.Context, data domain.PRConvergenceCheckedData, now time.Time) error {
+func (e *testCheckEventEmitter) EmitPRConvergenceChecked(ctx context.Context, data domain.PRConvergenceCheckedData, now time.Time) error {
 	ev, err := e.agg.RecordPRConvergenceChecked(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ev)
+	return e.emit(ctx, ev)
 }
 func (e *testCheckEventEmitter) EmitPRMerged(_ context.Context, _ domain.PRMergedData, _ time.Time) error {
 	return nil

@@ -17,7 +17,7 @@ type checkEventEmitter struct {
 	store         port.EventStore
 	seqAlloc      port.SeqAllocator // SQLite-backed global SeqNr (ADR S0040)
 	seqNrFallback uint64            // fallback counter when seqAlloc is nil
-	projector     domain.EventApplier
+	projector     port.ContextEventApplier
 	dispatcher    port.EventDispatcher
 	logger        domain.Logger
 }
@@ -27,7 +27,7 @@ type checkEventEmitter struct {
 func NewCheckEventEmitter(
 	agg *domain.CheckAggregate,
 	store port.EventStore,
-	projector domain.EventApplier,
+	projector port.ContextEventApplier,
 	dispatcher port.EventDispatcher,
 	seqAlloc port.SeqAllocator,
 	logger domain.Logger,
@@ -71,7 +71,7 @@ func (e *checkEventEmitter) emit(ctx context.Context, events ...domain.Event) er
 	}
 	if e.projector != nil {
 		for _, ev := range events {
-			if err := e.projector.Apply(ev); err != nil {
+			if err := e.projector.Apply(ctx, ev); err != nil {
 				return fmt.Errorf("apply event %s: %w", ev.Type, err)
 			}
 		}
