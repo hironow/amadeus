@@ -46,6 +46,21 @@ for file in "${!EXPECTED[@]}"; do
     fi
 done
 
+# --- Phase 2: sessions contract structural checks ---
+resolve_file="${REPO_ROOT}/internal/cmd/sessions_resolve.go"
+if [[ ! -f "$resolve_file" ]]; then
+    echo "DRIFT: internal/cmd/sessions_resolve.go — file missing"
+    rc=1
+else
+    # Verify canonical resolveSessionsDir signature exists
+    if ! grep -q 'func resolveSessionsDir(cmd \*cobra.Command) (repoRoot, stateDirPath string, err error)' "$resolve_file"; then
+        echo "DRIFT: internal/cmd/sessions_resolve.go — canonical resolveSessionsDir signature missing"
+        rc=1
+    else
+        echo "  OK: internal/cmd/sessions_resolve.go (resolveSessionsDir signature)"
+    fi
+fi
+
 if [[ $rc -eq 0 ]]; then
     echo "substrate-drift-check: all canonical files match"
 fi
