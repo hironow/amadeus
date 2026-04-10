@@ -230,6 +230,10 @@ nosemgrep-audit:
     if [ $rc -eq 0 ]; then echo "nosemgrep-audit: all annotations tagged"; fi
     exit $rc
 
+# Verify canonical AI coding substrate files have not drifted
+substrate-drift-check:
+    ./scripts/check-substrate-drift.sh .
+
 # Check docs for stale references (e.g. deprecated internal/port path)
 docs-check:
     @echo "Checking for stale references..."
