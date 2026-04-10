@@ -11,6 +11,8 @@ import (
 )
 
 // EventApplier applies domain events to update materialized projections.
+// Note: context is intentionally absent — domain types must remain pure.
+// Use ContextEventApplier (usecase/port) when caller context is required.
 type EventApplier interface {
 	Apply(event Event) error
 	Rebuild(events []Event) error

@@ -317,6 +317,27 @@ rules:
       - pattern-not: |
           []string{..., "--output-format", "stream-json", ..., "--verbose", ...}
 
+  # --- GAP-050: context.Background() regression guard ---
+  - id: gap050-session-context-background
+    languages: [go]
+    message: |
+      session/platform 層で context.Background() を直接使用しないでください。
+      Why: caller context を受け取るべき運用パスで trace/cancel の一貫性が崩れます (GAP-ARCH-050)。
+      How: 関数引数で ctx を受け取り、detached が必要な箇所は context.WithoutCancel(ctx) を使用してください。
+      root bootstrap (constructor) のみ許容 — nosemgrep コメントで意図を固定してください。
+    severity: ERROR
+    patterns:
+      - pattern: context.Background()
+    paths:
+      include:
+        - internal/session/
+        - internal/platform/
+      exclude:
+        - "*_test.go"
+        - "internal/session/error_queue_store.go"
+        - "internal/session/delivery_store.go"
+        - "internal/session/delivery_dedup_store.go"
+
   # --- D4: Resource leak detection ---
 
   # Rule 13: sql.Open without defer Close

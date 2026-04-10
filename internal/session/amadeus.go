@@ -21,7 +21,7 @@ type Amadeus struct {
 	Config      domain.Config
 	Store       port.StateReader
 	Events      port.EventStore     // nil skips event persistence (Projector still required for writes)
-	Projector   domain.EventApplier // nil skips projection updates (Events still required for writes)
+	Projector   port.ContextEventApplier // nil skips projection updates (Events still required for writes)
 	Git         port.Git
 	RepoDir     string            // repository root directory
 	Claude      port.ClaudeRunner // nil falls back to the default Claude runner
@@ -113,8 +113,8 @@ func (a *Amadeus) EventStore() port.EventStore {
 	return a.Events
 }
 
-// EventApplier returns the projection applier.
-func (a *Amadeus) EventApplier() domain.EventApplier {
+// EventApplier returns the projection applier (ctx-aware port interface).
+func (a *Amadeus) EventApplier() port.ContextEventApplier {
 	return a.Projector
 }
 
@@ -163,7 +163,7 @@ func (a *Amadeus) autoRebuildIfNeeded(ctx context.Context, quiet bool) error {
 	if !quiet {
 		a.Logger.Info("projections missing, rebuilding from %d event(s)", len(events))
 	}
-	if err := a.Projector.Rebuild(events); err != nil {
+	if err := a.Projector.Rebuild(ctx, events); err != nil {
 		return fmt.Errorf("auto-rebuild: %w", err)
 	}
 	return nil

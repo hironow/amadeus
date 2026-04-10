@@ -10,7 +10,7 @@ import (
 
 // Rebuild replays events to regenerate projection files.
 // The RebuildCommand is already valid by construction (parse-don't-validate).
-func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
+func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventStore, projector port.ContextEventApplier, logger domain.Logger) error {
 	_ = cmd // command validated by construction; no fields accessed here
 
 	allEvents, loadResult, err := events.LoadAll(ctx)
@@ -29,7 +29,7 @@ func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventSt
 
 	logger.Info("rebuilding projections from %d event(s)", len(trimmed))
 
-	if err := projector.Rebuild(trimmed); err != nil {
+	if err := projector.Rebuild(ctx, trimmed); err != nil {
 		return fmt.Errorf("rebuild: %w", err)
 	}
 
