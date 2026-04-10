@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -139,4 +142,33 @@ func printDoctorText(w io.Writer, logger *platform.Logger, results []domain.Doct
 		return &domain.SilentError{Err: fmt.Errorf("%d check(s) failed", fails)}
 	}
 	return nil
+}
+
+// runDoctor loads config and delegates to session.RunDoctorWithClaudeCmd.
+func runDoctor(ctx context.Context, configPath string, repoRoot string, logger domain.Logger, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
+	claudeCmd := domain.DefaultClaudeCmd
+	if cfg, err := loadConfig(configPath); err == nil {
+		claudeCmd = cfg.ClaudeCmd
+	}
+	return session.RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, claudeCmd, logger, repair, mode, checkSuccessRate)
+}
+
+// checkSuccessRate calculates and reports the event-based success rate.
+// Wires session.NewEventStore to usecase.ComputeSuccessRate.
+func checkSuccessRate(gateDir string, logger domain.Logger) domain.DoctorCheck {
+	eventStore := session.NewEventStore(gateDir, logger)
+	rate, clean, total, err := usecase.ComputeSuccessRate(context.Background(), eventStore, logger)
+	if err != nil || total == 0 {
+		return domain.DoctorCheck{
+			Name:    "success-rate",
+			Status:  domain.CheckOK,
+			Message: "no events",
+		}
+	}
+
+	return domain.DoctorCheck{
+		Name:    "success-rate",
+		Status:  domain.CheckOK,
+		Message: domain.FormatSuccessRate(rate, clean, total),
+	}
 }

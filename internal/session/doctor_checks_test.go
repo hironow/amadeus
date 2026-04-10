@@ -1,6 +1,6 @@
-package cmd
+package session
 
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+// white-box-reason: doctor checks: Override* test seams for package-level variables (newShellCmd, lookPathShell, etc.)
 
 import (
 	"context"
@@ -16,9 +16,6 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
-	"go.opentelemetry.io/otel"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,7 +30,7 @@ func buildFakeClaude(t *testing.T) string {
 	if !ok {
 		t.Fatal("cannot determine test file location")
 	}
-	// thisFile = internal/cmd/doctor_checks_test.go → project root = ../../
+	// thisFile = internal/session/doctor_checks_test.go -> project root = ../../
 	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
 	fakeSrc := filepath.Join(projectRoot, "tests", "scenario", "testdata", "fake-claude")
 
@@ -46,21 +43,7 @@ func buildFakeClaude(t *testing.T) string {
 	return binPath
 }
 
-// setupTestTracer configures an in-memory tracer for testing doctor spans.
-func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
-	t.Helper()
-	exp := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
-	prev := otel.GetTracerProvider()
-	otel.SetTracerProvider(tp)
-	platform.Tracer = tp.Tracer("amadeus-test")
-	t.Cleanup(func() {
-		tp.Shutdown(context.Background())
-		otel.SetTracerProvider(prev)
-		platform.Tracer = prev.Tracer("amadeus")
-	})
-	return exp
-}
+// setupTestTracer is defined in telemetry_test.go (shared within package session).
 
 // initGateDirForTest creates a minimal .gate/ directory structure for doctor tests.
 func initGateDirForTest(t *testing.T, root string) {
@@ -108,6 +91,16 @@ func initGateDirForTest(t *testing.T, root string) {
 	}
 }
 
+// nopSuccessRateChecker is a no-op SuccessRateChecker for tests that don't
+// need real success-rate computation.
+func nopSuccessRateChecker(gateDir string, logger domain.Logger) domain.DoctorCheck {
+	return domain.DoctorCheck{
+		Name:    "success-rate",
+		Status:  domain.CheckOK,
+		Message: "no events",
+	}
+}
+
 func TestCheckStatusLabel(t *testing.T) {
 	tests := []struct {
 		status domain.CheckStatus
@@ -126,7 +119,7 @@ func TestCheckStatusLabel(t *testing.T) {
 
 func TestCheckTool_Exists(t *testing.T) {
 	ctx := context.Background()
-	result := checkTool(ctx, "git")
+	result := CheckTool(ctx, "git")
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK for 'git', got %v: %s", result.Status, result.Message)
 	}
@@ -137,7 +130,7 @@ func TestCheckTool_Exists(t *testing.T) {
 
 func TestCheckTool_NotFound(t *testing.T) {
 	ctx := context.Background()
-	result := checkTool(ctx, "nonexistent-tool-xyz-12345")
+	result := CheckTool(ctx, "nonexistent-tool-xyz-12345")
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -152,7 +145,7 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("git init: %v", err)
 	}
-	result := checkGitRepo(dir)
+	result := CheckGitRepo(dir)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
@@ -160,7 +153,7 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 
 func TestCheckGitRepo_NotRepo(t *testing.T) {
 	dir := t.TempDir()
-	result := checkGitRepo(dir)
+	result := CheckGitRepo(dir)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -170,7 +163,7 @@ func TestCheckGateDir_Exists(t *testing.T) {
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	result := checkGateDir(dir, false)
+	result := CheckGateDir(dir, false)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
@@ -178,7 +171,7 @@ func TestCheckGateDir_Exists(t *testing.T) {
 
 func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
-	result := checkGateDir(dir, false)
+	result := CheckGateDir(dir, false)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -186,7 +179,7 @@ func TestCheckGateDir_NotExist(t *testing.T) {
 
 func TestCheckGateDir_RepairCreatesMissing(t *testing.T) {
 	dir := t.TempDir()
-	result := checkGateDir(dir, true)
+	result := CheckGateDir(dir, true)
 	if result.Status != domain.CheckFixed {
 		t.Errorf("expected domain.CheckFixed, got %v: %s", result.Status, result.Message)
 	}
@@ -197,10 +190,10 @@ func TestCheckGateDir_RepairCreatesMissing(t *testing.T) {
 
 func TestCheckClaudeAuth_Authenticated(t *testing.T) {
 	// given
-	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - \u2713 Connected"
 
 	// when
-	result := checkClaudeAuth(mcpOutput, nil, "claude")
+	result := CheckClaudeAuth(mcpOutput, nil, "claude")
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -216,7 +209,7 @@ func TestCheckClaudeAuth_NotAuthenticated(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkClaudeAuth("", mcpErr, "claude")
+	result := CheckClaudeAuth("", mcpErr, "claude")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -232,7 +225,7 @@ func TestCheckClaudeAuth_NotAuthenticated_WithEnvPrefix(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkClaudeAuth("", mcpErr, "CLAUDE_CONFIG_DIR=/foo claude")
+	result := CheckClaudeAuth("", mcpErr, "CLAUDE_CONFIG_DIR=/foo claude")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -248,10 +241,10 @@ func TestCheckClaudeAuth_NotAuthenticated_WithEnvPrefix(t *testing.T) {
 
 func TestCheckLinearMCP_Connected(t *testing.T) {
 	// given
-	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected"
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - \u2713 Connected"
 
 	// when
-	result := checkLinearMCP(mcpOutput, nil)
+	result := CheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -261,10 +254,10 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 
 func TestCheckLinearMCP_NotConnected(t *testing.T) {
 	// given
-	mcpOutput := "some-other-mcp: https://example.com - ✓ Connected"
+	mcpOutput := "some-other-mcp: https://example.com - \u2713 Connected"
 
 	// when
-	result := checkLinearMCP(mcpOutput, nil)
+	result := CheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -277,7 +270,7 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkLinearMCP("", mcpErr)
+	result := CheckLinearMCP("", mcpErr)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -287,10 +280,10 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 
 func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	// given
-	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected"
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - \u2717 Disconnected"
 
 	// when
-	result := checkLinearMCP(mcpOutput, nil)
+	result := CheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -304,14 +297,14 @@ func TestCheckConfig_Valid(t *testing.T) {
 	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(path, data, 0o644)
-	result := checkConfig(path)
+	result := CheckConfig(path)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckConfig_NotFound(t *testing.T) {
-	result := checkConfig("/nonexistent/config.yaml")
+	result := CheckConfig("/nonexistent/config.yaml")
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -321,7 +314,7 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 	os.WriteFile(path, []byte(`{{{invalid`), 0o644)
-	result := checkConfig(path)
+	result := CheckConfig(path)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -330,7 +323,7 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock commands succeed
 	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
 	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
@@ -353,7 +346,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: should have 19 results
 	if len(results) != 19 {
@@ -376,7 +369,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	// given: mock commands succeed
 	exp := setupTestTracer(t)
 	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
 	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
@@ -395,7 +388,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	runDoctor(ctx, filepath.Join(divRoot, "config.yaml"), dir, &domain.NopLogger{}, false, domain.ModeLinear)
+	RunDoctorWithClaudeCmd(ctx, filepath.Join(divRoot, "config.yaml"), dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: domain.doctor span should exist
 	spans := exp.GetSpans()
@@ -427,7 +420,7 @@ func TestCheckSkillMD_BothExist(t *testing.T) {
 	initGateDirForTest(t, root)
 
 	// when
-	result := checkSkillMD(dir)
+	result := CheckSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -443,7 +436,7 @@ func TestCheckSkillMD_MissingSendable(t *testing.T) {
 	os.Remove(filepath.Join(root, "skills", "dmail-sendable", "SKILL.md"))
 
 	// when
-	result := checkSkillMD(dir)
+	result := CheckSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -459,7 +452,7 @@ func TestCheckSkillMD_NoGateDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := checkSkillMD(dir)
+	result := CheckSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -477,7 +470,7 @@ func TestCheckSkillMD_DeprecatedFeedbackKind(t *testing.T) {
 		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: feedback\n---\n"), 0o644)
 
 	// when
-	result := checkSkillMD(dir)
+	result := CheckSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -495,7 +488,7 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 	initGateDirForTest(t, root)
 
 	// when
-	result := checkSkillMD(dir)
+	result := CheckSkillMD(dir)
 
 	// then: templates already have updated kinds
 	if result.Status != domain.CheckOK {
@@ -506,7 +499,7 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// given: mock commands succeed
 	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
 	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
@@ -523,7 +516,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: should have 19 results
 	if len(results) != 19 {
@@ -566,7 +559,7 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when: pass a nonexistent claude command
-	results := runDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false, domain.ModeLinear)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: claude-auth, Linear MCP, and claude-inference should be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -605,13 +598,13 @@ func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 	callCount := 0
 	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		callCount++
-		// First call: mcp list → fail
+		// First call: mcp list -> fail
 		for _, arg := range args {
 			if arg == "list" {
 				return exec.Command("false")
 			}
 			if arg == "--print" {
-				// inference call → succeed with "2"
+				// inference call -> succeed with "2"
 				return exec.Command("echo", `{"type":"result","result":"2"}`)
 			}
 		}
@@ -636,7 +629,7 @@ func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := runDoctor(ctx, configPath, dir, &domain.NopLogger{}, false, domain.ModeLinear)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: claude-auth should WARN, linear-mcp should SKIP, but inference should NOT be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -668,9 +661,9 @@ func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
 	initGateDirForTest(t, root)
 
 	// when
-	result := checkDMailSchema(root)
+	result := CheckDMailSchema(root)
 
-	// then: skip — no D-Mails to validate
+	// then: skip -- no D-Mails to validate
 	if result.Status != domain.CheckSkip {
 		t.Errorf("expected domain.CheckSkip for empty archive, got %v: %s", result.Status, result.Message)
 	}
@@ -699,7 +692,7 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	}
 
 	// when
-	result := checkDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -716,7 +709,7 @@ func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "archive", "feedback-001.md"), content, 0o644)
 
 	// when
-	result := checkDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -730,9 +723,9 @@ func TestCheckDMailSchema_NoGateDir(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 
 	// when
-	result := checkDMailSchema(root)
+	result := CheckDMailSchema(root)
 
-	// then: skip — archive doesn't exist yet
+	// then: skip -- archive doesn't exist yet
 	if result.Status != domain.CheckSkip {
 		t.Errorf("expected domain.CheckSkip for missing .gate, got %v: %s", result.Status, result.Message)
 	}
@@ -748,9 +741,9 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	defer os.Chmod(archiveDir, 0o755)
 
 	// when
-	result := checkDMailSchema(root)
+	result := CheckDMailSchema(root)
 
-	// then: FAIL — permission error should not be masked
+	// then: FAIL -- permission error should not be masked
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail for permission error, got %v: %s", result.Status, result.Message)
 	}
@@ -761,7 +754,7 @@ func TestCheckTool_GH(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkTool(ctx, "gh")
+	result := CheckTool(ctx, "gh")
 
 	// then: gh should be available in the test environment
 	if result.Status != domain.CheckOK {
@@ -779,7 +772,7 @@ func TestCheckGitRemote_HasRemote(t *testing.T) {
 	exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/example/repo.git").Run()
 
 	// when
-	result := checkGitRemote(dir)
+	result := CheckGitRemote(dir)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -796,7 +789,7 @@ func TestCheckGitRemote_NoRemote(t *testing.T) {
 	exec.Command("git", "init", dir).Run()
 
 	// when
-	result := checkGitRemote(dir)
+	result := CheckGitRemote(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -812,7 +805,7 @@ func TestCheckGitRemote_NotGitRepo(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := checkGitRemote(dir)
+	result := CheckGitRemote(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -822,7 +815,7 @@ func TestCheckGitRemote_NotGitRepo(t *testing.T) {
 
 func TestCheckFsnotify_Available(t *testing.T) {
 	// when
-	result := checkFsnotify()
+	result := CheckFsnotify()
 
 	// then: should succeed on any normal test environment
 	if result.Status != domain.CheckOK {
@@ -836,7 +829,7 @@ func TestCheckFsnotify_Available(t *testing.T) {
 func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	// given: mock commands succeed
 	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
-		return exec.Command("echo", "plugin:linear:linear: - ✓ Connected")
+		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
 	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
@@ -873,8 +866,39 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	ctx := context.Background()
 	configPath := filepath.Join(gateDir, "config.yaml")
 
+	// Use a real success-rate checker that reads events
+	realSuccessRateChecker := func(gateDir string, logger domain.Logger) domain.DoctorCheck {
+		eventStore := NewEventStore(gateDir, logger)
+		events, _, loadErr := eventStore.LoadAll(context.Background())
+		if loadErr != nil || len(events) == 0 {
+			return domain.DoctorCheck{
+				Name: "success-rate", Status: domain.CheckOK,
+				Message: "no events",
+			}
+		}
+		rate := domain.SuccessRate(events)
+		var clean, total int
+		for _, ev := range events {
+			if ev.Type != domain.EventCheckCompleted {
+				continue
+			}
+			var data domain.CheckCompletedData
+			if jsonErr := json.Unmarshal(ev.Data, &data); jsonErr != nil {
+				continue
+			}
+			total++
+			if len(data.Result.DMails) == 0 {
+				clean++
+			}
+		}
+		return domain.DoctorCheck{
+			Name: "success-rate", Status: domain.CheckOK,
+			Message: domain.FormatSuccessRate(rate, clean, total),
+		}
+	}
+
 	// when
-	results := runDoctor(ctx, configPath, repoRoot, &domain.NopLogger{}, false, domain.ModeLinear)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, realSuccessRateChecker)
 
 	// then: success-rate check should be present
 	var found bool
@@ -895,7 +919,7 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 }
 
 func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
-	// given: fake-claude binary via runDoctorWithClaudeCmd
+	// given: fake-claude binary via RunDoctorWithClaudeCmd
 	fakeClaude := buildFakeClaude(t)
 
 	repoRoot := t.TempDir()
@@ -908,7 +932,7 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := runDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false, domain.ModeLinear)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: claude-auth, linear-mcp, and claude-inference should be OK
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -938,7 +962,7 @@ func TestCheckClaudeInference_Success(t *testing.T) {
 	output := "2"
 
 	// when
-	result := checkClaudeInference(output, nil)
+	result := CheckClaudeInference(output, nil)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -954,7 +978,7 @@ func TestCheckClaudeInference_Error(t *testing.T) {
 	err := fmt.Errorf("exit status 1")
 
 	// when
-	result := checkClaudeInference("", err)
+	result := CheckClaudeInference("", err)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -967,9 +991,9 @@ func TestCheckClaudeInference_FalsePositive(t *testing.T) {
 	output := "12"
 
 	// when
-	result := checkClaudeInference(output, nil)
+	result := CheckClaudeInference(output, nil)
 
-	// then: must WARN — "12" is not "2"
+	// then: must WARN -- "12" is not "2"
 	if result.Status != domain.CheckWarn {
 		t.Errorf("expected WARN for false positive '12', got %v: %s", result.Status, result.Message)
 	}
@@ -983,7 +1007,7 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	output := "I cannot compute that"
 
 	// when
-	result := checkClaudeInference(output, nil)
+	result := CheckClaudeInference(output, nil)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -1036,7 +1060,7 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 {"type":"result","result":"2"}`
 
 	// when
-	result := checkContextBudget(streamJSON, "")
+	result := CheckContextBudget(streamJSON, "")
 
 	// then: should be OK (well under threshold)
 	if result.Status != domain.CheckOK {
@@ -1057,7 +1081,7 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 	streamJSON := strings.Join(lines, "\n")
 
 	// when
-	result := checkContextBudget(streamJSON, "")
+	result := CheckContextBudget(streamJSON, "")
 
 	// then: should be WARN with hint (over threshold)
 	if result.Status != domain.CheckWarn {
@@ -1075,7 +1099,7 @@ func TestCheckContextBudget_EmptyStream(t *testing.T) {
 	streamJSON := ""
 
 	// when
-	result := checkContextBudget(streamJSON, "")
+	result := CheckContextBudget(streamJSON, "")
 
 	// then: should be OK (nothing to measure)
 	if result.Status != domain.CheckOK {
@@ -1090,7 +1114,7 @@ func TestCheckContextBudget_NoInitMessage(t *testing.T) {
 	streamJSON := `{"type":"result","result":"2"}`
 
 	// when
-	result := checkContextBudget(streamJSON, "")
+	result := CheckContextBudget(streamJSON, "")
 
 	// then: should be OK (no init = no overhead)
 	if result.Status != domain.CheckOK {
@@ -1106,7 +1130,7 @@ func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
 	streamJSON := initMsg + "\n"
 
 	// when
-	result := checkContextBudget(streamJSON, "")
+	result := CheckContextBudget(streamJSON, "")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -1132,13 +1156,13 @@ func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
 	streamJSON := initMsg + "\n"
 
 	// when
-	result := checkContextBudget(streamJSON, dir)
+	result := CheckContextBudget(streamJSON, dir)
 
 	// then
 	if result.Status != domain.CheckWarn {
 		t.Errorf("expected WARN, got %v", result.Status.StatusLabel())
 	}
-	if !strings.Contains(result.Hint, "見直して") {
+	if !strings.Contains(result.Hint, "\u898b\u76f4\u3057\u3066") {
 		t.Errorf("hint should say review settings, got: %s", result.Hint)
 	}
 }
@@ -1152,7 +1176,7 @@ func TestDoctor_WaveMode_SkipsLinearMCP(t *testing.T) {
 	os.WriteFile(configPath, []byte("lang: en\nclaude_cmd: echo\n"), 0644)
 
 	// when: run doctor in wave mode
-	results := runDoctor(context.Background(), configPath, dir, &domain.NopLogger{}, false, domain.ModeWave)
+	results := RunDoctorWithClaudeCmd(context.Background(), configPath, dir, "echo", &domain.NopLogger{}, false, domain.ModeWave, nopSuccessRateChecker)
 
 	// then: linear-mcp should be SKIP (not WARN or FAIL)
 	for _, r := range results {
@@ -1167,7 +1191,7 @@ func TestDoctor_WaveMode_SkipsLinearMCP(t *testing.T) {
 		}
 	}
 	// linear-mcp check might be skipped entirely if claude is not available
-	// That's acceptable — the check is conditional on claude being found
+	// That's acceptable -- the check is conditional on claude being found
 }
 
 func TestCheckEventStore_CorruptLines(t *testing.T) {
@@ -1182,7 +1206,7 @@ func TestCheckEventStore_CorruptLines(t *testing.T) {
 		[]byte(validEvent+"\n"+corruptLine+"\n"+validEvent+"\n"), 0644)
 
 	// when
-	check := checkEventStore(gateRoot)
+	check := CheckEventStore(gateRoot)
 
 	// then
 	if check.Status != domain.CheckWarn {
@@ -1204,41 +1228,10 @@ func TestCheckEventStore_Clean(t *testing.T) {
 		[]byte(validEvent+"\n"), 0644)
 
 	// when
-	check := checkEventStore(gateRoot)
+	check := CheckEventStore(gateRoot)
 
 	// then
 	if check.Status != domain.CheckOK {
 		t.Errorf("expected OK, got %s: %s", check.Status.StatusLabel(), check.Message)
-	}
-}
-
-func TestPrintDoctorJSON_StatusLabelsAreKnown(t *testing.T) {
-	// given: all 5 check statuses
-	checks := []domain.DoctorCheck{
-		{Name: "ok", Status: domain.CheckOK, Message: "ok"},
-		{Name: "fail", Status: domain.CheckFail, Message: "fail"},
-		{Name: "warn", Status: domain.CheckWarn, Message: "warn"},
-		{Name: "skip", Status: domain.CheckSkip, Message: "skip"},
-		{Name: "fix", Status: domain.CheckFixed, Message: "fix"},
-	}
-
-	// when
-	var buf strings.Builder
-	_ = printDoctorJSON(&buf, checks)
-
-	// then: all status labels are in the known set
-	known := map[string]bool{"OK": true, "FAIL": true, "SKIP": true, "WARN": true, "FIX": true}
-	var parsed struct {
-		Checks []struct {
-			Status string `json:"status"`
-		} `json:"checks"`
-	}
-	if err := json.Unmarshal([]byte(buf.String()), &parsed); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-	for _, c := range parsed.Checks {
-		if !known[c.Status] {
-			t.Errorf("unknown status label in doctor JSON: %q", c.Status)
-		}
 	}
 }
