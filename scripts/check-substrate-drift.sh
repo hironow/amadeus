@@ -20,6 +20,13 @@ declare -A EXPECTED=(
     ["internal/platform/stream_normalizer.go"]="76ac7c89eeb019d62dc463a00406273ebf882feb061a7c1c77db7969f272ab98"
     ["internal/harness/policy/run_guard.go"]="b7ad3880247798d94a776ecd43d03a911318c5d0ae176b0ffb05f51e91ec7c81"
     ["docs/shared-adr/S0037-coding-session-abstraction-layer.md"]="2515700a3e8d672863e6d10e2ab89e913eef85a9805a0c84fdd59dfac1de4a58"
+    # --- v2 expansion: session enter, mcp config, provider telemetry, port ---
+    ["internal/session/session_enter.go"]="81a43b225c277be70cfdce3d8c6c8b673d9550dc7335ac7558a3580a040707ad"
+    ["internal/session/mcp_config.go"]="4e83070b885db7153b0d4c225829573f5c88fbf4391077b42332cf1fc27add81"
+    ["internal/session/provider_telemetry.go"]="26cb7de74690bb1da1de21df261bbd4ca15dde9d38ba102ce0be83bcc9392183"
+    ["internal/usecase/port/coding_session.go"]="1ed8404eef463332813fbc6da527615c54143821080cc8219f5fa5b2709450b3"
+    ["internal/session/session_enter_test.go"]="ee922ebc86c4f0dbee7172d983dffff11c4241768b681e7b029dda5808702fbc"
+    ["internal/session/mcp_config_test.go"]="5c9e15460809398630475c85963ba494b6e9c4f74b54227b3dfce01d0da95eda"
 )
 
 rc=0

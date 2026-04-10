@@ -137,7 +137,7 @@ func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (st
 
 	// Enforce mode: wave mode = no MCP servers, linear mode = add linear server
 	if mode.IsWave() {
-		delete(cfg.MCPServers, "linear")
+		delete(cfg.MCPServers, "linear") // Remove stale linear server from legacy migration
 	}
 	if mode.IsLinear() {
 		cfg.MCPServers["linear"] = MCPServerEntry{
