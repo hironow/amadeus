@@ -1,6 +1,4 @@
-package session
-
-// white-box-reason: doctor checks: tests hint field population on check functions
+package session_test
 
 import (
 	"context"
@@ -10,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/session"
 )
 
 // --- BEHAVIORAL tests: Hint populated on FAIL ---
 
 func TestCheckTool_NotFound_HasHint(t *testing.T) {
 	// given/when
-	result := CheckTool(context.Background(), "nonexistent-tool-xyz-99999")
+	result := session.CheckTool(context.Background(), "nonexistent-tool-xyz-99999")
 
 	// then
 	if result.Hint == "" {
@@ -32,7 +31,7 @@ func TestCheckGitRepo_NotRepo_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := CheckGitRepo(dir)
+	result := session.CheckGitRepo(dir)
 
 	// then
 	if result.Hint == "" {
@@ -48,7 +47,7 @@ func TestCheckGateDir_NotExist_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := CheckGateDir(dir, false)
+	result := session.CheckGateDir(dir, false)
 
 	// then
 	if result.Hint == "" {
@@ -64,7 +63,7 @@ func TestCheckLinearMCP_NotConnected_HasHint(t *testing.T) {
 	mcpOutput := "no linear here"
 
 	// when
-	result := CheckLinearMCP(mcpOutput, nil)
+	result := session.CheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Hint == "" {
@@ -77,7 +76,7 @@ func TestCheckLinearMCP_NotConnected_HasHint(t *testing.T) {
 
 func TestCheckConfig_NotFound_HasHint(t *testing.T) {
 	// given/when
-	result := CheckConfig("/nonexistent/config.yaml")
+	result := session.CheckConfig("/nonexistent/config.yaml")
 
 	// then
 	if result.Hint == "" {
@@ -95,7 +94,7 @@ func TestCheckConfig_InvalidYAML_HasHint(t *testing.T) {
 	os.WriteFile(path, []byte(`{{{invalid`), 0o644)
 
 	// when
-	result := CheckConfig(path)
+	result := session.CheckConfig(path)
 
 	// then
 	if result.Hint == "" {
@@ -111,7 +110,7 @@ func TestCheckSkillMD_Missing_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := CheckSkillMD(dir)
+	result := session.CheckSkillMD(dir)
 
 	// then
 	if result.Hint == "" {
@@ -128,7 +127,7 @@ func TestCheckEventStore_NoDir_HasHint(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 
 	// when
-	result := CheckEventStore(root)
+	result := session.CheckEventStore(root)
 
 	// then
 	if result.Status != domain.CheckSkip {
@@ -148,7 +147,7 @@ func TestCheckDMailSchema_PermError_HasHint(t *testing.T) {
 	defer os.Chmod(archiveDir, 0o755)
 
 	// when
-	result := CheckDMailSchema(root)
+	result := session.CheckDMailSchema(root)
 
 	// then
 	if result.Status != domain.CheckFail {
