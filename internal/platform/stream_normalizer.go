@@ -222,6 +222,7 @@ func (n *StreamNormalizer) normalizeResult(msg *StreamMessage) *domain.SessionSt
 	if msg.Duration > 0 {
 		n.lastDuration = msg.Duration
 	}
+	// Capture provider session ID from result if not yet captured.
 	if n.sessionID == "" && msg.SessionID != "" {
 		n.sessionID = msg.SessionID
 	}

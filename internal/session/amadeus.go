@@ -61,8 +61,10 @@ type Amadeus struct {
 }
 
 // claudeRunner returns the configured ClaudeRunner, falling back to a lazily-initialized
-// default runner with session tracking. The runner is built once and reused, so the
-// underlying sessions.db connection is not duplicated across calls.
+// tracked runner with session tracking. This is the standard path for resumable
+// provider-backed invocations. Retry is NOT included — amadeus retries at the
+// check-cycle level via RetryRunner composition at the call site.
+// Store ownership: instance-owned (lazy singleton). Closed by CloseRunner().
 func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 	if a.Claude != nil {
 		return a.Claude
@@ -85,7 +87,8 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 }
 
 // CloseRunner closes the underlying session store opened by claudeRunner().
-// Call this when the Amadeus instance is no longer needed (e.g. defer after construction).
+// Store ownership: instance-owned. Caller MUST call CloseRunner when the Amadeus
+// instance is no longer needed (e.g. defer after construction).
 // Safe to call multiple times or when no runner was created.
 func (a *Amadeus) CloseRunner() {
 	if a.sessionStore != nil {
