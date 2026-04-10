@@ -160,7 +160,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			// publishCtx is cancel-safe but retains trace info for connected spans.
 			if vErr := domain.ValidateSessionStreamEvent(endEvent); vErr != nil {
 				if a.Logger != nil {
-					a.Logger.Warn("session_end dropped (invalid): %v", vErr)
+					a.Logger.Warn("session_end event dropped (invalid): %v", vErr)
 				}
 			} else {
 				// publishCtx preserves trace spans but is cancel-safe.
