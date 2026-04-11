@@ -43,7 +43,7 @@ type StreamMessage struct {
 	Skills     []string        `json:"skills,omitempty"`
 	// Plugins is populated by ParseStreamMessage. Supports both []PluginInfo (new)
 	// and []string (legacy Claude CLI) formats via custom unmarshalling.
-	Plugins []PluginInfo `json:"-"`
+	Plugins []PluginInfo `json:"plugins,omitempty"`
 }
 
 // MCPServerInfo represents a connected MCP server from system:init.

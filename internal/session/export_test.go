@@ -6,9 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"os/exec"
+	"testing"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 // NewLocalNotifierForTest creates a LocalNotifier with test overrides.
@@ -79,3 +81,11 @@ func ExportSetMaxWaitDuration(d time.Duration) func() {
 
 // ExportBuildIsolationFlags exposes buildIsolationFlags for contract testing.
 func ExportBuildIsolationFlags(cfg EnterConfig) []string { return buildIsolationFlags(cfg) }
+
+// ExportFindSkillsRefDir exposes findSkillsRefDir for external tests.
+func ExportFindSkillsRefDir(baseDir string) string { return findSkillsRefDir(baseDir) }
+
+// ExportSetupTestTracer exposes setupTestTracer for external test packages.
+func ExportSetupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	return setupTestTracer(t)
+}

@@ -86,6 +86,21 @@ func TestParseExtraEndpoints_Whitespace(t *testing.T) {
 	}
 }
 
+func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	platform.Tracer = tp.Tracer("amadeus-test")
+	t.Cleanup(func() {
+		tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prev)
+		platform.Tracer = prev.Tracer("amadeus")
+	})
+	return exp
+}
+
 func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
 	// given
 	exp := setupTestTracer(t)
