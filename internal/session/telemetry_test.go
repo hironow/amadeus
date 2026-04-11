@@ -99,16 +99,16 @@ func (m *testInternalCheckStateProvider) AdvanceCheckCount(fullCheck bool, wasFo
 }
 func (m *testInternalCheckStateProvider) Restore(result domain.CheckResult) { m.agg.Restore(result) }
 
-// fakeClaudeRunner returns a fixed JSON response for testing.
-type fakeClaudeRunner struct {
+// fakeProviderRunner returns a fixed JSON response for testing.
+type fakeProviderRunner struct {
 	response string
 }
 
-func (f *fakeClaudeRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+func (f *fakeProviderRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
 	return f.response, nil
 }
 
-var _ port.ClaudeRunner = (*fakeClaudeRunner)(nil)
+var _ port.ProviderRunner = (*fakeProviderRunner)(nil)
 
 func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 	// given
@@ -126,7 +126,7 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 	agg := domain.NewCheckAggregate(cfg)
 	a := &Amadeus{
 		Config:  cfg,
-		Claude:  &fakeClaudeRunner{response: fakeResp},
+		Claude:  &fakeProviderRunner{response: fakeResp},
 		Logger:  &domain.NopLogger{},
 		Emitter: &testInternalCheckEventEmitter{agg: agg},
 		State:   &testInternalCheckStateProvider{agg: agg},
@@ -146,7 +146,7 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 	spans := exporter.GetSpans()
 	var invokeFound bool
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			invokeFound = true
 			// Verify gen_ai.* semantic convention attributes
 			requiredAttrs := map[string]string{
@@ -179,7 +179,7 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 			}
 
 			// Cross-tool conformance: claude.model and claude.timeout_sec must be present
-			conformanceAttrs := []string{"claude.model", "claude.timeout_sec"}
+			conformanceAttrs := []string{"provider.model", "provider.timeout_sec"}
 			for _, key := range conformanceAttrs {
 				var attrFound bool
 				for _, attr := range s.Attributes {

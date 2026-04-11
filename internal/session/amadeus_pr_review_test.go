@@ -70,11 +70,11 @@ func (f *fakePRWriterForReview) ClosePR(_ context.Context, _, _ string) error {
 	return nil
 }
 
-type fakeClaudeRunnerForReview struct {
+type fakeProviderRunnerForReview struct {
 	response string
 }
 
-func (f *fakeClaudeRunnerForReview) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+func (f *fakeProviderRunnerForReview) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
 	return f.response, nil
 }
 
@@ -125,7 +125,7 @@ func TestEvaluatePRDiffs_ReEvaluatesAfterPush(t *testing.T) {
 		PRReader:    reader,
 		PRWriter:    writer,
 		Logger:      &testLogger{t: t},
-		Claude:      &fakeClaudeRunnerForReview{response: `{"axes": {"structural": {"score": 10}}, "reasoning": "Minor issues", "dmails": []}`},
+		Claude:      &fakeProviderRunnerForReview{response: `{"axes": {"structural": {"score": 10}}, "reasoning": "Minor issues", "dmails": []}`},
 		ClaudeModel: "test-model",
 		Config:      domain.Config{Lang: "en"},
 		Emitter:     &nopReviewEmitter{},
@@ -213,7 +213,7 @@ func TestEvaluatePRDiffs_NoPRWriter_SkipsLabel(t *testing.T) {
 		PRReader:    reader,
 		PRWriter:    nil, // no writer
 		Logger:      &domain.NopLogger{},
-		Claude:      &fakeClaudeRunnerForReview{response: `{"axes": {"structural": {"score": 0}}, "reasoning": "OK", "dmails": []}`},
+		Claude:      &fakeProviderRunnerForReview{response: `{"axes": {"structural": {"score": 0}}, "reasoning": "OK", "dmails": []}`},
 		ClaudeModel: "test-model",
 		Config:      domain.Config{Lang: "en"},
 		Emitter:     &nopReviewEmitter{},
@@ -252,7 +252,7 @@ func TestEvaluatePRDiffs_GoTaskboardScenario(t *testing.T) {
 
 	claudeResponse := `{"axes": {"structural": {"score": 5}}, "reasoning": "Minor deviations", "dmails": []}`
 	evalCount := 0
-	countingClaude := &countingClaudeRunner{
+	countingClaude := &countingProviderRunner{
 		response: claudeResponse,
 		count:    &evalCount,
 	}
@@ -306,7 +306,7 @@ func TestEvaluatePRDiffs_GoTaskboardScenario(t *testing.T) {
 		PRReader:    reader2,
 		PRWriter:    newFakePRWriter(),
 		Logger:      &domain.NopLogger{},
-		Claude:      &countingClaudeRunner{response: claudeResponse, count: &evalCount2},
+		Claude:      &countingProviderRunner{response: claudeResponse, count: &evalCount2},
 		ClaudeModel: "test-model",
 		Config:      domain.Config{Lang: "en"},
 		Emitter:     &nopReviewEmitter{},
@@ -333,13 +333,13 @@ func mustPRStateWithSHA(t *testing.T, number, title, base, head, sha string) dom
 	return ps
 }
 
-// countingClaudeRunner counts invocations.
-type countingClaudeRunner struct {
+// countingProviderRunner counts invocations.
+type countingProviderRunner struct {
 	response string
 	count    *int
 }
 
-func (c *countingClaudeRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+func (c *countingProviderRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
 	*c.count++
 	return c.response, nil
 }

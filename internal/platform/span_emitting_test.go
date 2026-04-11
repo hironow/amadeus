@@ -76,7 +76,7 @@ func TestSpanEmittingStreamReader_emits_tool_spans(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -129,7 +129,7 @@ func TestSpanEmittingStreamReader_synthetic_id_fallback(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -178,7 +178,7 @@ func TestSpanEmittingStreamReader_preserves_result_and_text(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -247,7 +247,7 @@ func TestSpanEmittingStreamReader_weave_thread_id_from_session(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -296,7 +296,7 @@ func TestSpanEmittingStreamReader_tool_spans_have_thread_id_no_turn(t *testing.T
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -342,7 +342,7 @@ func TestSpanEmittingStreamReader_weave_io_attrs(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 	emitter.SetInput("What is the meaning of life?")

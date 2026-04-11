@@ -16,7 +16,7 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// fakeReviewFixRunner implements port.ClaudeRunner for testing review fix cycles.
+// fakeReviewFixRunner implements port.ProviderRunner for testing review fix cycles.
 type fakeReviewFixRunner struct {
 	runFunc   func(ctx context.Context, prompt string) (string, error)
 	callCount int

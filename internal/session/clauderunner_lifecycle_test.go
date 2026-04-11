@@ -9,7 +9,7 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-func TestClaudeRunner_ReusedAcrossCalls(t *testing.T) {
+func TestProviderRunner_ReusedAcrossCalls(t *testing.T) {
 	// given: Amadeus with default runner (no Claude override)
 	a := &Amadeus{
 		ClaudeCmd:   "nonexistent",
@@ -35,7 +35,7 @@ func TestClaudeRunner_ReusedAcrossCalls(t *testing.T) {
 	}
 }
 
-func TestClaudeRunner_CloseRunnerIdempotent(t *testing.T) {
+func TestProviderRunner_CloseRunnerIdempotent(t *testing.T) {
 	// given
 	a := &Amadeus{
 		ClaudeCmd:   "nonexistent",

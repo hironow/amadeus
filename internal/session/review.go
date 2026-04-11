@@ -69,7 +69,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 // Returns (true, nil) if review passes or is skipped (empty reviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, reviewCmd string, runner port.ClaudeRunner, dir string, timeoutSec int, logger domain.Logger, budget ...int) (bool, error) {
+func RunReviewGate(ctx context.Context, reviewCmd string, runner port.ProviderRunner, dir string, timeoutSec int, logger domain.Logger, budget ...int) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "amadeus.review")
 	defer span.End()
 
@@ -141,9 +141,9 @@ func RunReviewGate(ctx context.Context, reviewCmd string, runner port.ClaudeRunn
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments string, timeoutSec int, logger domain.Logger) error {
+func runReviewFix(ctx context.Context, runner port.ProviderRunner, dir, comments string, timeoutSec int, logger domain.Logger) error {
 	if runner == nil {
-		return fmt.Errorf("no ClaudeRunner configured for review fix")
+		return fmt.Errorf("no ProviderRunner configured for review fix")
 	}
 
 	branch, err := currentBranch(ctx, dir)

@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-// fakeRunner is a test double for ClaudeRunner.
+// fakeRunner is a test double for ProviderRunner.
 type fakeRunner struct {
 	calls    int
 	failN    int
@@ -340,7 +340,7 @@ func (h *hangingRunner) Run(ctx context.Context, _ string, _ io.Writer, _ ...por
 	return "", ctx.Err()
 }
 
-// retryDetailedRunner implements both ClaudeRunner and DetailedRunner.
+// retryDetailedRunner implements both ProviderRunner and DetailedRunner.
 type retryDetailedRunner struct {
 	calls             int
 	failN             int
@@ -442,5 +442,5 @@ func TestRetryRunner_RunDetailed_FallsBackToRun(t *testing.T) {
 	}
 }
 
-// Verify RetryRunner satisfies the ClaudeRunner interface at compile time.
-var _ port.ClaudeRunner = (*session.RetryRunner)(nil)
+// Verify RetryRunner satisfies the ProviderRunner interface at compile time.
+var _ port.ProviderRunner = (*session.RetryRunner)(nil)

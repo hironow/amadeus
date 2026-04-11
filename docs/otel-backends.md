@@ -98,7 +98,7 @@ normalized event instead of dropping the signal immediately.
 
 ## GenAI Semantic Conventions
 
-amadeus emits GenAI semantic convention attributes on `claude.invoke` spans
+amadeus emits GenAI semantic convention attributes on `provider.invoke` spans
 during the DivergenceMeter phase (Phase 2b):
 
 - `gen_ai.operation.name=chat`
@@ -117,12 +117,12 @@ Each tool's telemetry tests verify conformance to prevent drift.
 | Span name | Yes | Tool-specific operation name |
 | `otel.status_code` | Yes | OK on success, ERROR on failure |
 
-### claude.invoke Span (sightjack, paintress, amadeus only)
+### provider.invoke Span (sightjack, paintress, amadeus only)
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `claude.model` | Yes | Model name (e.g. "opus") |
-| `claude.timeout_sec` | Yes | Timeout in seconds (context deadline or config) |
+| `provider.model` | Yes | Model name (e.g. "opus") |
+| `provider.timeout_sec` | Yes | Timeout in seconds (context deadline or config) |
 | `gen_ai.operation.name` | Yes | Always "chat" |
 | `gen_ai.system` | Yes | Always "anthropic" |
 | `gen_ai.request.model` | Yes | Model name |

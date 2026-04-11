@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ClaudeAdapter implements port.ClaudeRunner by executing the Claude CLI
+// ClaudeAdapter implements port.ProviderRunner by executing the Claude CLI
 // as a subprocess with streaming (--output-format stream-json).
 // It does NOT retry; wrap with RetryRunner for that.
 type ClaudeAdapter struct {
@@ -56,11 +56,11 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		model = rc.Model
 	}
 
-	_, span := platform.Tracer.Start(ctx, "claude.invoke",
+	_, span := platform.Tracer.Start(ctx, "provider.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", platform.SanitizeUTF8(model)),
-				attribute.Int("claude.timeout_sec", a.TimeoutSec),
+				attribute.String("provider.model", platform.SanitizeUTF8(model)),
+				attribute.Int("provider.timeout_sec", a.TimeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
