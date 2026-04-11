@@ -65,7 +65,6 @@ func WithModel(model string) RunOption {
 	}
 }
 
-// WithResume targets a specific provider session for continuation.
 // WithCodingSessionID sets the CodingSessionRecord.ID for stream event correlation.
 func WithCodingSessionID(id string) RunOption {
 	return func(c *RunConfig) {

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newTestCmd(withConfig bool) *cobra.Command {
+func newTestCommand(withConfig bool) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Flags().String("path", "", "")
 	if withConfig {
@@ -25,7 +25,7 @@ func TestResolveSessionsDir_PathFlag(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, domain.StateDir), 0755)
 
-	cmd := newTestCmd(false)
+	cmd := newTestCommand(false)
 	cmd.Flags().Set("path", dir)
 
 	repoRoot, stateDirPath, err := resolveSessionsDir(cmd)
@@ -48,7 +48,7 @@ func TestResolveSessionsDir_ConfigFlag(t *testing.T) {
 	configPath := filepath.Join(stateDir, "config.yaml")
 	os.WriteFile(configPath, []byte("team: test\n"), 0644)
 
-	cmd := newTestCmd(true)
+	cmd := newTestCommand(true)
 	cmd.Flags().Set("config", configPath)
 
 	repoRoot, stateDirPath, err := resolveSessionsDir(cmd)
@@ -73,7 +73,7 @@ func TestResolveSessionsDir_CwdFallback(t *testing.T) {
 	os.Chdir(dir)
 	t.Cleanup(func() { os.Chdir(oldWd) })
 
-	cmd := newTestCmd(false)
+	cmd := newTestCommand(false)
 	repoRoot, _, err := resolveSessionsDir(cmd)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -93,7 +93,7 @@ func TestResolveSessionsDir_PathOverridesConfig(t *testing.T) {
 	configPath := filepath.Join(configStateDir, "config.yaml")
 	os.WriteFile(configPath, []byte("team: test\n"), 0644)
 
-	cmd := newTestCmd(true)
+	cmd := newTestCommand(true)
 	cmd.Flags().Set("path", pathDir)
 	cmd.Flags().Set("config", configPath)
 
@@ -109,7 +109,7 @@ func TestResolveSessionsDir_PathOverridesConfig(t *testing.T) {
 func TestResolveSessionsDir_MissingStateDir(t *testing.T) {
 	dir := t.TempDir() // no StateDir inside
 
-	cmd := newTestCmd(false)
+	cmd := newTestCommand(false)
 	cmd.Flags().Set("path", dir)
 
 	_, _, err := resolveSessionsDir(cmd)
@@ -127,7 +127,7 @@ func TestResolveSessionsDir_MissingStateDir(t *testing.T) {
 func TestResolveSessionsDir_ErrorMessageFormat(t *testing.T) {
 	dir := t.TempDir()
 
-	cmd := newTestCmd(false)
+	cmd := newTestCommand(false)
 	cmd.Flags().Set("path", dir)
 
 	_, _, err := resolveSessionsDir(cmd)

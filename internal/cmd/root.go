@@ -117,11 +117,11 @@ func NewRootCommand() *cobra.Command {
 		newStatusCommand(),
 		newImprovementStatsCommand(),
 		newVersionCommand(),
-		newUpdateCmd(),
+		newUpdateCommand(),
 		newConfigCommand(),
 		newMCPConfigCommand(),
 		newDashboardCommand(),
-		newSessionsCmd(),
+		newSessionsCommand(),
 		newDeadLettersCommand(),
 	)
 
