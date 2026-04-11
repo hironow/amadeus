@@ -24,7 +24,7 @@ type Amadeus struct {
 	Projector   port.ContextEventApplier // nil skips projection updates (Events still required for writes)
 	Git         port.Git
 	RepoDir     string            // repository root directory
-	Claude      port.ClaudeRunner // nil falls back to the default Claude runner
+	Claude      port.ProviderRunner // nil falls back to the default Claude runner
 	Logger      domain.Logger
 	DataOut     io.Writer               // machine-readable output (stdout); Logger is for human progress (stderr)
 	Approver    port.Approver           // nil = no gate (auto-approve)
@@ -55,7 +55,7 @@ type Amadeus struct {
 	// trackedRunner is the lazily-initialized default runner. Built once on first
 	// call to claudeRunner() and reused for all subsequent calls (divergence scoring,
 	// PR review, review gate). The underlying session store is closed by CloseRunner().
-	trackedRunner     port.ClaudeRunner
+	trackedRunner     port.ProviderRunner
 	trackedRunnerOnce sync.Once
 	sessionStore      *SQLiteCodingSessionStore // nil when tracking unavailable; closed by CloseRunner()
 }
@@ -65,18 +65,18 @@ type Amadeus struct {
 // Retry is NOT included — amadeus retries at the check-cycle level.
 // Store ownership: returned alongside runner. Caller MUST nil-check store
 // before calling store.Close() (nil when session tracking is unavailable).
-func NewTrackedRunner(cmd, model, repoDir string, logger domain.Logger, streamBus port.SessionStreamPublisher) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+func NewTrackedRunner(cmd, model, repoDir string, logger domain.Logger, streamBus port.SessionStreamPublisher) (port.ProviderRunner, *SQLiteCodingSessionStore) {
 	adapter := &ClaudeAdapter{ClaudeCmd: cmd, Model: model, Logger: logger, StreamBus: streamBus, ToolName: "amadeus"}
 	return WrapWithSessionTracking(adapter, repoDir, domain.ProviderClaudeCode, logger)
 }
 
-// WrapWithSessionTracking adds session persistence to a ClaudeRunner.
+// WrapWithSessionTracking adds session persistence to a ProviderRunner.
 // The runner must also implement DetailedRunner for session ID capture.
 // Best-effort: returns (runner, nil) when the session store cannot be opened
 // or the runner does not implement DetailedRunner.
 // Caller MUST nil-check store before calling store.Close().
 // This is the canonical factory helper shared across all AI coding tools.
-func WrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+func WrapWithSessionTracking(runner port.ProviderRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
 	detailed, ok := runner.(port.DetailedRunner)
 	if !ok {
 		return runner, nil
@@ -92,12 +92,12 @@ func WrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, provider 
 	return NewSessionTrackingAdapter(detailed, store, provider), store
 }
 
-// claudeRunner returns the configured ClaudeRunner, falling back to a lazily-initialized
+// claudeRunner returns the configured ProviderRunner, falling back to a lazily-initialized
 // tracked runner with session tracking. This is the standard path for resumable
 // provider-backed invocations. Retry is NOT included — amadeus retries at the
 // check-cycle level via RetryRunner composition at the call site.
 // Store ownership: instance-owned (lazy singleton). Closed by CloseRunner().
-func (a *Amadeus) claudeRunner() port.ClaudeRunner {
+func (a *Amadeus) claudeRunner() port.ProviderRunner {
 	if a.Claude != nil {
 		return a.Claude
 	}

@@ -66,6 +66,8 @@ func WithModel(model string) RunOption {
 }
 
 // WithCodingSessionID sets the CodingSessionRecord.ID for stream event correlation.
+// SessionTrackingAdapter injects this so live stream events can be correlated with
+// the persisted coding session record.
 func WithCodingSessionID(id string) RunOption {
 	return func(c *RunConfig) {
 		c.CodingSessionID = id
@@ -80,12 +82,12 @@ func WithResume(providerSessionID string) RunOption {
 	}
 }
 
-// ClaudeRunner executes an AI coding tool and returns the result text.
+// ProviderRunner executes an AI coding tool and returns the result text.
 // Provider-agnostic: implementations wrap any CLI (Claude, Codex, Copilot, etc.).
 // Implementations may stream intermediate output to w.
 //
-// TODO(rename): ClaudeRunner → ProviderRunner — legacy name from Claude-only era.
+// TODO(rename): ProviderRunner → ProviderRunner — legacy name from Claude-only era.
 // The interface is fully provider-agnostic; rename blocked only by 40+ call sites.
-type ClaudeRunner interface {
+type ProviderRunner interface {
 	Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error)
 }

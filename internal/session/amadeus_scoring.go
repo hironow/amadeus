@@ -257,11 +257,11 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			timeoutSec = 0
 		}
 	}
-	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "claude.invoke", // nosemgrep: adr0003-otel-span-without-defer-end — End() called explicitly after Run() [permanent]
+	invokeCtx, invokeSpan := platform.Tracer.Start(ctx, "provider.invoke", // nosemgrep: adr0003-otel-span-without-defer-end — End() called explicitly after Run() [permanent]
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", platform.SanitizeUTF8(model)),
-				attribute.Int("claude.timeout_sec", timeoutSec),
+				attribute.String("provider.model", platform.SanitizeUTF8(model)),
+				attribute.Int("provider.timeout_sec", timeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)

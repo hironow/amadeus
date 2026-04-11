@@ -14,7 +14,7 @@ type RunResult struct {
 	Stderr            string // captured stderr for circuit breaker inspection
 }
 
-// DetailedRunner extends ClaudeRunner to also return session metadata.
+// DetailedRunner extends ProviderRunner to also return session metadata.
 type DetailedRunner interface {
 	RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (RunResult, error)
 }

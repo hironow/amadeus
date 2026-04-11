@@ -37,7 +37,7 @@ func TestGolden_hook_id_based_keying(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -83,7 +83,7 @@ func TestGolden_hook_exit_code_on_span(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -122,7 +122,7 @@ func TestGolden_hook_event_attribute(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -158,7 +158,7 @@ func TestGolden_thinking_event_from_real_stream(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -173,7 +173,7 @@ func TestGolden_thinking_event_from_real_stream(t *testing.T) {
 	spans := exporter.GetSpans()
 	var parentStub tracetest.SpanStub
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			parentStub = s
 			break
 		}
@@ -198,7 +198,7 @@ func TestGolden_rate_limit_event_with_info(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -213,7 +213,7 @@ func TestGolden_rate_limit_event_with_info(t *testing.T) {
 	spans := exporter.GetSpans()
 	var parentStub tracetest.SpanStub
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			parentStub = s
 			break
 		}
@@ -250,7 +250,7 @@ func TestGolden_session_id_captured(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -291,7 +291,7 @@ func TestGoldenMCP_mixed_hook_events(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -340,7 +340,7 @@ func TestGoldenMCP_rate_limit_allowed_no_warning(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -355,7 +355,7 @@ func TestGoldenMCP_rate_limit_allowed_no_warning(t *testing.T) {
 	spans := exporter.GetSpans()
 	var parentStub tracetest.SpanStub
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			parentStub = s
 			break
 		}
@@ -383,7 +383,7 @@ func TestGoldenMCP_thinking_and_text_both_present(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -399,7 +399,7 @@ func TestGoldenMCP_thinking_and_text_both_present(t *testing.T) {
 	spans := exporter.GetSpans()
 	var parentStub tracetest.SpanStub
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			parentStub = s
 			break
 		}
@@ -436,7 +436,7 @@ func TestGoldenMCP_weave_session_id(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -475,7 +475,7 @@ func TestGoldenSkills_four_same_name_hooks_reverse_order(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -527,7 +527,7 @@ func TestGoldenSkills_high_utilization_rate_limit(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -542,7 +542,7 @@ func TestGoldenSkills_high_utilization_rate_limit(t *testing.T) {
 	spans := exporter.GetSpans()
 	var parentStub tracetest.SpanStub
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			parentStub = s
 			break
 		}
@@ -572,7 +572,7 @@ func TestGoldenSkills_result_text(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -603,7 +603,7 @@ func TestGolden_init_model_on_parent_span(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -634,7 +634,7 @@ func TestGoldenMCP_init_mcp_servers(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -671,7 +671,7 @@ func TestGoldenSkills_init_counts(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -717,7 +717,7 @@ func TestGolden_hook_outcome_attribute(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 
@@ -753,7 +753,7 @@ func TestGolden_result_captures_output(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	tracer := tp.Tracer("test")
 
-	ctx, parentSpan := tracer.Start(context.Background(), "claude.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
+	ctx, parentSpan := tracer.Start(context.Background(), "provider.invoke") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, End() called explicitly [permanent]
 	sr := platform.NewStreamReader(strings.NewReader(input))
 	emitter := platform.NewSpanEmittingStreamReader(sr, ctx, tracer)
 	emitter.SetInput("1+1=")

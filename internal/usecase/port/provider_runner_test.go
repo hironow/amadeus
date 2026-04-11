@@ -25,9 +25,9 @@ func (s *stubRunner) Run(_ context.Context, _ string, _ io.Writer, opts ...RunOp
 	return s.output, nil
 }
 
-func TestClaudeRunner_InterfaceSatisfied(t *testing.T) {
+func TestProviderRunner_InterfaceSatisfied(t *testing.T) {
 	// given
-	var runner ClaudeRunner = &stubRunner{output: "ok"}
+	var runner ProviderRunner = &stubRunner{output: "ok"}
 
 	// when
 	result, err := runner.Run(context.Background(), "test", io.Discard)

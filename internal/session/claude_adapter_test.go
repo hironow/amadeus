@@ -8,7 +8,7 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-func TestClaudeAdapter_ImplementsClaudeRunner(t *testing.T) {
+func TestClaudeAdapter_ImplementsProviderRunner(t *testing.T) {
 	// given
 	adapter := &session.ClaudeAdapter{
 		ClaudeCmd:  "claude",
@@ -18,6 +18,6 @@ func TestClaudeAdapter_ImplementsClaudeRunner(t *testing.T) {
 	}
 
 	// then
-	var _ port.ClaudeRunner = adapter
+	var _ port.ProviderRunner = adapter
 	_ = adapter // use variable
 }

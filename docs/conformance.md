@@ -10,7 +10,7 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 | **How** | Scan merged PRs → Claude evaluates against ADRs/DoDs → score 4 divergence axes → route D-Mails by severity → enter D-Mail waiting loop (fsnotify inbox/ watch, re-check on arrival); with `--base`: additionally run PR convergence pipeline via `gh` CLI |
 | **Input** | Git log (merged PRs), ADRs, DoDs, codebase source, inbox D-Mails; with `--base`: open PR state (via `gh` CLI) |
 | **Output** | Divergence scores, corrective D-Mails (design-feedback / implementation-feedback from divergence scoring, works with or without `--base`) to downstream tools, insight ledger files (`insights/divergence.md` with LLM-enriched How, `insights/convergence.md` with archive-enriched Why); with `--base`: additionally PR convergence reports |
-| **Telemetry** | OTel spans: `amadeus.run`, `reading_steiner`, `divergence_meter`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`); `context_budget.*` attributes: `context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens` |
+| **Telemetry** | OTel spans: `amadeus.run`, `reading_steiner`, `divergence_meter`, `provider.invoke` (with `provider.model`, `provider.timeout_sec`, `gen_ai.*`); `context_budget.*` attributes: `context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens` |
 | **External Systems** | Claude Code subprocess, Git, `gh` CLI (PR reading), OTel exporter (Jaeger/Weave), fsnotify (inbox watcher) |
 
 ## Layer Architecture
