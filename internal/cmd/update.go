@@ -23,7 +23,7 @@ func isUpToDate(current, latest string) bool {
 	return !cv.LessThan(lv)
 }
 
-func newUpdateCmd() *cobra.Command {
+func newUpdateCommand() *cobra.Command {
 	var checkOnly bool
 
 	cmd := &cobra.Command{
