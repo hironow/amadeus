@@ -60,6 +60,38 @@ type Amadeus struct {
 	sessionStore      *SQLiteCodingSessionStore // nil when tracking unavailable; closed by CloseRunner()
 }
 
+// NewTrackedRunner creates a ClaudeAdapter wrapped with session tracking.
+// This is the standard factory for resumable provider-backed invocations.
+// Retry is NOT included — amadeus retries at the check-cycle level.
+// Store ownership: returned alongside runner. Caller MUST nil-check store
+// before calling store.Close() (nil when session tracking is unavailable).
+func NewTrackedRunner(cmd, model, repoDir string, logger domain.Logger, streamBus port.SessionStreamPublisher) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+	adapter := &ClaudeAdapter{ClaudeCmd: cmd, Model: model, Logger: logger, StreamBus: streamBus, ToolName: "amadeus"}
+	return WrapWithSessionTracking(adapter, repoDir, domain.ProviderClaudeCode, logger)
+}
+
+// WrapWithSessionTracking adds session persistence to a ClaudeRunner.
+// The runner must also implement DetailedRunner for session ID capture.
+// Best-effort: returns (runner, nil) when the session store cannot be opened
+// or the runner does not implement DetailedRunner.
+// Caller MUST nil-check store before calling store.Close().
+// This is the canonical factory helper shared across all AI coding tools.
+func WrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+	detailed, ok := runner.(port.DetailedRunner)
+	if !ok {
+		return runner, nil
+	}
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "sessions.db")
+	store, err := NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		if logger != nil {
+			logger.Debug("session tracking unavailable: %v", err)
+		}
+		return runner, nil
+	}
+	return NewSessionTrackingAdapter(detailed, store, provider), store
+}
+
 // claudeRunner returns the configured ClaudeRunner, falling back to a lazily-initialized
 // tracked runner with session tracking. This is the standard path for resumable
 // provider-backed invocations. Retry is NOT included — amadeus retries at the
@@ -70,18 +102,9 @@ func (a *Amadeus) claudeRunner() port.ClaudeRunner {
 		return a.Claude
 	}
 	a.trackedRunnerOnce.Do(func() {
-		adapter := &ClaudeAdapter{ClaudeCmd: a.ClaudeCmd, Model: a.ClaudeModel, Logger: a.Logger, StreamBus: a.StreamBus, ToolName: "amadeus"}
-		dbPath := filepath.Join(a.RepoDir, domain.StateDir, ".run", "sessions.db")
-		store, err := NewSQLiteCodingSessionStore(dbPath)
-		if err != nil {
-			if a.Logger != nil {
-				a.Logger.Debug("session tracking unavailable: %v", err)
-			}
-			a.trackedRunner = adapter
-			return
-		}
+		runner, store := NewTrackedRunner(a.ClaudeCmd, a.ClaudeModel, a.RepoDir, a.Logger, a.StreamBus)
+		a.trackedRunner = runner
 		a.sessionStore = store
-		a.trackedRunner = NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
 	})
 	return a.trackedRunner
 }

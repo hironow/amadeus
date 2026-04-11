@@ -8,15 +8,35 @@ This document freezes the current implementation contract for the AI coding subs
 shared across sightjack, paintress, and amadeus. It is the reference for provider
 expansion and copy-sync verification.
 
-## Constructor / Retry / Ownership Matrix
+## Factory Contract
+
+### Canonical Helper (copy-synced)
+
+All 3 tools share `WrapWithSessionTracking(runner, baseDir, provider, logger) → (ClaudeRunner, *SQLiteCodingSessionStore)`:
+- Adds session persistence to a DetailedRunner
+- Best-effort: returns `(runner, nil)` when store cannot be opened
+- Caller MUST nil-check store before calling `store.Close()`
+
+### Constructor / Retry / Ownership Matrix
 
 | Aspect | sightjack | paintress | amadeus |
 |--------|-----------|-----------|---------|
-| Tracked Constructor | `NewTrackedRunner` (exported) | `NewTrackedRunner` (exported) | `claudeRunner()` (lazy singleton) |
+| Tracked Constructor | `NewTrackedRunner` (exported) | `NewTrackedRunner` (exported) | `NewTrackedRunner` (exported) + `claudeRunner()` (lazy singleton) |
 | Once Constructor | `NewOnceRunner` (exported) | N/A (expedition-level retry) | N/A |
 | Retry in Tracked Path | Yes (RetryRunner) | No (expedition-level) | No (check-cycle-level) |
-| Store Ownership | Caller-owned | Instance-owned (CloseRunner) | Instance-owned (CloseRunner) |
-| Close Mechanism | Caller scope | `Paintress.CloseRunner()` | `Amadeus.CloseRunner()` |
+| Return Type | `(ClaudeRunner, *Store)` | `(ClaudeRunner, *Store)` | `(ClaudeRunner, *Store)` |
+| Store Close | `if store != nil { defer store.Close() }` | `Paintress.CloseRunner()` | `Amadeus.CloseRunner()` |
+
+### Role-Specific Policies
+
+- **Retry placement**: sightjack wraps with RetryRunner inside NewTrackedRunner. paintress/amadeus manage retry at expedition/check-cycle level.
+- **Lazy singleton**: amadeus uses `claudeRunner()` (sync.Once) that delegates to `NewTrackedRunner`. Store is instance-owned.
+- **NewOnceRunner**: sightjack-only, for side-effect-safe operations (wave apply, classify).
+
+### Telemetry Naming
+
+Provider-generic spans: `provider.invoke`, `provider.model`, `provider.timeout_sec`.
+Future providers add provider-specific child attributes under the same span hierarchy.
 
 ## Sessions CLI Contract
 
