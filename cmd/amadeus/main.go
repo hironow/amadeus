@@ -63,8 +63,9 @@ func run() int {
 // when the error is not silent. Returns the appropriate exit code.
 func handleError(err error, w io.Writer) int {
 	if err != nil {
+		var exitErr *cmd.ExitError
 		var silent *domain.SilentError
-		if !errors.As(err, &silent) {
+		if !errors.As(err, &exitErr) && !errors.As(err, &silent) {
 			fmt.Fprintf(w, "error: %v\n", err)
 		}
 	}
