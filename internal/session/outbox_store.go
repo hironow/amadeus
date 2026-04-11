@@ -101,6 +101,7 @@ func (s *SQLiteOutboxStore) Stage(ctx context.Context, name string, data []byte)
 	_, span := platform.Tracer.Start(ctx, "outbox.stage")
 	defer span.End()
 
+	span.SetAttributes(attribute.String("db.operation", "stage"))
 	_, err := s.db.Exec(`INSERT INTO staged (name, data) VALUES (?, ?)
 		ON CONFLICT(name) DO UPDATE SET data = excluded.data, flushed = 0, retry_count = 0`, name, data)
 	if err != nil {
@@ -108,7 +109,6 @@ func (s *SQLiteOutboxStore) Stage(ctx context.Context, name string, data []byte)
 		span.SetAttributes(attribute.String("error.stage", "outbox.stage"))
 		return fmt.Errorf("outbox store: stage %s: %w", name, err)
 	}
-	span.SetAttributes(attribute.String("db.operation", "stage"))
 	return nil
 }
 
