@@ -2,6 +2,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -116,6 +117,23 @@ func TestIsEnvKey(t *testing.T) {
 	for _, tt := range tests {
 		if got := isEnvKey(tt.key); got != tt.want {
 			t.Errorf("isEnvKey(%q) = %v, want %v", tt.key, got, tt.want)
+		}
+	}
+}
+
+func TestNewShellCmd_FiltersCLAUDECODE(t *testing.T) {
+	// given: CLAUDECODE is set in the environment
+	t.Setenv("CLAUDECODE", "1")
+
+	// when: NewShellCmd creates a command
+	ctx := context.Background()
+	cmd := NewShellCmd(ctx, "echo", "hello")
+
+	// then: cmd.Env must NOT contain CLAUDECODE — it is always stripped
+	// to prevent nested-session errors when invoking the Claude CLI.
+	for _, e := range cmd.Env {
+		if e == "CLAUDECODE=1" {
+			t.Error("NewShellCmd should strip CLAUDECODE from env to prevent nested-session errors")
 		}
 	}
 }

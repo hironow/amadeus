@@ -192,3 +192,71 @@ func TestPluginInfo_JSONRoundTrip(t *testing.T) {
 		t.Errorf("Path = %q, want /some/path", decoded.Path)
 	}
 }
+
+func TestStreamMessage_MarshalPreservesPlugins(t *testing.T) {
+	t.Parallel()
+
+	// given: a StreamMessage with plugins populated
+	msg := StreamMessage{
+		Type:    "system",
+		Subtype: "init",
+		Plugins: []PluginInfo{
+			{Name: "superpowers", Path: "/some/path"},
+			{Name: "linear"},
+		},
+	}
+
+	// when: marshal to JSON
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	// then: plugins should be present in JSON output
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal raw failed: %v", err)
+	}
+	pluginsRaw, ok := raw["plugins"]
+	if !ok {
+		t.Fatal("plugins key missing from marshaled JSON")
+	}
+	var plugins []PluginInfo
+	if err := json.Unmarshal(pluginsRaw, &plugins); err != nil {
+		t.Fatalf("Unmarshal plugins failed: %v", err)
+	}
+	if len(plugins) != 2 {
+		t.Fatalf("expected 2 plugins, got %d", len(plugins))
+	}
+	if plugins[0].Name != "superpowers" {
+		t.Errorf("plugins[0].Name = %q, want superpowers", plugins[0].Name)
+	}
+	if plugins[1].Name != "linear" {
+		t.Errorf("plugins[1].Name = %q, want linear", plugins[1].Name)
+	}
+}
+
+func TestStreamMessage_MarshalOmitsEmptyPlugins(t *testing.T) {
+	t.Parallel()
+
+	// given: a StreamMessage with no plugins
+	msg := StreamMessage{
+		Type:    "system",
+		Subtype: "init",
+	}
+
+	// when: marshal to JSON
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	// then: plugins key should not be present
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal raw failed: %v", err)
+	}
+	if _, ok := raw["plugins"]; ok {
+		t.Error("plugins key should be omitted when empty")
+	}
+}
