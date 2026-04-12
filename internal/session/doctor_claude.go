@@ -13,7 +13,7 @@ import (
 	"github.com/hironow/amadeus/internal/platform"
 )
 
-func CheckClaudeAuth(mcpOutput string, mcpErr error, claudeCmd string) domain.DoctorCheck {
+func checkClaudeAuth(mcpOutput string, mcpErr error, claudeCmd string) domain.DoctorCheck {
 	if mcpErr != nil {
 		hint := buildLoginHint(claudeCmd)
 		return domain.DoctorCheck{
@@ -58,7 +58,7 @@ func extractEnvPrefix(cmd string) string {
 // CheckLinearMCP verifies Linear MCP is connected by parsing `claude mcp list` output.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func CheckLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
+func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	if mcpErr != nil {
 		return domain.DoctorCheck{
 			Name:    "linear-mcp",
@@ -90,7 +90,7 @@ func CheckLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 
 // CheckClaudeInference determines if the Claude CLI can perform inference
 // by interpreting the result of a minimal "1+1=" prompt.
-func CheckClaudeInference(output string, err error) domain.DoctorCheck {
+func checkClaudeInference(output string, err error) domain.DoctorCheck {
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "claude-inference",
@@ -117,7 +117,7 @@ func CheckClaudeInference(output string, err error) domain.DoctorCheck {
 }
 
 // CheckSkillMD verifies that both dmail-sendable and dmail-readable SKILL.md files exist.
-func CheckSkillMD(repoRoot string) domain.DoctorCheck {
+func checkSkillMD(repoRoot string) domain.DoctorCheck {
 	skillsDir := filepath.Join(repoRoot, domain.StateDir, "skills")
 	required := []string{"dmail-sendable", "dmail-readable"}
 	var missing []string
@@ -164,7 +164,7 @@ func CheckSkillMD(repoRoot string) domain.DoctorCheck {
 
 // RunDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
 
-func ExtractStreamResult(streamJSON string) string {
+func extractStreamResult(streamJSON string) string {
 	for _, line := range strings.Split(streamJSON, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -183,7 +183,7 @@ func ExtractStreamResult(streamJSON string) string {
 
 // CheckContextBudget parses stream-json output from a Claude CLI invocation
 // and reports context budget health based on hooks, plugins, skills, and MCP servers.
-func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
+func checkContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 	var messages []*platform.StreamMessage
 	for _, line := range strings.Split(streamJSON, "\n") {
 		line = strings.TrimSpace(line)
@@ -263,7 +263,7 @@ func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 
 // CheckGHAuth verifies that the GitHub CLI is authenticated by running
 // `gh auth status`. Returns OK if authenticated, WARN if not.
-func CheckGHAuth(ctx context.Context) domain.DoctorCheck {
+func checkGHAuth(ctx context.Context) domain.DoctorCheck {
 	cmd := exec.CommandContext(ctx, "gh", "auth", "status", "--active")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
