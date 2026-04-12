@@ -83,6 +83,7 @@ All gap detection runs from `tap/justfile`:
 - `internal/domain/coding_session.go`
 - `internal/session/session_tracking_adapter.go`
 - `internal/session/coding_session_store.go`
+- `internal/session/provider_adapter_config.go` (struct only — helpers are tool-specific)
 - `internal/platform/stream_normalizer.go`
 - `internal/harness/policy/run_guard.go`
 - `internal/session/session_enter.go`
@@ -90,11 +91,17 @@ All gap detection runs from `tap/justfile`:
 - `internal/session/provider_telemetry.go`
 - `internal/usecase/port/coding_session.go`
 - `internal/usecase/port/provider_runner.go`
-- `docs/shared-adr/S0037-coding-session-abstraction-layer.md`
+- `docs/shared-adr/S0037-current-contract.md` (this file)
+
+Note: `S0037-coding-session-abstraction-layer.md` is the historical decision rationale (Accepted ADR). It is NOT checksum-gated.
 
 ### Exact-sync test files:
 - `internal/session/session_enter_test.go`
 - `internal/session/mcp_config_test.go`
+
+### Tool-specific (NOT checksum-gated):
+- `internal/session/provider_adapter_helpers.go` — assembly helpers (intentionally divergent per tool)
+- `internal/session/provider_adapter_config_test.go` — field omission guard tests (test respective helper)
 
 ### Structural check (signature existence):
 - `internal/cmd/sessions_resolve.go` — `resolveSessionsDir` signature
