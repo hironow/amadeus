@@ -33,30 +33,33 @@ func (r *RetryRunner) logger() domain.Logger {
 	return &domain.NopLogger{}
 }
 
-// retryLoop runs fn with exponential backoff. fn receives the attempt number
-// and should return an error (nil = success, stops the loop).
+// retryLoop executes fn with exponential backoff retry.
+// The entire loop is bounded by Timeout. fn receives the current attempt number.
 func (r *RetryRunner) retryLoop(ctx context.Context, fn func(ctx context.Context, attempt int) error) error {
 	maxAttempts := r.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
+
 	if r.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
 		defer cancel()
 	}
+
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		// Circuit breaker: skip remaining retries when rate-limited
 		if r.CircuitBreaker != nil {
 			if cbErr := r.CircuitBreaker.Allow(ctx); cbErr != nil {
 				attrs := []attribute.KeyValue{
-					attribute.String("claude.error", platform.SanitizeUTF8(cbErr.Error())),
+					attribute.String("provider.error", platform.SanitizeUTF8(cbErr.Error())),
 				}
 				attrs = append(attrs, providerStateSpanAttrs(r.CircuitBreaker.Snapshot())...)
-				trace.SpanFromContext(ctx).AddEvent("claude.blocked", trace.WithAttributes(attrs...))
+				trace.SpanFromContext(ctx).AddEvent("provider.blocked", trace.WithAttributes(attrs...))
 				if lastErr != nil {
 					return lastErr
 				}
@@ -83,15 +86,15 @@ func (r *RetryRunner) retryLoop(ctx context.Context, fn func(ctx context.Context
 		}
 		span := trace.SpanFromContext(ctx)
 		attrs := []attribute.KeyValue{
-			attribute.Int("claude.attempt", attempt),
-			attribute.String("claude.error", platform.SanitizeUTF8(err.Error())),
+			attribute.Int("provider.attempt", attempt),
+			attribute.String("provider.error", platform.SanitizeUTF8(err.Error())),
 		}
 		if r.CircuitBreaker != nil {
 			attrs = append(attrs, providerStateSpanAttrs(r.CircuitBreaker.Snapshot())...)
 		}
-		span.AddEvent("claude.retry", trace.WithAttributes(attrs...))
+		span.AddEvent("provider.retry", trace.WithAttributes(attrs...))
 	}
-	return fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
+	return fmt.Errorf("provider failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // Run executes the inner runner with exponential backoff retry.
@@ -117,8 +120,8 @@ func (r *RetryRunner) RunDetailed(ctx context.Context, prompt string, w io.Write
 
 	var lastResult port.RunResult
 	err := r.retryLoop(ctx, func(ctx context.Context, _ int) error {
-		var runErr error
-		lastResult, runErr = detailed.RunDetailed(ctx, prompt, w, opts...)
+		result, runErr := detailed.RunDetailed(ctx, prompt, w, opts...)
+		lastResult = result
 		return runErr
 	})
 	return lastResult, err

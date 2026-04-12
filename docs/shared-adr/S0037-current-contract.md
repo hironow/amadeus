@@ -57,10 +57,33 @@ type ProviderAdapterConfig struct {
 - **Lazy singleton**: amadeus uses `claudeRunner()` (sync.Once) that delegates to `NewTrackedRunner`. Store is instance-owned.
 - **NewOnceRunner**: sightjack-only, for side-effect-safe operations (wave apply, classify). Takes `ProviderAdapterConfig` only (same as paintress/amadeus `NewTrackedRunner`).
 
+### RetryRunner.Run Output Contract
+
+On error, `Run` returns `(lastOutput, err)` — partial output from the last attempt is preserved.
+Callers MUST NOT assume output is empty when err != nil.
+
 ### Telemetry Naming
 
 Provider-generic spans: `provider.invoke`, `provider.model`, `provider.timeout_sec`.
+Provider-generic events: `provider.retry`, `provider.blocked`.
+Provider-generic event attributes: `provider.error`, `provider.attempt`.
+Provider-generic init attributes: `provider.init.model`, `provider.init.mcp_servers`,
+`provider.init.tools_count`, `provider.init.skills_count`, `provider.init.plugins_count`.
+
 Future providers add provider-specific child attributes under the same span hierarchy.
+
+### Operator-Facing Schema Boundary
+
+Config key `claude_cmd` (YAML) / `ClaudeCmd` (Go field) is a legacy seam tied to the
+current sole provider (Claude). It maps to `ProviderAdapterConfig.Cmd` at the session layer.
+
+When a second provider is onboarded:
+1. Introduce `provider_cmd` as the generic key
+2. Retain `claude_cmd` as an alias for backwards compatibility
+3. Config validation accepts either key
+
+Until then, `claude_cmd` is the canonical operator-facing config key.
+Session-layer code (`ProviderAdapterConfig.Cmd`, `EnterConfig.ProviderCmd`) is already generic.
 
 ## Sessions CLI Contract
 

@@ -161,10 +161,10 @@ func TestRetryRunner_RecordsProviderStateOnRetryEvent(t *testing.T) {
 	if parent == nil {
 		t.Fatal("missing retry-parent span")
 	}
-	if got := eventAttrString(parent, "claude.retry", domain.MetadataProviderState); got != string(domain.ProviderStateActive) {
+	if got := eventAttrString(parent, "provider.retry", domain.MetadataProviderState); got != string(domain.ProviderStateActive) {
 		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateActive)
 	}
-	if got := eventAttrInt(parent, "claude.retry", domain.MetadataProviderRetryBudget); got != 1 {
+	if got := eventAttrInt(parent, "provider.retry", domain.MetadataProviderRetryBudget); got != 1 {
 		t.Fatalf("provider_retry_budget = %d, want 1", got)
 	}
 }
@@ -318,13 +318,13 @@ func TestRetryRunner_RecordsProviderStateOnBlockedEvent(t *testing.T) {
 	if parent == nil {
 		t.Fatal("missing retry-blocked-parent span")
 	}
-	if got := eventAttrString(parent, "claude.blocked", domain.MetadataProviderState); got != string(domain.ProviderStateWaiting) {
+	if got := eventAttrString(parent, "provider.blocked", domain.MetadataProviderState); got != string(domain.ProviderStateWaiting) {
 		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateWaiting)
 	}
-	if got := eventAttrString(parent, "claude.blocked", domain.MetadataProviderReason); got != "rate_limit" {
+	if got := eventAttrString(parent, "provider.blocked", domain.MetadataProviderReason); got != "rate_limit" {
 		t.Fatalf("provider_reason = %q, want rate_limit", got)
 	}
-	if got := eventAttrInt(parent, "claude.blocked", domain.MetadataProviderRetryBudget); got != 0 {
+	if got := eventAttrInt(parent, "provider.blocked", domain.MetadataProviderRetryBudget); got != 0 {
 		t.Fatalf("provider_retry_budget = %d, want 0", got)
 	}
 }

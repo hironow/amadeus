@@ -110,23 +110,23 @@ func (s *SpanEmittingStreamReader) InitAttrs() []attribute.KeyValue {
 	var attrs []attribute.KeyValue
 
 	if msg.Model != "" {
-		attrs = append(attrs, attribute.String("claude.init.model", SanitizeUTF8(msg.Model)))
+		attrs = append(attrs, attribute.String("provider.init.model", SanitizeUTF8(msg.Model)))
 	}
 	if len(msg.MCPServers) > 0 {
 		names := make([]string, len(msg.MCPServers))
 		for i, srv := range msg.MCPServers {
 			names[i] = SanitizeUTF8(srv.Name)
 		}
-		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", SanitizeUTF8Slice(names)))
+		attrs = append(attrs, attribute.StringSlice("provider.init.mcp_servers", SanitizeUTF8Slice(names)))
 	}
 	if len(msg.Tools) > 0 {
-		attrs = append(attrs, attribute.Int("claude.init.tools_count", len(msg.Tools)))
+		attrs = append(attrs, attribute.Int("provider.init.tools_count", len(msg.Tools)))
 	}
 	if len(msg.Skills) > 0 {
-		attrs = append(attrs, attribute.Int("claude.init.skills_count", len(msg.Skills)))
+		attrs = append(attrs, attribute.Int("provider.init.skills_count", len(msg.Skills)))
 	}
 	if len(msg.Plugins) > 0 {
-		attrs = append(attrs, attribute.Int("claude.init.plugins_count", len(msg.Plugins)))
+		attrs = append(attrs, attribute.Int("provider.init.plugins_count", len(msg.Plugins)))
 	}
 
 	return attrs
