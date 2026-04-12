@@ -10,7 +10,7 @@ import (
 
 // EnterConfig holds configuration for interactive session re-entry.
 type EnterConfig struct {
-	ProviderCmd       string    // CLI command (from config.claude_cmd)
+	ProviderCmd       string    // CLI command (from config.claude_cmd — legacy seam)
 	ProviderSessionID string    // provider native session ID
 	WorkDir           string    // working directory (from session record)
 	ConfigBase        string    // base directory for resolving stateDir settings
