@@ -37,7 +37,7 @@ func (a *Amadeus) consumeInbox(ctx context.Context, quiet bool) ([]domain.DMail,
 	now := time.Now().UTC()
 	for _, d := range consumed {
 		domain.LogBanner(a.Logger, domain.BannerRecv, string(d.Kind), d.Name, d.Description)
-		if err := a.Emitter.EmitInboxConsumed(ctx, domain.InboxConsumedData{
+		if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
 			Name:   d.Name,
 			Kind:   d.Kind,
 			Source: d.Name + ".md",
@@ -143,7 +143,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				continue
 			}
 			domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
-			if err := a.Emitter.EmitDMailGenerated(ctx, dmail, now); err != nil {
+			if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
 				span3.End()
 				return nil, fmt.Errorf("phase 3 (emit dmail): %w", err)
 			}
@@ -170,7 +170,7 @@ func (a *Amadeus) detectConvergence(ctx context.Context, now time.Time) ([]domai
 	allDMails = domain.FilterByTTL(allDMails, now)
 	convergenceAlerts := a.Config.DetectConvergence(allDMails, now)
 	for _, alert := range convergenceAlerts {
-		if err := a.Emitter.EmitConvergenceDetected(ctx, alert, now); err != nil {
+		if err := a.Emitter.EmitConvergenceDetected(alert, now); err != nil {
 			return nil, nil, fmt.Errorf("phase 4 (emit convergence event): %w", err)
 		}
 	}
@@ -207,7 +207,7 @@ func (a *Amadeus) saveConvergenceDMails(ctx context.Context, alerts []domain.Con
 		}
 		cd.Name = cdName
 		domain.LogBanner(a.Logger, domain.BannerSend, string(cd.Kind), cd.Name, cd.Description)
-		if err := a.Emitter.EmitDMailGenerated(ctx, cd, time.Now().UTC()); err != nil {
+		if err := a.Emitter.EmitDMailGenerated(cd, time.Now().UTC()); err != nil {
 			return saved, fmt.Errorf("emit convergence dmail %s: %w", cdName, err)
 		}
 		saved = append(saved, cd)

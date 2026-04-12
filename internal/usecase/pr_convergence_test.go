@@ -37,45 +37,45 @@ type mockEmitter struct {
 	emitPRConvergenceErr     error
 }
 
-func (m *mockEmitter) EmitInboxConsumed(_ context.Context, _ domain.InboxConsumedData, _ time.Time) error {
+func (m *mockEmitter) EmitInboxConsumed(_ domain.InboxConsumedData, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitForceFullNextSet(_ context.Context, _, _ float64, _ time.Time) error {
+func (m *mockEmitter) EmitForceFullNextSet(_, _ float64, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitDMailGenerated(_ context.Context, dmail domain.DMail, _ time.Time) error {
+func (m *mockEmitter) EmitDMailGenerated(dmail domain.DMail, _ time.Time) error {
 	if m.emitDMailErr != nil {
 		return m.emitDMailErr
 	}
 	m.dmailsGenerated = append(m.dmailsGenerated, dmail)
 	return nil
 }
-func (m *mockEmitter) EmitConvergenceDetected(_ context.Context, _ domain.ConvergenceAlert, _ time.Time) error {
+func (m *mockEmitter) EmitConvergenceDetected(_ domain.ConvergenceAlert, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitDMailCommented(_ context.Context, _, _ string, _ time.Time) error {
+func (m *mockEmitter) EmitDMailCommented(_, _ string, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitCheck(_ context.Context, _ domain.CheckResult, _ time.Time) error {
+func (m *mockEmitter) EmitCheck(_ domain.CheckResult, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitRunStarted(_ context.Context, _ domain.RunStartedData, _ time.Time) error {
+func (m *mockEmitter) EmitRunStarted(_ domain.RunStartedData, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitRunStopped(_ context.Context, _ domain.RunStoppedData, _ time.Time) error {
+func (m *mockEmitter) EmitRunStopped(_ domain.RunStoppedData, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitPRConvergenceChecked(_ context.Context, data domain.PRConvergenceCheckedData, _ time.Time) error {
+func (m *mockEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, _ time.Time) error {
 	if m.emitPRConvergenceErr != nil {
 		return m.emitPRConvergenceErr
 	}
 	m.prConvergenceCheckedData = &data
 	return nil
 }
-func (m *mockEmitter) EmitPRMerged(_ context.Context, _ domain.PRMergedData, _ time.Time) error {
+func (m *mockEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error {
 	return nil
 }
-func (m *mockEmitter) EmitPRMergeSkipped(_ context.Context, _ domain.PRMergeSkippedData, _ time.Time) error {
+func (m *mockEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
 	return nil
 }
 

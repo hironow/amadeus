@@ -155,7 +155,7 @@ func (a *Amadeus) evaluateSinglePR(ctx context.Context, pr domain.PRState) ([]do
 		}
 
 		if a.Emitter != nil {
-			if emitErr := a.Emitter.EmitDMailGenerated(ctx, dmail, now); emitErr != nil {
+			if emitErr := a.Emitter.EmitDMailGenerated(dmail, now); emitErr != nil {
 				// Emit failure is fatal for this PR — prevents label from being applied
 				return nil, fmt.Errorf("emit D-Mail for PR %s: %w", pr.Number(), emitErr)
 			}

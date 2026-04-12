@@ -48,7 +48,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 
 	// Emit run.started
 	now := time.Now().UTC()
-	if err := a.Emitter.EmitRunStarted(ctx, domain.RunStartedData{
+	if err := a.Emitter.EmitRunStarted(domain.RunStartedData{
 		IntegrationBranch: integrationBranch,
 		BaseBranch:        opts.BaseBranch,
 	}, now); err != nil {
@@ -62,7 +62,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 	defer func() {
 		if runErr != nil {
 			stopNow := time.Now().UTC()
-			_ = a.Emitter.EmitRunStopped(ctx, domain.RunStoppedData{Reason: domain.RunStoppedReasonError}, stopNow)
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonError}, stopNow)
 		}
 	}()
 
@@ -152,7 +152,7 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 		select {
 		case <-ctx.Done():
 			stopNow := time.Now().UTC()
-			_ = a.Emitter.EmitRunStopped(ctx, domain.RunStoppedData{Reason: domain.RunStoppedReasonSignal}, stopNow)
+			_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonSignal}, stopNow)
 			if !opts.Quiet {
 				a.Logger.Info("amadeus run: stopped (signal)")
 			}
@@ -162,13 +162,13 @@ func (a *Amadeus) Run(ctx context.Context, opts domain.RunOptions, emitter port.
 			if !ok {
 				// Channel closed
 				stopNow := time.Now().UTC()
-				_ = a.Emitter.EmitRunStopped(ctx, domain.RunStoppedData{Reason: domain.RunStoppedReasonChannelClosed}, stopNow)
+				_ = a.Emitter.EmitRunStopped(domain.RunStoppedData{Reason: domain.RunStoppedReasonChannelClosed}, stopNow)
 				return nil
 			}
 
 			inboxNow := time.Now().UTC()
 			domain.LogBanner(a.Logger, domain.BannerRecv, string(dmail.Kind), dmail.Name, dmail.Description)
-			if err := a.Emitter.EmitInboxConsumed(ctx, domain.InboxConsumedData{
+			if err := a.Emitter.EmitInboxConsumed(domain.InboxConsumedData{
 				Name:   dmail.Name,
 				Kind:   dmail.Kind,
 				Source: dmail.Name + ".md",
@@ -337,7 +337,7 @@ func (a *Amadeus) runPostMergeCheck(ctx context.Context, opts domain.CheckOption
 		ConvergenceAlerts: convergenceAlerts,
 	}
 
-	if err := a.Emitter.EmitCheck(ctx, result, now); err != nil {
+	if err := a.Emitter.EmitCheck(result, now); err != nil {
 		return fmt.Errorf("emit check completed: %w", err)
 	}
 

@@ -91,10 +91,10 @@ func (p *testPRPipeline) RunPreMergePipeline(ctx context.Context, integrationBra
 		if errs := harness.ValidateDMail(dmail); len(errs) > 0 {
 			continue
 		}
-		_ = p.emitter.EmitDMailGenerated(ctx, dmail, now)
+		_ = p.emitter.EmitDMailGenerated(dmail, now)
 		dmails = append(dmails, dmail)
 	}
-	_ = p.emitter.EmitPRConvergenceChecked(ctx, domain.PRConvergenceCheckedData{
+	_ = p.emitter.EmitPRConvergenceChecked(domain.PRConvergenceCheckedData{
 		IntegrationBranch: integrationBranch,
 		TotalOpenPRs:      report.TotalOpenPRs,
 		Chains:            len(report.Chains),
@@ -119,7 +119,7 @@ type runEmitter struct {
 	prConvergenceCalls int
 }
 
-func (e *runEmitter) EmitRunStarted(_ context.Context, data domain.RunStartedData, _ time.Time) error {
+func (e *runEmitter) EmitRunStarted(data domain.RunStartedData, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.runStartedCalled = true
@@ -127,7 +127,7 @@ func (e *runEmitter) EmitRunStarted(_ context.Context, data domain.RunStartedDat
 	return nil
 }
 
-func (e *runEmitter) EmitRunStopped(_ context.Context, data domain.RunStoppedData, _ time.Time) error {
+func (e *runEmitter) EmitRunStopped(data domain.RunStoppedData, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.runStoppedCalled = true
@@ -135,44 +135,44 @@ func (e *runEmitter) EmitRunStopped(_ context.Context, data domain.RunStoppedDat
 	return nil
 }
 
-func (e *runEmitter) EmitInboxConsumed(_ context.Context, data domain.InboxConsumedData, _ time.Time) error {
+func (e *runEmitter) EmitInboxConsumed(data domain.InboxConsumedData, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.inboxConsumed = append(e.inboxConsumed, data)
 	return nil
 }
 
-func (e *runEmitter) EmitForceFullNextSet(_ context.Context, _, _ float64, _ time.Time) error {
+func (e *runEmitter) EmitForceFullNextSet(_, _ float64, _ time.Time) error {
 	return nil
 }
-func (e *runEmitter) EmitDMailGenerated(_ context.Context, dmail domain.DMail, _ time.Time) error {
+func (e *runEmitter) EmitDMailGenerated(dmail domain.DMail, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.dmailsGenerated = append(e.dmailsGenerated, dmail)
 	return nil
 }
-func (e *runEmitter) EmitConvergenceDetected(_ context.Context, _ domain.ConvergenceAlert, _ time.Time) error {
+func (e *runEmitter) EmitConvergenceDetected(_ domain.ConvergenceAlert, _ time.Time) error {
 	return nil
 }
-func (e *runEmitter) EmitDMailCommented(_ context.Context, _, _ string, _ time.Time) error {
+func (e *runEmitter) EmitDMailCommented(_, _ string, _ time.Time) error {
 	return nil
 }
-func (e *runEmitter) EmitCheck(_ context.Context, result domain.CheckResult, _ time.Time) error {
+func (e *runEmitter) EmitCheck(result domain.CheckResult, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.checksEmitted = append(e.checksEmitted, result)
 	return nil
 }
-func (e *runEmitter) EmitPRConvergenceChecked(_ context.Context, _ domain.PRConvergenceCheckedData, _ time.Time) error {
+func (e *runEmitter) EmitPRConvergenceChecked(_ domain.PRConvergenceCheckedData, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.prConvergenceCalls++
 	return nil
 }
-func (e *runEmitter) EmitPRMerged(_ context.Context, _ domain.PRMergedData, _ time.Time) error {
+func (e *runEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error {
 	return nil
 }
-func (e *runEmitter) EmitPRMergeSkipped(_ context.Context, _ domain.PRMergeSkippedData, _ time.Time) error {
+func (e *runEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
 	return nil
 }
 

@@ -90,45 +90,45 @@ type mergeEmitter struct {
 	runStopped      bool
 }
 
-func (e *mergeEmitter) EmitRunStarted(_ context.Context, _ domain.RunStartedData, _ time.Time) error {
+func (e *mergeEmitter) EmitRunStarted(_ domain.RunStartedData, _ time.Time) error {
 	e.runStarted = true
 	return nil
 }
-func (e *mergeEmitter) EmitRunStopped(_ context.Context, _ domain.RunStoppedData, _ time.Time) error {
+func (e *mergeEmitter) EmitRunStopped(_ domain.RunStoppedData, _ time.Time) error {
 	e.runStopped = true
 	return nil
 }
-func (e *mergeEmitter) EmitInboxConsumed(_ context.Context, _ domain.InboxConsumedData, _ time.Time) error {
+func (e *mergeEmitter) EmitInboxConsumed(_ domain.InboxConsumedData, _ time.Time) error {
 	return nil
 }
-func (e *mergeEmitter) EmitForceFullNextSet(_ context.Context, _, _ float64, _ time.Time) error {
+func (e *mergeEmitter) EmitForceFullNextSet(_, _ float64, _ time.Time) error {
 	return nil
 }
-func (e *mergeEmitter) EmitDMailGenerated(_ context.Context, dmail domain.DMail, _ time.Time) error {
+func (e *mergeEmitter) EmitDMailGenerated(dmail domain.DMail, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.dmailsGenerated = append(e.dmailsGenerated, dmail)
 	return nil
 }
-func (e *mergeEmitter) EmitConvergenceDetected(_ context.Context, _ domain.ConvergenceAlert, _ time.Time) error {
+func (e *mergeEmitter) EmitConvergenceDetected(_ domain.ConvergenceAlert, _ time.Time) error {
 	return nil
 }
-func (e *mergeEmitter) EmitDMailCommented(_ context.Context, _, _ string, _ time.Time) error {
+func (e *mergeEmitter) EmitDMailCommented(_, _ string, _ time.Time) error {
 	return nil
 }
-func (e *mergeEmitter) EmitCheck(_ context.Context, _ domain.CheckResult, _ time.Time) error {
+func (e *mergeEmitter) EmitCheck(_ domain.CheckResult, _ time.Time) error {
 	return nil
 }
-func (e *mergeEmitter) EmitPRConvergenceChecked(_ context.Context, _ domain.PRConvergenceCheckedData, _ time.Time) error {
+func (e *mergeEmitter) EmitPRConvergenceChecked(_ domain.PRConvergenceCheckedData, _ time.Time) error {
 	return nil
 }
-func (e *mergeEmitter) EmitPRMerged(_ context.Context, data domain.PRMergedData, _ time.Time) error {
+func (e *mergeEmitter) EmitPRMerged(data domain.PRMergedData, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.merged = append(e.merged, data)
 	return nil
 }
-func (e *mergeEmitter) EmitPRMergeSkipped(_ context.Context, data domain.PRMergeSkippedData, _ time.Time) error {
+func (e *mergeEmitter) EmitPRMergeSkipped(data domain.PRMergeSkippedData, _ time.Time) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.skipped = append(e.skipped, data)

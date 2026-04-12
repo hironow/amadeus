@@ -105,13 +105,13 @@ func runPreMergePipeline(ctx context.Context, integrationBranch string,
 		}
 
 		domain.LogBanner(logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
-		if err := emitter.EmitDMailGenerated(ctx, dmail, now); err != nil {
+		if err := emitter.EmitDMailGenerated(dmail, now); err != nil {
 			return dmails, fmt.Errorf("pr convergence (emit dmail): %w", err)
 		}
 		dmails = append(dmails, dmail)
 	}
 
-	if err := emitter.EmitPRConvergenceChecked(ctx, domain.PRConvergenceCheckedData{
+	if err := emitter.EmitPRConvergenceChecked(domain.PRConvergenceCheckedData{
 		IntegrationBranch: integrationBranch,
 		TotalOpenPRs:      report.TotalOpenPRs,
 		Chains:            len(report.Chains),
