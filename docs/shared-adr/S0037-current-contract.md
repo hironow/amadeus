@@ -1,6 +1,6 @@
-# AI Coding Substrate: Current Contract (post-v1)
+# AI Coding Substrate: Current Contract
 
-**Date:** 2026-04-11
+**Date:** 2026-04-12
 **Status:** Active
 **Companion ADR:** S0037 (session abstraction decision rationale)
 
@@ -12,26 +12,48 @@ expansion and copy-sync verification.
 
 ### Canonical Helper (copy-synced)
 
-All 3 tools share `WrapWithSessionTracking(runner, baseDir, provider, logger) → (ClaudeRunner, *SQLiteCodingSessionStore)`:
+All 3 tools share `WrapWithSessionTracking(runner, baseDir, provider, logger) → (ProviderRunner, *SQLiteCodingSessionStore)`:
 - Adds session persistence to a DetailedRunner
 - Best-effort: returns `(runner, nil)` when store cannot be opened
 - Caller MUST nil-check store before calling `store.Close()`
 
-### Constructor / Retry / Ownership Matrix
+### Provider Onboarding Pattern
+
+To add a new provider, follow this single pattern:
+
+1. Create an adapter implementing `DetailedRunner`
+2. Call `WrapWithSessionTracking(adapter, baseDir, provider, logger)` to get `(ProviderRunner, *Store)`
+3. Optionally wrap with `RetryRunner` if role policy requires it (sightjack only)
+
+### ProviderAdapterConfig (copy-synced)
+
+All tools define `ProviderAdapterConfig` with the same shape:
+
+```go
+type ProviderAdapterConfig struct {
+    Cmd        string // provider CLI command (e.g. "claude")
+    Model      string // model name (e.g. "opus")
+    TimeoutSec int    // per-invocation timeout (0 = context deadline only)
+    BaseDir    string // repository root (state dir parent)
+    ToolName   string // tool identifier for stream events
+}
+```
+
+### Constructor Matrix
 
 | Aspect | sightjack | paintress | amadeus |
 |--------|-----------|-----------|---------|
-| Tracked Constructor | `NewTrackedRunner` (exported) | `NewTrackedRunner` (exported) | `NewTrackedRunner` (exported) + `claudeRunner()` (lazy singleton) |
-| Once Constructor | `NewOnceRunner` (exported) | N/A (expedition-level retry) | N/A |
-| Retry in Tracked Path | Yes (RetryRunner) | No (expedition-level) | No (check-cycle-level) |
-| Return Type | `(ClaudeRunner, *Store)` | `(ClaudeRunner, *Store)` | `(ClaudeRunner, *Store)` |
+| Tracked Constructor | `NewTrackedRunner(pac, rc, logger)` | `NewTrackedRunner(pac, logger)` | `NewTrackedRunner(pac, logger)` |
+| Once Constructor | `NewOnceRunner(pac, logger)` | N/A (expedition-level retry) | N/A |
+| Retry in Tracked Path | Yes (RetryRunner via RetryConfig) | No (expedition-level) | No (check-cycle-level) |
+| Return Type | `(ProviderRunner, *Store)` | `(ProviderRunner, *Store)` | `(ProviderRunner, *Store)` |
 | Store Close | `if store != nil { defer store.Close() }` | `Paintress.CloseRunner()` | `Amadeus.CloseRunner()` |
 
 ### Role-Specific Policies
 
-- **Retry placement**: sightjack wraps with RetryRunner inside NewTrackedRunner. paintress/amadeus manage retry at expedition/check-cycle level.
+- **Retry placement**: sightjack wraps with RetryRunner inside NewTrackedRunner (extra `RetryConfig` param). paintress/amadeus manage retry at expedition/check-cycle level.
 - **Lazy singleton**: amadeus uses `claudeRunner()` (sync.Once) that delegates to `NewTrackedRunner`. Store is instance-owned.
-- **NewOnceRunner**: sightjack-only, for side-effect-safe operations (wave apply, classify).
+- **NewOnceRunner**: sightjack-only, for side-effect-safe operations (wave apply, classify). Takes `ProviderAdapterConfig` only (same as paintress/amadeus `NewTrackedRunner`).
 
 ### Telemetry Naming
 
@@ -51,6 +73,10 @@ Canonical errors:
 
 ## Drift Checker Canonical Surface
 
+All gap detection runs from `tap/justfile`:
+- `just gap-check-ai-coding` — canonical checksum gate
+- `just gap-check-ai-sync` — exploratory diff (not a gate)
+
 ### Exact-sync production files (checksum verified):
 - `internal/domain/coding_session.go`
 - `internal/session/session_tracking_adapter.go`
@@ -61,6 +87,7 @@ Canonical errors:
 - `internal/session/mcp_config.go`
 - `internal/session/provider_telemetry.go`
 - `internal/usecase/port/coding_session.go`
+- `internal/usecase/port/provider_runner.go`
 - `docs/shared-adr/S0037-coding-session-abstraction-layer.md`
 
 ### Exact-sync test files:
@@ -93,9 +120,10 @@ Canonical errors:
 When adding a new provider:
 1. Add `Provider` constant to `internal/domain/coding_session.go`
 2. Implement `DetailedRunner` interface in session adapter
-3. Add resume mechanism in `internal/session/session_enter.go`
-4. Add stream normalization in `internal/platform/stream_normalizer.go`
-5. Add MCP config isolation in `internal/session/mcp_config.go`
-6. Add provider telemetry attributes in `internal/session/provider_telemetry.go`
-7. Update `scripts/check-substrate-drift.sh` checksums
-8. Run `just substrate-drift-check` on all 3 tools
+3. Call `WrapWithSessionTracking` to compose with session persistence
+4. Add resume mechanism in `internal/session/session_enter.go`
+5. Add stream normalization in `internal/platform/stream_normalizer.go`
+6. Add MCP config isolation in `internal/session/mcp_config.go`
+7. Add provider telemetry attributes in `internal/session/provider_telemetry.go`
+8. Update `tap/scripts/check_substrate_drift.sh` checksums
+9. Run `cd tap && just gap-check-ai-coding` on all 3 tools

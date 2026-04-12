@@ -60,14 +60,25 @@ type Amadeus struct {
 	sessionStore      *SQLiteCodingSessionStore // nil when tracking unavailable; closed by CloseRunner()
 }
 
+// sharedStreamBus is the process-wide session stream bus. Set via SetStreamBus
+// at startup. All ClaudeAdapter instances created via NewTrackedRunner
+// automatically pick up this bus.
+var sharedStreamBus port.SessionStreamPublisher
+
+// SetStreamBus sets the process-wide stream bus for live session event publishing.
+// Call this once during startup before any provider invocations.
+func SetStreamBus(bus port.SessionStreamPublisher) {
+	sharedStreamBus = bus
+}
+
 // NewTrackedRunner creates a ClaudeAdapter wrapped with session tracking.
-// This is the standard factory for resumable provider-backed invocations.
+// Accepts the canonical ProviderAdapterConfig shape (same as paintress).
 // Retry is NOT included — amadeus retries at the check-cycle level.
 // Store ownership: returned alongside runner. Caller MUST nil-check store
 // before calling store.Close() (nil when session tracking is unavailable).
-func NewTrackedRunner(cmd, model, repoDir string, logger domain.Logger, streamBus port.SessionStreamPublisher) (port.ProviderRunner, *SQLiteCodingSessionStore) {
-	adapter := &ClaudeAdapter{ClaudeCmd: cmd, Model: model, Logger: logger, StreamBus: streamBus, ToolName: "amadeus"}
-	return WrapWithSessionTracking(adapter, repoDir, domain.ProviderClaudeCode, logger)
+func NewTrackedRunner(pac ProviderAdapterConfig, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
+	adapter := &ClaudeAdapter{ClaudeCmd: pac.Cmd, Model: pac.Model, TimeoutSec: pac.TimeoutSec, Logger: logger, StreamBus: sharedStreamBus, ToolName: pac.ToolName}
+	return WrapWithSessionTracking(adapter, pac.BaseDir, domain.ProviderClaudeCode, logger)
 }
 
 // WrapWithSessionTracking adds session persistence to a ProviderRunner.
@@ -102,7 +113,14 @@ func (a *Amadeus) claudeRunner() port.ProviderRunner {
 		return a.Claude
 	}
 	a.trackedRunnerOnce.Do(func() {
-		runner, store := NewTrackedRunner(a.ClaudeCmd, a.ClaudeModel, a.RepoDir, a.Logger, a.StreamBus)
+		pac := ProviderAdapterConfig{
+			Cmd:        a.ClaudeCmd,
+			Model:      a.ClaudeModel,
+			TimeoutSec: a.Config.TimeoutSec,
+			BaseDir:    a.RepoDir,
+			ToolName:   "amadeus",
+		}
+		runner, store := NewTrackedRunner(pac, a.Logger)
 		a.trackedRunner = runner
 		a.sessionStore = store
 	})

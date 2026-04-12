@@ -248,7 +248,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 		),
 	)
 
-	// claude.invoke span wraps the Claude CLI execution with GenAI semconv attributes.
+	// provider.invoke span wraps the Claude CLI execution with GenAI semconv attributes.
 	model := a.ClaudeModel
 	timeoutSec := 0
 	if deadline, ok := ctx.Deadline(); ok {

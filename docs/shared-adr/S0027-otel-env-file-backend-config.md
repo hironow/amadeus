@@ -49,8 +49,8 @@ a `fromEnv{}` detector that reads `OTEL_RESOURCE_ATTRIBUTES` automatically.
 
 - `os.Setenv` in `PersistentPreRunE` — safe for single-threaded CLI init but
   would be a concern in concurrent server scenarios
-- paintress resolves state dir from cwd (no `--config` flag on root) — if cwd
-  differs from project root, `.otel.env` won't be found
+- All 3 AI coding tools resolve state dir via `--config` / `--path` / cwd.
+  If cwd differs from project root and no flag is provided, `.otel.env` won't be found
 
 ### Neutral
 
