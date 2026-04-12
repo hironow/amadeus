@@ -3,6 +3,8 @@
 **Date:** 2026-04-12
 **Status:** Active
 **Companion ADR:** S0037 (session abstraction decision rationale)
+**Authority:** This is the machine-gated active source (`tap/scripts/check_substrate_drift.sh`).
+`S0037-coding-session-abstraction-layer.md` is the historical decision rationale (Accepted ADR, not gated).
 
 This document freezes the current implementation contract for the AI coding substrate
 shared across sightjack, paintress, and amadeus. It is the reference for provider

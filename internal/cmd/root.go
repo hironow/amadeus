@@ -82,6 +82,14 @@ func NewRootCommand() *cobra.Command {
 			session.SetStreamBus(streamBus)
 			sharedStreamBus = streamBus
 
+			// Production subscriber: bridge stream events to logger.
+			sub := streamBus.Subscribe(64)
+			go func() {
+				for ev := range sub.C() {
+					logger.Debug("stream: %s [%s] session=%s", ev.Type, ev.Tool, ev.SessionID)
+				}
+			}()
+
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

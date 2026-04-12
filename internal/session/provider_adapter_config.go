@@ -10,3 +10,14 @@ type ProviderAdapterConfig struct {
 	BaseDir    string // repository root (state dir parent)
 	ToolName   string // tool identifier for stream events
 }
+
+// AdapterConfigFromAmadeusFields extracts ProviderAdapterConfig from individual fields.
+func AdapterConfigFromAmadeusFields(cmd, model string, timeoutSec int, repoDir string) ProviderAdapterConfig {
+	return ProviderAdapterConfig{
+		Cmd:        cmd,
+		Model:      model,
+		TimeoutSec: timeoutSec,
+		BaseDir:    repoDir,
+		ToolName:   "amadeus",
+	}
+}
