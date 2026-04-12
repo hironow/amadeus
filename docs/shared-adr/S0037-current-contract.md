@@ -85,6 +85,25 @@ When a second provider is onboarded:
 Until then, `claude_cmd` is the canonical operator-facing config key.
 Session-layer code (`ProviderAdapterConfig.Cmd`, `EnterConfig.ProviderCmd`) is already generic.
 
+### Claude-Specific Runtime Seams
+
+The following session-layer files are Claude CLI implementation-specific.
+They are NOT part of the provider-generic canonical surface.
+Second provider onboarding requires replacing or extending these:
+
+| File | Seam | What to replace |
+|------|------|-----------------|
+| `session_enter.go` | `buildIsolationFlags()` | Provider-specific subprocess flags |
+| `session_enter.go` | `ClaudeSettingsPath/Exists` | Provider settings discovery |
+| `session_enter.go` | `ResolveMCPConfigPath` | Provider MCP/tool config path |
+| `claude_adapter.go` | `ClaudeAdapter` struct | Provider CLI invocation + stream parsing |
+| `mcp_config.go` | `ResolveMCPConfigPath` | MCP config path resolution |
+| `doctor_claude.go` | `checkClaudeAuth` | Provider auth/health check |
+
+Generic surface (`EnterConfig.ProviderCmd`, `ProviderRunner` interface,
+`ProviderAdapterConfig`) is stable — only the implementations listed above
+are Claude-specific.
+
 ## Sessions CLI Contract
 
 Resolution order: `--path` → `--config` → `cwd`
@@ -157,5 +176,6 @@ When adding a new provider:
 5. Add stream normalization in `internal/platform/stream_normalizer.go`
 6. Add MCP config isolation in `internal/session/mcp_config.go`
 7. Add provider telemetry attributes in `internal/session/provider_telemetry.go`
-8. Update `tap/scripts/check_substrate_drift.sh` checksums
-9. Run `cd tap && just gap-check-ai-coding` on all 3 tools
+8. Replace or extend Claude-specific runtime seams (see "Claude-Specific Runtime Seams" section)
+9. Update `tap/scripts/check_substrate_drift.sh` checksums
+10. Run `cd tap && just gap-check-ai-coding` on all 3 tools

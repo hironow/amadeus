@@ -12,10 +12,10 @@ type RunOption func(*RunConfig)
 type RunConfig struct {
 	AllowedTools    []string
 	WorkDir         string // sets cmd.Dir for the subprocess
-	ConfigBase      string // base directory for resolving stateDir settings (defaults to WorkDir)
-	Continue        bool   // passes --continue to resume a prior session
+	ConfigBase      string // base directory for resolving provider-specific settings (defaults to WorkDir)
+	Continue        bool   // resume a prior session (implementation maps to provider-specific flag)
 	Model           string // overrides the default model for this invocation
-	ResumeSessionID string // passes --resume <id> to target a specific session (mutually exclusive with Continue)
+	ResumeSessionID string // target a specific provider session for continuation (mutually exclusive with Continue)
 	CodingSessionID string // our CodingSessionRecord.ID for stream event correlation
 }
 
@@ -28,7 +28,7 @@ func ApplyOptions(opts ...RunOption) RunConfig {
 	return c
 }
 
-// WithAllowedTools restricts the tools available to the Claude model.
+// WithAllowedTools restricts the tools available to the provider model.
 func WithAllowedTools(tools ...string) RunOption {
 	return func(c *RunConfig) {
 		c.AllowedTools = tools
@@ -42,7 +42,7 @@ func WithWorkDir(dir string) RunOption {
 	}
 }
 
-// WithContinue enables --continue mode to resume a prior provider session.
+// WithContinue enables continuation of a prior provider session.
 func WithContinue() RunOption {
 	return func(c *RunConfig) {
 		c.Continue = true
@@ -50,7 +50,7 @@ func WithContinue() RunOption {
 }
 
 // WithConfigBase sets the base directory for resolving tool stateDir settings
-// (e.g. .claude/settings.json under the stateDir). When unset, WorkDir is used.
+// (e.g. provider-specific settings under the stateDir). When unset, WorkDir is used.
 // Use this when WorkDir is a worktree that doesn't contain the stateDir.
 func WithConfigBase(dir string) RunOption {
 	return func(c *RunConfig) {
@@ -85,9 +85,6 @@ func WithResume(providerSessionID string) RunOption {
 // ProviderRunner executes an AI coding tool and returns the result text.
 // Provider-agnostic: implementations wrap any CLI (Claude, Codex, Copilot, etc.).
 // Implementations may stream intermediate output to w.
-//
-// TODO(rename): ProviderRunner → ProviderRunner — legacy name from Claude-only era.
-// The interface is fully provider-agnostic; rename blocked only by 40+ call sites.
 type ProviderRunner interface {
 	Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error)
 }

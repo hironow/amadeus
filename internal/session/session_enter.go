@@ -20,8 +20,9 @@ type EnterConfig struct {
 }
 
 // EnterSession launches the provider CLI in interactive mode with --resume.
-// stdin/stdout/stderr are connected to the user's TTY. This function does NOT
-// use ClaudeAdapter — it hands control to the user's terminal.
+// stdin/stdout/stderr are connected to the user's TTY.
+// This function uses Claude-specific isolation flags (see S0037 runtime seams).
+// It hands control to the user's terminal.
 func EnterSession(ctx context.Context, cfg EnterConfig) error {
 	if cfg.WorkDir == "" {
 		return fmt.Errorf("EnterSession: WorkDir is required to prevent CWD drift")
