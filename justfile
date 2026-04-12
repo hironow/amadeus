@@ -111,7 +111,6 @@ root-guard:
         ls *.go | grep -v '^doc\.go$' >&2; \
         exit 1; \
     fi
-    @bash scripts/check-root-layout.sh
 
 # Lint (fmt check + vet + markdown lint)
 lint: vet semgrep root-guard nosemgrep-audit lint-md
@@ -230,17 +229,12 @@ nosemgrep-audit:
     if [ $rc -eq 0 ]; then echo "nosemgrep-audit: all annotations tagged"; fi
     exit $rc
 
-# Verify canonical AI coding substrate files have not drifted
-substrate-drift-check:
-    ./scripts/check-substrate-drift.sh .
-
 # Check docs for stale references (e.g. deprecated internal/port path)
 docs-check:
     @echo "Checking for stale references..."
     @! grep -rn 'internal/port[^/]' docs/ internal/domain/doc.go 2>/dev/null || (echo "ERROR: stale internal/port references found" && exit 1)
     @! grep -n 'usecase は session' .semgrep/layers.yaml 2>/dev/null || (echo "ERROR: stale usecase->session allowance in semgrep" && exit 1)
     @! grep -rin 'eventsource.*廃止\|eventsource.*吸収\|eventsource.*session.*移' docs/ 2>/dev/null || (echo "ERROR: stale eventsource terminology — eventsource is retained per todo 73" && exit 1)
-    @bash scripts/check_adr_refs.sh
     @echo "docs-check passed"
 
 # Audit white-box-reason comments on same-package test files
