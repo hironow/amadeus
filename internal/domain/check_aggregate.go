@@ -19,6 +19,7 @@ type CheckAggregate struct {
 	checkCount        int
 	forceFullNext     bool
 	cooldownRemaining int
+	seqNr             uint64
 }
 
 // NewCheckAggregate creates a new CheckAggregate with the given config.
@@ -102,15 +103,27 @@ func (a *CheckAggregate) ShouldPromoteToFull(previousDivergence, currentDivergen
 	return delta >= a.config.FullCheck.OnDivergenceJump
 }
 
+// nextEvent creates an event tagged with check aggregate identity.
+func (a *CheckAggregate) nextEvent(eventType EventType, data any, now time.Time) (Event, error) {
+	a.seqNr++
+	ev, err := NewEvent(eventType, data, now)
+	if err != nil {
+		return ev, err
+	}
+	ev.AggregateType = AggregateTypeCheck
+	ev.SeqNr = a.seqNr
+	return ev, nil
+}
+
 // RecordInboxConsumed produces an inbox.consumed event.
 func (a *CheckAggregate) RecordInboxConsumed(data InboxConsumedData, now time.Time) (Event, error) {
-	return NewEvent(EventInboxConsumed, data, now)
+	return a.nextEvent(EventInboxConsumed, data, now)
 }
 
 // RecordForceFullNextSet produces a force.full.next.set event and sets the flag.
 func (a *CheckAggregate) RecordForceFullNextSet(prevDiv, currDiv float64, now time.Time) (Event, error) {
 	a.forceFullNext = true
-	return NewEvent(EventForceFullNextSet, ForceFullNextSetData{
+	return a.nextEvent(EventForceFullNextSet, ForceFullNextSetData{
 		PreviousDivergence: prevDiv,
 		CurrentDivergence:  currDiv,
 	}, now)
@@ -118,44 +131,44 @@ func (a *CheckAggregate) RecordForceFullNextSet(prevDiv, currDiv float64, now ti
 
 // RecordDMailGenerated produces a dmail.generated event.
 func (a *CheckAggregate) RecordDMailGenerated(dmail DMail, now time.Time) (Event, error) {
-	return NewEvent(EventDMailGenerated, DMailGeneratedData{DMail: dmail}, now)
+	return a.nextEvent(EventDMailGenerated, DMailGeneratedData{DMail: dmail}, now)
 }
 
 // RecordConvergenceDetected produces a convergence.detected event.
 func (a *CheckAggregate) RecordConvergenceDetected(alert ConvergenceAlert, now time.Time) (Event, error) {
-	return NewEvent(EventConvergenceDetected, ConvergenceDetectedData{Alert: alert}, now)
+	return a.nextEvent(EventConvergenceDetected, ConvergenceDetectedData{Alert: alert}, now)
 }
 
 // RecordDMailCommented produces a dmail.commented event.
 func (a *CheckAggregate) RecordDMailCommented(dmailName, issueID string, now time.Time) (Event, error) {
-	return NewEvent(EventDMailCommented, DMailCommentedData{
+	return a.nextEvent(EventDMailCommented, DMailCommentedData{
 		DMail: dmailName, IssueID: issueID,
 	}, now)
 }
 
 // RecordRunStarted produces a run.started event.
 func (a *CheckAggregate) RecordRunStarted(data RunStartedData, now time.Time) (Event, error) {
-	return NewEvent(EventRunStarted, data, now)
+	return a.nextEvent(EventRunStarted, data, now)
 }
 
 // RecordRunStopped produces a run.stopped event.
 func (a *CheckAggregate) RecordRunStopped(data RunStoppedData, now time.Time) (Event, error) {
-	return NewEvent(EventRunStopped, data, now)
+	return a.nextEvent(EventRunStopped, data, now)
 }
 
 // RecordPRConvergenceChecked produces a pr.convergence.checked event.
 func (a *CheckAggregate) RecordPRConvergenceChecked(data PRConvergenceCheckedData, now time.Time) (Event, error) {
-	return NewEvent(EventPRConvergenceChecked, data, now)
+	return a.nextEvent(EventPRConvergenceChecked, data, now)
 }
 
 // RecordPRMerged produces a pr.merged event.
 func (a *CheckAggregate) RecordPRMerged(data PRMergedData, now time.Time) (Event, error) {
-	return NewEvent(EventPRMerged, data, now)
+	return a.nextEvent(EventPRMerged, data, now)
 }
 
 // RecordPRMergeSkipped produces a pr.merge.skipped event.
 func (a *CheckAggregate) RecordPRMergeSkipped(data PRMergeSkippedData, now time.Time) (Event, error) {
-	return NewEvent(EventPRMergeSkipped, data, now)
+	return a.nextEvent(EventPRMergeSkipped, data, now)
 }
 
 // RecordCheck produces events for a completed check result.
@@ -167,14 +180,14 @@ func (a *CheckAggregate) RecordCheck(result CheckResult, now time.Time) ([]Event
 	result.CooldownRemaining = a.cooldownRemaining
 	a.forceFullNext = false
 
-	checkEv, err := NewEvent(EventCheckCompleted, CheckCompletedData{Result: result}, now)
+	checkEv, err := a.nextEvent(EventCheckCompleted, CheckCompletedData{Result: result}, now)
 	if err != nil {
 		return nil, err
 	}
 	events := []Event{checkEv}
 
 	if result.Type == CheckTypeFull && !result.GateDenied {
-		baselineEv, bErr := NewEvent(EventBaselineUpdated, BaselineUpdatedData{
+		baselineEv, bErr := a.nextEvent(EventBaselineUpdated, BaselineUpdatedData{
 			Commit: result.Commit, Divergence: result.Divergence,
 		}, now)
 		if bErr != nil {
