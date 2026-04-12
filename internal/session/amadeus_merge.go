@@ -167,7 +167,7 @@ func (a *Amadeus) tryMergePR(ctx context.Context, mc *mergeCandidate) bool {
 }
 
 func (a *Amadeus) emitMerged(ctx context.Context, pr domain.PRState, method domain.MergeMethod, now time.Time) error {
-	return a.Emitter.EmitPRMerged(ctx, domain.PRMergedData{
+	return a.Emitter.EmitPRMerged(domain.PRMergedData{
 		PRNumber: pr.Number(),
 		Title:    pr.Title(),
 		Method:   string(method),
@@ -200,13 +200,13 @@ func (a *Amadeus) emitConflictDMail(ctx context.Context, pr domain.PRState, now 
 		return
 	}
 	domain.LogBanner(a.Logger, domain.BannerSend, string(dmail.Kind), dmail.Name, dmail.Description)
-	if err := a.Emitter.EmitDMailGenerated(ctx, dmail, now); err != nil {
+	if err := a.Emitter.EmitDMailGenerated(dmail, now); err != nil {
 		a.Logger.Warn("auto-merge: emit conflict D-Mail for %s: %v", pr.Number(), err)
 	}
 }
 
 func (a *Amadeus) emitMergeSkipped(ctx context.Context, pr domain.PRState, reasons []string, now time.Time) error {
-	return a.Emitter.EmitPRMergeSkipped(ctx, domain.PRMergeSkippedData{
+	return a.Emitter.EmitPRMergeSkipped(domain.PRMergeSkippedData{
 		PRNumber: pr.Number(),
 		Title:    pr.Title(),
 		Reasons:  reasons,

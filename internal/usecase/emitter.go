@@ -20,17 +20,22 @@ type checkEventEmitter struct {
 	projector     port.ContextEventApplier
 	dispatcher    port.EventDispatcher
 	logger        domain.Logger
+	checkID       string // enriches events with correlation metadata
+	prevID        string // previous event ID for causation chain
+	ctx           context.Context //nolint:containedctx // stored for trace propagation into emit chain
 }
 
 // NewCheckEventEmitter creates a CheckEventEmitter that wraps the aggregate event chain.
 // seqAlloc is optional — pass nil to skip global SeqNr assignment.
 func NewCheckEventEmitter(
+	ctx context.Context,
 	agg *domain.CheckAggregate,
 	store port.EventStore,
 	projector port.ContextEventApplier,
 	dispatcher port.EventDispatcher,
 	seqAlloc port.SeqAllocator,
 	logger domain.Logger,
+	checkID string,
 ) port.CheckEventEmitter {
 	return &checkEventEmitter{
 		agg:        agg,
@@ -39,18 +44,24 @@ func NewCheckEventEmitter(
 		projector:  projector,
 		dispatcher: dispatcher,
 		logger:     logger,
+		checkID:    checkID,
+		ctx:        ctx,
 	}
 }
 
 // emit persists events and applies projections, then dispatches (best-effort).
 // At least one of store or projector must be non-nil to prevent silent data loss.
-func (e *checkEventEmitter) emit(ctx context.Context, events ...domain.Event) error {
+func (e *checkEventEmitter) emit(events ...domain.Event) error {
+	ctx := e.ctx
 	if e.store == nil && e.projector == nil {
 		return fmt.Errorf("emit: neither EventStore nor Projector is configured — state would not be persisted")
 	}
-	// Tag events with aggregate identity and global SeqNr
+	// Enrich events with correlation metadata and global SeqNr
 	for i := range events {
-		events[i].AggregateType = domain.AggregateTypeCheck
+		events[i].CorrelationID = e.checkID
+		if e.prevID != "" {
+			events[i].CausationID = e.prevID
+		}
 		if e.seqAlloc != nil {
 			seq, err := e.seqAlloc.AllocSeqNr(ctx)
 			if err != nil {
@@ -69,6 +80,10 @@ func (e *checkEventEmitter) emit(ctx context.Context, events ...domain.Event) er
 			return fmt.Errorf("append events: %w", err)
 		}
 	}
+	// Update causation chain after successful store
+	if len(events) > 0 {
+		e.prevID = events[len(events)-1].ID
+	}
 	if e.projector != nil {
 		for _, ev := range events {
 			if err := e.projector.Apply(ctx, ev); err != nil {
@@ -86,92 +101,92 @@ func (e *checkEventEmitter) emit(ctx context.Context, events ...domain.Event) er
 	return nil
 }
 
-func (e *checkEventEmitter) EmitInboxConsumed(ctx context.Context, data domain.InboxConsumedData, now time.Time) error {
+func (e *checkEventEmitter) EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error {
 	ev, err := e.agg.RecordInboxConsumed(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitForceFullNextSet(ctx context.Context, prevDiv, currDiv float64, now time.Time) error {
+func (e *checkEventEmitter) EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error {
 	ev, err := e.agg.RecordForceFullNextSet(prevDiv, currDiv, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitDMailGenerated(ctx context.Context, dmail domain.DMail, now time.Time) error {
+func (e *checkEventEmitter) EmitDMailGenerated(dmail domain.DMail, now time.Time) error {
 	ev, err := e.agg.RecordDMailGenerated(dmail, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitConvergenceDetected(ctx context.Context, alert domain.ConvergenceAlert, now time.Time) error {
+func (e *checkEventEmitter) EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error {
 	ev, err := e.agg.RecordConvergenceDetected(alert, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitDMailCommented(ctx context.Context, dmailName, issueID string, now time.Time) error {
+func (e *checkEventEmitter) EmitDMailCommented(dmailName, issueID string, now time.Time) error {
 	ev, err := e.agg.RecordDMailCommented(dmailName, issueID, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitCheck(ctx context.Context, result domain.CheckResult, now time.Time) error {
+func (e *checkEventEmitter) EmitCheck(result domain.CheckResult, now time.Time) error {
 	events, err := e.agg.RecordCheck(result, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, events...)
+	return e.emit(events...)
 }
 
-func (e *checkEventEmitter) EmitRunStarted(ctx context.Context, data domain.RunStartedData, now time.Time) error {
+func (e *checkEventEmitter) EmitRunStarted(data domain.RunStartedData, now time.Time) error {
 	ev, err := e.agg.RecordRunStarted(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitRunStopped(ctx context.Context, data domain.RunStoppedData, now time.Time) error {
+func (e *checkEventEmitter) EmitRunStopped(data domain.RunStoppedData, now time.Time) error {
 	ev, err := e.agg.RecordRunStopped(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitPRConvergenceChecked(ctx context.Context, data domain.PRConvergenceCheckedData, now time.Time) error {
+func (e *checkEventEmitter) EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error {
 	ev, err := e.agg.RecordPRConvergenceChecked(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitPRMerged(ctx context.Context, data domain.PRMergedData, now time.Time) error {
+func (e *checkEventEmitter) EmitPRMerged(data domain.PRMergedData, now time.Time) error {
 	ev, err := e.agg.RecordPRMerged(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
-func (e *checkEventEmitter) EmitPRMergeSkipped(ctx context.Context, data domain.PRMergeSkippedData, now time.Time) error {
+func (e *checkEventEmitter) EmitPRMergeSkipped(data domain.PRMergeSkippedData, now time.Time) error {
 	ev, err := e.agg.RecordPRMergeSkipped(data, now)
 	if err != nil {
 		return err
 	}
-	return e.emit(ctx, ev)
+	return e.emit(ev)
 }
 
 // checkStateProvider implements port.CheckStateProvider.

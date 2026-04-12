@@ -15,6 +15,7 @@ const AggregateTypeCheck = "check"
 // It owns the check count, force-full-next flag, and previous result state,
 // enforcing invariants and producing events as return values (no side effects).
 type CheckAggregate struct {
+	checkID           string
 	config            Config
 	checkCount        int
 	forceFullNext     bool
@@ -25,6 +26,16 @@ type CheckAggregate struct {
 // NewCheckAggregate creates a new CheckAggregate with the given config.
 func NewCheckAggregate(cfg Config) *CheckAggregate {
 	return &CheckAggregate{config: cfg}
+}
+
+// SetCheckID sets the check ID (used for event correlation).
+func (a *CheckAggregate) SetCheckID(id string) {
+	a.checkID = id
+}
+
+// CheckID returns the current check ID.
+func (a *CheckAggregate) CheckID() string {
+	return a.checkID
 }
 
 // Restore hydrates the aggregate from a persisted CheckResult projection.
@@ -110,6 +121,7 @@ func (a *CheckAggregate) nextEvent(eventType EventType, data any, now time.Time)
 	if err != nil {
 		return ev, err
 	}
+	ev.AggregateID = a.checkID
 	ev.AggregateType = AggregateTypeCheck
 	ev.SeqNr = a.seqNr
 	return ev, nil

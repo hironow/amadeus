@@ -246,17 +246,17 @@ type ArchiveOps interface {
 // Implemented in usecase layer, injected into session by usecase.RunCheck.
 // Emit chain: agg.Record*() → store.Append() → projector.Apply() → dispatch (best-effort).
 type CheckEventEmitter interface {
-	EmitInboxConsumed(ctx context.Context, data domain.InboxConsumedData, now time.Time) error
-	EmitForceFullNextSet(ctx context.Context, prevDiv, currDiv float64, now time.Time) error
-	EmitDMailGenerated(ctx context.Context, dmail domain.DMail, now time.Time) error
-	EmitConvergenceDetected(ctx context.Context, alert domain.ConvergenceAlert, now time.Time) error
-	EmitDMailCommented(ctx context.Context, dmailName, issueID string, now time.Time) error
-	EmitCheck(ctx context.Context, result domain.CheckResult, now time.Time) error
-	EmitRunStarted(ctx context.Context, data domain.RunStartedData, now time.Time) error
-	EmitRunStopped(ctx context.Context, data domain.RunStoppedData, now time.Time) error
-	EmitPRConvergenceChecked(ctx context.Context, data domain.PRConvergenceCheckedData, now time.Time) error
-	EmitPRMerged(ctx context.Context, data domain.PRMergedData, now time.Time) error
-	EmitPRMergeSkipped(ctx context.Context, data domain.PRMergeSkippedData, now time.Time) error
+	EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error
+	EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error
+	EmitDMailGenerated(dmail domain.DMail, now time.Time) error
+	EmitConvergenceDetected(alert domain.ConvergenceAlert, now time.Time) error
+	EmitDMailCommented(dmailName, issueID string, now time.Time) error
+	EmitCheck(result domain.CheckResult, now time.Time) error
+	EmitRunStarted(data domain.RunStartedData, now time.Time) error
+	EmitRunStopped(data domain.RunStoppedData, now time.Time) error
+	EmitPRConvergenceChecked(data domain.PRConvergenceCheckedData, now time.Time) error
+	EmitPRMerged(data domain.PRMergedData, now time.Time) error
+	EmitPRMergeSkipped(data domain.PRMergeSkippedData, now time.Time) error
 }
 
 // CheckStateProvider provides aggregate state read/write without exposing the aggregate type.

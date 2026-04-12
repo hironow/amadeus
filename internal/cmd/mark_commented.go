@@ -61,7 +61,7 @@ func newMarkCommentedCommand() *cobra.Command {
 			cfg := domain.DefaultConfig()
 
 			agg := domain.NewCheckAggregate(cfg)
-			emitter := usecase.NewCheckEventEmitter(agg, eventStore, projector, nil, nil, logger)
+			emitter := usecase.NewCheckEventEmitter(cmd.Context(), agg, eventStore, projector, nil, nil, logger, "")
 
 			a := &session.Amadeus{
 				Config:    cfg,

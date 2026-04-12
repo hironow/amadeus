@@ -2,6 +2,9 @@ package usecase
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/usecase/port"
@@ -33,7 +36,9 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	registerCheckPolicies(engine, logger, notifier, metrics, dispatcher)
 
 	// Create EventEmitter + StateManager wrapping the aggregate
-	emitter := NewCheckEventEmitter(agg, pipeline.EventStore(), pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger)
+	checkID := fmt.Sprintf("check-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	agg.SetCheckID(checkID)
+	emitter := NewCheckEventEmitter(ctx, agg, pipeline.EventStore(), pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger, checkID)
 	state := NewCheckStateProvider(agg)
 
 	// Delegate to session I/O pipeline via Orchestrator interface

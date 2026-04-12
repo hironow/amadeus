@@ -337,7 +337,7 @@ func (a *Amadeus) runDivergenceMeter(ctx context.Context, prompt string, fullChe
 			a.Logger.Info("Divergence jump detected (%.2f -> %.2f), next run will trigger full calibration",
 				previous.Divergence, meterResult.Divergence.Value)
 		}
-		if err := a.Emitter.EmitForceFullNextSet(ctx, previous.Divergence, meterResult.Divergence.Value, time.Now().UTC()); err != nil {
+		if err := a.Emitter.EmitForceFullNextSet(previous.Divergence, meterResult.Divergence.Value, time.Now().UTC()); err != nil {
 			span2.End()
 			return domain.MeterResult{}, fmt.Errorf("emit force_full_next: %w", err)
 		}

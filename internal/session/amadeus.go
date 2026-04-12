@@ -294,7 +294,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		noShiftResult.PRsEvaluated = nil
 		noShiftResult.DMails = nil
 		noShiftResult.ConvergenceAlerts = nil
-		if err := a.Emitter.EmitCheck(ctx, noShiftResult, now); err != nil {
+		if err := a.Emitter.EmitCheck(noShiftResult, now); err != nil {
 			return fmt.Errorf("emit check (no shift): %w", err)
 		}
 		platform.RecordCheck(ctx, "clean")
@@ -373,7 +373,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 			Axes:       meterResult.Divergence.Axes,
 			GateDenied: true,
 		}
-		if err := a.Emitter.EmitCheck(ctx, gateDeniedResult, now); err != nil {
+		if err := a.Emitter.EmitCheck(gateDeniedResult, now); err != nil {
 			return fmt.Errorf("emit check (gate denied): %w", err)
 		}
 		platform.RecordCheck(ctx, "drift")
@@ -436,7 +436,7 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 		ADRAlignment:      meterResult.Divergence.ADRAlignment, // E19: per-ADR scores
 	}
 
-	if err := a.Emitter.EmitCheck(ctx, result, now); err != nil {
+	if err := a.Emitter.EmitCheck(result, now); err != nil {
 		return fmt.Errorf("emit check completed: %w", err)
 	}
 	if len(dmails) > 0 {
@@ -478,5 +478,5 @@ func (a *Amadeus) RunCheck(ctx context.Context, opts domain.CheckOptions, emitte
 
 // MarkCommented records that a D-Mail x Issue pair has been posted as a comment.
 func (a *Amadeus) MarkCommented(ctx context.Context, dmailName, issueID string) error {
-	return a.Emitter.EmitDMailCommented(ctx, dmailName, issueID, time.Now().UTC())
+	return a.Emitter.EmitDMailCommented(dmailName, issueID, time.Now().UTC())
 }

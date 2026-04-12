@@ -347,36 +347,36 @@ func (c *countingProviderRunner) Run(_ context.Context, _ string, _ io.Writer, _
 // nopReviewEmitter is a minimal CheckEventEmitter for PR review tests.
 type nopReviewEmitter struct{}
 
-func (n *nopReviewEmitter) EmitInboxConsumed(_ context.Context, _ domain.InboxConsumedData, _ time.Time) error {
+func (n *nopReviewEmitter) EmitInboxConsumed(_ domain.InboxConsumedData, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitForceFullNextSet(_ context.Context, _, _ float64, _ time.Time) error {
+func (n *nopReviewEmitter) EmitForceFullNextSet(_, _ float64, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitDMailGenerated(_ context.Context, _ domain.DMail, _ time.Time) error {
+func (n *nopReviewEmitter) EmitDMailGenerated(_ domain.DMail, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitConvergenceDetected(_ context.Context, _ domain.ConvergenceAlert, _ time.Time) error {
+func (n *nopReviewEmitter) EmitConvergenceDetected(_ domain.ConvergenceAlert, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitDMailCommented(_ context.Context, _, _ string, _ time.Time) error {
+func (n *nopReviewEmitter) EmitDMailCommented(_, _ string, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitCheck(_ context.Context, _ domain.CheckResult, _ time.Time) error {
+func (n *nopReviewEmitter) EmitCheck(_ domain.CheckResult, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitRunStarted(_ context.Context, _ domain.RunStartedData, _ time.Time) error {
+func (n *nopReviewEmitter) EmitRunStarted(_ domain.RunStartedData, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitRunStopped(_ context.Context, _ domain.RunStoppedData, _ time.Time) error {
+func (n *nopReviewEmitter) EmitRunStopped(_ domain.RunStoppedData, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitPRConvergenceChecked(_ context.Context, _ domain.PRConvergenceCheckedData, _ time.Time) error {
+func (n *nopReviewEmitter) EmitPRConvergenceChecked(_ domain.PRConvergenceCheckedData, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitPRMerged(_ context.Context, _ domain.PRMergedData, _ time.Time) error {
+func (n *nopReviewEmitter) EmitPRMerged(_ domain.PRMergedData, _ time.Time) error {
 	return nil
 }
-func (n *nopReviewEmitter) EmitPRMergeSkipped(_ context.Context, _ domain.PRMergeSkippedData, _ time.Time) error {
+func (n *nopReviewEmitter) EmitPRMergeSkipped(_ domain.PRMergeSkippedData, _ time.Time) error {
 	return nil
 }

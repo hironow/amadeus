@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/usecase/port"
@@ -42,7 +44,9 @@ func Run(ctx context.Context, _ domain.ExecuteRunCommand, opts domain.RunOptions
 	registerCheckPolicies(engine, logger, notifier, metrics, dispatcher)
 
 	// Create EventEmitter + StateProvider wrapping the aggregate
-	emitter := NewCheckEventEmitter(agg, store, pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger)
+	checkID := fmt.Sprintf("run-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	agg.SetCheckID(checkID)
+	emitter := NewCheckEventEmitter(ctx, agg, store, pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger, checkID)
 	state := NewCheckStateProvider(agg)
 
 	// Wire PRPipelineRunner if prReader is available
