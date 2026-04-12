@@ -1,4 +1,5 @@
-package session_test
+// white-box-reason: tests unexported doctor check functions (checkClaudeAuth, checkLinearMCP, etc.)
+package session
 
 import (
 	"context"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
-	"github.com/hironow/amadeus/internal/session"
 	"gopkg.in/yaml.v3"
 )
 
@@ -42,7 +42,7 @@ func buildFakeClaude(t *testing.T) string {
 	return binPath
 }
 
-// setupTestTracer is exposed via session.ExportSetupTestTracer from export_test.go.
+// setupTestTracer is exposed via ExportSetupTestTracer from export_test.go.
 
 // initGateDirForTest creates a minimal .gate/ directory structure for doctor tests.
 func initGateDirForTest(t *testing.T, root string) {
@@ -118,7 +118,7 @@ func TestCheckStatusLabel(t *testing.T) {
 
 func TestCheckTool_Exists(t *testing.T) {
 	ctx := context.Background()
-	result := session.CheckTool(ctx, "git")
+	result := CheckTool(ctx, "git")
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK for 'git', got %v: %s", result.Status, result.Message)
 	}
@@ -129,7 +129,7 @@ func TestCheckTool_Exists(t *testing.T) {
 
 func TestCheckTool_NotFound(t *testing.T) {
 	ctx := context.Background()
-	result := session.CheckTool(ctx, "nonexistent-tool-xyz-12345")
+	result := CheckTool(ctx, "nonexistent-tool-xyz-12345")
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -144,7 +144,7 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("git init: %v", err)
 	}
-	result := session.CheckGitRepo(dir)
+	result := CheckGitRepo(dir)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
@@ -152,7 +152,7 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 
 func TestCheckGitRepo_NotRepo(t *testing.T) {
 	dir := t.TempDir()
-	result := session.CheckGitRepo(dir)
+	result := CheckGitRepo(dir)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -162,7 +162,7 @@ func TestCheckGateDir_Exists(t *testing.T) {
 	dir := t.TempDir()
 	divRoot := filepath.Join(dir, ".gate")
 	os.MkdirAll(divRoot, 0o755)
-	result := session.CheckGateDir(dir, false)
+	result := CheckGateDir(dir, false)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
@@ -170,7 +170,7 @@ func TestCheckGateDir_Exists(t *testing.T) {
 
 func TestCheckGateDir_NotExist(t *testing.T) {
 	dir := t.TempDir()
-	result := session.CheckGateDir(dir, false)
+	result := CheckGateDir(dir, false)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -178,7 +178,7 @@ func TestCheckGateDir_NotExist(t *testing.T) {
 
 func TestCheckGateDir_RepairCreatesMissing(t *testing.T) {
 	dir := t.TempDir()
-	result := session.CheckGateDir(dir, true)
+	result := CheckGateDir(dir, true)
 	if result.Status != domain.CheckFixed {
 		t.Errorf("expected domain.CheckFixed, got %v: %s", result.Status, result.Message)
 	}
@@ -192,7 +192,7 @@ func TestCheckClaudeAuth_Authenticated(t *testing.T) {
 	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - \u2713 Connected"
 
 	// when
-	result := session.CheckClaudeAuth(mcpOutput, nil, "claude")
+	result := checkClaudeAuth(mcpOutput, nil, "claude")
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -208,7 +208,7 @@ func TestCheckClaudeAuth_NotAuthenticated(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := session.CheckClaudeAuth("", mcpErr, "claude")
+	result := checkClaudeAuth("", mcpErr, "claude")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -224,7 +224,7 @@ func TestCheckClaudeAuth_NotAuthenticated_WithEnvPrefix(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := session.CheckClaudeAuth("", mcpErr, "CLAUDE_CONFIG_DIR=/foo claude")
+	result := checkClaudeAuth("", mcpErr, "CLAUDE_CONFIG_DIR=/foo claude")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -243,7 +243,7 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - \u2713 Connected"
 
 	// when
-	result := session.CheckLinearMCP(mcpOutput, nil)
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -256,7 +256,7 @@ func TestCheckLinearMCP_NotConnected(t *testing.T) {
 	mcpOutput := "some-other-mcp: https://example.com - \u2713 Connected"
 
 	// when
-	result := session.CheckLinearMCP(mcpOutput, nil)
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -269,7 +269,7 @@ func TestCheckLinearMCP_CommandFails(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	result := session.CheckLinearMCP("", mcpErr)
+	result := checkLinearMCP("", mcpErr)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -282,7 +282,7 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - \u2717 Disconnected"
 
 	// when
-	result := session.CheckLinearMCP(mcpOutput, nil)
+	result := checkLinearMCP(mcpOutput, nil)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -296,14 +296,14 @@ func TestCheckConfig_Valid(t *testing.T) {
 	cfg := domain.DefaultConfig()
 	data, _ := yaml.Marshal(cfg)
 	os.WriteFile(path, data, 0o644)
-	result := session.CheckConfig(path)
+	result := CheckConfig(path)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected domain.CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckConfig_NotFound(t *testing.T) {
-	result := session.CheckConfig("/nonexistent/config.yaml")
+	result := CheckConfig("/nonexistent/config.yaml")
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -313,7 +313,7 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 	os.WriteFile(path, []byte(`{{{invalid`), 0o644)
-	result := session.CheckConfig(path)
+	result := CheckConfig(path)
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected domain.CheckFail, got %v: %s", result.Status, result.Message)
 	}
@@ -321,11 +321,11 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock commands succeed
-	cleanupCmd := session.OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
-	cleanupPath := session.OverrideLookPath(func(cmdLine string) (string, error) {
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
 	})
 	defer cleanupPath()
@@ -345,7 +345,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := session.RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: should have 19 results
 	if len(results) != 19 {
@@ -366,12 +366,12 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 
 func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	// given: mock commands succeed
-	exp := session.ExportSetupTestTracer(t)
-	cleanupCmd := session.OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	exp := ExportSetupTestTracer(t)
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
-	cleanupPath := session.OverrideLookPath(func(cmdLine string) (string, error) {
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
 	})
 	defer cleanupPath()
@@ -387,7 +387,7 @@ func TestRunDoctor_CreatesSpanWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	session.RunDoctorWithClaudeCmd(ctx, filepath.Join(divRoot, "config.yaml"), dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
+	RunDoctorWithClaudeCmd(ctx, filepath.Join(divRoot, "config.yaml"), dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: domain.doctor span should exist
 	spans := exp.GetSpans()
@@ -419,7 +419,7 @@ func TestCheckSkillMD_BothExist(t *testing.T) {
 	initGateDirForTest(t, root)
 
 	// when
-	result := session.CheckSkillMD(dir)
+	result := checkSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -435,7 +435,7 @@ func TestCheckSkillMD_MissingSendable(t *testing.T) {
 	os.Remove(filepath.Join(root, "skills", "dmail-sendable", "SKILL.md"))
 
 	// when
-	result := session.CheckSkillMD(dir)
+	result := checkSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -451,7 +451,7 @@ func TestCheckSkillMD_NoGateDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := session.CheckSkillMD(dir)
+	result := checkSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -469,7 +469,7 @@ func TestCheckSkillMD_DeprecatedFeedbackKind(t *testing.T) {
 		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: feedback\n---\n"), 0o644)
 
 	// when
-	result := session.CheckSkillMD(dir)
+	result := checkSkillMD(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -487,7 +487,7 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 	initGateDirForTest(t, root)
 
 	// when
-	result := session.CheckSkillMD(dir)
+	result := checkSkillMD(dir)
 
 	// then: templates already have updated kinds
 	if result.Status != domain.CheckOK {
@@ -497,11 +497,11 @@ func TestCheckSkillMD_UpdatedFeedbackKind(t *testing.T) {
 
 func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	// given: mock commands succeed
-	cleanupCmd := session.OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
-	cleanupPath := session.OverrideLookPath(func(cmdLine string) (string, error) {
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
 	})
 	defer cleanupPath()
@@ -515,7 +515,7 @@ func TestRunDoctor_IncludesSkillMDCheck(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := session.RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: should have 19 results
 	if len(results) != 19 {
@@ -558,7 +558,7 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when: pass a nonexistent claude command
-	results := session.RunDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, "nonexistent-claude-xyz", &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: claude-auth, Linear MCP, and claude-inference should be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -595,7 +595,7 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 	// given: claude binary exists but mcp list fails
 	callCount := 0
-	cleanupCmd := session.OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		callCount++
 		// First call: mcp list -> fail
 		for _, arg := range args {
@@ -611,7 +611,7 @@ func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 		return exec.Command("echo", "1.0.0")
 	})
 	defer cleanupCmd()
-	cleanupPath := session.OverrideLookPath(func(cmdLine string) (string, error) {
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
 	})
 	defer cleanupPath()
@@ -628,7 +628,7 @@ func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 	configPath := filepath.Join(divRoot, "config.yaml")
 
 	// when
-	results := session.RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, dir, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: claude-auth should WARN, linear-mcp should SKIP, but inference should NOT be skipped
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -660,7 +660,7 @@ func TestCheckDMailSchema_EmptyArchive(t *testing.T) {
 	initGateDirForTest(t, root)
 
 	// when
-	result := session.CheckDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then: skip -- no D-Mails to validate
 	if result.Status != domain.CheckSkip {
@@ -691,7 +691,7 @@ func TestCheckDMailSchema_ValidDMails(t *testing.T) {
 	}
 
 	// when
-	result := session.CheckDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -708,7 +708,7 @@ func TestCheckDMailSchema_InvalidDMail(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "archive", "feedback-001.md"), content, 0o644)
 
 	// when
-	result := session.CheckDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -722,7 +722,7 @@ func TestCheckDMailSchema_NoGateDir(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 
 	// when
-	result := session.CheckDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then: skip -- archive doesn't exist yet
 	if result.Status != domain.CheckSkip {
@@ -740,7 +740,7 @@ func TestCheckDMailSchema_ArchivePermissionError(t *testing.T) {
 	defer os.Chmod(archiveDir, 0o755)
 
 	// when
-	result := session.CheckDMailSchema(root)
+	result := CheckDMailSchema(root)
 
 	// then: FAIL -- permission error should not be masked
 	if result.Status != domain.CheckFail {
@@ -753,7 +753,7 @@ func TestCheckTool_GH(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckTool(ctx, "gh")
+	result := CheckTool(ctx, "gh")
 
 	// then: gh should be available in the test environment
 	if result.Status != domain.CheckOK {
@@ -771,7 +771,7 @@ func TestCheckGitRemote_HasRemote(t *testing.T) {
 	exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/example/repo.git").Run()
 
 	// when
-	result := session.CheckGitRemote(dir)
+	result := CheckGitRemote(dir)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -788,7 +788,7 @@ func TestCheckGitRemote_NoRemote(t *testing.T) {
 	exec.Command("git", "init", dir).Run()
 
 	// when
-	result := session.CheckGitRemote(dir)
+	result := CheckGitRemote(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -804,7 +804,7 @@ func TestCheckGitRemote_NotGitRepo(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := session.CheckGitRemote(dir)
+	result := CheckGitRemote(dir)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -814,7 +814,7 @@ func TestCheckGitRemote_NotGitRepo(t *testing.T) {
 
 func TestCheckFsnotify_Available(t *testing.T) {
 	// when
-	result := session.CheckFsnotify()
+	result := CheckFsnotify()
 
 	// then: should succeed on any normal test environment
 	if result.Status != domain.CheckOK {
@@ -827,11 +827,11 @@ func TestCheckFsnotify_Available(t *testing.T) {
 
 func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	// given: mock commands succeed
-	cleanupCmd := session.OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	cleanupCmd := OverrideShellCmd(func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "plugin:linear:linear: - \u2713 Connected")
 	})
 	defer cleanupCmd()
-	cleanupPath := session.OverrideLookPath(func(cmdLine string) (string, error) {
+	cleanupPath := OverrideLookPath(func(cmdLine string) (string, error) {
 		return "/usr/local/bin/" + cmdLine, nil
 	})
 	defer cleanupPath()
@@ -867,7 +867,7 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 
 	// Use a real success-rate checker that reads events
 	realSuccessRateChecker := func(gateDir string, logger domain.Logger) domain.DoctorCheck {
-		eventStore := session.NewEventStore(gateDir, logger)
+		eventStore := NewEventStore(gateDir, logger)
 		events, _, loadErr := eventStore.LoadAll(context.Background())
 		if loadErr != nil || len(events) == 0 {
 			return domain.DoctorCheck{
@@ -897,7 +897,7 @@ func TestRunDoctor_IncludesSuccessRate(t *testing.T) {
 	}
 
 	// when
-	results := session.RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, realSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, domain.DefaultClaudeCmd, &domain.NopLogger{}, false, domain.ModeLinear, realSuccessRateChecker)
 
 	// then: success-rate check should be present
 	var found bool
@@ -931,7 +931,7 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	configPath := filepath.Join(gateDir, "config.yaml")
 
 	// when
-	results := session.RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(ctx, configPath, repoRoot, fakeClaude, &domain.NopLogger{}, false, domain.ModeLinear, nopSuccessRateChecker)
 
 	// then: claude-auth, linear-mcp, and claude-inference should be OK
 	var authResult, mcpResult, inferResult domain.DoctorCheck
@@ -961,7 +961,7 @@ func TestCheckClaudeInference_Success(t *testing.T) {
 	output := "2"
 
 	// when
-	result := session.CheckClaudeInference(output, nil)
+	result := checkClaudeInference(output, nil)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -977,7 +977,7 @@ func TestCheckClaudeInference_Error(t *testing.T) {
 	err := fmt.Errorf("exit status 1")
 
 	// when
-	result := session.CheckClaudeInference("", err)
+	result := checkClaudeInference("", err)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -990,7 +990,7 @@ func TestCheckClaudeInference_FalsePositive(t *testing.T) {
 	output := "12"
 
 	// when
-	result := session.CheckClaudeInference(output, nil)
+	result := checkClaudeInference(output, nil)
 
 	// then: must WARN -- "12" is not "2"
 	if result.Status != domain.CheckWarn {
@@ -1006,7 +1006,7 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	output := "I cannot compute that"
 
 	// when
-	result := session.CheckClaudeInference(output, nil)
+	result := checkClaudeInference(output, nil)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -1028,7 +1028,7 @@ func TestFindSkillsRefDir_UsesBaseDir(t *testing.T) {
 	}
 
 	// when: findSkillsRefDir uses baseDir (not CWD)
-	result := session.ExportFindSkillsRefDir(baseDir)
+	result := ExportFindSkillsRefDir(baseDir)
 
 	// then: should find the skills-ref directory
 	if result == "" {
@@ -1043,7 +1043,7 @@ func TestFindSkillsRefDir_NotFound(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	result := session.ExportFindSkillsRefDir(baseDir)
+	result := ExportFindSkillsRefDir(baseDir)
 
 	// then
 	if result != "" {
@@ -1059,7 +1059,7 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 {"type":"result","result":"2"}`
 
 	// when
-	result := session.CheckContextBudget(streamJSON, "")
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be OK (well under threshold)
 	if result.Status != domain.CheckOK {
@@ -1080,7 +1080,7 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 	streamJSON := strings.Join(lines, "\n")
 
 	// when
-	result := session.CheckContextBudget(streamJSON, "")
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be WARN with hint (over threshold)
 	if result.Status != domain.CheckWarn {
@@ -1098,7 +1098,7 @@ func TestCheckContextBudget_EmptyStream(t *testing.T) {
 	streamJSON := ""
 
 	// when
-	result := session.CheckContextBudget(streamJSON, "")
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be OK (nothing to measure)
 	if result.Status != domain.CheckOK {
@@ -1113,7 +1113,7 @@ func TestCheckContextBudget_NoInitMessage(t *testing.T) {
 	streamJSON := `{"type":"result","result":"2"}`
 
 	// when
-	result := session.CheckContextBudget(streamJSON, "")
+	result := checkContextBudget(streamJSON, "")
 
 	// then: should be OK (no init = no overhead)
 	if result.Status != domain.CheckOK {
@@ -1129,7 +1129,7 @@ func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
 	streamJSON := initMsg + "\n"
 
 	// when
-	result := session.CheckContextBudget(streamJSON, "")
+	result := checkContextBudget(streamJSON, "")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -1155,7 +1155,7 @@ func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
 	streamJSON := initMsg + "\n"
 
 	// when
-	result := session.CheckContextBudget(streamJSON, dir)
+	result := checkContextBudget(streamJSON, dir)
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -1175,7 +1175,7 @@ func TestDoctor_WaveMode_SkipsLinearMCP(t *testing.T) {
 	os.WriteFile(configPath, []byte("lang: en\nclaude_cmd: echo\n"), 0644)
 
 	// when: run doctor in wave mode
-	results := session.RunDoctorWithClaudeCmd(context.Background(), configPath, dir, "echo", &domain.NopLogger{}, false, domain.ModeWave, nopSuccessRateChecker)
+	results := RunDoctorWithClaudeCmd(context.Background(), configPath, dir, "echo", &domain.NopLogger{}, false, domain.ModeWave, nopSuccessRateChecker)
 
 	// then: linear-mcp should be SKIP (not WARN or FAIL)
 	for _, r := range results {
@@ -1205,7 +1205,7 @@ func TestCheckEventStore_CorruptLines(t *testing.T) {
 		[]byte(validEvent+"\n"+corruptLine+"\n"+validEvent+"\n"), 0644)
 
 	// when
-	check := session.CheckEventStore(gateRoot)
+	check := CheckEventStore(gateRoot)
 
 	// then
 	if check.Status != domain.CheckWarn {
@@ -1227,7 +1227,7 @@ func TestCheckEventStore_Clean(t *testing.T) {
 		[]byte(validEvent+"\n"), 0644)
 
 	// when
-	check := session.CheckEventStore(gateRoot)
+	check := CheckEventStore(gateRoot)
 
 	// then
 	if check.Status != domain.CheckOK {

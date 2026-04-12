@@ -240,7 +240,7 @@ func CheckGateDir(repoRoot string, repair bool) domain.DoctorCheck {
 	}
 }
 
-// CheckClaudeAuth determines if the Claude CLI is authenticated by
+// checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
 // claudeCmd is the configured command string (may include env prefix).
@@ -257,7 +257,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	ghResult := CheckTool(ctx, "gh")
 	results = append(results, ghResult)
 	if ghResult.Status == domain.CheckOK {
-		results = append(results, CheckGHAuth(ctx))
+		results = append(results, checkGHAuth(ctx))
 	} else {
 		results = append(results, domain.DoctorCheck{
 			Name:    "gh-auth",
@@ -291,10 +291,10 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	}
 
 	// --- Data ---
-	skillResult := CheckSkillMD(repoRoot)
+	skillResult := checkSkillMD(repoRoot)
 	if repair && skillResult.Status == domain.CheckFail {
 		if err := generateSkillsFn(repoRoot, logger); err == nil {
-			recheck := CheckSkillMD(repoRoot)
+			recheck := checkSkillMD(repoRoot)
 			if recheck.Status == domain.CheckOK {
 				results = append(results, domain.DoctorCheck{
 					Name: "SKILL.md", Status: domain.CheckFixed,
@@ -344,7 +344,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		mcpCancel()
 		mcpOutput := string(out)
 
-		authResult := CheckClaudeAuth(mcpOutput, mcpErr, claudeCmd)
+		authResult := checkClaudeAuth(mcpOutput, mcpErr, claudeCmd)
 		results = append(results, authResult)
 
 		// Linear MCP: skip if auth failed (mcp list output unreliable)
@@ -355,7 +355,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 				Message: "skipped (auth failed)",
 			})
 		} else if mode.IsLinear() {
-			results = append(results, CheckLinearMCP(mcpOutput, mcpErr))
+			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 		} else {
 			results = append(results, domain.DoctorCheck{
 				Name:    "linear-mcp",
@@ -377,7 +377,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		inferOut, inferErr := inferCmd.Output()
 		inferCancel()
 		inferOutput := string(inferOut)
-		inferResult := CheckClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
+		inferResult := checkClaudeInference(strings.TrimSpace(extractStreamResult(inferOutput)), inferErr)
 		results = append(results, inferResult)
 
 		// Context budget check: skip if inference failed
@@ -388,7 +388,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 				Message: "skipped (inference failed)",
 			})
 		} else {
-			results = append(results, CheckContextBudget(inferOutput, repoRoot))
+			results = append(results, checkContextBudget(inferOutput, repoRoot))
 		}
 	}
 
@@ -545,5 +545,5 @@ func CheckConfig(path string) domain.DoctorCheck {
 	}
 }
 
-// ExtractStreamResult parses stream-json output and returns the "result" field
+// extractStreamResult parses stream-json output and returns the "result" field
 // from the result message. Used to reuse login check output for inference check.
