@@ -54,7 +54,7 @@ the --otel-backend flag. The generated .otel.env file is written into
 			}
 			logger := loggerFrom(cmd)
 			initCmd := domain.NewInitCommand(rp)
-			if err := usecase.RunInit(initCmd, &session.InitAdapter{Logger: logger}); err != nil {
+			if _, err := usecase.RunInit(initCmd, &session.InitAdapter{Logger: logger}); err != nil {
 				return fmt.Errorf("init: %w", err)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "  Initialized %s\n", divRoot)
