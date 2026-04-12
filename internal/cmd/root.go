@@ -10,6 +10,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -27,9 +28,10 @@ var (
 // shutdownTracer holds the OTel tracer shutdown function registered by
 // PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
 var (
-	shutdownTracer func(context.Context) error
-	shutdownMeter  func(context.Context) error
-	finalizerOnce  sync.Once
+	shutdownTracer  func(context.Context) error
+	shutdownMeter   func(context.Context) error
+	sharedStreamBus interface{ Close() } // closed by OnFinalize
+	finalizerOnce   sync.Once
 )
 
 func init() {
@@ -74,6 +76,12 @@ func NewRootCommand() *cobra.Command {
 			shutdownMeter = initMeter("amadeus", Version)
 			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
+
+			// StreamBus: process-wide live session event bus.
+			streamBus := platform.NewInProcessSessionBus()
+			session.SetStreamBus(streamBus)
+			sharedStreamBus = streamBus
+
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -84,6 +92,9 @@ func NewRootCommand() *cobra.Command {
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
 			endRootSpan()
+			if sharedStreamBus != nil {
+				sharedStreamBus.Close()
+			}
 			if shutdownMeter != nil {
 				shutdownMeter(context.Background())
 			}

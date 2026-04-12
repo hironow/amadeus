@@ -164,7 +164,7 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 					}
 				}
 				if !attrFound {
-					t.Errorf("missing gen_ai attribute %q on claude.invoke span", key)
+					t.Errorf("missing gen_ai attribute %q on provider.invoke span", key)
 				}
 			}
 			// gen_ai.request.model should be present
@@ -175,10 +175,10 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 				}
 			}
 			if !modelFound {
-				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
+				t.Error("missing gen_ai.request.model attribute on provider.invoke span")
 			}
 
-			// Cross-tool conformance: claude.model and claude.timeout_sec must be present
+			// Cross-tool conformance: provider.model and provider.timeout_sec must be present
 			conformanceAttrs := []string{"provider.model", "provider.timeout_sec"}
 			for _, key := range conformanceAttrs {
 				var attrFound bool
@@ -188,12 +188,12 @@ func TestRunDivergenceMeter_EmitsClaudeInvokeSpan(t *testing.T) {
 					}
 				}
 				if !attrFound {
-					t.Errorf("missing cross-tool conformance attribute %q on claude.invoke span", key)
+					t.Errorf("missing cross-tool conformance attribute %q on provider.invoke span", key)
 				}
 			}
 		}
 	}
 	if !invokeFound {
-		t.Error("expected 'claude.invoke' span to be emitted by runDivergenceMeter")
+		t.Error("expected 'provider.invoke' span to be emitted by runDivergenceMeter")
 	}
 }
