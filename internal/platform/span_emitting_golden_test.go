@@ -618,12 +618,12 @@ func TestGolden_init_model_on_parent_span(t *testing.T) {
 	initAttrs := emitter.InitAttrs()
 	foundModel := false
 	for _, attr := range initAttrs {
-		if string(attr.Key) == "claude.init.model" && attr.Value.AsString() == "claude-opus-4-6" {
+		if string(attr.Key) == "provider.init.model" && attr.Value.AsString() == "claude-opus-4-6" {
 			foundModel = true
 		}
 	}
 	if !foundModel {
-		t.Error("expected claude.init.model = claude-opus-4-6")
+		t.Error("expected provider.init.model = claude-opus-4-6")
 	}
 }
 
@@ -651,7 +651,7 @@ func TestGoldenMCP_init_mcp_servers(t *testing.T) {
 	// Should have mcp_server names
 	foundMCP := false
 	for _, attr := range initAttrs {
-		if string(attr.Key) == "claude.init.mcp_servers" {
+		if string(attr.Key) == "provider.init.mcp_servers" {
 			foundMCP = true
 			servers := attr.Value.AsStringSlice()
 			if len(servers) != 3 {
@@ -660,7 +660,7 @@ func TestGoldenMCP_init_mcp_servers(t *testing.T) {
 		}
 	}
 	if !foundMCP {
-		t.Error("expected claude.init.mcp_servers attribute")
+		t.Error("expected provider.init.mcp_servers attribute")
 	}
 }
 
@@ -686,9 +686,9 @@ func TestGoldenSkills_init_counts(t *testing.T) {
 	initAttrs := emitter.InitAttrs()
 
 	checks := map[string]int64{
-		"claude.init.tools_count":   8,
-		"claude.init.skills_count":  10,
-		"claude.init.plugins_count": 4,
+		"provider.init.tools_count":   8,
+		"provider.init.skills_count":  10,
+		"provider.init.plugins_count": 4,
 	}
 	for key, want := range checks {
 		found := false

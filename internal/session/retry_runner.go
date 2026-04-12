@@ -53,10 +53,10 @@ func (r *RetryRunner) retryLoop(ctx context.Context, fn func(ctx context.Context
 		if r.CircuitBreaker != nil {
 			if cbErr := r.CircuitBreaker.Allow(ctx); cbErr != nil {
 				attrs := []attribute.KeyValue{
-					attribute.String("claude.error", platform.SanitizeUTF8(cbErr.Error())),
+					attribute.String("provider.error", platform.SanitizeUTF8(cbErr.Error())),
 				}
 				attrs = append(attrs, providerStateSpanAttrs(r.CircuitBreaker.Snapshot())...)
-				trace.SpanFromContext(ctx).AddEvent("claude.blocked", trace.WithAttributes(attrs...))
+				trace.SpanFromContext(ctx).AddEvent("provider.blocked", trace.WithAttributes(attrs...))
 				if lastErr != nil {
 					return lastErr
 				}
@@ -83,15 +83,15 @@ func (r *RetryRunner) retryLoop(ctx context.Context, fn func(ctx context.Context
 		}
 		span := trace.SpanFromContext(ctx)
 		attrs := []attribute.KeyValue{
-			attribute.Int("claude.attempt", attempt),
-			attribute.String("claude.error", platform.SanitizeUTF8(err.Error())),
+			attribute.Int("provider.attempt", attempt),
+			attribute.String("provider.error", platform.SanitizeUTF8(err.Error())),
 		}
 		if r.CircuitBreaker != nil {
 			attrs = append(attrs, providerStateSpanAttrs(r.CircuitBreaker.Snapshot())...)
 		}
-		span.AddEvent("claude.retry", trace.WithAttributes(attrs...))
+		span.AddEvent("provider.retry", trace.WithAttributes(attrs...))
 	}
-	return fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
+	return fmt.Errorf("provider failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // Run executes the inner runner with exponential backoff retry.
