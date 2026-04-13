@@ -9,12 +9,18 @@ import (
 
 // InitAdapter implements port.InitRunner by delegating to session.InitGateDir.
 type InitAdapter struct {
-	Logger domain.Logger
+	Logger     domain.Logger
+	LastResult *InitResult // populated after InitProject for display by cmd layer
 }
 
 // InitProject creates the state directory structure.
 // amadeus uses only baseDir; opts are ignored (no team/project/lang/strictness).
 func (a *InitAdapter) InitProject(baseDir string, _ ...port.InitOption) ([]string, error) {
 	stateDir := filepath.Join(baseDir, domain.StateDir)
-	return nil, InitGateDir(stateDir, a.Logger)
+	result, err := InitGateDir(stateDir, a.Logger)
+	a.LastResult = result
+	if err != nil {
+		return nil, err
+	}
+	return result.Warnings(), nil
 }

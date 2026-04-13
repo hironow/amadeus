@@ -55,7 +55,7 @@ func setupGateDir(t *testing.T) (tmpDir, gateDir string, store *session.Projecti
 	t.Helper()
 	tmpDir = t.TempDir()
 	gateDir = filepath.Join(tmpDir, ".gate")
-	if err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
+	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
