@@ -35,19 +35,21 @@ func (s *ProjectionStore) runDir() string {
 
 // InitGateDir creates the .gate/ directory structure and writes
 // a default config.yaml if one does not already exist.
-func InitGateDir(root string, logger domain.Logger) error {
+// Returns an InitResult recording what was created or skipped.
+func InitGateDir(root string, logger domain.Logger) (*InitResult, error) {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
 
 	// Core directories + mail dirs
-	if _, err := EnsureStateDir(root, WithMailDirs()); err != nil {
-		return err
+	result, err := EnsureStateDir(root, WithMailDirs())
+	if err != nil {
+		return result, err
 	}
 
 	// Migrate legacy state/ -> .run/
 	if err := migrateLegacyState(root); err != nil {
-		return fmt.Errorf("migrate legacy state: %w", err)
+		return result, fmt.Errorf("migrate legacy state: %w", err)
 	}
 
 	// Skill templates (idempotent sync from embedded FS)
@@ -55,13 +57,13 @@ func InitGateDir(root string, logger domain.Logger) error {
 	for _, name := range skillNames {
 		destDir := filepath.Join(root, "skills", name)
 		if err := os.MkdirAll(destDir, 0o755); err != nil {
-			return err
+			return result, err
 		}
 		skillPath := filepath.Join(destDir, "SKILL.md")
 		tmplPath := path.Join("templates", "skills", name, "SKILL.md")
 		content, readErr := platform.SkillsFS.ReadFile(tmplPath)
 		if readErr != nil {
-			return fmt.Errorf("read skill template %s: %w", name, readErr)
+			return result, fmt.Errorf("read skill template %s: %w", name, readErr)
 		}
 		existing, existErr := os.ReadFile(skillPath)
 		if existErr != nil || !bytes.Equal(existing, content) {
@@ -69,20 +71,29 @@ func InitGateDir(root string, logger domain.Logger) error {
 				logger.Info("updated SKILL.md: %s (template changed)", name)
 			}
 			if err := os.WriteFile(skillPath, content, 0o644); err != nil {
-				return err
+				return result, err
 			}
+			result.Add("skills/"+name+"/", InitUpdated, "")
+		} else {
+			result.Add("skills/"+name+"/", InitSkipped, "")
 		}
 	}
 
 	// Config (merge with existing)
 	configPath := filepath.Join(root, "config.yaml")
 	if err := writeConfigWithDefaults(configPath); err != nil {
-		return err
+		return result, err
 	}
+	result.Add("config.yaml", InitUpdated, "")
 
 	// Gitignore (append-only)
 	gateGitignoreEntries := []string{".run/", "outbox/", "inbox/", ".otel.env", "events/", ".mcp.json", ".claude/"}
-	return EnsureGitignoreEntries(filepath.Join(root, ".gitignore"), gateGitignoreEntries)
+	if err := EnsureGitignoreEntries(filepath.Join(root, ".gitignore"), gateGitignoreEntries); err != nil {
+		return result, err
+	}
+	result.Add(".gitignore", InitUpdated, "")
+
+	return result, nil
 }
 
 // migrateLegacyState moves files from the legacy state/ directory to .run/.

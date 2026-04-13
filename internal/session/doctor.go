@@ -53,7 +53,8 @@ var findSkillsRefDirFn = findSkillsRefDir
 
 // generateSkillsFn regenerates SKILL.md files. Injectable for testing.
 var generateSkillsFn = func(repoRoot string, logger domain.Logger) error {
-	return InitGateDir(filepath.Join(repoRoot, domain.StateDir), logger)
+	_, err := InitGateDir(filepath.Join(repoRoot, domain.StateDir), logger)
+	return err
 }
 
 func findSkillsRefDir(baseDir string) string {

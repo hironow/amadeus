@@ -20,7 +20,7 @@ func TestInitGateDir_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// given — first init creates SKILL.md
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
@@ -32,7 +32,7 @@ func TestInitGateDir_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	}
 
 	// when — second init should overwrite with latest template
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestInitGateDir_LogsWhenSkillUpdated(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// given — first init
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
@@ -66,7 +66,7 @@ func TestInitGateDir_LogsWhenSkillUpdated(t *testing.T) {
 	// when — second init captures log
 	var buf bytes.Buffer
 	logCapture := platform.NewLogger(&buf, false)
-	if err := session.InitGateDir(root, logCapture); err != nil {
+	if _, err := session.InitGateDir(root, logCapture); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -83,14 +83,14 @@ func TestInitGateDir_NoLogWhenSkillUnchanged(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// given — first init
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
 	// when — second init with no changes
 	var buf bytes.Buffer
 	logCapture := platform.NewLogger(&buf, false)
-	if err := session.InitGateDir(root, logCapture); err != nil {
+	if _, err := session.InitGateDir(root, logCapture); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestInitGateDir_GitignoreIncludesEvents(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
@@ -131,7 +131,7 @@ func TestInitGateDir_AppendsEventsToExistingGitignore(t *testing.T) {
 	os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".run/\noutbox/\ninbox/\n.otel.env\n"), 0644)
 
 	// when
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestInitGateDir_ConfigCreatedWithDefaults(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
@@ -183,7 +183,7 @@ func TestInitGateDir_ConfigMergesExisting(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 	logger := platform.NewLogger(io.Discard, false)
 
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
@@ -194,7 +194,7 @@ func TestInitGateDir_ConfigMergesExisting(t *testing.T) {
 	os.WriteFile(configPath, []byte(modified), 0644)
 
 	// when — second init should merge (preserve user's lang)
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -224,7 +224,7 @@ func TestInitGateDir_ConfigAddsNewFields(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "config.yaml"), minimal, 0644)
 
 	// when
-	if err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
