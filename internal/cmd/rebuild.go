@@ -35,7 +35,7 @@ func newRebuildCommand() *cobra.Command {
 			// Composition root: wire stores directly
 			eventStore := session.NewEventStore(divRoot, logger)
 			store := session.NewProjectionStore(divRoot)
-			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			outbox, outboxErr := session.NewOutboxStoreForDir(repoRoot)
 			if outboxErr != nil {
 				return fmt.Errorf("outbox store: %w", outboxErr)
 			}

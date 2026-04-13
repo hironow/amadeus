@@ -181,7 +181,7 @@ If [path] is omitted, the current working directory is used. Requires
 			// Composition root: wire session.Amadeus
 			store := session.NewProjectionStore(divRoot)
 			eventStore := session.NewEventStore(divRoot, logger)
-			outbox, outboxErr := session.NewOutboxStoreForDir(divRoot)
+			outbox, outboxErr := session.NewOutboxStoreForDir(repoRoot)
 			if outboxErr != nil {
 				return fmt.Errorf("outbox store: %w", outboxErr)
 			}

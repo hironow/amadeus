@@ -22,10 +22,10 @@ func testOutboxStore(t *testing.T, root string) *session.SQLiteOutboxStore {
 	return store
 }
 
-func ensureGateDirs(t *testing.T, root string) {
+func ensureGateDirs(t *testing.T, repoRoot string) {
 	t.Helper()
 	for _, sub := range []string{".run", "archive", "outbox"} {
-		if err := os.MkdirAll(filepath.Join(root, sub), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(repoRoot, ".gate", sub), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", sub, err)
 		}
 	}
@@ -68,7 +68,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 		t.Errorf("flushed count: got %d, want 1", n)
 	}
 
-	archivePath := filepath.Join(root, "archive", "test-mail.md")
+	archivePath := filepath.Join(root, ".gate", "archive", "test-mail.md")
 	data, err := os.ReadFile(archivePath)
 	if err != nil {
 		t.Fatalf("read archive: %v", err)
@@ -77,7 +77,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 		t.Errorf("archive content: got %q, want %q", string(data), "hello")
 	}
 
-	outboxPath := filepath.Join(root, "outbox", "test-mail.md")
+	outboxPath := filepath.Join(root, ".gate", "outbox", "test-mail.md")
 	data, err = os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -111,7 +111,7 @@ func TestSQLiteOutboxStore_StageUpsert_LatestDataWins(t *testing.T) {
 	}
 
 	// then: latest data wins (upsert semantics)
-	outboxPath := filepath.Join(root, "outbox", "dup.md")
+	outboxPath := filepath.Join(root, ".gate", "outbox", "dup.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -169,7 +169,7 @@ func TestSQLiteOutboxStore_RestageAfterFlush_EnablesRedelivery(t *testing.T) {
 	}
 
 	// then: outbox file should contain the updated data
-	outboxPath := filepath.Join(root, "outbox", "conflict.md")
+	outboxPath := filepath.Join(root, ".gate", "outbox", "conflict.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -204,7 +204,7 @@ func TestSQLiteOutboxStore_RestageBeforeFlush_UpdatesData(t *testing.T) {
 		t.Errorf("flushed count: got %d, want 1", n)
 	}
 
-	outboxPath := filepath.Join(root, "outbox", "update.md")
+	outboxPath := filepath.Join(root, ".gate", "outbox", "update.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -234,7 +234,7 @@ func TestSQLiteOutboxStore_FlushOnlyUnflushed(t *testing.T) {
 	}
 
 	for _, name := range []string{"first.md", "second.md"} {
-		outboxPath := filepath.Join(root, "outbox", name)
+		outboxPath := filepath.Join(root, ".gate", "outbox", name)
 		if _, err := os.Stat(outboxPath); err != nil {
 			t.Errorf("outbox %s missing: %v", name, err)
 		}
@@ -261,7 +261,7 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 
 	for _, name := range []string{"a.md", "b.md", "c.md"} {
 		for _, sub := range []string{"archive", "outbox"} {
-			p := filepath.Join(root, sub, name)
+			p := filepath.Join(root, ".gate", sub, name)
 			if _, err := os.Stat(p); err != nil {
 				t.Errorf("%s/%s missing: %v", sub, name, err)
 			}
@@ -273,9 +273,9 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 
-	dbPath := filepath.Join(root, ".run", "outbox.db")
-	archiveDir := filepath.Join(root, "archive")
-	outboxDir := filepath.Join(root, "outbox")
+	dbPath := filepath.Join(root, ".gate", ".run", "outbox.db")
+	archiveDir := filepath.Join(root, ".gate", "archive")
+	outboxDir := filepath.Join(root, ".gate", "outbox")
 
 	storeA, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -340,10 +340,10 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("%s-%03d.md", prefix, i)
 			for _, sub := range []string{"archive", "outbox"} {
-				p := filepath.Join(root, sub, name)
+				p := filepath.Join(root, ".gate", sub, name)
 				data, readErr := os.ReadFile(p)
 				if readErr != nil {
-					t.Errorf("%s/%s missing: %v", sub, name, readErr)
+					t.Errorf(".gate/%s/%s missing: %v", sub, name, readErr)
 					continue
 				}
 				expected := fmt.Sprintf("from-%s-%s", strings.ToUpper(prefix), name)
@@ -367,7 +367,7 @@ func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
 	_ = store
 
 	// when
-	dbPath := filepath.Join(root, ".run", "outbox.db")
+	dbPath := filepath.Join(root, ".gate", ".run", "outbox.db")
 	info, err := os.Stat(dbPath)
 	if err != nil {
 		t.Fatalf("stat db: %v", err)
@@ -385,9 +385,9 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 
-	dbPath := filepath.Join(root, ".run", "outbox.db")
-	archiveDir := filepath.Join(root, "archive")
-	outboxDir := filepath.Join(root, "outbox")
+	dbPath := filepath.Join(root, ".gate", ".run", "outbox.db")
+	archiveDir := filepath.Join(root, ".gate", "archive")
+	outboxDir := filepath.Join(root, ".gate", "outbox")
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -427,9 +427,9 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 
-	dbPath := filepath.Join(root, ".run", "outbox.db")
-	archiveDir := filepath.Join(root, "archive")
-	outboxDir := filepath.Join(root, "outbox")
+	dbPath := filepath.Join(root, ".gate", ".run", "outbox.db")
+	archiveDir := filepath.Join(root, ".gate", "archive")
+	outboxDir := filepath.Join(root, ".gate", "outbox")
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -470,9 +470,9 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	root := t.TempDir()
 	ensureGateDirs(t, root)
 
-	dbPath := filepath.Join(root, ".run", "outbox.db")
-	archiveDir := filepath.Join(root, "archive")
-	outboxDir := filepath.Join(root, "outbox")
+	dbPath := filepath.Join(root, ".gate", ".run", "outbox.db")
+	archiveDir := filepath.Join(root, ".gate", "archive")
+	outboxDir := filepath.Join(root, ".gate", "outbox")
 
 	storeSetup, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -523,7 +523,7 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 		t.Errorf("total flushed: got %d (A=%d, B=%d), want 1 or 2", total, nA, nB)
 	}
 
-	outboxPath := filepath.Join(root, "outbox", "shared.md")
+	outboxPath := filepath.Join(root, ".gate", "outbox", "shared.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -563,7 +563,7 @@ func TestDeadLetterCount_AfterMaxRetries(t *testing.T) {
 	}
 
 	// Make archive dir unwritable to force flush failures
-	archiveDir := filepath.Join(root, "archive")
+	archiveDir := filepath.Join(root, ".gate", "archive")
 	os.Chmod(archiveDir, 0o555)
 	defer os.Chmod(archiveDir, 0o755)
 
@@ -607,7 +607,7 @@ func TestPurgeDeadLetters(t *testing.T) {
 	if err := store.Stage(ctx, "dead-letter.md", []byte("content")); err != nil {
 		t.Fatalf("Stage: %v", err)
 	}
-	archiveDir := filepath.Join(root, "archive")
+	archiveDir := filepath.Join(root, ".gate", "archive")
 	os.Chmod(archiveDir, 0o555)
 	for range 3 {
 		store.Flush(ctx) //nolint:errcheck

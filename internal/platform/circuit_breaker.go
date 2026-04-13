@@ -31,7 +31,7 @@ const defaultBackoffMax = 10 * time.Minute
 
 // CircuitBreaker prevents cascading failures when AI coding tool providers
 // hit rate limits or server errors. Provider-agnostic: error classification
-// is handled by domain.ClassifyProviderError before calling RecordProviderError.
+// is handled by harness.ClassifyProviderError before calling RecordProviderError.
 type CircuitBreaker struct {
 	mu             sync.Mutex
 	state          circuitState
@@ -127,7 +127,7 @@ func (cb *CircuitBreaker) Allow(ctx context.Context) error {
 }
 
 // RecordProviderError updates the circuit breaker state based on a classified
-// provider error. Callers should use domain.ClassifyProviderError to produce
+// provider error. Callers should use harness.ClassifyProviderError to produce
 // the ProviderErrorInfo before calling this method.
 func (cb *CircuitBreaker) RecordProviderError(info domain.ProviderErrorInfo) {
 	cb.mu.Lock()

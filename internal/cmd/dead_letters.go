@@ -76,7 +76,7 @@ Pass --execute to actually delete them.`,
 				return nil
 			}
 
-			store, storeErr := session.NewOutboxStoreForDir(divRoot)
+			store, storeErr := session.NewOutboxStoreForDir(repoRoot)
 			if storeErr != nil {
 				return fmt.Errorf("open outbox store: %w", storeErr)
 			}
