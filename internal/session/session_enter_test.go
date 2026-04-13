@@ -44,7 +44,7 @@ func TestBuildIsolationFlags_AlwaysIncludesBase(t *testing.T) {
 		WorkDir:           t.TempDir(),
 		ConfigBase:        t.TempDir(),
 	}
-	args := session.ExportBuildIsolationFlags(cfg)
+	args := session.ExportBuildIsolationFlags(cfg.ConfigBase)
 
 	// --setting-sources "" and --disable-slash-commands are always present
 	if !containsFlag(args, "--setting-sources") {
@@ -62,7 +62,7 @@ func TestBuildIsolationFlags_SettingsPathWhenExists(t *testing.T) {
 	os.WriteFile(filepath.Join(settingsDir, "settings.json"), []byte("{}"), 0644)
 
 	cfg := session.EnterConfig{ConfigBase: base}
-	args := session.ExportBuildIsolationFlags(cfg)
+	args := session.ExportBuildIsolationFlags(cfg.ConfigBase)
 
 	if !containsFlag(args, "--settings") {
 		t.Error("expected --settings flag when settings.json exists")
@@ -86,7 +86,7 @@ func TestBuildIsolationFlags_MCPConfigPathWhenExists(t *testing.T) {
 	os.WriteFile(filepath.Join(mcpDir, ".mcp.json"), []byte("{}"), 0644)
 
 	cfg := session.EnterConfig{ConfigBase: base}
-	args := session.ExportBuildIsolationFlags(cfg)
+	args := session.ExportBuildIsolationFlags(cfg.ConfigBase)
 
 	if !containsFlag(args, "--strict-mcp-config") {
 		t.Error("expected --strict-mcp-config flag when .mcp.json exists")
@@ -103,7 +103,7 @@ func TestBuildIsolationFlags_ResumeFlag(t *testing.T) {
 		ProviderSessionID: "sess-resume-001",
 		ConfigBase:        t.TempDir(),
 	}
-	args := session.ExportBuildIsolationFlags(cfg)
+	args := session.ExportBuildIsolationFlags(cfg.ConfigBase)
 
 	// --resume is NOT in isolation flags (added by EnterSession)
 	if containsFlag(args, "--resume") {
@@ -117,11 +117,13 @@ func TestEnterSession_ResumeArgPassedToProvider(t *testing.T) {
 	// given: "echo" as fake provider — prints all args to stdout
 	var stdout strings.Builder
 	workDir := t.TempDir()
+	configBase := t.TempDir()
 	cfg := session.EnterConfig{
 		ProviderCmd:       "echo",
 		ProviderSessionID: "sess-exec-001",
 		WorkDir:           workDir,
-		ConfigBase:        t.TempDir(),
+		ConfigBase:        configBase,
+		IsolationFlags:    session.BuildClaudeIsolationFlags(configBase),
 		Stdout:            &stdout,
 		Stderr:            &strings.Builder{},
 	}
