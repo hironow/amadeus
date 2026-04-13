@@ -41,7 +41,7 @@ func InitGateDir(root string, logger domain.Logger) error {
 	}
 
 	// Core directories + mail dirs
-	if err := EnsureStateDir(root, WithMailDirs()); err != nil {
+	if _, err := EnsureStateDir(root, WithMailDirs()); err != nil {
 		return err
 	}
 

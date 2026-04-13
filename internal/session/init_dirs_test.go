@@ -1,21 +1,20 @@
 package session_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/session"
 )
 
 func TestEnsureStateDir_CreatesCoreDirs(t *testing.T) {
-	// given
 	stateDir := filepath.Join(t.TempDir(), ".state")
 
-	// when
-	err := session.EnsureStateDir(stateDir)
+	result, err := session.EnsureStateDir(stateDir)
 
-	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -27,16 +26,16 @@ func TestEnsureStateDir_CreatesCoreDirs(t *testing.T) {
 			t.Errorf("expected %s to be a directory", sub)
 		}
 	}
+	if result.StateDir != ".state" {
+		t.Errorf("StateDir = %q, want .state", result.StateDir)
+	}
 }
 
 func TestEnsureStateDir_WithMailDirs(t *testing.T) {
-	// given
 	stateDir := filepath.Join(t.TempDir(), ".state")
 
-	// when
-	err := session.EnsureStateDir(stateDir, session.WithMailDirs())
+	result, err := session.EnsureStateDir(stateDir, session.WithMailDirs())
 
-	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,43 +45,83 @@ func TestEnsureStateDir_WithMailDirs(t *testing.T) {
 			t.Errorf("expected mail dir %s to exist: %v", sub, err)
 		}
 	}
+	// Should have created entries
+	createdCount := 0
+	for _, e := range result.Entries {
+		if e.Action == session.InitCreated {
+			createdCount++
+		}
+	}
+	if createdCount < 7 { // state + .run + events + insights + inbox + outbox + archive
+		t.Errorf("expected at least 7 created entries, got %d", createdCount)
+	}
 }
 
 func TestEnsureStateDir_WithExtraDirs(t *testing.T) {
-	// given
 	stateDir := filepath.Join(t.TempDir(), ".state")
 
-	// when
-	err := session.EnsureStateDir(stateDir, session.WithExtraDirs("journal", "custom"))
+	_, err := session.EnsureStateDir(stateDir, session.WithExtraDirs("journal", "custom"))
 
-	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for _, sub := range []string{"journal", "custom"} {
-		p := filepath.Join(stateDir, sub)
-		if _, err := os.Stat(p); err != nil {
+		if _, err := os.Stat(filepath.Join(stateDir, sub)); err != nil {
 			t.Errorf("expected extra dir %s to exist: %v", sub, err)
 		}
 	}
 }
 
-func TestEnsureStateDir_Idempotent(t *testing.T) {
-	// given
+func TestEnsureStateDir_Idempotent_RecordsSkipped(t *testing.T) {
 	stateDir := filepath.Join(t.TempDir(), ".state")
 
-	// when: call twice
-	if err := session.EnsureStateDir(stateDir, session.WithMailDirs()); err != nil {
-		t.Fatalf("first call: %v", err)
-	}
-	if err := session.EnsureStateDir(stateDir, session.WithMailDirs()); err != nil {
-		t.Fatalf("second call: %v", err)
+	// First call: all created
+	r1, _ := session.EnsureStateDir(stateDir, session.WithMailDirs())
+	createdFirst := 0
+	for _, e := range r1.Entries {
+		if e.Action == session.InitCreated {
+			createdFirst++
+		}
 	}
 
-	// then: no error, dirs still exist
-	for _, sub := range []string{".run", "events", "insights", "inbox", "outbox", "archive"} {
-		if _, err := os.Stat(filepath.Join(stateDir, sub)); err != nil {
-			t.Errorf("expected %s to exist after idempotent call: %v", sub, err)
+	// Second call: all skipped
+	r2, err := session.EnsureStateDir(stateDir, session.WithMailDirs())
+	if err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+	skippedSecond := 0
+	for _, e := range r2.Entries {
+		if e.Action == session.InitSkipped {
+			skippedSecond++
 		}
+	}
+
+	if skippedSecond != createdFirst {
+		t.Errorf("second call: %d skipped, want %d (same as first created)", skippedSecond, createdFirst)
+	}
+}
+
+func TestPrintInitResult(t *testing.T) {
+	result := &session.InitResult{StateDir: ".siren"}
+	result.Add(".siren/", session.InitCreated, "")
+	result.Add(".siren/.run/", session.InitCreated, "")
+	result.Add(".siren/config.yaml", session.InitUpdated, "")
+	result.Add("skills", session.InitWarning, "failed to install")
+
+	var buf bytes.Buffer
+	session.PrintInitResult(&buf, result)
+
+	output := buf.String()
+	if !strings.Contains(output, "Initialized .siren/") {
+		t.Error("missing header")
+	}
+	if !strings.Contains(output, "+ .siren/") {
+		t.Error("missing created entry")
+	}
+	if !strings.Contains(output, "~ .siren/config.yaml") {
+		t.Error("missing updated entry")
+	}
+	if !strings.Contains(output, "! failed to install") {
+		t.Error("missing warning entry")
 	}
 }

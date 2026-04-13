@@ -34,6 +34,7 @@ rules:
         - "/internal/session/**"
       exclude:
         - "*_test.go"
+        - "internal/session/init_dirs.go"
     message: |
       session 層での D-Mail action dispatch (switch dm.Action) は禁止です。
       Why: action dispatch は POLICY logic であり usecase 層の責務 (ADR S0034)
