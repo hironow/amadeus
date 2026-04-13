@@ -20,7 +20,7 @@ func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(gateDir, ".run"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
+	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}, ""); err != nil {
 		t.Fatal(err)
 	}
 

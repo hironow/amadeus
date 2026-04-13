@@ -37,7 +37,7 @@ func newSyncCommand() *cobra.Command {
 			}
 			logger := loggerFrom(cmd)
 
-			if _, err := session.InitGateDir(divRoot, logger); err != nil {
+			if _, err := session.InitGateDir(divRoot, logger, ""); err != nil {
 				return fmt.Errorf("init gate dir: %w", err)
 			}
 

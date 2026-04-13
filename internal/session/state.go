@@ -35,8 +35,9 @@ func (s *ProjectionStore) runDir() string {
 
 // InitGateDir creates the .gate/ directory structure and writes
 // a default config.yaml if one does not already exist.
+// lang overrides the default language when non-empty (3-stage merge: defaults → existing → CLI).
 // Returns an InitResult recording what was created or skipped.
-func InitGateDir(root string, logger domain.Logger) (*InitResult, error) {
+func InitGateDir(root string, logger domain.Logger, lang string) (*InitResult, error) {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -79,9 +80,9 @@ func InitGateDir(root string, logger domain.Logger) (*InitResult, error) {
 		}
 	}
 
-	// Config (merge with existing)
+	// Config (merge with existing, CLI lang override)
 	configPath := filepath.Join(root, "config.yaml")
-	if err := writeConfigWithDefaults(configPath); err != nil {
+	if err := writeConfigWithDefaults(configPath, lang); err != nil {
 		return result, err
 	}
 	result.Add("config.yaml", InitUpdated, "")
@@ -171,8 +172,14 @@ func (s *ProjectionStore) writeJSON(path string, v any) error {
 
 // writeConfigWithDefaults writes config.yaml with all defaults populated.
 // If an existing config.yaml exists, user values are preserved (merged over defaults).
-func writeConfigWithDefaults(configPath string) error {
+// CLI-provided values (lang) always win over both defaults and existing values.
+func writeConfigWithDefaults(configPath, lang string) error {
 	cfg := domain.DefaultConfig()
+
+	// Apply CLI flags
+	if lang != "" {
+		cfg.Lang = lang
+	}
 
 	existing, readErr := os.ReadFile(configPath)
 	if readErr == nil && len(existing) > 0 {
@@ -191,7 +198,13 @@ func writeConfigWithDefaults(configPath string) error {
 			return err
 		}
 
+		// existing values override defaults
 		deepMerge(defaultMap, existingMap)
+
+		// CLI flags override everything: re-apply on top
+		if lang != "" {
+			deepMerge(defaultMap, map[string]any{"lang": lang})
+		}
 
 		merged, err := yaml.Marshal(defaultMap)
 		if err != nil {
@@ -202,14 +215,9 @@ func writeConfigWithDefaults(configPath string) error {
 		if err := yaml.Unmarshal(merged, &mergedCfg); err != nil {
 			return err
 		}
-		data, err := yaml.Marshal(mergedCfg)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(configPath, data, 0o644)
+		cfg = mergedCfg
 	}
 
-	// No existing config: write defaults
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
