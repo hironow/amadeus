@@ -147,6 +147,7 @@ func newSessionsEnterCommand() *cobra.Command {
 				ProviderSessionID: rec.ProviderSessionID,
 				WorkDir:           rec.WorkDir,
 				ConfigBase:        repoRoot,
+				IsolationFlags:    session.BuildClaudeIsolationFlags(repoRoot),
 				Stdin:             cmd.InOrStdin(),
 				Stdout:            cmd.OutOrStdout(),
 				Stderr:            cmd.ErrOrStderr(),
