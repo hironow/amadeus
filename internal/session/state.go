@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
@@ -40,26 +39,18 @@ func InitGateDir(root string, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
-	dirs := []string{
-		filepath.Join(root, ".run"),
-		filepath.Join(root, "events"),
-		filepath.Join(root, "outbox"),
-		filepath.Join(root, "inbox"),
-		filepath.Join(root, "archive"),
-		filepath.Join(root, "insights"),
+
+	// Core directories + mail dirs
+	if err := EnsureStateDir(root, WithMailDirs()); err != nil {
+		return err
 	}
-	for _, d := range dirs {
-		if err := os.MkdirAll(d, 0o755); err != nil {
-			return err
-		}
-	}
+
 	// Migrate legacy state/ -> .run/
 	if err := migrateLegacyState(root); err != nil {
 		return fmt.Errorf("migrate legacy state: %w", err)
 	}
-	// Ensure SKILL.md files are always up-to-date with the embedded template.
-	// SKILL.md is not user-editable — it is derived from the binary's embedded
-	// template and must stay in sync across upgrades.
+
+	// Skill templates (idempotent sync from embedded FS)
 	skillNames := []string{"dmail-sendable", "dmail-readable"}
 	for _, name := range skillNames {
 		destDir := filepath.Join(root, "skills", name)
@@ -83,41 +74,15 @@ func InitGateDir(root string, logger domain.Logger) error {
 		}
 	}
 
+	// Config (merge with existing)
 	configPath := filepath.Join(root, "config.yaml")
 	if err := writeConfigWithDefaults(configPath); err != nil {
 		return err
 	}
-	gitignorePath := filepath.Join(root, ".gitignore")
-	requiredEntries := []string{".run/", "outbox/", "inbox/", ".otel.env", "events/", ".mcp.json", ".claude/"}
-	if _, err := os.Stat(gitignorePath); errors.Is(err, fs.ErrNotExist) {
-		content := strings.Join(requiredEntries, "\n") + "\n"
-		if err := os.WriteFile(gitignorePath, []byte(content), 0o644); err != nil {
-			return err
-		}
-	} else if err == nil {
-		existing, readErr := os.ReadFile(gitignorePath)
-		if readErr == nil {
-			var toAdd []string
-			for _, entry := range requiredEntries {
-				if !strings.Contains(string(existing), entry) {
-					toAdd = append(toAdd, entry)
-				}
-			}
-			if len(toAdd) > 0 {
-				f, openErr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0o644)
-				if openErr == nil {
-					defer f.Close()
-					if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
-						f.Write([]byte("\n"))
-					}
-					for _, entry := range toAdd {
-						f.Write([]byte(entry + "\n"))
-					}
-				}
-			}
-		}
-	}
-	return nil
+
+	// Gitignore (append-only)
+	gateGitignoreEntries := []string{".run/", "outbox/", "inbox/", ".otel.env", "events/", ".mcp.json", ".claude/"}
+	return EnsureGitignoreEntries(filepath.Join(root, ".gitignore"), gateGitignoreEntries)
 }
 
 // migrateLegacyState moves files from the legacy state/ directory to .run/.
