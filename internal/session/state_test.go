@@ -20,7 +20,7 @@ func TestInitGateDir_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// given — first init creates SKILL.md
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
@@ -32,7 +32,7 @@ func TestInitGateDir_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	}
 
 	// when — second init should overwrite with latest template
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestInitGateDir_LogsWhenSkillUpdated(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// given — first init
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
@@ -66,7 +66,7 @@ func TestInitGateDir_LogsWhenSkillUpdated(t *testing.T) {
 	// when — second init captures log
 	var buf bytes.Buffer
 	logCapture := platform.NewLogger(&buf, false)
-	if _, err := session.InitGateDir(root, logCapture); err != nil {
+	if _, err := session.InitGateDir(root, logCapture, ""); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -83,14 +83,14 @@ func TestInitGateDir_NoLogWhenSkillUnchanged(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// given — first init
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
 	// when — second init with no changes
 	var buf bytes.Buffer
 	logCapture := platform.NewLogger(&buf, false)
-	if _, err := session.InitGateDir(root, logCapture); err != nil {
+	if _, err := session.InitGateDir(root, logCapture, ""); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestInitGateDir_GitignoreIncludesEvents(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
@@ -131,7 +131,7 @@ func TestInitGateDir_AppendsEventsToExistingGitignore(t *testing.T) {
 	os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".run/\noutbox/\ninbox/\n.otel.env\n"), 0644)
 
 	// when
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestInitGateDir_ConfigCreatedWithDefaults(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 
@@ -183,7 +183,7 @@ func TestInitGateDir_ConfigMergesExisting(t *testing.T) {
 	root := filepath.Join(dir, ".gate")
 	logger := platform.NewLogger(io.Discard, false)
 
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("first InitGateDir: %v", err)
 	}
 
@@ -194,7 +194,7 @@ func TestInitGateDir_ConfigMergesExisting(t *testing.T) {
 	os.WriteFile(configPath, []byte(modified), 0644)
 
 	// when — second init should merge (preserve user's lang)
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("second InitGateDir: %v", err)
 	}
 
@@ -212,6 +212,64 @@ func TestInitGateDir_ConfigMergesExisting(t *testing.T) {
 	}
 }
 
+func TestInitGateDir_LangOverrideWins(t *testing.T) {
+	// given — existing config with lang=ja
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	logger := platform.NewLogger(io.Discard, false)
+
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
+		t.Fatalf("first InitGateDir: %v", err)
+	}
+
+	// when — re-init with lang=en override
+	if _, err := session.InitGateDir(root, logger, "en"); err != nil {
+		t.Fatalf("second InitGateDir: %v", err)
+	}
+
+	// then — lang should be "en" (CLI override wins)
+	data, _ := os.ReadFile(filepath.Join(root, "config.yaml"))
+	var cfg domain.Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if cfg.Lang != "en" {
+		t.Errorf("lang = %q, want %q", cfg.Lang, "en")
+	}
+}
+
+func TestInitGateDir_EmptyLangPreservesExisting(t *testing.T) {
+	// given — existing config with lang changed to "en"
+	dir := t.TempDir()
+	root := filepath.Join(dir, ".gate")
+	logger := platform.NewLogger(io.Discard, false)
+
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
+		t.Fatalf("first InitGateDir: %v", err)
+	}
+
+	// Manually set lang to "en"
+	configPath := filepath.Join(root, "config.yaml")
+	data, _ := os.ReadFile(configPath)
+	modified := strings.Replace(string(data), `lang: ja`, `lang: en`, 1)
+	os.WriteFile(configPath, []byte(modified), 0644)
+
+	// when — re-init with empty lang (no override)
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
+		t.Fatalf("second InitGateDir: %v", err)
+	}
+
+	// then — user's lang preserved
+	result, _ := os.ReadFile(configPath)
+	var cfg domain.Config
+	if err := yaml.Unmarshal(result, &cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if cfg.Lang != "en" {
+		t.Errorf("lang = %q, want %q (existing value should be preserved)", cfg.Lang, "en")
+	}
+}
+
 func TestInitGateDir_ConfigAddsNewFields(t *testing.T) {
 	// given — existing config missing some fields (simulates upgrade)
 	dir := t.TempDir()
@@ -224,7 +282,7 @@ func TestInitGateDir_ConfigAddsNewFields(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "config.yaml"), minimal, 0644)
 
 	// when
-	if _, err := session.InitGateDir(root, logger); err != nil {
+	if _, err := session.InitGateDir(root, logger, ""); err != nil {
 		t.Fatalf("InitGateDir: %v", err)
 	}
 

@@ -47,15 +47,19 @@ func (c RebuildCommand) RepoPath() RepoPath { return c.repoPath }
 // Fields are unexported; use NewInitCommand to construct a valid instance.
 type InitCommand struct {
 	repoRoot RepoPath
+	lang     string
 }
 
 // NewInitCommand creates an InitCommand from validated primitives.
-func NewInitCommand(repoRoot RepoPath) InitCommand {
-	return InitCommand{repoRoot: repoRoot}
+func NewInitCommand(repoRoot RepoPath, lang string) InitCommand {
+	return InitCommand{repoRoot: repoRoot, lang: lang}
 }
 
 // RepoRoot returns the validated repository root path.
 func (c InitCommand) RepoRoot() RepoPath { return c.repoRoot }
+
+// Lang returns the language override (empty means use default/existing).
+func (c InitCommand) Lang() string { return c.lang }
 
 // ArchivePruneCommand represents the intent to prune old archive files.
 // Fields are unexported; use NewArchivePruneCommand to construct a valid instance.

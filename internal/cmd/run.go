@@ -73,7 +73,7 @@ If [path] is omitted, the current working directory is used. Requires
 
 			logger := loggerFrom(cmd)
 
-			if _, err := session.InitGateDir(divRoot, logger); err != nil {
+			if _, err := session.InitGateDir(divRoot, logger, ""); err != nil {
 				return fmt.Errorf("init .gate: %w", err)
 			}
 

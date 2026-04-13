@@ -52,8 +52,9 @@ the --otel-backend flag. The generated .otel.env file is written into
 			if rpErr != nil {
 				return rpErr
 			}
+			lang, _ := cmd.Flags().GetString("lang")
 			logger := loggerFrom(cmd)
-			initCmd := domain.NewInitCommand(rp)
+			initCmd := domain.NewInitCommand(rp, lang)
 			adapter := &session.InitAdapter{Logger: logger}
 			if _, err := usecase.RunInit(initCmd, adapter); err != nil {
 				return fmt.Errorf("init: %w", err)
@@ -81,6 +82,7 @@ the --otel-backend flag. The generated .otel.env file is written into
 		},
 	}
 	cmd.Flags().Bool("force", false, "Overwrite existing state directory (re-initialize)")
+	cmd.Flags().String("lang", "", "Language (ja/en)")
 	cmd.Flags().String("otel-backend", "", "OTel backend: jaeger, weave")
 	cmd.Flags().String("otel-entity", "", "Weave entity/team (required for weave)")
 	cmd.Flags().String("otel-project", "", "Weave project (required for weave)")

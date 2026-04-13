@@ -32,7 +32,7 @@ func TestNewRebuildCommand(t *testing.T) {
 
 func TestNewInitCommand(t *testing.T) {
 	rp, _ := domain.NewRepoPath("/tmp/repo")
-	cmd := domain.NewInitCommand(rp)
+	cmd := domain.NewInitCommand(rp, "")
 	if cmd.RepoRoot().String() != "/tmp/repo" {
 		t.Errorf("expected /tmp/repo, got %s", cmd.RepoRoot().String())
 	}

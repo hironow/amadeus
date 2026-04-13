@@ -24,7 +24,7 @@ func (s *stubInitRunner) InitProject(baseDir string, _ ...port.InitOption) ([]st
 func TestRunInit_ValidCommand(t *testing.T) {
 	runner := &stubInitRunner{}
 	rp, _ := domain.NewRepoPath("/tmp/repo")
-	cmd := domain.NewInitCommand(rp)
+	cmd := domain.NewInitCommand(rp, "")
 
 	_, err := usecase.RunInit(cmd, runner)
 
@@ -42,7 +42,7 @@ func TestRunInit_ValidCommand(t *testing.T) {
 func TestRunInit_RunnerError(t *testing.T) {
 	runner := &stubInitRunner{err: fmt.Errorf("disk full")}
 	rp, _ := domain.NewRepoPath("/tmp/repo")
-	cmd := domain.NewInitCommand(rp)
+	cmd := domain.NewInitCommand(rp, "")
 
 	_, err := usecase.RunInit(cmd, runner)
 

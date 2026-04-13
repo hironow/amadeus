@@ -62,7 +62,7 @@ func TestRebuildCommand_RebuildsProjectionsFromEvents(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Ensure config exists
-	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
+	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,7 +97,7 @@ func TestRebuildCommand_EmptyEventsSucceeds(t *testing.T) {
 	// given: a temp .gate/ with empty events directory
 	dir := t.TempDir()
 	gateDir := filepath.Join(dir, ".gate")
-	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}); err != nil {
+	if _, err := session.InitGateDir(gateDir, &domain.NopLogger{}, ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(gateDir, "events"), 0o755); err != nil {

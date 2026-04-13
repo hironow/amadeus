@@ -7,7 +7,11 @@ import (
 
 // RunInit delegates state directory creation to the InitRunner port.
 // The InitCommand is already valid by construction (parse-don't-validate).
-// amadeus init uses only baseDir (no team/project/lang/strictness options).
+// Passes through lang override for config merge (3-stage: defaults → existing → CLI).
 func RunInit(cmd domain.InitCommand, runner port.InitRunner) ([]string, error) {
-	return runner.InitProject(cmd.RepoRoot().String())
+	var opts []port.InitOption
+	if cmd.Lang() != "" {
+		opts = append(opts, port.WithLang(cmd.Lang()))
+	}
+	return runner.InitProject(cmd.RepoRoot().String(), opts...)
 }
