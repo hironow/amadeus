@@ -12,6 +12,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 
@@ -304,23 +305,23 @@ func (s *SQLiteOutboxStore) Close() error {
 }
 
 // NewOutboxStoreForDir creates a SQLiteOutboxStore using conventional paths
-// derived from the .gate/ directory: DB at .run/outbox.db, targets at archive/
-// and outbox/.
-func NewOutboxStoreForDir(root string) (*SQLiteOutboxStore, error) {
-	dbPath := filepath.Join(root, ".run", "outbox.db")
-	archiveDir := filepath.Join(root, "archive")
-	outboxDir := filepath.Join(root, "outbox")
+// derived from the repository root: DB at {stateDir}/.run/outbox.db, targets
+// at {stateDir}/archive/ and {stateDir}/outbox/.
+func NewOutboxStoreForDir(repoRoot string) (*SQLiteOutboxStore, error) {
+	dbPath := filepath.Join(repoRoot, domain.StateDir, ".run", "outbox.db")
+	archiveDir := filepath.Join(repoRoot, domain.StateDir, "archive")
+	outboxDir := filepath.Join(repoRoot, domain.StateDir, "outbox")
 	return NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 }
 
 // PruneFlushedOutbox opens the outbox DB, deletes flushed rows, runs
 // incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
-func PruneFlushedOutbox(ctx context.Context, root string) (int, error) {
-	dbPath := filepath.Join(root, ".run", "outbox.db")
+func PruneFlushedOutbox(ctx context.Context, repoRoot string) (int, error) {
+	dbPath := filepath.Join(repoRoot, domain.StateDir, ".run", "outbox.db")
 	if _, err := os.Stat(dbPath); errors.Is(err, fs.ErrNotExist) {
 		return 0, nil
 	}
-	store, err := NewOutboxStoreForDir(root)
+	store, err := NewOutboxStoreForDir(repoRoot)
 	if err != nil {
 		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
 	}

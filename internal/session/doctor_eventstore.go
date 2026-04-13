@@ -25,8 +25,7 @@ func CheckDeadLetters(ctx context.Context, repoRoot string) domain.DoctorCheck {
 			Message: "no outbox DB",
 		}
 	}
-	divRoot := filepath.Join(repoRoot, domain.StateDir)
-	store, err := NewOutboxStoreForDir(divRoot)
+	store, err := NewOutboxStoreForDir(repoRoot)
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "dead-letters",
