@@ -8,7 +8,7 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/session"
-	"github.com/hironow/amadeus/internal/usecase"
+	"github.com/hironow/amadeus/internal/usecase/port"
 	"github.com/spf13/cobra"
 )
 
@@ -48,15 +48,14 @@ the --otel-backend flag. The generated .otel.env file is written into
 			if _, err := os.Stat(divRoot); err == nil && !force {
 				return fmt.Errorf("%s already exists\nUse --force to overwrite", divRoot)
 			}
-			rp, rpErr := domain.NewRepoPath(repoRoot)
-			if rpErr != nil {
-				return rpErr
-			}
 			lang, _ := cmd.Flags().GetString("lang")
 			logger := loggerFrom(cmd)
-			initCmd := domain.NewInitCommand(rp, lang)
 			adapter := &session.InitAdapter{Logger: logger}
-			if _, err := usecase.RunInit(initCmd, adapter); err != nil {
+			var opts []port.InitOption
+			if lang != "" {
+				opts = append(opts, port.WithLang(lang))
+			}
+			if _, err := adapter.InitProject(repoRoot, opts...); err != nil {
 				return fmt.Errorf("init: %w", err)
 			}
 			if adapter.LastResult != nil {
