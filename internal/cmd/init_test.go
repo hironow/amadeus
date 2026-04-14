@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/hironow/amadeus/internal/cmd"
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -119,6 +122,117 @@ func TestInitCmd_OtelBackend_CreatesOtelEnv(t *testing.T) {
 	if !strings.Contains(string(data), "OTEL_EXPORTER_OTLP_ENDPOINT") {
 		t.Errorf("expected OTEL_EXPORTER_OTLP_ENDPOINT in .otel.env, got:\n%s", data)
 	}
+}
+
+func TestInitCmd_Snapshot(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"init"})
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	stateDir := filepath.Join(dir, domain.StateDir)
+	got := walkStateDir(t, stateDir)
+
+	want := []string{
+		".gitignore",
+		".run/",
+		"archive/",
+		"config.yaml",
+		"events/",
+		"inbox/",
+		"insights/",
+		"outbox/",
+		"skills/",
+		"skills/dmail-readable/",
+		"skills/dmail-readable/SKILL.md",
+		"skills/dmail-sendable/",
+		"skills/dmail-sendable/SKILL.md",
+	}
+
+	if !slices.Equal(want, got) {
+		t.Errorf("init snapshot mismatch\nwant: %v\ngot:  %v", want, got)
+	}
+}
+
+func TestInitCmd_ConfigHeader(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"init"})
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, domain.StateDir, "config.yaml"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "# amadeus configuration") {
+		t.Errorf("expected config header comment, got:\n%s", string(data)[:min(len(data), 80)])
+	}
+}
+
+func TestInitCmd_GitignoreComplete(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"init"})
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, domain.StateDir, ".gitignore"))
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	content := string(data)
+	for _, entry := range []string{".run/", "outbox/", "inbox/", "archive/", "insights/", ".otel.env", "events/", ".mcp.json", ".claude/"} {
+		if !strings.Contains(content, entry) {
+			t.Errorf("expected %q in .gitignore, got:\n%s", entry, content)
+		}
+	}
+}
+
+func walkStateDir(t *testing.T, stateDir string) []string {
+	t.Helper()
+	var paths []string
+	err := filepath.WalkDir(stateDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(stateDir, path)
+		if rel == "." {
+			return nil
+		}
+		if d.IsDir() {
+			rel += "/"
+		}
+		paths = append(paths, rel)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk state dir: %v", err)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 func TestInitCommand_OtelFlags_Exist(t *testing.T) {
