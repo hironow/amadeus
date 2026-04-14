@@ -222,7 +222,8 @@ func writeConfigWithDefaults(configPath, lang string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath, data, 0o644)
+	header := "# amadeus configuration\n# Run 'amadeus init --force' to regenerate with defaults\n\n"
+	return os.WriteFile(configPath, []byte(header+string(data)), 0o644)
 }
 
 // deepMerge merges src into dst recursively. src values override dst values.
