@@ -10,22 +10,16 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// RunCheck orchestrates the amadeus check pipeline.
-// This is the reference implementation of COMMAND → Aggregate → EVENT:
-//  1. Create CheckAggregate, wrap in EventEmitter + StateManager
-//  2. Wire policy engine (WHEN [EVENT] THEN [handler])
-//  3. Delegate I/O pipeline to session via port.Orchestrator
-//
-// The ExecuteCheckCommand is already valid by construction (parse-don't-validate).
-func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.CheckOptions,
+// BuildCheckEmitter creates a CheckEventEmitter + CheckStateProvider for the amadeus pipeline.
+// Called by cmd (composition root) before delegating to pipeline.RunCheck or pipeline.Run.
+// The idPrefix distinguishes check vs run invocations (e.g. "check-" or "run-").
+func BuildCheckEmitter(ctx context.Context, idPrefix string,
 	pipeline port.Orchestrator, cfg domain.Config, logger domain.Logger,
 	notifier port.Notifier, metrics port.PolicyMetrics,
 	dispatcher port.ImprovementTaskDispatcher,
-) error {
-	// Create aggregate with config
+) (port.CheckEventEmitter, port.CheckStateProvider) {
 	agg := domain.NewCheckAggregate(cfg)
 
-	// Wire policy engine (WHEN [EVENT] THEN [handler])
 	engine := NewPolicyEngine(logger)
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
@@ -35,13 +29,10 @@ func RunCheck(ctx context.Context, cmd domain.ExecuteCheckCommand, opts domain.C
 	}
 	registerCheckPolicies(engine, logger, notifier, metrics, dispatcher)
 
-	// Create EventEmitter + StateManager wrapping the aggregate
-	checkID := fmt.Sprintf("check-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	checkID := fmt.Sprintf("%s%d-%d", idPrefix, time.Now().UnixMilli(), os.Getpid())
 	agg.SetCheckID(checkID)
 	emitter := NewCheckEventEmitter(ctx, agg, pipeline.EventStore(), pipeline.EventApplier(), engine, pipeline.SeqAllocator(), logger, checkID)
 	state := NewCheckStateProvider(agg)
 
-	// Delegate to session I/O pipeline via Orchestrator interface
-	// Session restores aggregate state from persisted projection internally
-	return pipeline.RunCheck(ctx, opts, emitter, state)
+	return emitter, state
 }
