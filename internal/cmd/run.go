@@ -256,9 +256,8 @@ If [path] is omitted, the current working directory is used. Requires
 
 			defer a.CloseRunner()
 
-			// Parse -> COMMAND -> usecase -> EventEmitter -> EVENT
-			rp, rpErr := domain.NewRepoPath(repoRoot)
-			if rpErr != nil {
+			// Validate repo path
+			if _, rpErr := domain.NewRepoPath(repoRoot); rpErr != nil {
 				return rpErr
 			}
 
@@ -274,12 +273,16 @@ If [path] is omitted, the current working directory is used. Requires
 			if baseBranch != "" {
 				noMerge, _ := cmd.Flags().GetBool("no-merge")
 				autoMerge := !noMerge // default ON when --base is set
-				runErr := usecase.Run(cmd.Context(), domain.NewExecuteRunCommand(rp, baseBranch), domain.RunOptions{
+				emitter, state := usecase.BuildCheckEmitter(cmd.Context(), "run-", a, cfg, logger, notifier, &platform.OTelPolicyMetrics{}, dispatcher)
+				if prReader != nil {
+					usecase.WirePRPipeline(a, prReader, store, emitter, logger)
+				}
+				runErr := a.Run(cmd.Context(), domain.RunOptions{
 					CheckOptions: checkOpts,
 					BaseBranch:   baseBranch,
 					AutoMerge:    autoMerge,
 					ReadyLabel:   "sightjack:ready",
-				}, a, cfg, logger, notifier, &platform.OTelPolicyMetrics{}, prReader, store, dispatcher)
+				}, emitter, state)
 				return tryWriteHandover(cmd.Context(), runErr, repoRoot, domain.HandoverState{
 					Tool:       "amadeus",
 					Operation:  "divergence",
@@ -298,8 +301,8 @@ If [path] is omitted, the current working directory is used. Requires
 			// PR convergence analysis is skipped (PRReader=nil), but divergence-based
 			// impl feedback is still generated and flushed to outbox.
 			metrics := &platform.OTelPolicyMetrics{}
-			checkErr := usecase.RunCheck(cmd.Context(), domain.NewExecuteCheckCommand(rp), checkOpts,
-				a, cfg, logger, notifier, metrics, dispatcher)
+			emitter, state := usecase.BuildCheckEmitter(cmd.Context(), "check-", a, cfg, logger, notifier, metrics, dispatcher)
+			checkErr := a.RunCheck(cmd.Context(), checkOpts, emitter, state)
 			if checkErr != nil {
 				if _, ok := checkErr.(*domain.DriftError); !ok {
 					return tryWriteHandover(cmd.Context(), checkErr, repoRoot, domain.HandoverState{
@@ -331,8 +334,8 @@ If [path] is omitted, the current working directory is used. Requires
 			waitErr := runWaitingLoop(
 				cmd.Context(),
 				func(ctx context.Context) error {
-					return usecase.RunCheck(ctx, domain.NewExecuteCheckCommand(rp), checkOpts,
-						a, cfg, logger, notifier, metrics, dispatcher)
+					e, s := usecase.BuildCheckEmitter(ctx, "check-", a, cfg, logger, notifier, metrics, dispatcher)
+					return a.RunCheck(ctx, checkOpts, e, s)
 				},
 				func(ctx context.Context) (bool, error) {
 					return session.WaitForDMail(ctx, inboxCh, cfg.IdleTimeout, logger)

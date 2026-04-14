@@ -13,8 +13,8 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
-	// given: valid command with minimal real deps (temp dir with .gate/)
+func TestBuildCheckEmitter_ReturnsEmitterAndState(t *testing.T) {
+	// given: valid deps (temp dir with .gate/)
 	tmpDir := t.TempDir()
 	gateDir := filepath.Join(tmpDir, ".gate")
 	if err := os.MkdirAll(filepath.Join(gateDir, ".run"), 0o755); err != nil {
@@ -27,9 +27,6 @@ func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 	store := session.NewProjectionStore(gateDir)
 	eventStore := session.NewEventStore(gateDir, &domain.NopLogger{})
 
-	rp, _ := domain.NewRepoPath(tmpDir)
-	cmd := domain.NewExecuteCheckCommand(rp)
-	opts := domain.CheckOptions{DryRun: true}
 	cfg := domain.DefaultConfig()
 	logger := platform.NewLogger(nil, false)
 	a := &session.Amadeus{
@@ -39,22 +36,14 @@ func TestRunCheck_EmitterAndStateInjected(t *testing.T) {
 		Logger: logger,
 	}
 
-	// pre-conditions
-	if a.Emitter != nil {
-		t.Fatal("emitter should be nil before RunCheck")
-	}
-	if a.State != nil {
-		t.Fatal("state should be nil before RunCheck")
-	}
+	// when
+	emitter, state := usecase.BuildCheckEmitter(context.Background(), "check-", a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
-	// when: RunCheck will fail at Git operations (not configured), but wiring happens first
-	_ = usecase.RunCheck(context.Background(), cmd, opts, a, cfg, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
-
-	// then: emitter and state should have been injected
-	if a.Emitter == nil {
-		t.Fatal("emitter should be injected after RunCheck")
+	// then
+	if emitter == nil {
+		t.Fatal("emitter should not be nil")
 	}
-	if a.State == nil {
-		t.Fatal("state should be injected after RunCheck")
+	if state == nil {
+		t.Fatal("state should not be nil")
 	}
 }

@@ -163,15 +163,11 @@ func TestRunLifecycle_StartAndStop(t *testing.T) {
 		CheckOptions: domain.CheckOptions{Quiet: true},
 	}
 
-	rp, err := domain.NewRepoPath(tmpDir)
-	if err != nil {
-		t.Fatalf("NewRepoPath: %v", err)
-	}
-	cmd := domain.NewExecuteRunCommand(rp, "")
+	cfg := domain.DefaultConfig()
+	emitter, state := usecase.BuildCheckEmitter(ctx, "run-", a, cfg, &domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
 
 	// when: run the daemon loop (exits when context is cancelled)
-	err = usecase.Run(ctx, cmd, opts, a, domain.DefaultConfig(),
-		&domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, nil, nil, &port.NopImprovementTaskDispatcher{})
+	err := a.Run(ctx, opts, emitter, state)
 
 	// then: no error
 	if err != nil {
@@ -243,19 +239,18 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 		CheckOptions: domain.CheckOptions{Quiet: true},
 	}
 
-	rp, err := domain.NewRepoPath(tmpDir)
-	if err != nil {
-		t.Fatalf("NewRepoPath: %v", err)
+	cfg := domain.DefaultConfig()
+	emitter2, state2 := usecase.BuildCheckEmitter(ctx, "run-", a, cfg, &domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
+	if prReader != nil {
+		usecase.WirePRPipeline(a, prReader, store, emitter2, &domain.NopLogger{})
 	}
-	cmd := domain.NewExecuteRunCommand(rp, "")
 
 	// when: run the daemon loop
-	err = usecase.Run(ctx, cmd, opts, a, domain.DefaultConfig(),
-		&domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, prReader, store, &port.NopImprovementTaskDispatcher{})
+	runErr := a.Run(ctx, opts, emitter2, state2)
 
 	// then: no error
-	if err != nil {
-		t.Fatalf("Run returned error: %v", err)
+	if runErr != nil {
+		t.Fatalf("Run returned error: %v", runErr)
 	}
 
 	// then: verify events in the real event store
