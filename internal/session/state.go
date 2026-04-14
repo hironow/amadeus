@@ -88,7 +88,7 @@ func InitGateDir(root string, logger domain.Logger, lang string) (*InitResult, e
 	result.Add("config.yaml", InitUpdated, "")
 
 	// Gitignore (append-only)
-	gateGitignoreEntries := []string{".run/", "outbox/", "inbox/", ".otel.env", "events/", ".mcp.json", ".claude/"}
+	gateGitignoreEntries := []string{".run/", "outbox/", "inbox/", "archive/", "insights/", ".otel.env", "events/", ".mcp.json", ".claude/"}
 	if err := EnsureGitignoreEntries(filepath.Join(root, ".gitignore"), gateGitignoreEntries); err != nil {
 		return result, err
 	}
