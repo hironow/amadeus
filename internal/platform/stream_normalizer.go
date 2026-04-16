@@ -146,7 +146,10 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 		if subagentToolNames[tool.Name] {
 			return n.normalizeSubagentStart(tool, msg)
 		}
-		summary, _ := truncateInput(tool.Input, 200)
+		summary, ok := truncateInput(tool.Input, 200)
+		if !ok && summary == "" {
+			summary = string(tool.Input)
+		}
 		data, err := json.Marshal(map[string]any{
 			"tool_name":      tool.Name,
 			"tool_id":        tool.ID,
@@ -168,7 +171,7 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	if am != nil {
 		for _, block := range am.Content {
 			if block.Type == "thinking" && block.Thinking != "" {
-				text, _ := domain.TruncateField(block.Thinking, domain.RawFieldMaxBytes)
+					text := mustTruncate(block.Thinking, domain.RawFieldMaxBytes)
 				data, err := json.Marshal(map[string]string{"text": text})
 				if err != nil {
 					data = []byte("{}")
@@ -185,7 +188,7 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 		text = ""
 	}
 	if text != "" {
-		truncated, _ := domain.TruncateField(text, domain.RawFieldMaxBytes)
+		truncated := mustTruncate(text, domain.RawFieldMaxBytes)
 		data, err := json.Marshal(map[string]string{"text": truncated})
 		if err != nil {
 			data = []byte("{}")
@@ -200,7 +203,10 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 func (n *StreamNormalizer) normalizeSubagentStart(tool ContentBlock, msg *StreamMessage) *domain.SessionStreamEvent {
 	subID := fmt.Sprintf("sub_%s", tool.ID)
 	n.subagents[tool.ID] = subID
-	desc, _ := truncateInput(tool.Input, 200)
+	desc, ok := truncateInput(tool.Input, 200)
+	if !ok && desc == "" {
+		desc = string(tool.Input)
+	}
 	data, err := json.Marshal(map[string]any{
 		"subagent_id":       subID,
 		"parent_session_id": n.codingSessionID,
@@ -326,4 +332,13 @@ func truncateInput(input json.RawMessage, maxLen int) (string, bool) {
 	}
 	s := string(input)
 	return domain.TruncateField(s, maxLen)
+}
+
+// mustTruncate truncates s to maxBytes, returning the (possibly truncated) string.
+func mustTruncate(s string, maxBytes int) string {
+	result, wasTruncated := domain.TruncateField(s, maxBytes)
+	if wasTruncated && result == "" {
+		return s
+	}
+	return result
 }
