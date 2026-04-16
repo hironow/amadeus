@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -19,6 +20,15 @@ import (
 
 	"github.com/hironow/amadeus/internal/platform"
 )
+
+func mergeResource(base *resource.Resource, extra *resource.Resource) *resource.Resource {
+	merged, err := resource.Merge(base, extra)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "otel resource merge warning: %v (continuing with base resource)\n", err)
+		return base
+	}
+	return merged
+}
 
 // initTracer sets up the OpenTelemetry TracerProvider and updates
 // platform.Tracer. Called from PersistentPreRunE; shutdown is registered
@@ -39,7 +49,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 		return func(context.Context) error { return nil }
 	}
 
-	res, _ := resource.Merge(
+	res := mergeResource(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -49,7 +59,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 	)
 
 	if entity := os.Getenv("WANDB_ENTITY"); entity != "" {
-		res, _ = resource.Merge(res, resource.NewWithAttributes(
+		res = mergeResource(res, resource.NewWithAttributes(
 			semconv.SchemaURL,
 			attribute.String("wandb.entity", platform.SanitizeUTF8(entity)),
 			attribute.String("wandb.project", platform.SanitizeUTF8(os.Getenv("WANDB_PROJECT"))),
@@ -99,7 +109,7 @@ func initMeter(serviceName, ver string) func(context.Context) error {
 		return func(context.Context) error { return nil }
 	}
 
-	res, _ := resource.Merge(
+	res := mergeResource(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
