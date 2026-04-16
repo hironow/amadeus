@@ -102,7 +102,10 @@ func (n *StreamNormalizer) SessionEnd(providerSessionID string, runErr error) do
 	if n.lastDuration > 0 {
 		data["duration_ms"] = n.lastDuration
 	}
-	dataJSON, _ := json.Marshal(data)
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		dataJSON = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSessionEnd, dataJSON)
 	if providerSessionID != "" {
 		ev.ProviderSessionID = providerSessionID
@@ -119,18 +122,24 @@ func (n *StreamNormalizer) normalizeInit(msg *StreamMessage) *domain.SessionStre
 	for _, s := range msg.MCPServers {
 		servers = append(servers, map[string]string{"name": s.Name, "status": s.Status})
 	}
-	data, _ := json.Marshal(map[string]any{
+	data, err := json.Marshal(map[string]any{
 		"model":       msg.Model,
 		"tools":       tools,
 		"mcp_servers": servers,
 	})
+	if err != nil {
+		data = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSessionStart, data)
 	return &ev
 }
 
 func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.SessionStreamEvent {
 	// Check for tool_use (including subagent starts).
-	toolBlocks, _ := msg.ExtractToolUse()
+	toolBlocks, err := msg.ExtractToolUse()
+	if err != nil {
+		toolBlocks = nil
+	}
 	if len(toolBlocks) > 0 {
 		// Emit first tool_use as the event (multiple tools in one message are rare).
 		tool := toolBlocks[0]
@@ -138,23 +147,32 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 			return n.normalizeSubagentStart(tool, msg)
 		}
 		summary, _ := truncateInput(tool.Input, 200)
-		data, _ := json.Marshal(map[string]any{
+		data, err := json.Marshal(map[string]any{
 			"tool_name":      tool.Name,
 			"tool_id":        tool.ID,
 			"parent_tool_id": msg.ParentToolUseID,
 			"summary":        summary,
 		})
+		if err != nil {
+			data = []byte("{}")
+		}
 		ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamToolUseStart, data)
 		return &ev
 	}
 
 	// Check for thinking blocks.
-	am, _ := msg.ParseAssistantMessage()
+	am, err := msg.ParseAssistantMessage()
+	if err != nil {
+		am = nil
+	}
 	if am != nil {
 		for _, block := range am.Content {
 			if block.Type == "thinking" && block.Thinking != "" {
 				text, _ := domain.TruncateField(block.Thinking, domain.RawFieldMaxBytes)
-				data, _ := json.Marshal(map[string]string{"text": text})
+				data, err := json.Marshal(map[string]string{"text": text})
+				if err != nil {
+					data = []byte("{}")
+				}
 				ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamThinking, data)
 				return &ev
 			}
@@ -162,10 +180,16 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	}
 
 	// Text output.
-	text, _ := msg.ExtractText()
+	text, err := msg.ExtractText()
+	if err != nil {
+		text = ""
+	}
 	if text != "" {
 		truncated, _ := domain.TruncateField(text, domain.RawFieldMaxBytes)
-		data, _ := json.Marshal(map[string]string{"text": truncated})
+		data, err := json.Marshal(map[string]string{"text": truncated})
+		if err != nil {
+			data = []byte("{}")
+		}
 		ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamAssistantText, data)
 		return &ev
 	}
@@ -177,11 +201,14 @@ func (n *StreamNormalizer) normalizeSubagentStart(tool ContentBlock, msg *Stream
 	subID := fmt.Sprintf("sub_%s", tool.ID)
 	n.subagents[tool.ID] = subID
 	desc, _ := truncateInput(tool.Input, 200)
-	data, _ := json.Marshal(map[string]any{
+	data, err := json.Marshal(map[string]any{
 		"subagent_id":       subID,
 		"parent_session_id": n.codingSessionID,
 		"description":       desc,
 	})
+	if err != nil {
+		data = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSubagentStart, data)
 	ev.SubagentID = subID
 	ev.ParentSessionID = n.codingSessionID
@@ -192,19 +219,25 @@ func (n *StreamNormalizer) normalizeToolResult(msg *StreamMessage) *domain.Sessi
 	// Check if this is a subagent end.
 	if subID, ok := n.subagents[msg.ToolUseID]; ok {
 		delete(n.subagents, msg.ToolUseID)
-		data, _ := json.Marshal(map[string]any{
+		data, err := json.Marshal(map[string]any{
 			"subagent_id": subID,
 			"status":      "completed",
 		})
+		if err != nil {
+			data = []byte("{}")
+		}
 		ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSubagentEnd, data)
 		ev.SubagentID = subID
 		return &ev
 	}
 
-	data, _ := json.Marshal(map[string]any{
+	data, err := json.Marshal(map[string]any{
 		"tool_id": msg.ToolUseID,
 		"status":  "completed",
 	})
+	if err != nil {
+		data = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamToolResult, data)
 	return &ev
 }
@@ -230,11 +263,14 @@ func (n *StreamNormalizer) normalizeResult(msg *StreamMessage) *domain.SessionSt
 }
 
 func (n *StreamNormalizer) normalizeHookStart(msg *StreamMessage) *domain.SessionStreamEvent {
-	data, _ := json.Marshal(map[string]string{
+	data, err := json.Marshal(map[string]string{
 		"hook_name":  msg.HookName,
 		"hook_event": msg.HookEvent,
 		"command":    msg.Command,
 	})
+	if err != nil {
+		data = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamHookStart, data)
 	return &ev
 }
@@ -244,11 +280,14 @@ func (n *StreamNormalizer) normalizeHookResult(msg *StreamMessage) *domain.Sessi
 	if msg.ExitCode != nil {
 		exitCode = *msg.ExitCode
 	}
-	data, _ := json.Marshal(map[string]any{
+	data, err := json.Marshal(map[string]any{
 		"hook_name": msg.HookName,
 		"exit_code": exitCode,
 		"outcome":   msg.Outcome,
 	})
+	if err != nil {
+		data = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamHookResult, data)
 	return &ev
 }
@@ -260,16 +299,22 @@ func (n *StreamNormalizer) normalizeRateLimit(msg *StreamMessage) *domain.Sessio
 		data["resets_at"] = msg.RateLimitInfo.ResetsAt
 		data["utilization"] = msg.RateLimitInfo.Utilization
 	}
-	dataJSON, _ := json.Marshal(data)
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		dataJSON = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamRateLimit, dataJSON)
 	return &ev
 }
 
 func (n *StreamNormalizer) normalizeError(msg *StreamMessage) *domain.SessionStreamEvent {
-	data, _ := json.Marshal(map[string]any{
+	data, err := json.Marshal(map[string]any{
 		"message":     msg.Result,
 		"recoverable": false,
 	})
+	if err != nil {
+		data = []byte("{}")
+	}
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamError, data)
 	return &ev
 }
