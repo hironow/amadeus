@@ -32,8 +32,8 @@ structured JSON for piping into downstream commands.`,
   amadeus log /path/to/project`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
-			jsonOut, _ := cmd.Flags().GetBool("json")
+			configPath := mustString(cmd, "config")
+			jsonOut := mustBool(cmd, "json")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {

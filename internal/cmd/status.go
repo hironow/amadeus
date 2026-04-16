@@ -52,7 +52,7 @@ Use --history N to show a sparkline of the last N baseline divergence points.`,
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
 			report := session.Status(cmd.Context(), divRoot, logger)
 
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt == "json" {
 				data, jsonErr := json.Marshal(report)
 				if jsonErr != nil {
@@ -66,7 +66,7 @@ Use --history N to show a sparkline of the last N baseline divergence points.`,
 			fmt.Fprint(cmd.OutOrStdout(), report.FormatText())
 
 			// Sparkline history display
-			historyN, _ := cmd.Flags().GetInt("history")
+			historyN := mustInt(cmd, "history")
 			if historyN > 0 && len(report.BaselineHistory) > 0 {
 				points := report.BaselineHistory
 				if len(points) > historyN {

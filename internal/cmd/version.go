@@ -30,7 +30,7 @@ for structured output suitable for scripts and CI.`,
 				"arch":    runtime.GOARCH,
 			}
 
-			jsonFlag, _ := cmd.Flags().GetBool("json")
+			jsonFlag := mustBool(cmd, "json")
 			if jsonFlag {
 				enc := json.NewEncoder(cmd.OutOrStdout())
 				enc.SetIndent("", "  ")

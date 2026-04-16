@@ -49,24 +49,24 @@ func NewRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		Version:       Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			cfgPath, _ := cmd.Flags().GetString("config")
+			cfgPath := mustString(cmd, "config")
 			if cfgPath != "" {
 				applyOtelEnv(filepath.Dir(cfgPath))
 			} else {
 				applyOtelEnv(domain.StateDir)
 			}
-			noColor, _ := cmd.Flags().GetBool("no-color")
+			noColor := mustBool(cmd, "no-color")
 			if noColor {
 				os.Setenv("NO_COLOR", "1")
 			}
-			verbose, _ := cmd.Flags().GetBool("verbose")
+			verbose := mustBool(cmd, "verbose")
 			out := cmd.ErrOrStderr()
-			quiet, _ := cmd.Flags().GetBool("quiet")
+			quiet := mustBool(cmd, "quiet")
 			if quiet {
 				out = io.Discard
 			}
 			logger := platform.NewLogger(out, verbose)
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt != "json" {
 				logger.Header("amadeus", Version)
 				logger.Section(cmd.Name())

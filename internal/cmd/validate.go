@@ -31,7 +31,7 @@ current working directory is used.`,
   amadeus validate --config /path/to/config.yaml`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
+			configPath := mustString(cmd, "config")
 
 			if configPath == "" {
 				repoRoot, err := resolveTargetDir(args)

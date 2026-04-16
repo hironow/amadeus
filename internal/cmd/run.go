@@ -45,19 +45,19 @@ If [path] is omitted, the current working directory is used. Requires
   amadeus run --full --json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
-			dryRun, _ := cmd.Flags().GetBool("dry-run")
-			full, _ := cmd.Flags().GetBool("full")
-			quiet, _ := cmd.Flags().GetBool("quiet")
-			jsonOut, _ := cmd.Flags().GetBool("json")
-			lang, _ := cmd.Flags().GetString("lang")
-			baseBranch, _ := cmd.Flags().GetString("base")
-			collectorEnable, _ := cmd.Flags().GetBool("collector-enable")
-			collectorDisable, _ := cmd.Flags().GetBool("collector-disable")
-			collectorProjectID, _ := cmd.Flags().GetString("collector-project-id")
-			collectorAPIURL, _ := cmd.Flags().GetString("collector-api-url")
-			collectorQueryLimit, _ := cmd.Flags().GetInt("collector-query-limit")
-			collectorFeedbackTypes, _ := cmd.Flags().GetStringSlice("collector-feedback-type")
+			configPath := mustString(cmd, "config")
+			dryRun := mustBool(cmd, "dry-run")
+			full := mustBool(cmd, "full")
+			quiet := mustBool(cmd, "quiet")
+			jsonOut := mustBool(cmd, "json")
+			lang := mustString(cmd, "lang")
+			baseBranch := mustString(cmd, "base")
+			collectorEnable := mustBool(cmd, "collector-enable")
+			collectorDisable := mustBool(cmd, "collector-disable")
+			collectorProjectID := mustString(cmd, "collector-project-id")
+			collectorAPIURL := mustString(cmd, "collector-api-url")
+			collectorQueryLimit := mustInt(cmd, "collector-query-limit")
+			collectorFeedbackTypes := mustStringSlice(cmd, "collector-feedback-type")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
@@ -134,7 +134,7 @@ If [path] is omitted, the current working directory is used. Requires
 			session.SetCircuitBreaker(platform.NewCircuitBreaker(logger))
 
 			if cmd.Flags().Changed("idle-timeout") {
-				cfg.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
+				cfg.IdleTimeout = mustDuration(cmd, "idle-timeout")
 			}
 
 			if lang != "" {
@@ -145,9 +145,9 @@ If [path] is omitted, the current working directory is used. Requires
 			}
 
 			// Wire approver (default: no gate — amadeus uses explicit --approve-cmd to enable)
-			approveCmd, _ := cmd.Flags().GetString("approve-cmd")
+			approveCmd := mustString(cmd, "approve-cmd")
 			autoApprove := approveCmd == ""
-			if v, _ := cmd.Flags().GetBool("auto-approve"); v {
+			if mustBool(cmd, "auto-approve") {
 				autoApprove = true
 			}
 			approver := session.BuildApprover(
@@ -156,7 +156,7 @@ If [path] is omitted, the current working directory is used. Requires
 			)
 
 			// Wire notifier
-			notifyCmd, _ := cmd.Flags().GetString("notify-cmd")
+			notifyCmd := mustString(cmd, "notify-cmd")
 			var notifier port.Notifier
 			if notifyCmd != "" {
 				notifier = session.NewCmdNotifier(notifyCmd)
@@ -164,7 +164,7 @@ If [path] is omitted, the current working directory is used. Requires
 				notifier = &port.NopNotifier{}
 			}
 
-			reviewCmd, _ := cmd.Flags().GetString("review-cmd")
+			reviewCmd := mustString(cmd, "review-cmd")
 
 			// One-time cutover: migrate to global SeqNr (ADR S0040, idempotent)
 			var seqAlloc port.SeqAllocator
@@ -271,7 +271,7 @@ If [path] is omitted, the current working directory is used. Requires
 			// With --base: daemon loop with inbox monitoring + post-merge checks.
 			// Adds PR convergence analysis (via PRReader/gh) on top of divergence scoring.
 			if baseBranch != "" {
-				noMerge, _ := cmd.Flags().GetBool("no-merge")
+				noMerge := mustBool(cmd, "no-merge")
 				autoMerge := !noMerge // default ON when --base is set
 				emitter, state := usecase.BuildCheckEmitter(cmd.Context(), "run-", a, cfg, logger, notifier, &platform.OTelPolicyMetrics{}, dispatcher)
 				if prReader != nil {

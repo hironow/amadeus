@@ -41,8 +41,8 @@ hint recommends adjusting .claude/settings.json.`,
   amadeus doctor --repair`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
-			jsonOut, _ := cmd.Flags().GetBool("json")
+			configPath := mustString(cmd, "config")
+			jsonOut := mustBool(cmd, "json")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
@@ -54,8 +54,8 @@ hint recommends adjusting .claude/settings.json.`,
 			}
 
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
-			repair, _ := cmd.Flags().GetBool("repair")
-			linearFlag, _ := cmd.Flags().GetBool("linear")
+			repair := mustBool(cmd, "repair")
+			linearFlag := mustBool(cmd, "linear")
 			mode := domain.NewTrackingMode(linearFlag)
 			results := runDoctor(cmd.Context(), configPath, repoRoot, logger, repair, mode)
 

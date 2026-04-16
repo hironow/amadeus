@@ -53,7 +53,7 @@ Use -o json for machine-readable JSON output.`,
 				return fmt.Errorf("query stats: %w", queryErr)
 			}
 
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt == "json" {
 				data, jsonErr := json.Marshal(stats)
 				if jsonErr != nil {

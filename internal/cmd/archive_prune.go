@@ -42,11 +42,11 @@ Pass --execute to actually remove the files.`,
   amadeus archive-prune --rebuild-index`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			days, _ := cmd.Flags().GetInt("days")
-			execute, _ := cmd.Flags().GetBool("execute")
+			days := mustInt(cmd, "days")
+			execute := mustBool(cmd, "execute")
 			dryRunExplicit := cmd.Flags().Changed("dry-run")
-			yes, _ := cmd.Flags().GetBool("yes")
-			outputFmt, _ := cmd.Flags().GetString("output")
+			yes := mustBool(cmd, "yes")
+			outputFmt := mustString(cmd, "output")
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
 
 			if execute && dryRunExplicit {
@@ -58,7 +58,7 @@ Pass --execute to actually remove the files.`,
 				return err
 			}
 
-			rebuildIndex, _ := cmd.Flags().GetBool("rebuild-index")
+			rebuildIndex := mustBool(cmd, "rebuild-index")
 			if rebuildIndex {
 				if execute || dryRunExplicit {
 					return fmt.Errorf("--rebuild-index cannot be combined with --execute or --dry-run")

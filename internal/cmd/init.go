@@ -43,12 +43,12 @@ the --otel-backend flag. The generated .otel.env file is written into
 			if err != nil {
 				return err
 			}
-			force, _ := cmd.Flags().GetBool("force")
+			force := mustBool(cmd, "force")
 			divRoot := filepath.Join(repoRoot, domain.StateDir)
 			if _, err := os.Stat(divRoot); err == nil && !force {
 				return fmt.Errorf("%s already exists\nUse --force to overwrite", divRoot)
 			}
-			lang, _ := cmd.Flags().GetString("lang")
+			lang := mustString(cmd, "lang")
 			logger := loggerFrom(cmd)
 			adapter := &session.InitAdapter{Logger: logger}
 			var opts []port.InitOption
@@ -62,10 +62,10 @@ the --otel-backend flag. The generated .otel.env file is written into
 				session.PrintInitResult(cmd.ErrOrStderr(), adapter.LastResult)
 			}
 
-			otelBackend, _ := cmd.Flags().GetString("otel-backend")
+			otelBackend := mustString(cmd, "otel-backend")
 			if otelBackend != "" {
-				otelEntity, _ := cmd.Flags().GetString("otel-entity")
-				otelProject, _ := cmd.Flags().GetString("otel-project")
+				otelEntity := mustString(cmd, "otel-entity")
+				otelProject := mustString(cmd, "otel-project")
 				content, otelErr := platform.OtelEnvContent(otelBackend, otelEntity, otelProject)
 				if otelErr != nil {
 					return otelErr

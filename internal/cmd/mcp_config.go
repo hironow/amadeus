@@ -52,7 +52,7 @@ Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
 			}
 
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
-			linearFlag, _ := cmd.Flags().GetBool("linear")
+			linearFlag := mustBool(cmd, "linear")
 			mode := domain.NewTrackingMode(linearFlag)
 
 			path, genErr := session.GenerateMCPConfig(baseDir, mode, force)

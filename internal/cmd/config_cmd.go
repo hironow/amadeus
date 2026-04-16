@@ -130,7 +130,7 @@ Supported keys:
 }
 
 func resolveConfigPath(cmd *cobra.Command, args []string) (string, error) {
-	configPath, _ := cmd.Flags().GetString("config")
+	configPath := mustString(cmd, "config")
 	if configPath != "" {
 		return configPath, nil
 	}

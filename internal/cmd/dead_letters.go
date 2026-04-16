@@ -47,9 +47,9 @@ Pass --execute to actually delete them.`,
   amadeus dead-letters purge -o json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			execute, _ := cmd.Flags().GetBool("execute")
-			yes, _ := cmd.Flags().GetBool("yes")
-			outputFmt, _ := cmd.Flags().GetString("output")
+			execute := mustBool(cmd, "execute")
+			yes := mustBool(cmd, "yes")
+			outputFmt := mustString(cmd, "output")
 
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
