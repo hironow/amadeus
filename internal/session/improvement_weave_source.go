@@ -18,7 +18,7 @@ import (
 
 const defaultWeaveAPIBaseURL = "https://trace.wandb.ai"
 
-type HTTPImprovementFeedbackSource struct {
+type HTTPImprovementFeedbackSource struct { // nosemgrep: domain-primitives.public-string-field-go — internal HTTP client config; fields exported for struct literal initialization, not domain primitives [permanent]
 	BaseURL    string
 	APIKey     string
 	HTTPClient *http.Client

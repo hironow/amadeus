@@ -74,8 +74,8 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := domain.ValidateKind(dm.Kind); err == nil {
-		t.Error("expected ValidateKind to reject unknown kind 'advisory', but it passed")
+	if _, err := domain.ParseKindString(string(dm.Kind)); err == nil {
+		t.Error("expected ParseKindString to reject unknown kind 'advisory', but it passed")
 	}
 
 	data = readGolden(t, "future-schema.md")

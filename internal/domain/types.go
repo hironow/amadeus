@@ -22,7 +22,7 @@ type IndexEntry struct {
 
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
-type HandoverState struct {
+type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — pure signal-interrupt data carrier; Completed/Remaining are transient in-flight state lists, not domain invariant collections [permanent]
 	Tool         string // "amadeus"
 	Operation    string // "divergence"
 	Timestamp    time.Time

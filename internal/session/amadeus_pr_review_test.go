@@ -324,7 +324,7 @@ func TestEvaluatePRDiffs_GoTaskboardScenario(t *testing.T) {
 	_ = dmails
 }
 
-func mustPRStateWithSHA(t *testing.T, number, title, base, head, sha string) domain.PRState {
+func mustPRStateWithSHA(t *testing.T, number, title, base, head, sha string) domain.PRState { // nosemgrep: domain-primitives.multiple-string-params-go — test helper; distinct PR identity fields [permanent]
 	t.Helper()
 	ps, err := domain.NewPRState(number, title, base, head, true, 0, nil, nil, sha)
 	if err != nil {

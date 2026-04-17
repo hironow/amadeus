@@ -21,7 +21,7 @@ type ConvergenceConfig struct {
 // ComputedConfig holds system-written fields. Empty for amadeus today.
 type ComputedConfig struct{}
 
-type ImprovementCollectorConfig struct {
+type ImprovementCollectorConfig struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go — internal YAML config struct; fields exported for yaml.v3 decoder; FeedbackTypes is a config list, not a domain collection [permanent]
 	Enabled       *bool    `yaml:"enabled,omitempty"`
 	ProjectID     string   `yaml:"project_id,omitempty"`
 	APIURL        string   `yaml:"api_url,omitempty"`

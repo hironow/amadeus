@@ -6,7 +6,7 @@ import (
 
 // EvaluateMergeReadiness evaluates whether a PR is ready to merge.
 // reviewDecision "" means no reviewers assigned (treated as OK).
-func EvaluateMergeReadiness(number, mergeStateStatus, reviewDecision, mergeable string, hasReviewLabel bool) domain.PRMergeReadiness {
+func EvaluateMergeReadiness(number, mergeStateStatus, reviewDecision, mergeable string, hasReviewLabel bool) domain.PRMergeReadiness { // nosemgrep: domain-primitives.multiple-string-params-go — number/mergeStateStatus/reviewDecision/mergeable are distinct PR state fields, not interchangeable [permanent]
 	r := domain.PRMergeReadiness{
 		Number:           number,
 		MergeStateStatus: mergeStateStatus,

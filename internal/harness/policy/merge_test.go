@@ -7,7 +7,7 @@ import (
 	"github.com/hironow/amadeus/internal/harness/policy"
 )
 
-func mustPR(t *testing.T, number, title, base, head string, mergeable bool, labels []string, sha string) domain.PRState {
+func mustPR(t *testing.T, number, title, base, head string, mergeable bool, labels []string, sha string) domain.PRState { // nosemgrep: domain-primitives.multiple-string-params-go — test helper; distinct PR identity fields [permanent]
 	t.Helper()
 	pr, err := domain.NewPRState(number, title, base, head, mergeable, 0, nil, labels, sha)
 	if err != nil {

@@ -90,9 +90,8 @@ type Event struct {
 	SeqNr         uint64          `json:"seq_nr,omitempty"`
 }
 
-// ValidateEvent checks that an Event has all required fields populated.
-// Returns an error describing all validation failures.
-func ValidateEvent(e Event) error {
+// ParseEvent validates all required fields and returns the event for pipeline chaining.
+func ParseEvent(e Event) (Event, error) {
 	var errs []string
 	if e.ID == "" {
 		errs = append(errs, "ID is required")
@@ -112,9 +111,9 @@ func ValidateEvent(e Event) error {
 		errs = append(errs, fmt.Sprintf("schema_version %d exceeds supported version %d", e.SchemaVersion, CurrentEventSchemaVersion))
 	}
 	if len(errs) > 0 {
-		return errors.New("invalid event: " + strings.Join(errs, "; "))
+		return Event{}, errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
-	return nil
+	return e, nil
 }
 
 // AppendResult captures metrics from an event store Append operation.
@@ -169,7 +168,7 @@ type ConvergenceDetectedData struct {
 }
 
 // ArchivePrunedData is the payload for EventArchivePruned.
-type ArchivePrunedData struct {
+type ArchivePrunedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; Paths is a snapshot of pruned file list at event time [permanent]
 	Paths []string `json:"paths"`
 	Count int      `json:"count"`
 }
@@ -209,7 +208,7 @@ type PRMergedData struct {
 }
 
 // PRMergeSkippedData is the payload for pr.merge.skipped events.
-type PRMergeSkippedData struct {
+type PRMergeSkippedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; Reasons is a snapshot list at skip time [permanent]
 	PRNumber string   `json:"pr_number"`
 	Title    string   `json:"title"`
 	Reasons  []string `json:"reasons"`

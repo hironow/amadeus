@@ -40,7 +40,7 @@ type ToolSnapshot struct {
 }
 
 // CrossRepoSnapshot aggregates divergence data across all tools.
-type CrossRepoSnapshot struct {
+type CrossRepoSnapshot struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON payload for cross-tool status report; Snapshots is a read-only aggregation result, not a managed collection [permanent]
 	Snapshots      []ToolSnapshot `json:"snapshots"`
 	EcosystemScore float64        `json:"ecosystem_score"`
 	MaxSeverity    Severity       `json:"max_severity"`

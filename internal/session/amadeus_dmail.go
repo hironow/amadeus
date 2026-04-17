@@ -252,7 +252,7 @@ func dmailCorrectionMetadata(candidate domain.ClaudeDMailCandidate, kind domain.
 		OwnerHistory:    ownerHistory,
 		RecurrenceCount: recurrenceCount,
 		CorrelationID:   correlationIDForDMail(name, wave),
-		TraceID:         span.SpanContext().TraceID().String(),
+		TraceID:         span.SpanContext().TraceID().String(), // nosemgrep: demeter.method-chain-3-levels-go — OTel canonical API: span.SpanContext().TraceID().String() is the prescribed extraction path; no intermediate type to extract [permanent]
 		Outcome:         domain.ImprovementOutcomePending,
 	}
 	if trigger.IsImprovement() {

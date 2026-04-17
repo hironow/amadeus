@@ -34,7 +34,7 @@ const (
 )
 
 // CheckResult holds the outcome of a single divergence check.
-type CheckResult struct {
+type CheckResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload for check result; ImpactRadius/PRsEvaluated/DMails/ConvergenceAlerts are snapshot lists at check time [permanent]
 	CheckedAt           time.Time          `json:"checked_at"`
 	Commit              string             `json:"commit"`
 	Type                CheckType          `json:"type"`

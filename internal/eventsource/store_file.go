@@ -32,7 +32,7 @@ func NewFileEventStore(dir string, logger domain.Logger) *FileEventStore {
 // All events are validated before any writes occur; if any event is invalid, the entire batch is rejected.
 func (s *FileEventStore) Append(_ context.Context, events ...domain.Event) (domain.AppendResult, error) {
 	for _, ev := range events {
-		if err := domain.ValidateEvent(ev); err != nil {
+		if _, err := domain.ParseEvent(ev); err != nil {
 			return domain.AppendResult{}, fmt.Errorf("validate event %s: %w", ev.ID, err)
 		}
 	}

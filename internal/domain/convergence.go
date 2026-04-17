@@ -9,7 +9,7 @@ import (
 
 // ConvergenceAlert represents a detected world-line convergence:
 // multiple D-Mails targeting the same area within a time window.
-type ConvergenceAlert struct {
+type ConvergenceAlert struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; DMails field is a list of names in an alert snapshot, not a managed collection [permanent]
 	Target       string            `json:"target"`
 	Count        int               `json:"count"`
 	Window       int               `json:"window_days"`

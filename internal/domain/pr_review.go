@@ -7,7 +7,7 @@ import (
 )
 
 // PRReview holds review metadata for a merged pull request.
-type PRReview struct {
+type PRReview struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — domain model for PR review; Comments is a parsed list from gh API response [permanent]
 	Number         string // e.g. "#42"
 	ReviewDecision string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, or ""
 	CIStatus       string // SUCCESS, FAILURE, PENDING, or ""

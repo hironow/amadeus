@@ -131,19 +131,19 @@ func TestValidateSessionStreamEvent(t *testing.T) {
 	t.Parallel()
 
 	valid := domain.NewSessionStreamEvent("sightjack", domain.ProviderClaudeCode, domain.StreamSessionStart, nil)
-	if err := domain.ValidateSessionStreamEvent(valid); err != nil {
+	if _, err := domain.ParseSessionStreamEvent(valid); err != nil {
 		t.Errorf("valid event should pass: %v", err)
 	}
 
 	noTool := valid
 	noTool.Tool = ""
-	if err := domain.ValidateSessionStreamEvent(noTool); err == nil {
+	if _, err := domain.ParseSessionStreamEvent(noTool); err == nil {
 		t.Error("missing tool should fail")
 	}
 
 	noType := valid
 	noType.Type = ""
-	if err := domain.ValidateSessionStreamEvent(noType); err == nil {
+	if _, err := domain.ParseSessionStreamEvent(noType); err == nil {
 		t.Error("missing type should fail")
 	}
 }

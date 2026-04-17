@@ -21,7 +21,7 @@ type PRState struct {
 
 // NewPRState creates a validated PRState. Returns an error if required fields
 // (number, baseBranch, headBranch) are empty.
-func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles, labels []string, headSHA string) (PRState, error) {
+func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles, labels []string, headSHA string) (PRState, error) { // nosemgrep: domain-primitives.multiple-string-params-go — number/title/baseBranch/headBranch/headSHA are semantically distinct PR identity fields [permanent]
 	if number == "" {
 		return PRState{}, fmt.Errorf("PRState number is required")
 	}
@@ -115,14 +115,14 @@ func (p PRState) HeadSHAShort() string {
 }
 
 // PRChain represents a dependency chain of PRs ordered root to leaf.
-type PRChain struct {
+type PRChain struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — domain analysis result; PRs is an ordered chain snapshot produced by convergence analysis, not a managed collection [permanent]
 	ID          string
 	PRs         []PRState
 	HasConflict bool
 }
 
 // PRConvergenceReport is the result of pre-merge convergence analysis.
-type PRConvergenceReport struct {
+type PRConvergenceReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — analysis result struct; Chains/OrphanedPRs are read-only report outputs from convergence scan [permanent]
 	IntegrationBranch string
 	Chains            []PRChain
 	OrphanedPRs       []PRState
@@ -140,7 +140,7 @@ const (
 )
 
 // PRMergeReadiness holds the merge readiness evaluation for a single PR.
-type PRMergeReadiness struct {
+type PRMergeReadiness struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — merge evaluation result; BlockReasons is a diagnostic list produced at evaluation time [permanent]
 	Number           string
 	MergeStateStatus string   // "CLEAN", "BLOCKED", "BEHIND", "DIRTY", "UNSTABLE"
 	ReviewDecision   string   // "APPROVED", "REVIEW_REQUIRED", "CHANGES_REQUESTED", ""

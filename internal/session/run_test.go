@@ -33,7 +33,7 @@ func (m *mockPRReader) GetPRMergeReadiness(_ context.Context, _ string) (*domain
 	return nil, nil
 }
 
-func mustPRState(t *testing.T, number, title, base, head string, mergeable bool, behindBy int, conflicts []string) domain.PRState {
+func mustPRState(t *testing.T, number, title, base, head string, mergeable bool, behindBy int, conflicts []string) domain.PRState { // nosemgrep: domain-primitives.multiple-string-params-go — test helper; distinct PR identity fields [permanent]
 	t.Helper()
 	pr, err := domain.NewPRState(number, title, base, head, mergeable, behindBy, conflicts, nil, "")
 	if err != nil {
