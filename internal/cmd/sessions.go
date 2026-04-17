@@ -62,7 +62,7 @@ func newSessionsListCommand() *cobra.Command {
 				return fmt.Errorf("list sessions: %w", err)
 			}
 
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt == "json" {
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(records)
 			}
@@ -135,7 +135,7 @@ func newSessionsEnterCommand() *cobra.Command {
 
 			configPath := filepath.Join(stateDirPath, "config.yaml")
 			if f := cmd.Flags().Lookup("config"); f != nil && cmd.Flags().Changed("config") {
-				configPath, _ = cmd.Flags().GetString("config")
+				configPath = mustString(cmd, "config")
 			}
 			cfg, err := loadConfig(configPath)
 			if err != nil {

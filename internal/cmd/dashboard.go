@@ -68,7 +68,7 @@ Use -o json for machine-readable JSON output.`,
 				return fmt.Errorf("read cross-repo snapshot: %w", err)
 			}
 
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt == "json" {
 				data, jsonErr := json.Marshal(snapshot)
 				if jsonErr != nil {

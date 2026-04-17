@@ -25,7 +25,7 @@ func newSyncCommand() *cobra.Command {
   amadeus sync /path/to/project`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
+			configPath := mustString(cmd, "config")
 			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err

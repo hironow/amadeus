@@ -25,8 +25,8 @@ func NewGhPRWriter(repoDir string) *GhPRWriter {
 // ApplyLabel adds a label to the given PR. Creates the label if it doesn't exist.
 func (g *GhPRWriter) ApplyLabel(_ context.Context, prNumber, label string) error {
 	ghClient := &GHClient{Dir: g.RepoDir}
-	// Ensure label exists (--force is idempotent)
-	_, _ = ghClient.runGH("label", "create", label, "--force")
+	// Ensure label exists (--force is idempotent); ignore error — already-exists is not an error.
+	_, _ = ghClient.runGH("label", "create", label, "--force") // nosemgrep: ignored-error-go -- --force makes this idempotent; already-exists is not an error condition [permanent]
 	// Apply to PR
 	_, err := ghClient.runGH("pr", "edit", strings.TrimPrefix(prNumber, "#"), "--add-label", label)
 	if err != nil {

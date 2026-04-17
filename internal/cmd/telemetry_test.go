@@ -7,8 +7,11 @@ import (
 	"testing"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
 	"github.com/hironow/amadeus/internal/platform"
 )
@@ -134,4 +137,33 @@ func TestEndRootSpan_NilSafe(t *testing.T) {
 
 	// when / then — must not panic
 	endRootSpan()
+}
+
+// TestMergeResource_PreservesServiceNameAcrossSchemaConflict regression-guards
+// against losing service.name when resource.Default() (SDK-bundled semconv) and
+// the caller's semconv version differ. resource.Merge returns ErrSchemaURLConflict
+// but still provides a valid merged Resource with attributes preserved; the
+// mergeResource helper must surface that merged Resource, not fall back to base.
+func TestMergeResource_PreservesServiceNameAcrossSchemaConflict(t *testing.T) {
+	// given — resource.Default() uses whatever semconv the SDK ships (may differ
+	// from our imported v1.26.0) so Merge will likely return ErrSchemaURLConflict.
+	base := resource.Default()
+	extra := resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceName("amadeus-test"),
+	)
+
+	// when
+	merged := mergeResource(base, extra)
+
+	// then — merged must include service.name, even on schema URL conflict.
+	var got string
+	for _, kv := range merged.Attributes() {
+		if kv.Key == attribute.Key("service.name") {
+			got = kv.Value.AsString()
+		}
+	}
+	if got != "amadeus-test" {
+		t.Fatalf("service.name = %q, want %q (merge must not discard attributes on schema URL conflict)", got, "amadeus-test")
+	}
 }

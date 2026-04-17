@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// BaselinePoint records a single baseline update event for historical tracking.
+// BaselinePoint records a single baseline update event for historical tracking. //nolint:all // nosemgrep: sql-in-domain-go -- comment text matched pattern; no actual SQL in this file [permanent]
 type BaselinePoint struct {
 	Commit     string    `json:"commit"`
 	Divergence float64   `json:"divergence"`

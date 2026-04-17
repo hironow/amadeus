@@ -11,9 +11,12 @@ import (
 type OTelPolicyMetrics struct{}
 
 func (*OTelPolicyMetrics) RecordPolicyEvent(ctx context.Context, eventType, status string) {
-	c, _ := Meter.Int64Counter("amadeus.harness.event.total",
+	c, err := Meter.Int64Counter("amadeus.harness.event.total",
 		metric.WithDescription("Policy handler execution count"),
 	)
+	if err != nil {
+		return
+	}
 	c.Add(ctx, 1,
 		metric.WithAttributes(
 			attribute.String("event_type", SanitizeUTF8(eventType)),

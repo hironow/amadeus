@@ -31,7 +31,7 @@ func newMarkCommentedCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dmailName := args[0]
 			issueID := args[1]
-			jsonFlag, _ := cmd.Flags().GetBool("json")
+			jsonFlag := mustBool(cmd, "json")
 
 			repoRoot, err := resolveTargetDir(args[2:])
 			if err != nil {

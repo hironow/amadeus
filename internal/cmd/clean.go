@@ -36,7 +36,7 @@ func newCleanCommand() *cobra.Command {
 				return nil
 			}
 
-			yes, _ := cmd.Flags().GetBool("yes")
+			yes := mustBool(cmd, "yes")
 			if !yes {
 				fmt.Fprintf(cmd.ErrOrStderr(), "The following will be deleted:\n  %s/\n\nDelete? [y/N]: ", stateDir)
 				var answer string

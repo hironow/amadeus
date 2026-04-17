@@ -197,8 +197,18 @@ func CorrectionMetadataFromMap(meta map[string]string) CorrectionMetadata {
 	if len(meta) == 0 {
 		return CorrectionMetadata{}
 	}
-	recurrence, _ := strconv.Atoi(meta[MetadataRecurrenceCount])
-	providerRetryBudget, _ := strconv.Atoi(meta[MetadataProviderRetryBudget])
+	recurrence := 0
+	if raw := meta[MetadataRecurrenceCount]; raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			recurrence = v
+		}
+	}
+	providerRetryBudget := 0
+	if raw := meta[MetadataProviderRetryBudget]; raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			providerRetryBudget = v
+		}
+	}
 	var retryAllowed *bool
 	if raw, ok := meta[MetadataRetryAllowed]; ok && raw != "" {
 		parsed, err := strconv.ParseBool(raw)

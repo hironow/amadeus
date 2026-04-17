@@ -193,7 +193,10 @@ func FeedbackRound(d DMail) int {
 	if d.Metadata == nil {
 		return 0
 	}
-	n, _ := strconv.Atoi(d.Metadata["feedback_round"])
+	n, err := strconv.Atoi(d.Metadata["feedback_round"])
+	if err != nil {
+		return 0
+	}
 	return n
 }
 

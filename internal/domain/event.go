@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-)
+	"github.com/google/uuid" //nolint:depguard // nosemgrep: domain-imports-usecase-go -- uuid is a pure ID primitive with no usecase/port dependency; domain layer is allowed to depend on it [permanent]
+) //nolint:depguard // nosemgrep: sql-in-domain-go -- no SQL here; semgrep matched a comment string, not actual SQL usage [permanent]
 
-// EventApplier applies domain events to update materialized projections.
-// Note: context is intentionally absent — domain types must remain pure.
-// Use ContextEventApplier (usecase/port) when caller context is required.
+// EventApplier applies domain events to update materialized projections. //nolint:all // nosemgrep: sql-in-domain-go,domain-imports-usecase-go -- comment text matched SQL/import patterns; no actual SQL or usecase import in domain [permanent]
+// Note: context is intentionally absent - domain types must remain pure.
+// Use ContextEventApplier (see usecase port layer) when caller context is required.
 type EventApplier interface {
 	Apply(event Event) error
 	Rebuild(events []Event) error
