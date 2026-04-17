@@ -107,7 +107,7 @@ type dmailFrontmatter struct {
 }
 
 // WaveStepDef defines a single step within a wave specification.
-type WaveStepDef struct {
+type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/JSON wire struct for wave spec; Targets/Prerequisites are spec list fields, not managed collections [permanent]
 	ID            string   `yaml:"id" json:"id"`
 	Title         string   `yaml:"title" json:"title"`
 	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
@@ -117,14 +117,14 @@ type WaveStepDef struct {
 }
 
 // WaveReference links a D-Mail to a wave and optionally a specific step.
-type WaveReference struct {
+type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/JSON wire struct; Steps is a deserialized list from wave spec, not a managed collection [permanent]
 	ID    string        `yaml:"id" json:"id"`
 	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
 	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
 // DMail is the correction routing message using YAML frontmatter + Markdown body.
-type DMail struct {
+type DMail struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/JSON wire format for D-Mail message; Issues/Targets/Steps are serialized list fields from message spec [permanent]
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
 	Name          string            `yaml:"name"`
 	Kind          DMailKind         `yaml:"kind"`

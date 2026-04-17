@@ -23,6 +23,6 @@ type PendingComment struct {
 }
 
 // SyncOutput is the JSON output of `amadeus sync`.
-type SyncOutput struct {
+type SyncOutput struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON output struct for sync command; PendingComments is a computed result list [permanent]
 	PendingComments []PendingComment `json:"pending_comments"`
 }

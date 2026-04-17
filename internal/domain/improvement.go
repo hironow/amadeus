@@ -55,7 +55,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct {
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — domain metadata carrier; RoutingHistory/OwnerHistory are audit trail lists, not managed collections [permanent]
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity
@@ -78,7 +78,7 @@ type CorrectionMetadata struct {
 	Outcome             ImprovementOutcome
 }
 
-type ImprovementEvent struct {
+type ImprovementEvent struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON/YAML serialization struct for improvement event; RoutingHistory/OwnerHistory are event-sourced audit lists [permanent]
 	SchemaVersion       string             `json:"schema_version" yaml:"schema_version"`
 	FailureType         FailureType        `json:"failure_type" yaml:"failure_type"`
 	Severity            Severity           `json:"severity,omitempty" yaml:"severity,omitempty"`

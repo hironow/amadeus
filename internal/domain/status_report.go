@@ -15,7 +15,7 @@ type BaselinePoint struct {
 }
 
 // StatusReport holds operational status information for the amadeus tool.
-type StatusReport struct {
+type StatusReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON output struct for status command; BaselineHistory is a time-series snapshot list [permanent]
 	LastCheck           time.Time        `json:"last_check"`
 	Divergence          float64          `json:"divergence"`
 	CheckCount          int              `json:"check_count"`

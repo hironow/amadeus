@@ -22,7 +22,7 @@ type CapabilityViolation struct {
 }
 
 // ClaudeResponse represents the structured JSON output from Claude.
-type ClaudeResponse struct {
+type ClaudeResponse struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON wire struct for Claude API output; slice fields are multi-value response payloads, not collections with invariants [permanent]
 	FilesRead            []string               `json:"files_read,omitempty"`
 	Axes                 map[Axis]AxisScore     `json:"axes"`
 	DMails               []ClaudeDMailCandidate `json:"dmails"`
@@ -33,7 +33,7 @@ type ClaudeResponse struct {
 }
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.
-type ClaudeDMailCandidate struct {
+type ClaudeDMailCandidate struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON wire struct for Claude D-Mail candidate; slice fields are JSON arrays from Claude output [permanent]
 	Description string   `json:"description"`
 	Detail      string   `json:"detail"`
 	Issues      []string `json:"issues,omitempty"`
@@ -51,7 +51,7 @@ type RepeatedViolation struct {
 }
 
 // DiffCheckParams holds the template parameters for a file-reference diff check prompt.
-type DiffCheckParams struct {
+type DiffCheckParams struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — template parameter bag; RepeatedViolations is a read-only input list, not a domain collection with invariants [permanent]
 	EvalDir            string
 	HasPRReviews       bool
 	LinkedIssueIDs     string

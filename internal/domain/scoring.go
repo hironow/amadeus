@@ -40,7 +40,7 @@ func DefaultWeights() Weights {
 }
 
 // DivergenceResult holds the complete result of a divergence calculation.
-type DivergenceResult struct {
+type DivergenceResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON output struct for divergence calculation; MissingAxes is a diagnostic list, not a managed collection [permanent]
 	Value        float64            `json:"divergence"`
 	Internal     float64            `json:"internal"`
 	Axes         map[Axis]AxisScore `json:"axes"`
@@ -81,7 +81,7 @@ type Thresholds struct {
 }
 
 // PerAxisOverride holds per-axis critical thresholds that escalate severity.
-type PerAxisOverride struct {
+type PerAxisOverride struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/JSON config struct; ADRCritical is a config list of ADR identifiers [permanent]
 	ADRForceHigh        int      `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
 	DoDForceHigh        int      `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
 	DepForceMedium      int      `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
@@ -277,7 +277,7 @@ func ResolveFeedbackKinds(qualitative, quantitative string) []DMailKind {
 }
 
 // MeterResult holds the complete output of Phase 2 scoring orchestration.
-type MeterResult struct {
+type MeterResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — scoring output struct; DMailCandidates/ImpactRadius are computed result lists, not managed collections [permanent]
 	Divergence      DivergenceResult
 	DMailCandidates []ClaudeDMailCandidate
 	Reasoning       string

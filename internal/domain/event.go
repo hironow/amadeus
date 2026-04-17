@@ -168,7 +168,7 @@ type ConvergenceDetectedData struct {
 }
 
 // ArchivePrunedData is the payload for EventArchivePruned.
-type ArchivePrunedData struct {
+type ArchivePrunedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; Paths is a snapshot of pruned file list at event time [permanent]
 	Paths []string `json:"paths"`
 	Count int      `json:"count"`
 }
@@ -208,7 +208,7 @@ type PRMergedData struct {
 }
 
 // PRMergeSkippedData is the payload for pr.merge.skipped events.
-type PRMergeSkippedData struct {
+type PRMergeSkippedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; Reasons is a snapshot list at skip time [permanent]
 	PRNumber string   `json:"pr_number"`
 	Title    string   `json:"title"`
 	Reasons  []string `json:"reasons"`
