@@ -22,9 +22,14 @@ import (
 )
 
 func mergeResource(base *resource.Resource, extra *resource.Resource) *resource.Resource {
+	// resource.Merge returns a valid merged Resource even on ErrSchemaURLConflict
+	// (schema URL is cleared but attributes are preserved). Surface that merged
+	// Resource so service.name etc. reach the exporter; only fall back on nil.
 	merged, err := resource.Merge(base, extra)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "otel resource merge warning: %v (continuing with base resource)\n", err)
+		fmt.Fprintf(os.Stderr, "otel resource merge warning: %v\n", err)
+	}
+	if merged == nil {
 		return base
 	}
 	return merged
