@@ -147,7 +147,7 @@ func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 		if !domain.ValidLang(value) {
 			return fmt.Errorf("invalid lang %q: must be ja or en", value)
 		}
-		cfg.Lang = value
+		cfg.Lang = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 
 	// Weights
 	case "weights.adr_integrity":
@@ -244,24 +244,24 @@ func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 		cfg.PerAxisOverride.DepForceMedium = n
 
 	case "claude_cmd":
-		cfg.ClaudeCmd = value
+		cfg.ClaudeCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 
 	case "model":
-		cfg.Model = value
+		cfg.Model = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 
 	case "timeout_sec":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid timeout_sec %q: must be non-negative integer", value)
 		}
-		cfg.TimeoutSec = n
+		cfg.TimeoutSec = n // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 
 	case "idle_timeout":
 		d, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("invalid idle_timeout %q: %w", value, err)
 		}
-		cfg.IdleTimeout = d
+		cfg.IdleTimeout = d // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 
 	default:
 		return fmt.Errorf("unknown config key %q", key)
