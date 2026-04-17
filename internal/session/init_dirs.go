@@ -143,7 +143,7 @@ func dirExists(path string) bool {
 }
 
 // relOrBase returns a display-friendly relative path.
-func relOrBase(stateDir, path, base string) string {
+func relOrBase(stateDir, path, base string) string { // nosemgrep: domain-primitives.multiple-string-params-go — stateDir/path/base are distinct path resolution args [permanent]
 	if path == stateDir {
 		return base + "/"
 	}

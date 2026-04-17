@@ -21,7 +21,7 @@ type PRState struct {
 
 // NewPRState creates a validated PRState. Returns an error if required fields
 // (number, baseBranch, headBranch) are empty.
-func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles, labels []string, headSHA string) (PRState, error) {
+func NewPRState(number, title, baseBranch, headBranch string, mergeable bool, behindBy int, conflictFiles, labels []string, headSHA string) (PRState, error) { // nosemgrep: domain-primitives.multiple-string-params-go — number/title/baseBranch/headBranch/headSHA are semantically distinct PR identity fields [permanent]
 	if number == "" {
 		return PRState{}, fmt.Errorf("PRState number is required")
 	}

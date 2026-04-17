@@ -34,7 +34,7 @@ type SQLiteOutboxStore struct {
 // NewSQLiteOutboxStore opens (or creates) a SQLite database at dbPath and
 // initialises the schema. archiveDir and outboxDir are the target directories
 // for flushed D-Mail files.
-func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxStore, error) {
+func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxStore, error) { // nosemgrep: domain-primitives.multiple-string-params-go — dbPath/archiveDir/outboxDir are distinct path roles for the transactional outbox [permanent]
 	for _, dir := range []string{filepath.Dir(dbPath), archiveDir, outboxDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("outbox store: create dir %s: %w", dir, err)

@@ -19,7 +19,7 @@ import (
 // ClaudeAdapter implements port.ProviderRunner by executing the Claude CLI
 // as a subprocess with streaming (--output-format stream-json).
 // It does NOT retry; wrap with RetryRunner for that.
-type ClaudeAdapter struct {
+type ClaudeAdapter struct { // nosemgrep: domain-primitives.public-string-field-go — internal CLI subprocess adapter; fields exported for struct literal initialization in cmd (composition root), not domain primitives [permanent]
 	ClaudeCmd      string
 	Model          string
 	TimeoutSec     int

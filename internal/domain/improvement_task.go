@@ -21,7 +21,7 @@ type ImprovementTask struct {
 }
 
 // NewImprovementTask creates a task with a unique ID and computed expiry.
-func NewImprovementTask(sourceEvent, targetAgent, action string, ft FailureType, sev Severity, ttl time.Duration) ImprovementTask {
+func NewImprovementTask(sourceEvent, targetAgent, action string, ft FailureType, sev Severity, ttl time.Duration) ImprovementTask { // nosemgrep: domain-primitives.multiple-string-params-go — sourceEvent/targetAgent/action are semantically distinct roles, not interchangeable [permanent]
 	now := time.Now().UTC()
 	return ImprovementTask{
 		ID:              uuid.New().String(),

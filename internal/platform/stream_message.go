@@ -6,7 +6,7 @@ import (
 )
 
 // StreamMessage represents a single NDJSON line from Claude Code --output-format stream-json.
-type StreamMessage struct {
+type StreamMessage struct { // nosemgrep: domain-primitives.public-string-field-go — NDJSON parse struct for Claude stream-json wire format; fields exported for json.Unmarshal [permanent]
 	Type            string          `json:"type"`
 	Subtype         string          `json:"subtype,omitempty"`
 	UUID            string          `json:"uuid,omitempty"`

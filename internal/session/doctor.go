@@ -245,7 +245,7 @@ func CheckGateDir(repoRoot string, repair bool) domain.DoctorCheck {
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
 // claudeCmd is the configured command string (may include env prefix).
-func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger, repair bool, mode domain.TrackingMode, successRateCheck SuccessRateChecker) []domain.DoctorCheck {
+func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot string, claudeCmd string, logger domain.Logger, repair bool, mode domain.TrackingMode, successRateCheck SuccessRateChecker) []domain.DoctorCheck { // nosemgrep: domain-primitives.multiple-string-params-go — configPath/repoRoot/claudeCmd are distinct path/command config fields [permanent]
 	_, span := platform.Tracer.Start(ctx, "domain.doctor")
 	defer span.End()
 

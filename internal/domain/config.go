@@ -21,7 +21,7 @@ type ConvergenceConfig struct {
 // ComputedConfig holds system-written fields. Empty for amadeus today.
 type ComputedConfig struct{}
 
-type ImprovementCollectorConfig struct {
+type ImprovementCollectorConfig struct { // nosemgrep: domain-primitives.public-string-field-go — internal YAML config struct; fields exported for yaml.v3 decoder, not domain primitives [permanent]
 	Enabled       *bool    `yaml:"enabled,omitempty"`
 	ProjectID     string   `yaml:"project_id,omitempty"`
 	APIURL        string   `yaml:"api_url,omitempty"`

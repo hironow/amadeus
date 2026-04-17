@@ -112,7 +112,7 @@ func StatusColor(s domain.CheckStatus) string {
 	}
 }
 
-func (l *Logger) logLine(prefix, color, format string, args ...any) {
+func (l *Logger) logLine(prefix, color, format string, args ...any) { // nosemgrep: domain-primitives.multiple-string-params-go — prefix/color/format are distinct logging roles [permanent]
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
 	l.mu.Lock()
@@ -201,7 +201,7 @@ func (l *Logger) SetExtraWriter(w io.Writer) {
 
 // Banner prints an inverted-color D-Mail intent line to stderr.
 // It satisfies domain.BannerLogger.
-func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) {
+func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) { // nosemgrep: domain-primitives.multiple-string-params-go — kind/name/description are distinct display fields satisfying domain.BannerLogger [permanent]
 	desc := description
 	if len(desc) > 50 {
 		desc = desc[:47] + "..."

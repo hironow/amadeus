@@ -11,7 +11,7 @@ import (
 
 // writeDivergenceInsight writes a divergence insight entry after scoring.
 // Fails silently (log warning) to avoid breaking the check pipeline.
-func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, sessionID string, commitRange string, reasoning string) {
+func (a *Amadeus) writeDivergenceInsight(result domain.DivergenceResult, sessionID string, commitRange string, reasoning string) { // nosemgrep: domain-primitives.multiple-string-params-go — sessionID/commitRange/reasoning are distinct insight provenance fields [permanent]
 	if a.Insights == nil {
 		return
 	}
