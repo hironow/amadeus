@@ -355,7 +355,7 @@ func TestParseClaudeResponse_WithCapabilityViolations(t *testing.T) {
 			{
 				"boundary": "external_api",
 				"description": "Direct call to external service bypasses approved adapter",
-				"file": "internal/service/payments.go"
+				"file": "internal/external/payments.go"
 			}
 		]
 	}`
@@ -373,7 +373,7 @@ func TestParseClaudeResponse_WithCapabilityViolations(t *testing.T) {
 	if resp.CapabilityViolations[0].Boundary != "external_api" {
 		t.Errorf("expected boundary 'external_api', got %q", resp.CapabilityViolations[0].Boundary)
 	}
-	if resp.CapabilityViolations[0].File != "internal/service/payments.go" {
+	if resp.CapabilityViolations[0].File != "internal/external/payments.go" {
 		t.Errorf("expected file path, got %q", resp.CapabilityViolations[0].File)
 	}
 }
