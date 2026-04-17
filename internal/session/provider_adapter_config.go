@@ -6,7 +6,7 @@ package session
 //
 // This struct is copy-synced and checksum-gated across sightjack/paintress/amadeus.
 // Assembly helpers are tool-specific and live in provider_adapter_helpers.go (not gated).
-type ProviderAdapterConfig struct {
+type ProviderAdapterConfig struct { // nosemgrep: domain-primitives.public-string-field-go -- S0037 canonical config DTO synced across 3 AI coding tools; Cmd/Model/BaseDir/ToolName are config identifiers, not domain primitives [permanent]
 	Cmd        string // provider CLI command (e.g. "claude")
 	Model      string // model name (e.g. "opus")
 	TimeoutSec int    // per-invocation timeout (0 = context deadline only)
