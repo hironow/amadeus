@@ -90,16 +90,16 @@ func TruncateField(s string, maxBytes int) (string, bool) {
 	return s[:limit] + "...", true
 }
 
-// ValidateSessionStreamEvent checks required fields.
-func ValidateSessionStreamEvent(e SessionStreamEvent) error {
+// ParseSessionStreamEvent validates required fields and returns the event for pipeline chaining.
+func ParseSessionStreamEvent(e SessionStreamEvent) (SessionStreamEvent, error) {
 	if e.Tool == "" {
-		return fmt.Errorf("session stream event: tool is required")
+		return SessionStreamEvent{}, fmt.Errorf("session stream event: tool is required")
 	}
 	if e.Type == "" {
-		return fmt.Errorf("session stream event: type is required")
+		return SessionStreamEvent{}, fmt.Errorf("session stream event: type is required")
 	}
 	if e.ID == "" {
-		return fmt.Errorf("session stream event: id is required")
+		return SessionStreamEvent{}, fmt.Errorf("session stream event: id is required")
 	}
-	return nil
+	return e, nil
 }

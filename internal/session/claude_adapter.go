@@ -158,7 +158,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		defer func() {
 			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
 			// publishCtx is cancel-safe but retains trace info for connected spans.
-			if vErr := domain.ValidateSessionStreamEvent(endEvent); vErr != nil {
+			if _, vErr := domain.ParseSessionStreamEvent(endEvent); vErr != nil {
 				if a.Logger != nil {
 					a.Logger.Warn("session_end event dropped (invalid): %v", vErr)
 				}
@@ -182,7 +182,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		if normalizer != nil {
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := normalizer.Normalize(msg, raw); ev != nil {
-					if vErr := domain.ValidateSessionStreamEvent(*ev); vErr != nil {
+					if _, vErr := domain.ParseSessionStreamEvent(*ev); vErr != nil {
 						if a.Logger != nil {
 							a.Logger.Warn("stream event dropped (invalid): %v", vErr)
 						}

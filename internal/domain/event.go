@@ -90,9 +90,8 @@ type Event struct {
 	SeqNr         uint64          `json:"seq_nr,omitempty"`
 }
 
-// ValidateEvent checks that an Event has all required fields populated.
-// Returns an error describing all validation failures.
-func ValidateEvent(e Event) error {
+// ParseEvent validates all required fields and returns the event for pipeline chaining.
+func ParseEvent(e Event) (Event, error) {
 	var errs []string
 	if e.ID == "" {
 		errs = append(errs, "ID is required")
@@ -112,9 +111,9 @@ func ValidateEvent(e Event) error {
 		errs = append(errs, fmt.Sprintf("schema_version %d exceeds supported version %d", e.SchemaVersion, CurrentEventSchemaVersion))
 	}
 	if len(errs) > 0 {
-		return errors.New("invalid event: " + strings.Join(errs, "; "))
+		return Event{}, errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
-	return nil
+	return e, nil
 }
 
 // AppendResult captures metrics from an event store Append operation.

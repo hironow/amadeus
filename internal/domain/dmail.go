@@ -55,12 +55,13 @@ func IsValidDMailKind(kind DMailKind) bool {
 // ErrDMailKindInvalid is returned when a D-Mail kind is not in the canonical set.
 var ErrDMailKindInvalid = errors.New("dmail: invalid kind")
 
-// ValidateKind checks that kind is one of the allowed D-Mail kinds.
-func ValidateKind(kind DMailKind) error {
+// ParseKindString parses a raw string into a DMailKind, returning the typed value or an error.
+func ParseKindString(s string) (DMailKind, error) {
+	kind := DMailKind(s)
 	if !IsValidDMailKind(kind) {
-		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
+		return "", fmt.Errorf("invalid D-Mail kind %q: %w", s, ErrDMailKindInvalid)
 	}
-	return nil
+	return kind, nil
 }
 
 // DMailAction represents a recommended follow-up action for a D-Mail.

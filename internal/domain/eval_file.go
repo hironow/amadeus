@@ -41,7 +41,7 @@ warning: "DO NOT modify this file. It is auto-generated for evaluation only."
 // ValidateFilesRead checks that all expected kinds were reported as read by Claude.
 // Returns ErrIncompleteRead if any expected kind is missing from got.
 // Extra kinds in got (superset) are allowed.
-func ValidateFilesRead(got []string, expected []string) error {
+func ValidateFilesRead(got []string, expected []string) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go — performs set membership check on two []string slices; no single parsed domain type to return [permanent]
 	gotSet := make(map[string]bool, len(got))
 	for _, k := range got {
 		gotSet[k] = true

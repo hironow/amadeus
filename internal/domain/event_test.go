@@ -268,7 +268,7 @@ func TestValidateEvent_Valid(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err != nil {
@@ -286,7 +286,7 @@ func TestValidateEvent_EmptyType(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -303,7 +303,7 @@ func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -321,7 +321,7 @@ func TestValidateEvent_NilData(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -339,7 +339,7 @@ func TestValidateEvent_EmptyData(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -357,7 +357,7 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -375,7 +375,7 @@ func TestValidateEvent_UnknownType(t *testing.T) {
 	}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -415,7 +415,7 @@ func TestValidateEvent_MultipleErrors(t *testing.T) {
 	event := domain.Event{}
 
 	// when
-	err := domain.ValidateEvent(event)
+	_, err := domain.ParseEvent(event)
 
 	// then
 	if err == nil {
@@ -697,7 +697,7 @@ func TestValidateEvent_RejectsFutureSchema(t *testing.T) {
 	ev.SchemaVersion = domain.CurrentEventSchemaVersion + 1
 
 	// when
-	err := domain.ValidateEvent(ev)
+	_, err := domain.ParseEvent(ev)
 
 	// then
 	if err == nil {

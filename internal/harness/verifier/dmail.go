@@ -8,7 +8,7 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-// Kind validation uses domain.ValidateKind as the single canonical path.
+// Kind validation uses domain.ParseKindString as the single canonical path.
 
 // validSeverities is the set of valid Severity values per schema v1.
 var validSeverities = map[domain.Severity]bool{
@@ -38,7 +38,7 @@ func ValidateDMail(dmail domain.DMail) []string {
 	}
 	if dmail.Kind == "" {
 		errs = append(errs, "kind is required")
-	} else if err := domain.ValidateKind(dmail.Kind); err != nil {
+	} else if _, err := domain.ParseKindString(string(dmail.Kind)); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if dmail.Description == "" {
