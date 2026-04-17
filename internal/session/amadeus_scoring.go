@@ -169,7 +169,11 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 	}
 
 	// Diff check: write eval files
-	prevJSON, _ := json.Marshal(previous)
+	prevJSON, err := json.Marshal(previous)
+	if err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("marshal previous scores: %w", err)
+	}
 	if err := writeEvalFile(evalDir, "previous_scores.json", domain.EvalKindPreviousScores, string(prevJSON)); err != nil {
 		cleanup()
 		return "", nil, err

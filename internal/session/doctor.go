@@ -403,7 +403,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	if repair {
 		pidPath := filepath.Join(repoRoot, domain.StateDir, "watch.pid")
 		if data, err := os.ReadFile(pidPath); err == nil {
-			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			pid, _ := strconv.Atoi(strings.TrimSpace(string(data))) // nosemgrep: ignored-error-go,ignored-error-short-go -- parse failure yields 0; pid>0 guard below safely rejects non-numeric data
 			if pid > 0 {
 				if !platform.IsProcessAlive(pid) {
 					os.Remove(pidPath)
