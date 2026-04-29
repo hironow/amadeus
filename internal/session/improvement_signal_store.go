@@ -16,12 +16,12 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type ImprovementCursor struct {
+type ImprovementCursor struct { // nosemgrep: structure.multiple-exported-structs-go -- improvement signal store family (ImprovementCursor/NormalizedImprovementSignal/SQLiteImprovementCollectorStore/OutcomeStats) is a cohesive store schema; splitting would fragment the signal ingestion contract [permanent]
 	CreatedAt  time.Time
 	FeedbackID string
 }
 
-type NormalizedImprovementSignal struct {
+type NormalizedImprovementSignal struct { // nosemgrep: structure.multiple-exported-structs-go -- improvement signal store family cohesive set; see ImprovementCursor [permanent]
 	DedupKey         string
 	FeedbackID       string
 	ProjectID        string
@@ -48,7 +48,7 @@ type NormalizedImprovementSignal struct {
 	CreatedAt        time.Time
 }
 
-type SQLiteImprovementCollectorStore struct {
+type SQLiteImprovementCollectorStore struct { // nosemgrep: structure.multiple-exported-structs-go -- improvement signal store family cohesive set; see ImprovementCursor [permanent]
 	db *sql.DB
 }
 
@@ -384,7 +384,7 @@ func (s *SQLiteImprovementCollectorStore) AppendOutcomeTransition(ctx context.Co
 }
 
 // OutcomeStats holds aggregated outcome counts for a failure type.
-type OutcomeStats struct {
+type OutcomeStats struct { // nosemgrep: structure.multiple-exported-structs-go -- improvement signal store family cohesive set; see ImprovementCursor [permanent]
 	FailureType string
 	Resolved    int
 	FailedAgain int

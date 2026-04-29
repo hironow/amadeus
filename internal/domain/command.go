@@ -3,7 +3,7 @@ package domain
 // ExecuteCheckCommand represents the intent to run an amadeus check.
 // Independent of cobra — framework concerns are separated at the cmd layer.
 // Fields are unexported; use NewExecuteCheckCommand to construct a valid instance.
-type ExecuteCheckCommand struct {
+type ExecuteCheckCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus command family (ExecuteCheckCommand/RunSyncCommand/RebuildCommand/InitCommand/ArchivePruneCommand) is a cohesive command schema; splitting would fragment the command contract [permanent]
 	repoPath RepoPath
 }
 
@@ -17,7 +17,7 @@ func (c ExecuteCheckCommand) RepoPath() RepoPath { return c.repoPath }
 
 // RunSyncCommand represents the intent to synchronize PR comments and state.
 // Fields are unexported; use NewRunSyncCommand to construct a valid instance.
-type RunSyncCommand struct {
+type RunSyncCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus command family cohesive set; see ExecuteCheckCommand [permanent]
 	repoPath RepoPath
 }
 
@@ -31,7 +31,7 @@ func (c RunSyncCommand) RepoPath() RepoPath { return c.repoPath }
 
 // RebuildCommand represents the intent to rebuild amadeus state from events.
 // Fields are unexported; use NewRebuildCommand to construct a valid instance.
-type RebuildCommand struct {
+type RebuildCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus command family cohesive set; see ExecuteCheckCommand [permanent]
 	repoPath RepoPath
 }
 
@@ -45,7 +45,7 @@ func (c RebuildCommand) RepoPath() RepoPath { return c.repoPath }
 
 // InitCommand represents the intent to initialize a .gate directory.
 // Fields are unexported; use NewInitCommand to construct a valid instance.
-type InitCommand struct {
+type InitCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus command family cohesive set; see ExecuteCheckCommand [permanent]
 	repoRoot RepoPath
 	lang     string
 }
@@ -63,7 +63,7 @@ func (c InitCommand) Lang() string { return c.lang }
 
 // ArchivePruneCommand represents the intent to prune old archive files.
 // Fields are unexported; use NewArchivePruneCommand to construct a valid instance.
-type ArchivePruneCommand struct {
+type ArchivePruneCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus command family cohesive set; see ExecuteCheckCommand [permanent]
 	repoPath RepoPath
 	days     Days
 	dryRun   bool

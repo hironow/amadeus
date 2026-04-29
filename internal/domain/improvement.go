@@ -55,7 +55,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — domain metadata carrier; RoutingHistory/OwnerHistory are audit trail lists, not managed collections [permanent]
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — domain metadata carrier; RoutingHistory/OwnerHistory are audit trail lists, not managed collections; improvement family (CorrectionMetadata/ImprovementEvent) is a cohesive improvement schema [permanent]
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity

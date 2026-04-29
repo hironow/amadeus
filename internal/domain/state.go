@@ -17,7 +17,7 @@ const (
 )
 
 // DivergenceTrend holds a trend analysis of divergence scores over recent checks.
-type DivergenceTrend struct {
+type DivergenceTrend struct { // nosemgrep: structure.multiple-exported-structs-go -- state family (DivergenceTrend/CheckResult) is a cohesive check state schema [permanent]
 	Class   DivergenceTrendClass `json:"class"`
 	Delta   float64              `json:"delta"` // positive = worsening, negative = improving
 	Message string               `json:"message"`

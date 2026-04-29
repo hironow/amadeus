@@ -10,7 +10,7 @@ type shutdownKey struct{}
 var ShutdownKey = shutdownKey{}
 
 // IndexEntry represents one line in the archive index JSONL file.
-type IndexEntry struct {
+type IndexEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus types family (IndexEntry/HandoverState/MergedPR) is a cohesive domain types set [permanent]
 	Timestamp string `json:"ts"`
 	Operation string `json:"op"`
 	Issue     string `json:"issue"`
@@ -22,7 +22,7 @@ type IndexEntry struct {
 
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
-type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — pure signal-interrupt data carrier; Completed/Remaining are transient in-flight state lists, not domain invariant collections [permanent]
+type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — pure signal-interrupt data carrier; Completed/Remaining are transient in-flight state lists, not domain invariant collections; amadeus types family cohesive set; see IndexEntry [permanent]
 	Tool         string // "amadeus"
 	Operation    string // "divergence"
 	Timestamp    time.Time
@@ -33,7 +33,7 @@ type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field
 }
 
 // MergedPR represents a merged pull request.
-type MergedPR struct {
+type MergedPR struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus types family cohesive set; see IndexEntry [permanent]
 	Number string
 	Title  string
 }

@@ -16,7 +16,7 @@ type InitOption func(*InitConfig)
 
 // InitConfig holds per-invocation configuration for project initialization.
 // Tools use only the fields relevant to their init flow.
-type InitConfig struct {
+type InitConfig struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- port contract family (InitConfig/Approver/Notifier/PolicyMetrics/PruneCandidate/NopImprovementTaskDispatcher + interfaces) is a cohesive set for the amadeus usecase boundary; splitting would fragment the port API surface [permanent]
 	Team       string
 	Project    string
 	Lang       string
@@ -46,54 +46,54 @@ func WithStrictness(s string) InitOption { return func(c *InitConfig) { c.Strict
 
 // InitRunner handles project initialization I/O.
 // Returns warnings for non-fatal issues (nil when none). Error for critical failures.
-type InitRunner interface {
+type InitRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	InitProject(baseDir string, opts ...InitOption) (warnings []string, err error)
 }
 
 // EventDispatcher dispatches domain events to policy handlers.
 // Implemented by usecase.PolicyEngine; injected into session via Amadeus struct.
-type EventDispatcher interface {
+type EventDispatcher interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	Dispatch(ctx context.Context, event domain.Event) error
 }
 
 // Approver determines whether an action should proceed.
 // Implementations include StdinApprover (human prompt),
 // CmdApprover (external command), and AutoApprover (always yes).
-type Approver interface {
+type Approver interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	RequestApproval(ctx context.Context, message string) (approved bool, err error)
 }
 
 // AutoApprover always approves without human interaction.
-type AutoApprover struct{}
+type AutoApprover struct{} // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- null-object for Approver; must co-locate with interface definition; port null-object family cohesive set [permanent]
 
 func (*AutoApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
 	return true, nil
 }
 
 // Notifier sends notifications about events.
-type Notifier interface {
+type Notifier interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	Notify(ctx context.Context, title, message string) error
 }
 
 // NopNotifier is a no-op notifier for quiet mode or testing.
-type NopNotifier struct{}
+type NopNotifier struct{} // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- null-object for Notifier; must co-locate with interface definition; port null-object family cohesive set [permanent]
 
 func (*NopNotifier) Notify(_ context.Context, _, _ string) error { return nil }
 
 // PolicyMetrics records policy handler execution metrics.
-type PolicyMetrics interface {
+type PolicyMetrics interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	RecordPolicyEvent(ctx context.Context, eventType string, status string)
 }
 
 // NopPolicyMetrics is a no-op metrics recorder for tests and quiet mode.
-type NopPolicyMetrics struct{}
+type NopPolicyMetrics struct{} // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- null-object for PolicyMetrics; must co-locate with interface definition; port null-object family cohesive set [permanent]
 
 func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
 
 // ContextEventApplier extends domain.EventApplier with context propagation.
 // domain.EventApplier is ctx-free (pure domain); this port interface adds ctx
 // so that session-layer implementations can propagate trace/cancel.
-type ContextEventApplier interface {
+type ContextEventApplier interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	Apply(ctx context.Context, event domain.Event) error
 	Rebuild(ctx context.Context, events []domain.Event) error
 	Serialize() ([]byte, error)
@@ -101,7 +101,7 @@ type ContextEventApplier interface {
 }
 
 // EventStore is the append-only event persistence interface.
-type EventStore interface {
+type EventStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// Append persists one or more events. Validation is performed before any writes.
 	Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error)
 
@@ -123,7 +123,7 @@ type EventStore interface {
 // SnapshotStore persists materialized projection state at a known SeqNr.
 // Snapshots are an optimization — the system must function without them
 // (falling back to full replay via LoadAll).
-type SnapshotStore interface {
+type SnapshotStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// Save persists a snapshot. aggregateType identifies the projection kind.
 	Save(ctx context.Context, aggregateType string, seqNr uint64, state []byte) error
 
@@ -134,21 +134,21 @@ type SnapshotStore interface {
 
 // SeqAllocator assigns globally monotonic sequence numbers to events.
 // Implemented by eventsource.SeqCounter (SQLite-backed).
-type SeqAllocator interface {
+type SeqAllocator interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	AllocSeqNr(ctx context.Context) (uint64, error)
 }
 
 // OutboxStore is the transactional outbox interface for D-Mail delivery.
 // Stage writes to a write-ahead log (SQLite); Flush materialises staged
 // items to archive/ and outbox/ using atomic file writes.
-type OutboxStore interface {
+type OutboxStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	Stage(ctx context.Context, name string, data []byte) error
 	Flush(ctx context.Context) (int, error)
 	Close() error
 }
 
 // StateReader is the interface for reading materialized projection state.
-type StateReader interface {
+type StateReader interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// LoadLatest returns the most recent check result.
 	LoadLatest() (domain.CheckResult, error)
 
@@ -170,7 +170,7 @@ type StateReader interface {
 }
 
 // Git is the interface for repository version control operations.
-type Git interface {
+type Git interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// CurrentCommit returns the short SHA of the current HEAD.
 	CurrentCommit() (string, error)
 
@@ -186,7 +186,7 @@ type Git interface {
 
 // GitHubPRReader reads open PR state from GitHub (read-only).
 // Implemented by session-layer adapter using `gh` CLI.
-type GitHubPRReader interface {
+type GitHubPRReader interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// ListOpenPRs returns all open PRs targeting the given branch.
 	ListOpenPRs(ctx context.Context, targetBranch string) ([]domain.PRState, error)
 	// GetPRDiff returns the unified diff for the given PR number.
@@ -197,7 +197,7 @@ type GitHubPRReader interface {
 
 // GitHubPRWriter writes labels and merges PRs on GitHub.
 // Implemented by session-layer adapter using `gh` CLI.
-type GitHubPRWriter interface {
+type GitHubPRWriter interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// ApplyLabel adds a label to the given PR. Creates the label if it doesn't exist.
 	ApplyLabel(ctx context.Context, prNumber, label string) error
 	// RemoveLabel removes a label from the given PR.
@@ -213,7 +213,7 @@ type GitHubPRWriter interface {
 
 // GitHubIssueWriter closes issues on GitHub.
 // Implemented by session-layer adapter using `gh` CLI.
-type GitHubIssueWriter interface {
+type GitHubIssueWriter interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// ListOpenIssuesByLabel returns issue numbers with the given label that are still open.
 	ListOpenIssuesByLabel(ctx context.Context, label string) ([]string, error)
 	// CloseIssue closes the given issue with a comment.
@@ -222,19 +222,19 @@ type GitHubIssueWriter interface {
 
 // PRPipelineRunner executes the pre-merge PR convergence pipeline.
 // Implemented in usecase layer, injected into session by cmd (composition root).
-type PRPipelineRunner interface {
+type PRPipelineRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	RunPreMergePipeline(ctx context.Context, integrationBranch string) ([]domain.DMail, error)
 }
 
 // PruneCandidate represents a file eligible for pruning.
-type PruneCandidate struct {
+type PruneCandidate struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- PruneCandidate co-locates with ArchiveOps as the parameter type for the same port; port contract family cohesive set [permanent]
 	Path    string
 	ModTime time.Time
 }
 
 // ArchiveOps handles file pruning and lifecycle operations.
 // Implemented by session-layer adapter; injected into usecase by cmd.
-type ArchiveOps interface {
+type ArchiveOps interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	FindPruneCandidates(archiveDir string, maxAge time.Duration) ([]PruneCandidate, error)
 	PruneFiles(candidates []PruneCandidate) (int, error)
 	ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error)
@@ -245,7 +245,7 @@ type ArchiveOps interface {
 // CheckEventEmitter wraps aggregate event production + persistence + projection + dispatch.
 // Implemented in usecase layer, injected into session by usecase.RunCheck.
 // Emit chain: agg.Record*() → store.Append() → projector.Apply() → dispatch (best-effort).
-type CheckEventEmitter interface {
+type CheckEventEmitter interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	EmitInboxConsumed(data domain.InboxConsumedData, now time.Time) error
 	EmitForceFullNextSet(prevDiv, currDiv float64, now time.Time) error
 	EmitDMailGenerated(dmail domain.DMail, now time.Time) error
@@ -261,7 +261,7 @@ type CheckEventEmitter interface {
 
 // CheckStateProvider provides aggregate state read/write without exposing the aggregate type.
 // Implemented in usecase layer, injected into session by usecase.RunCheck.
-type CheckStateProvider interface {
+type CheckStateProvider interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	ShouldFullCheck(forceFlag bool) bool
 	ForceFullNext() bool
 	SetForceFullNext(v bool)
@@ -272,7 +272,7 @@ type CheckStateProvider interface {
 
 // RunLockStore provides cross-process run locking backed by persistent storage.
 // Prevents duplicate runs when multiple CLI instances target the same state directory.
-type RunLockStore interface {
+type RunLockStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	// TryAcquire attempts to acquire a lock for the given run key.
 	// Returns (true, "", nil) if acquired, (false, holder, nil) if already held.
 	// Stale locks (past expires_at) are automatically cleaned up.
@@ -287,13 +287,13 @@ type RunLockStore interface {
 
 // ImprovementTaskDispatcher dispatches improvement tasks with dedup.
 // Implemented by session.ImprovementTaskDispatcher (SQLite-backed).
-type ImprovementTaskDispatcher interface {
+type ImprovementTaskDispatcher interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
 	Dispatch(ctx context.Context, task domain.ImprovementTask, correlationID string) error
 	Close() error
 }
 
 // NopImprovementTaskDispatcher is a no-op dispatcher for dry-run and tests.
-type NopImprovementTaskDispatcher struct{}
+type NopImprovementTaskDispatcher struct{} // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- null-object for ImprovementTaskDispatcher; must co-locate with interface definition; port null-object family cohesive set [permanent]
 
 func (NopImprovementTaskDispatcher) Dispatch(context.Context, domain.ImprovementTask, string) error {
 	return nil

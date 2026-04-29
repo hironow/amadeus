@@ -25,7 +25,7 @@ func defaultCmdFactory(ctx context.Context, name string, args ...string) *exec.C
 
 // CmdNotifier executes a user-provided shell command for notifications.
 // The template may contain {title} and {message} placeholders.
-type CmdNotifier struct {
+type CmdNotifier struct { // nosemgrep: structure.multiple-exported-structs-go -- notifier family (CmdNotifier/LocalNotifier) is a cohesive set of Notifier implementations; must co-locate for NewCmdNotifier/LocalNotifier factory pattern [permanent]
 	cmdTemplate string
 	cmdFactory  cmdFactoryFunc
 }

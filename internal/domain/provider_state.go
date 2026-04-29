@@ -37,7 +37,7 @@ const (
 	MetadataProviderResumeWhen  = "provider_resume_when"
 )
 
-type ProviderStateSnapshot struct {
+type ProviderStateSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go -- provider state family (ProviderStateSnapshot/RetryBudgetTracker) is a cohesive provider circuit-breaker schema [permanent]
 	State           ProviderState
 	Reason          string
 	RetryBudget     int

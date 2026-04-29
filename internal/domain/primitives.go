@@ -34,7 +34,7 @@ func (m TrackingMode) IsWave() bool { return m == ModeWave }
 func (m TrackingMode) String() string { return string(m) }
 
 // RepoPath is an always-valid non-empty repository path.
-type RepoPath struct{ v string }
+type RepoPath struct{ v string } // nosemgrep: structure.multiple-exported-structs-go -- primitives family (RepoPath/Days) is a cohesive domain value object set [permanent]
 
 // NewRepoPath parses a raw string into a RepoPath.
 // Returns an error if the path is empty.

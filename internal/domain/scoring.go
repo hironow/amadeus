@@ -16,13 +16,13 @@ const (
 )
 
 // AxisScore holds the score and details for a single evaluation axis.
-type AxisScore struct {
+type AxisScore struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus scoring family (AxisScore/Weights/DivergenceResult/Thresholds/PerAxisOverride/SeverityConfig/MeterResult) is a cohesive scoring schema; splitting would fragment the divergence calculation contract [permanent]
 	Score   int    `json:"score"`
 	Details string `json:"details"`
 }
 
 // Weights holds the configurable weights for each evaluation axis.
-type Weights struct {
+type Weights struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus scoring family cohesive set; see AxisScore [permanent]
 	ADRIntegrity        float64 `yaml:"adr_integrity" json:"adr_integrity"`
 	DoDFulfillment      float64 `yaml:"dod_fulfillment" json:"dod_fulfillment"`
 	DependencyIntegrity float64 `yaml:"dependency_integrity" json:"dependency_integrity"`
@@ -40,7 +40,7 @@ func DefaultWeights() Weights {
 }
 
 // DivergenceResult holds the complete result of a divergence calculation.
-type DivergenceResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON output struct for divergence calculation; MissingAxes is a diagnostic list, not a managed collection [permanent]
+type DivergenceResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — JSON output struct for divergence calculation; MissingAxes is a diagnostic list, not a managed collection; amadeus scoring family cohesive set; see AxisScore [permanent]
 	Value        float64            `json:"divergence"`
 	Internal     float64            `json:"internal"`
 	Axes         map[Axis]AxisScore `json:"axes"`
@@ -75,13 +75,13 @@ func NormalizeSeverity(s Severity) Severity {
 }
 
 // Thresholds holds the severity threshold configuration.
-type Thresholds struct {
+type Thresholds struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus scoring family cohesive set; see AxisScore [permanent]
 	LowMax    float64 `yaml:"low_max" json:"low_max"`
 	MediumMax float64 `yaml:"medium_max" json:"medium_max"`
 }
 
 // PerAxisOverride holds per-axis critical thresholds that escalate severity.
-type PerAxisOverride struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/JSON config struct; ADRCritical is a config list of ADR identifiers [permanent]
+type PerAxisOverride struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — YAML/JSON config struct; ADRCritical is a config list of ADR identifiers; amadeus scoring family cohesive set; see AxisScore [permanent]
 	ADRForceHigh        int      `yaml:"adr_integrity_force_high" json:"adr_integrity_force_high"`
 	DoDForceHigh        int      `yaml:"dod_fulfillment_force_high" json:"dod_fulfillment_force_high"`
 	DepForceMedium      int      `yaml:"dependency_integrity_force_medium" json:"dependency_integrity_force_medium"`
@@ -90,7 +90,7 @@ type PerAxisOverride struct { // nosemgrep: first-class-collection.raw-slice-fie
 }
 
 // SeverityConfig combines thresholds and per-axis overrides.
-type SeverityConfig struct {
+type SeverityConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus scoring family cohesive set; see AxisScore [permanent]
 	Thresholds      Thresholds      `yaml:"thresholds" json:"thresholds"`
 	PerAxisOverride PerAxisOverride `yaml:"per_axis_override" json:"per_axis_override"`
 }
@@ -277,7 +277,7 @@ func ResolveFeedbackKinds(qualitative, quantitative string) []DMailKind {
 }
 
 // MeterResult holds the complete output of Phase 2 scoring orchestration.
-type MeterResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — scoring output struct; DMailCandidates/ImpactRadius are computed result lists, not managed collections [permanent]
+type MeterResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — scoring output struct; DMailCandidates/ImpactRadius are computed result lists, not managed collections; amadeus scoring family cohesive set; see AxisScore [permanent]
 	Divergence      DivergenceResult
 	DMailCandidates []ClaudeDMailCandidate
 	Reasoning       string

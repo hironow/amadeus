@@ -14,7 +14,7 @@ import (
 const InsightSchemaVersion = "1"
 
 // InsightEntry represents a single semantic insight with 6 required axes + optional extras.
-type InsightEntry struct {
+type InsightEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- insight family (InsightEntry/InsightFile/InsightContext) is a cohesive insight ledger schema; splitting would fragment the insight file contract [permanent]
 	Title       string
 	What        string
 	Why         string
@@ -26,7 +26,7 @@ type InsightEntry struct {
 }
 
 // InsightFile is the on-disk representation of an insight ledger file.
-type InsightFile struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/Markdown serialization struct; Entries is parsed from Markdown body, managed via AddEntry/All accessor pattern [permanent]
+type InsightFile struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — YAML/Markdown serialization struct; Entries is parsed from Markdown body, managed via AddEntry/All accessor pattern; insight family cohesive set; see InsightEntry [permanent]
 	SchemaVersion string         `yaml:"insight-schema-version"`
 	Kind          string         `yaml:"kind"`
 	Tool          string         `yaml:"tool"`
@@ -44,7 +44,7 @@ type insightFrontmatter struct {
 }
 
 // InsightContext is the optional context field added to D-Mail envelopes.
-type InsightContext struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — YAML/JSON wire field in D-Mail envelope; Insights is a summary list, not a managed collection [permanent]
+type InsightContext struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — YAML/JSON wire field in D-Mail envelope; Insights is a summary list, not a managed collection; insight family cohesive set; see InsightEntry [permanent]
 	Insights []InsightSummary `yaml:"insights,omitempty" json:"insights,omitempty"`
 }
 

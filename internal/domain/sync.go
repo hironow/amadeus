@@ -3,19 +3,19 @@ package domain
 import "time"
 
 // SyncState tracks which D-Mail × Issue pairs have been posted as comments.
-type SyncState struct {
+type SyncState struct { // nosemgrep: structure.multiple-exported-structs-go -- sync family (SyncState/CommentRecord/PendingComment) is a cohesive sync tracking schema [permanent]
 	CommentedDMails map[string]CommentRecord `json:"commented_dmails"`
 }
 
 // CommentRecord records a single D-Mail → Issue comment posting event.
-type CommentRecord struct {
+type CommentRecord struct { // nosemgrep: structure.multiple-exported-structs-go -- sync family cohesive set; see SyncState [permanent]
 	DMail       string    `json:"dmail"`
 	IssueID     string    `json:"issue_id"`
 	CommentedAt time.Time `json:"commented_at"`
 }
 
 // PendingComment represents a D-Mail × Issue pair not yet posted as a comment.
-type PendingComment struct {
+type PendingComment struct { // nosemgrep: structure.multiple-exported-structs-go -- sync family cohesive set; see SyncState [permanent]
 	DMail       string `json:"dmail"`
 	IssueID     string `json:"issue_id"`
 	Status      string `json:"status"`

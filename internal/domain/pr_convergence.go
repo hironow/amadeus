@@ -7,7 +7,7 @@ import (
 
 // PRState represents an open PR's convergence-relevant state.
 // All fields are unexported; use NewPRState to construct with validation.
-type PRState struct {
+type PRState struct { // nosemgrep: structure.multiple-exported-structs-go -- PR convergence family (PRState/PRChain/PRConvergenceReport) is a cohesive PR tracking schema; splitting would fragment the convergence contract [permanent]
 	number        string
 	title         string
 	baseBranch    string
@@ -115,14 +115,14 @@ func (p PRState) HeadSHAShort() string {
 }
 
 // PRChain represents a dependency chain of PRs ordered root to leaf.
-type PRChain struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — domain analysis result; PRs is an ordered chain snapshot produced by convergence analysis, not a managed collection [permanent]
+type PRChain struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — domain analysis result; PRs is an ordered chain snapshot produced by convergence analysis, not a managed collection; PR convergence family cohesive set; see PRState [permanent]
 	ID          string
 	PRs         []PRState
 	HasConflict bool
 }
 
 // PRConvergenceReport is the result of pre-merge convergence analysis.
-type PRConvergenceReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — analysis result struct; Chains/OrphanedPRs are read-only report outputs from convergence scan [permanent]
+type PRConvergenceReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — analysis result struct; Chains/OrphanedPRs are read-only report outputs from convergence scan; PR convergence family cohesive set; see PRState [permanent]
 	IntegrationBranch string
 	Chains            []PRChain
 	OrphanedPRs       []PRState

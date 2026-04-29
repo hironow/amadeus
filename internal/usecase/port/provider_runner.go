@@ -9,7 +9,7 @@ import (
 type RunOption func(*RunConfig)
 
 // RunConfig holds per-invocation configuration for a provider runner.
-type RunConfig struct {
+type RunConfig struct { // nosemgrep: structure.exported-struct-and-interface-go -- RunConfig co-locates with ProviderRunner interface as its configuration type; splitting would fragment the provider runner API [permanent]
 	AllowedTools    []string
 	WorkDir         string // sets cmd.Dir for the subprocess
 	ConfigBase      string // base directory for resolving provider-specific settings (defaults to WorkDir)
@@ -85,6 +85,6 @@ func WithResume(providerSessionID string) RunOption {
 // ProviderRunner executes an AI coding tool and returns the result text.
 // Provider-agnostic: implementations wrap any CLI (Claude, Codex, Copilot, etc.).
 // Implementations may stream intermediate output to w.
-type ProviderRunner interface {
+type ProviderRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- provider runner port family (RunConfig/ProviderRunner) is a cohesive API; see RunConfig [permanent]
 	Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error)
 }

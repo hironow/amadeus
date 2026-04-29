@@ -12,16 +12,16 @@ func ValidLang(lang string) bool {
 }
 
 // ConvergenceConfig controls the world-line convergence detection parameters.
-type ConvergenceConfig struct {
+type ConvergenceConfig struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- amadeus config family (ConvergenceConfig/ComputedConfig/ImprovementCollectorConfig/ApproverConfig/FlagApproverConfig/Config/FullCheckConfig/BaselineStalenessConfig) is a cohesive YAML config schema; splitting would fragment the config contract [permanent]
 	WindowDays           int `yaml:"window_days"`
 	Threshold            int `yaml:"threshold"`
 	EscalationMultiplier int `yaml:"escalation_multiplier"`
 }
 
 // ComputedConfig holds system-written fields. Empty for amadeus today.
-type ComputedConfig struct{}
+type ComputedConfig struct{} // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- amadeus config family cohesive set; see ConvergenceConfig [permanent]
 
-type ImprovementCollectorConfig struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go — internal YAML config struct; fields exported for yaml.v3 decoder; FeedbackTypes is a config list, not a domain collection [permanent]
+type ImprovementCollectorConfig struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go — internal YAML config struct; fields exported for yaml.v3 decoder; FeedbackTypes is a config list, not a domain collection; amadeus config family cohesive set; see ConvergenceConfig [permanent]
 	Enabled       *bool    `yaml:"enabled,omitempty"`
 	ProjectID     string   `yaml:"project_id,omitempty"`
 	APIURL        string   `yaml:"api_url,omitempty"`
@@ -48,7 +48,7 @@ type ApproverConfig interface {
 }
 
 // FlagApproverConfig adapts CLI flag values to the ApproverConfig interface.
-type FlagApproverConfig struct {
+type FlagApproverConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus config family cohesive set; see ConvergenceConfig [permanent]
 	AutoApprove bool
 	ApproveCmd  string
 }
@@ -60,7 +60,7 @@ func (f FlagApproverConfig) IsAutoApprove() bool { return f.AutoApprove }
 func (f FlagApproverConfig) ApproveCmdString() string { return f.ApproveCmd }
 
 // Config holds the complete Amadeus configuration.
-type Config struct {
+type Config struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus config family cohesive set; see ConvergenceConfig [permanent]
 	Lang                 string                     `yaml:"lang"`
 	ClaudeCmd            string                     `yaml:"claude_cmd,omitempty"`
 	Model                string                     `yaml:"model,omitempty"`
@@ -81,7 +81,7 @@ type Config struct {
 const DefaultMaxResultHistory = 100
 
 // FullCheckConfig controls the full scan strategy.
-type FullCheckConfig struct {
+type FullCheckConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus config family cohesive set; see ConvergenceConfig [permanent]
 	Interval         int     `yaml:"interval"`
 	OnDivergenceJump float64 `yaml:"on_divergence_jump"`
 	MaxResultHistory int     `yaml:"max_result_history,omitempty"`
@@ -89,7 +89,7 @@ type FullCheckConfig struct {
 
 // BaselineStalenessConfig controls auto-promotion to full calibration when the
 // last check is older than MaxAgeDays. Disabled when MaxAgeDays is 0.
-type BaselineStalenessConfig struct {
+type BaselineStalenessConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus config family cohesive set; see ConvergenceConfig [permanent]
 	MaxAgeDays int `yaml:"max_age_days"`
 }
 
