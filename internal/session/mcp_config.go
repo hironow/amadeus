@@ -12,7 +12,7 @@ import (
 )
 
 // MCPConfig is the JSON structure for --mcp-config.
-type MCPConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- MCP config family (MCPConfig/MCPServerEntry) is a cohesive JSON schema pair; MCPConfig holds a map of MCPServerEntry [permanent]
+type MCPConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- MCP config family (MCPConfig/MCPServerEntry) is a cohesive JSON wire-format pair for --mcp-config generation; splitting would fragment GenerateMCPConfig [permanent]
 	MCPServers map[string]MCPServerEntry `json:"mcpServers"`
 }
 
