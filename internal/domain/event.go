@@ -76,7 +76,7 @@ func ValidEventType(t EventType) bool {
 const CurrentEventSchemaVersion uint8 = 1
 
 // Event is the envelope for all domain events in the event store.
-type Event struct {
+type Event struct { // nosemgrep: structure.multiple-exported-structs-go -- event envelope + payload family (Event/AppendResult/LoadResult/CheckCompletedData/...) is a cohesive event-sourcing schema; splitting would fragment the event store contract [permanent]
 	SchemaVersion uint8           `json:"schema_version,omitempty"`
 	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
@@ -117,64 +117,64 @@ func ParseEvent(e Event) (Event, error) {
 }
 
 // AppendResult captures metrics from an event store Append operation.
-type AppendResult struct {
+type AppendResult struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	BytesWritten int // total bytes written to event files
 }
 
 // LoadResult captures metrics from an event store Load operation.
-type LoadResult struct {
+type LoadResult struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	FileCount        int // number of .jsonl files scanned
 	CorruptLineCount int // number of lines skipped due to parse errors
 }
 
 // CheckCompletedData is the payload for EventCheckCompleted.
-type CheckCompletedData struct {
+type CheckCompletedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Result CheckResult `json:"result"`
 }
 
 // BaselineUpdatedData is the payload for EventBaselineUpdated.
-type BaselineUpdatedData struct {
+type BaselineUpdatedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Commit     string  `json:"commit"`
 	Divergence float64 `json:"divergence"`
 }
 
 // ForceFullNextSetData is the payload for EventForceFullNextSet.
-type ForceFullNextSetData struct {
+type ForceFullNextSetData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	PreviousDivergence float64 `json:"previous_divergence"`
 	CurrentDivergence  float64 `json:"current_divergence"`
 }
 
 // DMailGeneratedData is the payload for EventDMailGenerated.
-type DMailGeneratedData struct {
+type DMailGeneratedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	DMail DMail `json:"dmail"`
 }
 
 // InboxConsumedData is the payload for EventInboxConsumed.
-type InboxConsumedData struct {
+type InboxConsumedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Name   string    `json:"name"`
 	Kind   DMailKind `json:"kind"`
 	Source string    `json:"source"`
 }
 
 // DMailCommentedData is the payload for EventDMailCommented.
-type DMailCommentedData struct {
+type DMailCommentedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	DMail   string `json:"dmail"`
 	IssueID string `json:"issue_id"`
 }
 
 // ConvergenceDetectedData is the payload for EventConvergenceDetected.
-type ConvergenceDetectedData struct {
+type ConvergenceDetectedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Alert ConvergenceAlert `json:"alert"`
 }
 
 // ArchivePrunedData is the payload for EventArchivePruned.
-type ArchivePrunedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; Paths is a snapshot of pruned file list at event time [permanent]
+type ArchivePrunedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Paths is a JSON event payload snapshot (no FCC benefit); event payload family cohesive set; see Event [permanent]
 	Paths []string `json:"paths"`
 	Count int      `json:"count"`
 }
 
 // RunStartedData is the payload for run.started events.
-type RunStartedData struct {
+type RunStartedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	IntegrationBranch string `json:"integration_branch"`
 	BaseBranch        string `json:"base_branch,omitempty"`
 }
@@ -187,12 +187,12 @@ const (
 )
 
 // RunStoppedData is the payload for run.stopped events.
-type RunStoppedData struct {
+type RunStoppedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Reason string `json:"reason"`
 }
 
 // PRConvergenceCheckedData is the payload for pr.convergence.checked events.
-type PRConvergenceCheckedData struct {
+type PRConvergenceCheckedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	IntegrationBranch string `json:"integration_branch"`
 	TotalOpenPRs      int    `json:"total_open_prs"`
 	Chains            int    `json:"chains"`
@@ -201,14 +201,14 @@ type PRConvergenceCheckedData struct {
 }
 
 // PRMergedData is the payload for pr.merged events.
-type PRMergedData struct {
+type PRMergedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	PRNumber string `json:"pr_number"`
 	Title    string `json:"title"`
 	Method   string `json:"method"` // "squash" or "merge"
 }
 
 // PRMergeSkippedData is the payload for pr.merge.skipped events.
-type PRMergeSkippedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON event payload; Reasons is a snapshot list at skip time [permanent]
+type PRMergeSkippedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Reasons is a JSON event payload snapshot (no FCC benefit); event payload family cohesive set; see Event [permanent]
 	PRNumber string   `json:"pr_number"`
 	Title    string   `json:"title"`
 	Reasons  []string `json:"reasons"`

@@ -30,7 +30,7 @@ func ToolStateDir(tool ToolName) string {
 }
 
 // ToolSnapshot holds the divergence state for a single tool.
-type ToolSnapshot struct {
+type ToolSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go -- cross-repo family (ToolSnapshot/CrossRepoSnapshot) is a cohesive cross-tool status schema [permanent]
 	Tool       ToolName  `json:"tool"`
 	Divergence float64   `json:"divergence"`
 	Severity   Severity  `json:"severity"`

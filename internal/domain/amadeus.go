@@ -10,7 +10,7 @@ const StateDir = ".gate"
 
 // DriftError is returned by RunCheck when drift is detected (D-Mails generated).
 // Callers can use errors.As to distinguish drift from runtime errors.
-type DriftError struct {
+type DriftError struct { // nosemgrep: structure.multiple-exported-structs-go -- amadeus error/options family (DriftError/SilentError/CheckOptions) is a cohesive set for check command lifecycle [permanent]
 	Divergence float64
 	DMails     int
 }
@@ -28,7 +28,7 @@ func (e *DriftError) Error() string {
 // SilentError wraps an error whose message has already been printed to stderr
 // by the command itself. main.go should suppress output for this error
 // while still honouring the exit code via ExitCode.
-type SilentError struct{ Err error }
+type SilentError struct{ Err error } // nosemgrep: structure.multiple-exported-structs-go -- amadeus error/options family cohesive set; see DriftError [permanent]
 
 func (e *SilentError) Error() string { return e.Err.Error() }
 func (e *SilentError) Unwrap() error { return e.Err }

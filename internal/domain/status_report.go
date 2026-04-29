@@ -8,14 +8,14 @@ import (
 )
 
 // BaselinePoint records a single baseline update event for historical tracking. //nolint:all // nosemgrep: sql-in-domain-go -- comment text matched pattern; no actual SQL in this file [permanent]
-type BaselinePoint struct {
+type BaselinePoint struct { // nosemgrep: structure.multiple-exported-structs-go -- status report family (BaselinePoint/StatusReport) is cohesive JSON output type; co-locates with StatusReport as the history element type [permanent]
 	Commit     string    `json:"commit"`
 	Divergence float64   `json:"divergence"`
 	At         time.Time `json:"at"`
 }
 
 // StatusReport holds operational status information for the amadeus tool.
-type StatusReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON output struct for status command; BaselineHistory is a time-series snapshot list [permanent]
+type StatusReport struct { // nosemgrep: structure.multiple-exported-structs-go,first-class-collection.raw-slice-field-domain-go -- status report family (BaselinePoint/StatusReport) is cohesive JSON output type; JSON output struct for status command; BaselineHistory is a time-series snapshot list [permanent]
 	LastCheck           time.Time        `json:"last_check"`
 	Divergence          float64          `json:"divergence"`
 	CheckCount          int              `json:"check_count"`

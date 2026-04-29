@@ -9,7 +9,7 @@ import (
 type RunOption func(*RunConfig)
 
 // RunConfig holds per-invocation configuration for a provider runner.
-type RunConfig struct {
+type RunConfig struct { // nosemgrep: structure.exported-struct-and-interface-go -- co-locates with ProviderRunner as its option configuration type; same port contract requires co-location [permanent]
 	AllowedTools    []string
 	WorkDir         string // sets cmd.Dir for the subprocess
 	ConfigBase      string // base directory for resolving provider-specific settings (defaults to WorkDir)

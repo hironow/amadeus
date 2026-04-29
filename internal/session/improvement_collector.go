@@ -21,7 +21,7 @@ const (
 	improvementSurfaceTrace    improvementSignalSurface = "trace"
 )
 
-type ImprovementFeedbackQuery struct {
+type ImprovementFeedbackQuery struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- improvement collector family (ImprovementFeedbackQuery/ImprovementFeedbackRow/ImprovementFeedbackSource/ImprovementCollector) is a cohesive query/source port schema; co-locates with ImprovementFeedbackSource interface as query parameter [permanent]
 	ProjectID     string
 	CreatedAfter  time.Time
 	AfterFeedback string
@@ -29,7 +29,7 @@ type ImprovementFeedbackQuery struct {
 	FeedbackTypes []string
 }
 
-type ImprovementFeedbackRow struct {
+type ImprovementFeedbackRow struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- improvement collector family cohesive set; see ImprovementFeedbackQuery [permanent]
 	ID           string
 	ProjectID    string
 	WeaveRef     string

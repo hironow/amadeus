@@ -7,7 +7,7 @@ import (
 )
 
 // ImpactEntry represents a single entry in the impact radius map.
-type ImpactEntry struct {
+type ImpactEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- Claude response family (ImpactEntry/CapabilityViolation/ClaudeResponse/ClaudeDMailCandidate/RepeatedViolation/DiffCheckParams) is a cohesive JSON wire schema for Claude evaluation output; splitting would fragment the response contract [permanent]
 	Area   string `json:"area"`
 	Impact string `json:"impact"` // direct, indirect, transitive
 	Detail string `json:"detail"`
@@ -15,14 +15,14 @@ type ImpactEntry struct {
 
 // CapabilityViolation represents a detected boundary violation where code exceeds
 // its intended capability scope (e.g., direct external API calls bypassing adapters).
-type CapabilityViolation struct {
+type CapabilityViolation struct { // nosemgrep: structure.multiple-exported-structs-go -- Claude response family cohesive set; see ImpactEntry [permanent]
 	Boundary    string `json:"boundary"`
 	Description string `json:"description"`
 	File        string `json:"file,omitempty"`
 }
 
 // ClaudeResponse represents the structured JSON output from Claude.
-type ClaudeResponse struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON wire struct for Claude API output; slice fields are multi-value response payloads, not collections with invariants [permanent]
+type ClaudeResponse struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — JSON wire struct for Claude API output; slice fields are multi-value response payloads, not collections with invariants; Claude response family cohesive set; see ImpactEntry [permanent]
 	FilesRead            []string               `json:"files_read,omitempty"`
 	Axes                 map[Axis]AxisScore     `json:"axes"`
 	DMails               []ClaudeDMailCandidate `json:"dmails"`
@@ -33,7 +33,7 @@ type ClaudeResponse struct { // nosemgrep: first-class-collection.raw-slice-fiel
 }
 
 // ClaudeDMailCandidate is a D-Mail candidate produced by Claude's evaluation.
-type ClaudeDMailCandidate struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — JSON wire struct for Claude D-Mail candidate; slice fields are JSON arrays from Claude output [permanent]
+type ClaudeDMailCandidate struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — JSON wire struct for Claude D-Mail candidate; slice fields are JSON arrays from Claude output; Claude response family cohesive set; see ImpactEntry [permanent]
 	Description string   `json:"description"`
 	Detail      string   `json:"detail"`
 	Issues      []string `json:"issues,omitempty"`
@@ -44,14 +44,14 @@ type ClaudeDMailCandidate struct { // nosemgrep: first-class-collection.raw-slic
 
 // RepeatedViolation represents an integrity axis that has scored above the
 // violation threshold across multiple consecutive check results.
-type RepeatedViolation struct {
+type RepeatedViolation struct { // nosemgrep: structure.multiple-exported-structs-go -- Claude response family cohesive set; see ImpactEntry [permanent]
 	Axis        string `json:"axis"`
 	Description string `json:"description"`
 	Count       int    `json:"count"`
 }
 
 // DiffCheckParams holds the template parameters for a file-reference diff check prompt.
-type DiffCheckParams struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go — template parameter bag; RepeatedViolations is a read-only input list, not a domain collection with invariants [permanent]
+type DiffCheckParams struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go — template parameter bag; RepeatedViolations is a read-only input list, not a domain collection with invariants; Claude response family cohesive set; see ImpactEntry [permanent]
 	EvalDir            string
 	HasPRReviews       bool
 	LinkedIssueIDs     string

@@ -7,12 +7,12 @@ import (
 )
 
 // SessionStreamPublisher publishes session stream events to subscribers.
-type SessionStreamPublisher interface {
+type SessionStreamPublisher interface { // nosemgrep: structure.multiple-exported-interfaces-go -- session stream port triple (SessionStreamPublisher/SessionStreamSubscriber/SessionStreamBus) is a cohesive pub/sub port family; splitting would fragment the bus contract [permanent]
 	Publish(ctx context.Context, event domain.SessionStreamEvent)
 }
 
 // SessionStreamSubscriber receives session stream events.
-type SessionStreamSubscriber interface {
+type SessionStreamSubscriber interface { // nosemgrep: structure.multiple-exported-interfaces-go -- session stream port family cohesive set; see SessionStreamPublisher [permanent]
 	C() <-chan domain.SessionStreamEvent
 	Close()
 }

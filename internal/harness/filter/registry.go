@@ -31,7 +31,7 @@ type promptFile struct {
 }
 
 // PromptConfig is the read-only API type.
-type PromptConfig struct {
+type PromptConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- filter registry family (PromptConfig/PromptRegistry) is a cohesive prompt lookup contract; PromptConfig co-locates with PromptRegistry as the API type it holds [permanent]
 	Name        string
 	Version     string
 	Description string

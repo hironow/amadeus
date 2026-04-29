@@ -10,7 +10,7 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-type ShiftReport struct {
+type ShiftReport struct { // nosemgrep: structure.multiple-exported-structs-go -- reading steiner family (ShiftReport/ReadingSteiner) is cohesive; ShiftReport is the result type produced by ReadingSteiner.detectShift [permanent]
 	Significant       bool
 	MergedPRs         []domain.MergedPR
 	PRReviews         []domain.PRReview
