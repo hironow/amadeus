@@ -21,6 +21,13 @@ variables:
     Pre-rendered section embedding the current Rival Contract v1
     Intent / Decisions / Boundaries / Evidence. Empty string when no
     Rival Contract v1 specification is available in the archive.
+  event_sourced_glossary_section: >-
+    Pre-rendered section emitting the canonical event-sourcing
+    glossary preamble (Command / Event / Aggregate / Read Model /
+    Policy). Activates only when the current Rival Contract metadata
+    carries `domain_style == event-sourced` (Rival Contract v1.1).
+    Empty string for legacy v1 and v1.1 generic / mixed values so the
+    rendered prompt stays byte-identical to v1.
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.
@@ -38,7 +45,7 @@ template: |
   Each file has a YAML front matter with `kind` and `read_only: true`.
   You MUST read ALL files before evaluating.
   Report which files you read via the `files_read` array in your response (use the `kind` values from each file's front matter).
-  {linked_issues_section}{repeated_violations_section}{divergence_trend_section}{rival_contract_section}## Task
+  {linked_issues_section}{repeated_violations_section}{divergence_trend_section}{rival_contract_section}{event_sourced_glossary_section}## Task
   Evaluate how these changes affect each integrity axis.
   Score each axis 0-100 (0 = full compliance, 100 = full deviation).
 

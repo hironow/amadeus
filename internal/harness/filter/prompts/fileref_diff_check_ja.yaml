@@ -21,6 +21,13 @@ variables:
     Pre-rendered section embedding the current Rival Contract v1
     Intent / Decisions / Boundaries / Evidence. Empty string when no
     Rival Contract v1 specification is available in the archive.
+  event_sourced_glossary_section: >-
+    Pre-rendered section emitting the canonical event-sourcing
+    glossary preamble (Command / Event / Aggregate / Read Model /
+    Policy). Activates only when the current Rival Contract metadata
+    carries `domain_style == event-sourced` (Rival Contract v1.1).
+    Empty string for legacy v1 and v1.1 generic / mixed values so the
+    rendered prompt stays byte-identical to v1.
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.
@@ -38,7 +45,7 @@ template: |
   各ファイルにはYAMLフロントマターで `kind` と `read_only: true` が記載されています。
   評価前に全ファイルを必ず読み込んでください。
   読み込んだファイルを `files_read` 配列でレスポンスに報告してください（各ファイルのフロントマターの `kind` 値を使用）。
-  {linked_issues_section}{repeated_violations_section}{divergence_trend_section}{rival_contract_section}## タスク
+  {linked_issues_section}{repeated_violations_section}{divergence_trend_section}{rival_contract_section}{event_sourced_glossary_section}## タスク
   これらの変更が各整合性軸にどのように影響するかを評価してください。
   各軸を0-100でスコアリング（0 = 完全準拠、100 = 完全乖離）。
 
