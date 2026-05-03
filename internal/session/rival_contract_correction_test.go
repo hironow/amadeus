@@ -77,13 +77,13 @@ func TestCorrectionDMail_IncludesContractAmendmentsSection(t *testing.T) {
 	}
 	amendments := []domain.RivalContractAmendment{
 		{
-			Section:     "Boundaries",
-			Suggestion:  "Allow short-lived OAuth refresh tokens for first-party clients.",
-			Rationale:   "Implementation now requires SSO; original boundary is obsolete.",
+			Section:    "Boundaries",
+			Suggestion: "Allow short-lived OAuth refresh tokens for first-party clients.",
+			Rationale:  "Implementation now requires SSO; original boundary is obsolete.",
 		},
 		{
-			Section:     "Evidence",
-			Suggestion:  "Add nfr.p95_latency_ms: <= 250 to reflect SSO overhead.",
+			Section:    "Evidence",
+			Suggestion: "Add nfr.p95_latency_ms: <= 250 to reflect SSO overhead.",
 		},
 	}
 
