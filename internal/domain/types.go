@@ -70,14 +70,22 @@ func (i ProviderErrorInfo) IsTrip() bool {
 // Fields mirror the four contract-aware sections used by the divergence
 // prompts (Intent / Decisions / Boundaries / Evidence) plus enough
 // metadata to cite the current contract revision in corrective bodies.
+//
+// DomainStyle carries the optional Rival Contract v1.1 metadata.domain_style
+// enum value forward to the prompt renderer so divergence prompts can
+// branch their glossary preamble (event-sourced vs generic/mixed/empty).
+// The session-layer adapter copies the value verbatim from the parsed
+// harness.RivalContractMetadata; consumers MUST treat the empty string as
+// the legacy v1 default (semantically equivalent to "generic").
 type RivalContractContext struct { // nosemgrep: structure.multiple-exported-structs-go -- Rival Contract v1 prompt-context family (RivalContractContext/RivalContractCitation/RivalContractAmendment) is a cohesive corrective-body schema; splitting would fragment the contract-aware surface [permanent]
-	ContractID string
-	Revision   int
-	Title      string
-	Intent     string
-	Decisions  string
-	Boundaries string
-	Evidence   string
+	ContractID  string
+	Revision    int
+	Title       string
+	Intent      string
+	Decisions   string
+	Boundaries  string
+	Evidence    string
+	DomainStyle string
 }
 
 // HasContent reports whether the context carries any contract-aware text

@@ -44,6 +44,15 @@ type RivalContract = policy.RivalContract
 // RivalContractMetadata is the parsed Rival Contract v1 metadata view.
 type RivalContractMetadata = policy.RivalContractMetadata
 
+// Rival Contract v1.1 DomainStyle enum re-exports. Session adapters use
+// these via the harness facade so the layer rule (session must not
+// import harness/policy directly) stays satisfied.
+const (
+	DomainStyleEventSourced = policy.DomainStyleEventSourced
+	DomainStyleGeneric      = policy.DomainStyleGeneric
+	DomainStyleMixed        = policy.DomainStyleMixed
+)
+
 // CurrentContract pairs a parsed Rival Contract v1 body with its metadata
 // and originating D-Mail name. amadeus uses this as the projection
 // result of ProjectCurrentContracts.
