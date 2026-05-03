@@ -18,6 +18,34 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// currentRivalContractContext returns the projected current Rival
+// Contract v1 context for divergence prompts, or nil when none is
+// available. Failures (load errors, conflicts, ambiguous archives) all
+// degrade gracefully to nil so existing scoring behavior is preserved
+// when no Rival Contract v1 specs exist in the archive.
+func (a *Amadeus) currentRivalContractContext() *domain.RivalContractContext {
+	if a.Store == nil {
+		return nil
+	}
+	dmails, err := a.Store.LoadAllDMails()
+	if err != nil {
+		// Logged at debug level only; absence of contract context must
+		// never break divergence scoring (graceful degradation).
+		if a.Logger != nil {
+			a.Logger.Debug("rival contract: load dmails failed: %v", err)
+		}
+		return nil
+	}
+	current, conflicts, err := ReadRivalContractsFromDMails(dmails)
+	if err != nil {
+		if a.Logger != nil {
+			a.Logger.Debug("rival contract: project failed: %v", err)
+		}
+		return nil
+	}
+	return CurrentContractForPrompt(current, conflicts)
+}
+
 // loadRecentCheckResults reads the recent check history from .run/recent_checks.json.
 // Returns nil (no error) if the file does not exist.
 func loadRecentCheckResults(stateDir string) ([]domain.CheckResult, error) {
@@ -159,7 +187,8 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		}
 
 		prompt, err := buildFullCheckPrompt(a.Config.ConfigLang(), domain.FullCheckParams{
-			EvalDir: evalDir,
+			EvalDir:         evalDir,
+			CurrentContract: a.currentRivalContractContext(),
 		})
 		if err != nil {
 			cleanup()
@@ -224,6 +253,7 @@ func (a *Amadeus) buildCheckPrompt(ctx context.Context, report ShiftReport, full
 		LinkedIssueIDs:     strings.Join(issueIDs, ", "),
 		RepeatedViolations: repeatedViolations,
 		DivergenceTrend:    divergenceTrend,
+		CurrentContract:    a.currentRivalContractContext(),
 	})
 	if err != nil {
 		cleanup()

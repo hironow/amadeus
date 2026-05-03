@@ -235,3 +235,145 @@ func TestBuildDiffCheckPrompt_WithDivergenceTrend(t *testing.T) {
 		t.Error("expected delta value in prompt")
 	}
 }
+
+func TestBuildDiffCheckPrompt_IncludesRivalContractContext(t *testing.T) {
+	// given a diff-check params carrying a current Rival Contract v1
+	// projection with non-empty Intent/Decisions/Boundaries/Evidence.
+	current := &domain.RivalContractContext{
+		ContractID: "auth-session-expiry",
+		Revision:   2,
+		Title:      "Add session expiry enforcement",
+		Intent:     "Prevent expired sessions from authorizing API calls.",
+		Decisions:  "Enforce expiry in middleware before handler execution.",
+		Boundaries: "Do not add OAuth, refresh tokens, or background cleanup.",
+		Evidence:   "test: just test\nnfr.p95_latency_ms: <= 200",
+	}
+	params := domain.DiffCheckParams{
+		EvalDir:         "/repo/.gate/.run/eval",
+		CurrentContract: current,
+	}
+
+	// when
+	prompt, err := buildDiffCheckPrompt("en", params)
+
+	// then the prompt embeds a dedicated Rival Contract section with the
+	// four contract-aware fields (Intent/Decisions/Boundaries/Evidence).
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "Rival Contract") {
+		t.Error("expected 'Rival Contract' header in diff-check prompt")
+	}
+	for _, want := range []string{
+		"auth-session-expiry",
+		"Add session expiry enforcement",
+		"Prevent expired sessions",
+		"Enforce expiry in middleware",
+		"Do not add OAuth",
+		"nfr.p95_latency_ms",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("expected diff-check prompt to contain %q", want)
+		}
+	}
+}
+
+func TestBuildDiffCheckPrompt_NoRivalContract_OmitsSection(t *testing.T) {
+	// given diff-check params without any Rival Contract context.
+	params := domain.DiffCheckParams{EvalDir: "/repo/.gate/.run/eval"}
+
+	// when
+	prompt, err := buildDiffCheckPrompt("en", params)
+
+	// then the prompt MUST NOT include the Rival Contract section header
+	// (graceful degradation: existing flows keep working unchanged).
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(prompt, "Rival Contract") {
+		t.Error("expected NO Rival Contract section when CurrentContract is nil")
+	}
+}
+
+func TestBuildFullCheckPrompt_IncludesRivalContractContext(t *testing.T) {
+	// given a full-check params carrying a current Rival Contract v1
+	// projection. Full-check also receives contract context so calibration
+	// scoring is contract-aware.
+	current := &domain.RivalContractContext{
+		ContractID: "auth-session-expiry",
+		Revision:   1,
+		Title:      "Add session expiry enforcement",
+		Intent:     "Prevent expired sessions from authorizing API calls.",
+		Decisions:  "Enforce expiry in middleware before handler execution.",
+		Boundaries: "Do not add OAuth, refresh tokens, or background cleanup.",
+		Evidence:   "test: just test",
+	}
+	params := domain.FullCheckParams{
+		EvalDir:         "/repo/.gate/.run/eval",
+		CurrentContract: current,
+	}
+
+	// when
+	prompt, err := buildFullCheckPrompt("en", params)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "Rival Contract") {
+		t.Error("expected 'Rival Contract' header in full-check prompt")
+	}
+	for _, want := range []string{
+		"auth-session-expiry",
+		"Prevent expired sessions",
+		"Do not add OAuth",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("expected full-check prompt to contain %q", want)
+		}
+	}
+}
+
+func TestBuildFullCheckPrompt_NoRivalContract_OmitsSection(t *testing.T) {
+	// given full-check params with no Rival Contract context.
+	params := domain.FullCheckParams{EvalDir: "/repo/.gate/.run/eval"}
+
+	// when
+	prompt, err := buildFullCheckPrompt("en", params)
+
+	// then graceful degradation: no Rival Contract section.
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(prompt, "Rival Contract") {
+		t.Error("expected NO Rival Contract section when CurrentContract is nil")
+	}
+}
+
+func TestBuildDiffCheckPrompt_RivalContractContext_Ja(t *testing.T) {
+	// given the same contract context on the Japanese diff-check prompt.
+	current := &domain.RivalContractContext{
+		ContractID: "auth-session-expiry",
+		Revision:   1,
+		Title:      "Add session expiry enforcement",
+		Intent:     "Prevent expired sessions.",
+		Decisions:  "Enforce expiry in middleware.",
+		Boundaries: "Do not add OAuth.",
+		Evidence:   "test: just test",
+	}
+	params := domain.DiffCheckParams{EvalDir: "/repo/.gate/.run/eval", CurrentContract: current}
+
+	// when
+	prompt, err := buildDiffCheckPrompt("ja", params)
+
+	// then the section is present in the Japanese template too.
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "Rival Contract") {
+		t.Error("expected 'Rival Contract' header in ja diff-check prompt")
+	}
+	if !strings.Contains(prompt, "auth-session-expiry") {
+		t.Error("expected contract ID in ja diff-check prompt")
+	}
+}

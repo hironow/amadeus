@@ -5,6 +5,10 @@ description: >
   and score divergence axes for a full calibration (zero-base) integrity check.
 variables:
   eval_dir: Absolute path to the eval directory containing scored files
+  rival_contract_section: >-
+    Pre-rendered section embedding the current Rival Contract v1
+    Intent / Decisions / Boundaries / Evidence. Empty string when no
+    Rival Contract v1 specification is available in the archive.
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.
@@ -22,7 +26,7 @@ template: |
   各ファイルにはYAMLフロントマターで `kind` と `read_only: true` が記載されています。
   評価前に全ファイルを必ず読み込んでください。
   読み込んだファイルを `files_read` 配列でレスポンスに報告してください（各ファイルのフロントマターの `kind` 値を使用）。
-
+  {rival_contract_section}
   ## タスク
   コードベース全体を全ADRおよびDoDに対して評価してください。
   各軸をゼロから0-100でスコアリング（0 = 完全準拠、100 = 完全乖離）。

@@ -35,6 +35,37 @@ var DetermineCorrectionDecision = policy.DetermineCorrectionDecision
 // CorrectiveTargetAgentForFailure resolves the owner for a corrective failure.
 var CorrectiveTargetAgentForFailure = policy.CorrectiveTargetAgentForFailure
 
+// --- Rival Contract v1 facade (Phase 3: amadeus contract-aware drift) ---
+
+// RivalContract is the parsed Rival Contract v1 body re-exported for
+// session-layer adapters that need the canonical six-section shape.
+type RivalContract = policy.RivalContract
+
+// RivalContractMetadata is the parsed Rival Contract v1 metadata view.
+type RivalContractMetadata = policy.RivalContractMetadata
+
+// CurrentContract pairs a parsed Rival Contract v1 body with its metadata
+// and originating D-Mail name. amadeus uses this as the projection
+// result of ProjectCurrentContracts.
+type CurrentContract = policy.CurrentContract
+
+// ContractConflict is emitted when two D-Mails claim the same contract
+// id at the same revision but disagree on body/supersedes lineage.
+type ContractConflict = policy.ContractConflict
+
+// EvidenceItem is a single deterministic Evidence bullet.
+type EvidenceItem = policy.EvidenceItem
+
+// ProjectCurrentContracts is the deterministic Rival Contract v1
+// projection that selects the winning revision per contract_id.
+var ProjectCurrentContracts = policy.ProjectCurrentContracts
+
+// ParseRivalContractBody parses a Rival Contract v1 markdown body.
+var ParseRivalContractBody = policy.ParseRivalContractBody
+
+// ParseEvidenceItems parses Evidence bullets into deterministic items.
+var ParseEvidenceItems = policy.ParseEvidenceItems
+
 // IsPipelinePR checks if a PR was created by the 4-tool pipeline.
 var IsPipelinePR = policy.IsPipelinePR
 
