@@ -38,11 +38,19 @@ type RivalContract struct { // nosemgrep: structure.multiple-exported-structs-go
 
 // RivalContractMetadata is the parsed view of contract metadata fields
 // embedded in the existing D-Mail metadata map.
+//
+// DomainStyle is the OPTIONAL Rival Contract v1.1 enum tag identifying the
+// vocabulary used in the contract's Domain section. When the metadata map
+// has no `domain_style` key, DomainStyle is the empty string and consumers
+// MUST treat it as the legacy v1 default (semantically equivalent to
+// `generic`). The parser never infers DomainStyle from any side channel;
+// inference, when desired, is the producer's responsibility.
 type RivalContractMetadata struct { // nosemgrep: structure.multiple-exported-structs-go -- Rival Contract v1 type family co-located with RivalContract [permanent]
-	Schema     string
-	ID         string
-	Revision   int
-	Supersedes string
+	Schema      string
+	ID          string
+	Revision    int
+	Supersedes  string
+	DomainStyle string
 }
 
 // EvidenceItem is a single deterministic bullet parsed from the Evidence
@@ -72,6 +80,24 @@ type ContractConflict struct { // nosemgrep: structure.multiple-exported-structs
 
 // SchemaRivalContractV1 is the only accepted contract_schema value for v1.
 const SchemaRivalContractV1 = "rival-contract-v1"
+
+// DomainStyle enum values accepted for the optional Rival Contract v1.1
+// `metadata.domain_style` key.
+const (
+	DomainStyleEventSourced = "event-sourced"
+	DomainStyleGeneric      = "generic"
+	DomainStyleMixed        = "mixed"
+)
+
+// validDomainStyles is the closed set of accepted domain_style values. The
+// empty string is intentionally NOT a member: missing keys never reach this
+// set (the parser short-circuits before consulting it), but explicit empty
+// strings should not silently round-trip through the renderer either.
+var validDomainStyles = map[string]struct{}{
+	DomainStyleEventSourced: {},
+	DomainStyleGeneric:      {},
+	DomainStyleMixed:        {},
+}
 
 // ErrContractIDUnavailable is returned by DeriveContractID when no stable
 // non-D-Mail-name input is available.
@@ -192,11 +218,19 @@ func ParseRivalContractMetadata(meta map[string]string) (RivalContractMetadata, 
 		return RivalContractMetadata{}, false, fmt.Errorf("rival contract: contract_revision must be positive, got %d", rev)
 	}
 
+	style := strings.TrimSpace(meta["domain_style"])
+	if style != "" {
+		if _, ok := validDomainStyles[style]; !ok {
+			return RivalContractMetadata{}, false, fmt.Errorf("rival contract: unsupported domain_style %q (allowed: event-sourced, generic, mixed)", style)
+		}
+	}
+
 	return RivalContractMetadata{
-		Schema:     schema,
-		ID:         id,
-		Revision:   rev,
-		Supersedes: strings.TrimSpace(meta["supersedes"]),
+		Schema:      schema,
+		ID:          id,
+		Revision:    rev,
+		Supersedes:  strings.TrimSpace(meta["supersedes"]),
+		DomainStyle: style,
 	}, true, nil
 }
 
