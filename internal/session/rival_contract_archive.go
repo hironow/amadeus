@@ -81,13 +81,14 @@ func CurrentContractForPrompt(current []harness.CurrentContract, conflicts []har
 	}
 	cc := current[0]
 	ctx := domain.RivalContractContext{
-		ContractID: cc.Metadata.ID,
-		Revision:   cc.Metadata.Revision,
-		Title:      cc.Contract.Title,
-		Intent:     cc.Contract.Intent,
-		Decisions:  cc.Contract.Decisions,
-		Boundaries: cc.Contract.Boundaries,
-		Evidence:   cc.Contract.Evidence,
+		ContractID:  cc.Metadata.ID,
+		Revision:    cc.Metadata.Revision,
+		Title:       cc.Contract.Title,
+		Intent:      cc.Contract.Intent,
+		Decisions:   cc.Contract.Decisions,
+		Boundaries:  cc.Contract.Boundaries,
+		Evidence:    cc.Contract.Evidence,
+		DomainStyle: cc.Metadata.DomainStyle,
 	}
 	if !ctx.HasContent() {
 		return nil

@@ -18,12 +18,13 @@ func buildDiffCheckPrompt(lang string, params domain.DiffCheckParams) (string, e
 	}
 
 	vars := map[string]string{
-		"eval_dir":                    params.EvalDir,
-		"pr_reviews_section":          renderPRReviewsSection(lang, params),
-		"linked_issues_section":       renderLinkedIssuesSection(lang, params),
-		"repeated_violations_section": renderRepeatedViolationsSection(lang, params),
-		"divergence_trend_section":    renderDivergenceTrendSection(lang, params),
-		"rival_contract_section":      renderRivalContractSection(lang, params.CurrentContract),
+		"eval_dir":                       params.EvalDir,
+		"pr_reviews_section":             renderPRReviewsSection(lang, params),
+		"linked_issues_section":          renderLinkedIssuesSection(lang, params),
+		"repeated_violations_section":    renderRepeatedViolationsSection(lang, params),
+		"divergence_trend_section":       renderDivergenceTrendSection(lang, params),
+		"rival_contract_section":         renderRivalContractSection(lang, params.CurrentContract),
+		"event_sourced_glossary_section": renderEventSourcedGlossarySection(lang, params.CurrentContract),
 	}
 
 	return reg.Expand(promptName, vars)
@@ -39,8 +40,9 @@ func buildFullCheckPrompt(lang string, params domain.FullCheckParams) (string, e
 	}
 
 	vars := map[string]string{
-		"eval_dir":               params.EvalDir,
-		"rival_contract_section": renderRivalContractSection(lang, params.CurrentContract),
+		"eval_dir":                       params.EvalDir,
+		"rival_contract_section":         renderRivalContractSection(lang, params.CurrentContract),
+		"event_sourced_glossary_section": renderEventSourcedGlossarySection(lang, params.CurrentContract),
 	}
 
 	return reg.Expand(promptName, vars)
@@ -167,6 +169,52 @@ func renderRivalContractSection(lang string, current *domain.RivalContractContex
 	writeContractField(&sb, "Evidence", current.Evidence)
 	sb.WriteString("\nTreat Boundaries and Evidence items as stronger than implicit codebase style when they conflict.\n")
 	return sb.String()
+}
+
+// renderEventSourcedGlossarySection emits a canonical command/event/
+// read-model glossary preamble when the current Rival Contract carries
+// `metadata.domain_style == "event-sourced"` (Rival Contract v1.1).
+//
+// The glossary normalizes vocabulary the model must use when reasoning
+// about an event-sourced contract Domain section so divergence scoring
+// stays grounded in the canonical terms (Command, Event, Aggregate,
+// Read Model, Policy). For every other domain_style value (including
+// the legacy v1 default `""` and the explicit `generic` / `mixed`
+// values), this returns the empty string so the rendered prompt is
+// byte-identical to the legacy v1 output.
+//
+// Why a fixed marker string ("event-sourcing glossary"): Phase 1.1A
+// only locks the *branching* behavior. The full glossary copy is a
+// Phase 3 deliverable; cross-tool consumers depend on the marker, not
+// the wording.
+func renderEventSourcedGlossarySection(lang string, current *domain.RivalContractContext) string {
+	if current == nil || !current.HasContent() {
+		return ""
+	}
+	if current.DomainStyle != harness.DomainStyleEventSourced {
+		return ""
+	}
+
+	if lang == "ja" {
+		return "\n## イベントソーシング用語集 (event-sourcing glossary)\n" +
+			"この契約の Domain セクションはイベントソーシング語彙で記述されています。" +
+			"乖離を採点する際は以下の語彙の整合性を厳しく評価してください:\n" +
+			"- **Command** (コマンド): 集約に対する未来形の入力 (例: AuthorizePurchase will -)。決して過去形にしないこと。\n" +
+			"- **Event** (イベント): 集約の状態変化を表す過去形の事実 (例: PurchaseAuthorized did -)。決して未来形にしないこと。\n" +
+			"- **Aggregate** (集約 / ドメインモデル): イベントを再生して整合性境界を保つ単位。コマンドの宛先。\n" +
+			"- **Read Model** (リードモデル / 帳票): イベントから派生したクエリ用ビュー。コマンドの発行元の根拠となる。\n" +
+			"- **Policy** (ポリシー): 「WHEN [EVENT] THEN [COMMAND]」を表現する自動連鎖。\n" +
+			"\n境界違反の例: Command が過去形で書かれている、集約の状態を直接変更する I/O、Read Model が集約の可変状態に結合している、ポリシーが副作用を直接行うなど。これらは Boundaries や Decisions と衝突する深刻な乖離です。\n"
+	}
+	return "\n## Event-Sourcing Glossary (event-sourcing glossary)\n" +
+		"This contract's Domain section is written in event-sourcing vocabulary." +
+		" When scoring divergence, evaluate adherence to the following terms strictly:\n" +
+		"- **Command**: a future-tense input to an aggregate (e.g. AuthorizePurchase will charge -). Never past tense.\n" +
+		"- **Event**: a past-tense fact recording an aggregate state change (e.g. PurchaseAuthorized did record -). Never future tense.\n" +
+		"- **Aggregate** (a.k.a. domain model): consistency boundary that replays events; the receiver of commands.\n" +
+		"- **Read Model**: query-side view derived from events; the basis on which commands are issued.\n" +
+		"- **Policy**: an automatic chain expressed as \"WHEN [EVENT] THEN [COMMAND]\".\n" +
+		"\nBoundary-violation signals: a Command written in past tense, direct I/O mutating aggregate state, a Read Model coupled to an aggregate's mutable state, or a Policy performing side effects directly. These are serious divergences against Boundaries and Decisions.\n"
 }
 
 // rivalContractFieldBudget caps each Rival Contract section excerpt so
