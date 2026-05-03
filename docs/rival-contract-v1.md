@@ -139,3 +139,69 @@ projected as contracts.
 
 - [`refs/plans/2026-05-03-rival-contract-v1.md`](../../refs/plans/2026-05-03-rival-contract-v1.md) — full design, phase plan, risks
 - [`refs/scripts/check_rival_contract_docs.sh`](../../refs/scripts/check_rival_contract_docs.sh) — gap-check enforcement
+
+## v1.1 additions
+
+Rival Contract v1.1 is a purely additive minor extension. The schema name
+remains `rival-contract-v1`. amadeus gains a new optional branch in the
+divergence prompt that activates when the projected current contract
+carries `metadata.domain_style: event-sourced`. The corrective D-Mail
+shapes (`## Violated Contract`, `## Contract Amendments`) are unchanged.
+
+Plan: [`refs/plans/2026-05-03-rival-contract-v1-1-extensions.md`](../../refs/plans/2026-05-03-rival-contract-v1-1-extensions.md).
+
+### `metadata.domain_style` accepted by the parser
+
+`ParseRivalContractMetadata` accepts an OPTIONAL `domain_style` key with
+exactly three enumerated values: `event-sourced`, `generic`, `mixed`.
+Unknown values are rejected. A missing key parses as the empty string and
+is treated as `generic` by amadeus (no behavior change vs v1).
+
+The parser never infers `domain_style` from ADRs, environment variables,
+or any other side channel. The metadata map is the only signal.
+
+### Divergence prompt glossary preamble
+
+When the current contract for a divergence check carries
+`metadata.domain_style == "event-sourced"`, the prompt builder injects an
+event-sourcing glossary preamble (Command / Event / Read Model /
+Aggregate / Policy) into the divergence prompt context. Both `diff` and
+`full` divergence prompt paths share the same branch via
+`renderEventSourcedGlossarySection` in
+`internal/session/prompt_builder.go`. The preamble has Japanese (`ja`)
+and English (`en`) variants matching the surrounding locale.
+
+When the current contract has no `domain_style`, or carries `generic` /
+`mixed`, the divergence prompt is bit-identical to the v1 surface. The
+divergence scoring function and corrective D-Mail emission are not
+affected by this branch.
+
+### Canonical projection: ProjectCurrentContracts
+
+`ProjectCurrentContracts` is canonical here in amadeus
+(`internal/harness/policy/rival_contract.go`). sightjack v1.1 added an
+internal copy of this function to its own parser package so that the
+producer-side REASONS Canvas export subcommand (`--wave <id>` mode)
+resolves the current revision deterministically using the same selection
+rules. A regression
+test in sightjack (`TestProjectCurrentContracts_BehavesLikeAmadeus`)
+enforces parity. amadeus remains the source of truth; the sj copy is a
+controlled duplicate.
+
+### What amadeus does NOT do
+
+- amadeus never SETS `domain_style`. The producer (sightjack) is the
+  only writer.
+- amadeus does not invoke the producer-side REASONS Canvas export
+  subcommand. That projection is a sightjack-only tool; the drift loop
+  has no need for it.
+- The corrective D-Mail body shapes (`## Violated Contract`,
+  `## Contract Amendments`) are unchanged from v1; v1.1 only adds prompt
+  context, not new corrective shapes.
+
+### Backward compatibility
+
+Legacy v1 D-Mails (no `domain_style` key) produce a divergence prompt
+that is bit-identical to the v1 prompt. The v1.1 branch is opt-in purely
+through producer-emitted metadata. Tools that haven't been upgraded
+continue to work unchanged.
