@@ -1,10 +1,14 @@
-// Package policy rival_contract.go: Rival Contract v1 parser.
+// Package policy rival_contract.go: Rival Contract v1 parser and projection.
 //
 // Pure parsing utilities for the Rival Contract v1 format. The parser is
 // deterministic, performs no I/O, and never invokes an LLM. Consumers in
 // sightjack, paintress, amadeus, and dominator are expected to keep the
 // canonical type and function names in sync via copy-sync until duplicate
 // maintenance becomes a real cost.
+//
+// amadeus is the contract owner of selection: ProjectCurrentContracts here
+// is the deterministic projection that picks the winning revision per
+// contract_id and emits ContractConflict for ambiguous cases.
 //
 // Refs: refs/plans/2026-05-03-rival-contract-v1.md
 package policy
@@ -14,8 +18,11 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/hironow/amadeus/internal/domain"
 )
 
 // RivalContract is the parsed body of a Rival Contract v1 specification.
@@ -250,6 +257,231 @@ func DeriveContractID(waveID string, issueIDs []string, clusterName string) (str
 		return name, nil
 	}
 	return "", ErrContractIDUnavailable
+}
+
+// ProjectCurrentContracts is the amadeus-specific deterministic projection
+// that selects the winning Rival Contract per contract_id from a stream of
+// D-Mails.
+//
+// Selection rules (per plan §"Current Contract Selection"):
+//  1. Filter to dmails of kind == specification.
+//  2. Filter to those with metadata.contract_schema == rival-contract-v1.
+//  3. Group by metadata.contract_id.
+//  4. Within each group, parse metadata.contract_revision as a positive
+//     integer.
+//  5. Pick the highest revision.
+//  6. If two D-Mails share the same contract_id and the same highest
+//     revision:
+//     - If exact duplicate (same idempotency_key, or same body+supersedes
+//     when idempotency keys are absent) → tolerate, pick deterministically
+//     (lexicographically smallest D-Mail name).
+//     - Else → emit ContractConflict with reason "same-revision conflict".
+//  7. If supersedes is non-empty, verify it equals a previous D-Mail name
+//     for the same contract_id at a strictly lower revision. If not → emit
+//     ContractConflict with reason "invalid supersedes lineage".
+//
+// The function is pure and deterministic. It does not invoke an LLM and
+// does not perform I/O. Output slices are sorted by contract_id for stable
+// ordering.
+func ProjectCurrentContracts(dmails []domain.DMail) ([]CurrentContract, []ContractConflict) {
+	groups := groupContractsByID(dmails)
+	contractIDs := sortedContractIDs(groups)
+
+	var current []CurrentContract
+	var conflicts []ContractConflict
+	for _, id := range contractIDs {
+		group := groups[id]
+		winners, sameRevConflict := pickHighestRevision(id, group)
+		if sameRevConflict != nil {
+			conflicts = append(conflicts, *sameRevConflict)
+			continue
+		}
+		if len(winners) == 0 {
+			continue
+		}
+		winner := winners[0]
+		if conflict := checkSupersedesLineage(id, winner, group); conflict != nil {
+			conflicts = append(conflicts, *conflict)
+			continue
+		}
+		current = append(current, winner)
+	}
+	return current, conflicts
+}
+
+// contractCandidate is a parsed projection of a single D-Mail.
+type contractCandidate struct {
+	dmail    domain.DMail
+	metadata RivalContractMetadata
+	contract RivalContract
+}
+
+// groupContractsByID parses each specification D-Mail and groups parsed
+// candidates by contract_id. D-Mails that fail metadata or body parsing
+// are silently skipped — invalid messages do not produce conflicts on
+// their own; selection conflicts arise from disagreement between valid
+// candidates.
+func groupContractsByID(dmails []domain.DMail) map[string][]contractCandidate {
+	groups := make(map[string][]contractCandidate)
+	for _, d := range dmails {
+		if d.Kind != domain.KindSpecification {
+			continue
+		}
+		meta, ok, err := ParseRivalContractMetadata(d.Metadata)
+		if err != nil || !ok {
+			continue
+		}
+		body, ok, err := ParseRivalContractBody(d.Body)
+		if err != nil || !ok {
+			continue
+		}
+		groups[meta.ID] = append(groups[meta.ID], contractCandidate{
+			dmail:    d,
+			metadata: meta,
+			contract: body,
+		})
+	}
+	return groups
+}
+
+// sortedContractIDs returns the keys of groups in lexicographic order so
+// that ProjectCurrentContracts produces a stable output regardless of the
+// input order.
+func sortedContractIDs(groups map[string][]contractCandidate) []string {
+	ids := make([]string, 0, len(groups))
+	for id := range groups {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// pickHighestRevision returns the winning candidate(s) at the highest
+// revision in a group. When multiple candidates share the same highest
+// revision, exact duplicates collapse to a single deterministic winner;
+// non-duplicate ties produce a same-revision ContractConflict.
+func pickHighestRevision(contractID string, group []contractCandidate) ([]CurrentContract, *ContractConflict) {
+	if len(group) == 0 {
+		return nil, nil
+	}
+	maxRev := 0
+	for _, c := range group {
+		if c.metadata.Revision > maxRev {
+			maxRev = c.metadata.Revision
+		}
+	}
+	var top []contractCandidate
+	for _, c := range group {
+		if c.metadata.Revision == maxRev {
+			top = append(top, c)
+		}
+	}
+	if len(top) == 1 {
+		return []CurrentContract{toCurrentContract(top[0])}, nil
+	}
+	if duplicates(top) {
+		winner := pickDeterministic(top)
+		return []CurrentContract{toCurrentContract(winner)}, nil
+	}
+	names := dmailNamesOf(top)
+	conflict := ContractConflict{
+		ContractID: contractID,
+		Reason:     "same-revision conflict",
+		Names:      names,
+	}
+	return nil, &conflict
+}
+
+// checkSupersedesLineage validates that a winner's supersedes pointer
+// names a real predecessor D-Mail in the same group. An empty supersedes
+// is always accepted (initial revision). When supersedes is set, the
+// referenced D-Mail must exist in the group at a strictly lower revision.
+func checkSupersedesLineage(contractID string, winner CurrentContract, group []contractCandidate) *ContractConflict {
+	prev := strings.TrimSpace(winner.Metadata.Supersedes)
+	if prev == "" {
+		return nil
+	}
+	for _, c := range group {
+		if c.dmail.Name == prev && c.metadata.Revision < winner.Metadata.Revision {
+			return nil
+		}
+	}
+	return &ContractConflict{
+		ContractID: contractID,
+		Reason:     "invalid supersedes lineage",
+		Names:      []string{winner.DMailName, prev},
+	}
+}
+
+// duplicates reports whether all candidates in top represent the same
+// content. Equivalence is decided first by idempotency_key in metadata
+// (the stored hash) and falls back to a full body+supersedes comparison
+// when no idempotency keys are present.
+func duplicates(top []contractCandidate) bool {
+	if len(top) < 2 {
+		return true
+	}
+	keys := make(map[string]struct{}, len(top))
+	for _, c := range top {
+		key, ok := c.dmail.Metadata["idempotency_key"]
+		if !ok || key == "" {
+			return bodiesEqual(top)
+		}
+		keys[key] = struct{}{}
+	}
+	return len(keys) == 1
+}
+
+// bodiesEqual reports whether all candidates have identical body text
+// and supersedes pointers. Used as a fallback when idempotency keys are
+// not available.
+func bodiesEqual(top []contractCandidate) bool {
+	if len(top) < 2 {
+		return true
+	}
+	first := top[0]
+	for _, c := range top[1:] {
+		if c.dmail.Body != first.dmail.Body {
+			return false
+		}
+		if c.metadata.Supersedes != first.metadata.Supersedes {
+			return false
+		}
+	}
+	return true
+}
+
+// pickDeterministic returns the candidate with the lexicographically
+// smallest D-Mail name. Used to break ties between exact duplicates.
+func pickDeterministic(top []contractCandidate) contractCandidate {
+	winner := top[0]
+	for _, c := range top[1:] {
+		if c.dmail.Name < winner.dmail.Name {
+			winner = c
+		}
+	}
+	return winner
+}
+
+// dmailNamesOf returns sorted D-Mail names for the candidates. Used for
+// ContractConflict.Names so output is deterministic.
+func dmailNamesOf(top []contractCandidate) []string {
+	names := make([]string, 0, len(top))
+	for _, c := range top {
+		names = append(names, c.dmail.Name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// toCurrentContract projects a contractCandidate onto the public
+// CurrentContract type.
+func toCurrentContract(c contractCandidate) CurrentContract {
+	return CurrentContract{
+		DMailName: c.dmail.Name,
+		Metadata:  c.metadata,
+		Contract:  c.contract,
+	}
 }
 
 // extractContractTitle returns the title text of the first `# Contract:`
