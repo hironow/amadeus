@@ -5,6 +5,10 @@ description: >
   and score divergence axes for a full calibration (zero-base) integrity check.
 variables:
   eval_dir: Absolute path to the eval directory containing scored files
+  rival_contract_section: >-
+    Pre-rendered section embedding the current Rival Contract v1
+    Intent / Decisions / Boundaries / Evidence. Empty string when no
+    Rival Contract v1 specification is available in the archive.
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.
@@ -22,7 +26,7 @@ template: |
   Each file has a YAML front matter with `kind` and `read_only: true`.
   You MUST read ALL files before evaluating.
   Report which files you read via the `files_read` array in your response (use the `kind` values from each file's front matter).
-
+  {rival_contract_section}
   ## Task
   Evaluate the entire codebase against all ADRs and DoDs.
   Score each axis 0-100 from zero (0 = full compliance, 100 = full deviation).

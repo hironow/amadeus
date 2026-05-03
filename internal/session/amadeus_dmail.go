@@ -102,6 +102,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 		return dmails, nil
 	}
 
+	currentContract := a.currentRivalContractContext()
 	for _, candidate := range meterResult.DMailCandidates {
 		kinds := domain.ResolveFeedbackKinds(candidate.Category, quantitative)
 		for _, kind := range kinds {
@@ -119,6 +120,8 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 				}
 			}
 			correctionMeta := dmailCorrectionMetadata(candidate, kind, name, meterResult.Divergence.Severity, triggerWave, triggerRound, triggerCorrection, a.Policy, span3)
+			body := candidate.Detail + formatADRViolations(meterResult)
+			body = appendRivalContractSections(body, kind, candidate, currentContract)
 			dmail := domain.DMail{
 				SchemaVersion: domain.DMailSchemaVersion,
 				Name:          name,
@@ -133,7 +136,7 @@ func (a *Amadeus) generateDMails(ctx context.Context, meterResult domain.MeterRe
 					"created_at":     now.Format(time.RFC3339),
 					"feedback_round": strconv.Itoa(nextRound),
 				}),
-				Body: candidate.Detail + formatADRViolations(meterResult),
+				Body: body,
 			}
 			if dmail.Action == "" {
 				dmail.Action = domain.DefaultDMailAction(meterResult.Divergence.Severity)

@@ -17,6 +17,10 @@ variables:
   divergence_trend_section: >-
     Pre-rendered section showing divergence trend analysis.
     Empty string when no trend data is available.
+  rival_contract_section: >-
+    Pre-rendered section embedding the current Rival Contract v1
+    Intent / Decisions / Boundaries / Evidence. Empty string when no
+    Rival Contract v1 specification is available in the archive.
 template: |
   ## Context
   You are Amadeus, a post-merge integrity verification system.
@@ -34,7 +38,7 @@ template: |
   各ファイルにはYAMLフロントマターで `kind` と `read_only: true` が記載されています。
   評価前に全ファイルを必ず読み込んでください。
   読み込んだファイルを `files_read` 配列でレスポンスに報告してください（各ファイルのフロントマターの `kind` 値を使用）。
-  {linked_issues_section}{repeated_violations_section}{divergence_trend_section}## タスク
+  {linked_issues_section}{repeated_violations_section}{divergence_trend_section}{rival_contract_section}## タスク
   これらの変更が各整合性軸にどのように影響するかを評価してください。
   各軸を0-100でスコアリング（0 = 完全準拠、100 = 完全乖離）。
 

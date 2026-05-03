@@ -23,6 +23,7 @@ func buildDiffCheckPrompt(lang string, params domain.DiffCheckParams) (string, e
 		"linked_issues_section":       renderLinkedIssuesSection(lang, params),
 		"repeated_violations_section": renderRepeatedViolationsSection(lang, params),
 		"divergence_trend_section":    renderDivergenceTrendSection(lang, params),
+		"rival_contract_section":      renderRivalContractSection(lang, params.CurrentContract),
 	}
 
 	return reg.Expand(promptName, vars)
@@ -38,7 +39,8 @@ func buildFullCheckPrompt(lang string, params domain.FullCheckParams) (string, e
 	}
 
 	vars := map[string]string{
-		"eval_dir": params.EvalDir,
+		"eval_dir":               params.EvalDir,
+		"rival_contract_section": renderRivalContractSection(lang, params.CurrentContract),
 	}
 
 	return reg.Expand(promptName, vars)
@@ -112,4 +114,76 @@ func renderDivergenceTrendSection(lang string, params domain.DiffCheckParams) st
 	}
 	return fmt.Sprintf("\n## Divergence Trend\nCurrent trend: **%s** (delta: %.1f)\n\n%s\n",
 		params.DivergenceTrend.Class, params.DivergenceTrend.Delta, params.DivergenceTrend.Message)
+}
+
+// renderRivalContractSection renders the optional Rival Contract v1 prompt
+// section. It returns the empty string when no current contract is
+// available (legacy archive, conflict, or empty content) so the prompt
+// degrades gracefully — existing scoring behavior is unchanged when
+// Rival Contract v1 specifications do not yet exist in the archive.
+//
+// The rendered block summarises the four contract-aware sections that
+// are useful as scoring context (Intent / Decisions / Boundaries /
+// Evidence). Body text is truncated per section so the overall prompt
+// stays under the size budget enforced by existing diff/full-check
+// tests; long contracts surface a "(truncated)" marker so the model
+// knows to consult the archive directly.
+func renderRivalContractSection(lang string, current *domain.RivalContractContext) string {
+	if current == nil || !current.HasContent() {
+		return ""
+	}
+
+	var sb strings.Builder
+	if lang == "ja" {
+		sb.WriteString("\n## Rival Contract (current specification)\n")
+		fmt.Fprintf(&sb, "- 契約ID: `%s`", current.ContractID)
+		if current.Revision > 0 {
+			fmt.Fprintf(&sb, " (revision %d)", current.Revision)
+		}
+		sb.WriteString("\n")
+		if current.Title != "" {
+			fmt.Fprintf(&sb, "- タイトル: %s\n", current.Title)
+		}
+		writeContractField(&sb, "Intent", current.Intent)
+		writeContractField(&sb, "Decisions", current.Decisions)
+		writeContractField(&sb, "Boundaries", current.Boundaries)
+		writeContractField(&sb, "Evidence", current.Evidence)
+		sb.WriteString("\n契約の Boundaries と Evidence は暗黙のスタイルより優先して逸脱判定に使ってください。\n")
+		return sb.String()
+	}
+
+	sb.WriteString("\n## Rival Contract (current specification)\n")
+	fmt.Fprintf(&sb, "- Contract: `%s`", current.ContractID)
+	if current.Revision > 0 {
+		fmt.Fprintf(&sb, " (revision %d)", current.Revision)
+	}
+	sb.WriteString("\n")
+	if current.Title != "" {
+		fmt.Fprintf(&sb, "- Title: %s\n", current.Title)
+	}
+	writeContractField(&sb, "Intent", current.Intent)
+	writeContractField(&sb, "Decisions", current.Decisions)
+	writeContractField(&sb, "Boundaries", current.Boundaries)
+	writeContractField(&sb, "Evidence", current.Evidence)
+	sb.WriteString("\nTreat Boundaries and Evidence items as stronger than implicit codebase style when they conflict.\n")
+	return sb.String()
+}
+
+// rivalContractFieldBudget caps each Rival Contract section excerpt so
+// the diff-check prompt stays within its existing 5000-byte budget.
+const rivalContractFieldBudget = 800
+
+// writeContractField appends a `### <name>` block with body text,
+// truncated to a soft per-field budget. Empty fields are skipped.
+func writeContractField(sb *strings.Builder, name, body string) {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return
+	}
+	fmt.Fprintf(sb, "\n### %s\n", name)
+	if len(body) > rivalContractFieldBudget {
+		body = body[:rivalContractFieldBudget] + "\n(truncated; consult archive for full section)"
+	}
+	sb.WriteString(body)
+	sb.WriteString("\n")
 }

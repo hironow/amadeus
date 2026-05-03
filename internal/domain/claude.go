@@ -57,11 +57,19 @@ type DiffCheckParams struct { // nosemgrep: first-class-collection.raw-slice-fie
 	LinkedIssueIDs     string
 	RepeatedViolations []RepeatedViolation
 	DivergenceTrend    *DivergenceTrend
+	// CurrentContract carries the projected Rival Contract v1 sections that
+	// matter for contract-aware divergence scoring (Intent / Decisions /
+	// Boundaries / Evidence). nil disables the prompt's contract section
+	// (graceful degradation for archives without Rival Contract v1 specs).
+	CurrentContract *RivalContractContext
 }
 
 // FullCheckParams holds the template parameters for a file-reference full check prompt.
 type FullCheckParams struct {
 	EvalDir string
+	// CurrentContract is the projected Rival Contract v1 context for full
+	// calibration. See DiffCheckParams.CurrentContract for semantics.
+	CurrentContract *RivalContractContext
 }
 
 // stripMarkdownCodeBlock removes markdown code block wrappers (```json ... ```)

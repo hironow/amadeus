@@ -60,3 +60,49 @@ type ProviderErrorInfo struct {
 func (i ProviderErrorInfo) IsTrip() bool {
 	return i.Kind != ProviderErrorNone
 }
+
+// RivalContractContext is the minimum projection of a current Rival
+// Contract v1 specification that prompt and corrective-body builders need
+// in order to produce contract-aware output. It is decoupled from the
+// harness/policy.RivalContract type so the domain layer (and thus the
+// prompt parameter structs) does not depend on harness internals.
+//
+// Fields mirror the four contract-aware sections used by the divergence
+// prompts (Intent / Decisions / Boundaries / Evidence) plus enough
+// metadata to cite the current contract revision in corrective bodies.
+type RivalContractContext struct { // nosemgrep: structure.multiple-exported-structs-go -- Rival Contract v1 prompt-context family (RivalContractContext/RivalContractCitation/RivalContractAmendment) is a cohesive corrective-body schema; splitting would fragment the contract-aware surface [permanent]
+	ContractID string
+	Revision   int
+	Title      string
+	Intent     string
+	Decisions  string
+	Boundaries string
+	Evidence   string
+}
+
+// HasContent reports whether the context carries any contract-aware text
+// worth rendering. Used by prompt builders to skip the section entirely
+// when graceful-degradation legacy specs are the only archive data.
+func (c RivalContractContext) HasContent() bool {
+	return c.Intent != "" || c.Decisions != "" || c.Boundaries != "" || c.Evidence != ""
+}
+
+// RivalContractCitation describes a single contract Boundary or Evidence
+// item that the merged code violates. Used by amadeus to render a
+// "## Violated Contract" section in implementation-feedback bodies.
+type RivalContractCitation struct { // nosemgrep: structure.multiple-exported-structs-go -- Rival Contract v1 prompt-context family cohesive set; see RivalContractContext [permanent]
+	ContractID string
+	Revision   int
+	Section    string // optional: which canonical section was violated (e.g. "Boundaries").
+	Reason     string
+}
+
+// RivalContractAmendment describes a single proposed change to the
+// current contract. Used by amadeus to render a "## Contract Amendments"
+// section in design-feedback bodies. Phase 5 (amendment loop) parses
+// these bullets back out of design-feedback D-Mails to drive nextgen.
+type RivalContractAmendment struct { // nosemgrep: structure.multiple-exported-structs-go -- Rival Contract v1 prompt-context family cohesive set; see RivalContractContext [permanent]
+	Section    string // canonical section name being amended (e.g. "Boundaries", "Evidence").
+	Suggestion string
+	Rationale  string
+}
