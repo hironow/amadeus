@@ -11,6 +11,7 @@
 - Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation
 
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
+- [rival-contract-v1.md](rival-contract-v1.md) — Rival Contract v1 (amadeus as drift controller; archive projection + corrective D-Mails)
 - [stdio-convention.md](stdio-convention.md) — stdin/stdout/stderr convention
 - [testing.md](testing.md) — Test strategy, conventions, and scenario test observer pattern
 
