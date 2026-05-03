@@ -205,3 +205,79 @@ Legacy v1 D-Mails (no `domain_style` key) produce a divergence prompt
 that is bit-identical to the v1 prompt. The v1.1 branch is opt-in purely
 through producer-emitted metadata. Tools that haven't been upgraded
 continue to work unchanged.
+
+## v1.2 additions — integration test coverage
+
+Rival Contract v1.2 is a test-only minor revision. The schema name
+remains `rival-contract-v1` and no production code path changed.
+amadeus gains both consumer-side round-trip integration coverage and a
+white-box amendment-emit golden test that produces the source-of-truth
+fixture sightjack consumes from disk.
+
+Plan: [`refs/plans/2026-05-03-rival-contract-v1-2-integration-e2e.md`](../../refs/plans/2026-05-03-rival-contract-v1-2-integration-e2e.md).
+
+### Consumer round-trip integration
+
+`tests/integration/rival_contract_roundtrip_test.go` reads three
+committed fixtures and exercises amadeus's parser end-to-end:
+
+| Fixture | Asserts |
+|---|---|
+| `tests/integration/testdata/rival/canonical-spec-v1.md` | byte-identical copy of sj's produced `canonical-spec-v1.md`; am parses it via `ParseRivalContractBody` + `ParseRivalContractMetadata` and the result matches the canonical Go struct expectation |
+| `tests/integration/testdata/rival/legacy-spec.md` | legacy v1 (no `domain_style`) gracefully parses without rejecting metadata |
+| `tests/integration/testdata/rival/event-sourced-v1.md` | a v1.1 D-Mail with `metadata.domain_style: event-sourced` parses correctly |
+
+Three integration tests total. A regression in sj's `ComposeSpecification`
+breaks amadeus's roundtrip test; a regression in am's parser breaks the
+same test. Cross-tool drift is caught either way.
+
+### Amendment emit white-box golden (am is source of truth)
+
+`internal/session/rival_amendment_emit_integration_test.go` is a
+white-box `package session` test that calls amadeus's real corrective
+body composer (the path that wires `composeCorrectiveBodyWithContract`
+inside `internal/session/amadeus_dmail.go`'s emit flow). The emitted
+body is written byte-stable to
+`internal/session/testdata/rival/cross-tool/amadeus-emitted-correction.md`
+and asserted against a committed golden.
+
+The white-box placement is deliberate: amadeus's emit functions remain
+**unexported**. Putting the test inside `package session` exercises the
+real production path without forcing an API boundary change. The
+emitted golden is the **source of truth** — sightjack commits a
+byte-identical copy under
+`sightjack/tests/integration/testdata/rival/cross-tool/amadeus-emitted-correction.md`,
+and `refs/scripts/check_rival_amendment_fixture.sh` enforces byte
+identity (wired into `just gap-check-rival-contract`).
+
+Two tests in this file:
+
+- `TestRivalAmendmentEmit_AppendsContractAmendmentsSection_WritesGolden`
+  (golden diff against the committed `amadeus-emitted-correction.md`,
+  with the standard `-update` flag pattern for maintenance).
+- `TestRivalAmendmentEmit_BulletGrammarStable` (asserts the bullet
+  grammar amadeus emits remains stable against accidental rewording).
+
+### Test inventory delta (am only)
+
+| Phase | Tests added (am) |
+|---|---|
+| 1.2A — consumer round-trip | 3 integration tests |
+| 1.2B — amendment emit white-box | 2 white-box tests |
+
+Total: 5 cross-component tests added in v1.2 for amadeus. Cross-side
+gap-check enforces byte-identity am golden ↔ sj copy; the cycle is
+provably consistent through the on-disk D-Mail format.
+
+### What did NOT change
+
+- Schema (still `rival-contract-v1`; v1 invariants 1-13 maintained).
+- The corrective D-Mail body shapes (`## Violated Contract`,
+  `## Contract Amendments`) — unchanged from v1; v1.1 added
+  `domain_style` prompt context only, v1.2 adds tests only.
+- `ProjectCurrentContracts` selection rules.
+- The divergence prompt surface.
+- Any production code path. The amendment emit test is white-box and
+  requires no exporting of unexported emit functions.
+
+v1.2 is purely additive test code and gap-check guards.
