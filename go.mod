@@ -62,3 +62,5 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+replace github.com/fsnotify/fsnotify => github.com/hironow/fsnotify v0.0.0-20260504103917-76b01a6e8f50
