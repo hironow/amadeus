@@ -59,6 +59,7 @@ Format: `{tool}-{kind}-{sanitized-key}_{uuid8}.md`
 | amadeus | `am` | convergence | sequential number | `am-conv-001_e8c2f5a4.md` |
 
 Sanitization rules for the key portion:
+
 - Keeps: `a-z`, `0-9`, `-`
 - Converts `:`, space, `_` to `-`
 - Compresses consecutive `-`

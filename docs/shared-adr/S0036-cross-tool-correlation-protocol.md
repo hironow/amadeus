@@ -62,15 +62,18 @@ SessionRecorder accepts any string as sessionID.
 ## Consequences
 
 ### Positive
+
 - Full lifecycle traceability across 4 tools with filesystem-native `grep`
 - No central database or distributed tracing backend required
 - Compatible with OTel trace correlation when OTLP is configured
 - D-Mail name as correlation key is human-readable and content-addressed
 
 ### Negative
+
 - Requires all tools to use SessionRecorder (or equivalent) consistently
 - D-Mail naming must remain unique (already enforced by S0031)
 
 ### Neutral
+
 - phonewave (courier) does not generate its own CorrelationID; it preserves
   whatever the sender tool set in the D-Mail metadata

@@ -9,7 +9,6 @@ import (
 	"github.com/hironow/amadeus/internal/harness/policy"
 )
 
-
 func TestBuildPRChains_singleChain(t *testing.T) {
 	// given: 3 PRs forming a single chain main <- feat-a <- feat-b <- feat-c
 	pr1 := mustPRState(t, "#1", "A", "main", "feat-a", true, 0, nil)

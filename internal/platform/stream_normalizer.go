@@ -16,15 +16,15 @@ var subagentToolNames = map[string]bool{
 
 // StreamNormalizer converts provider-specific StreamMessage into unified SessionStreamEvent.
 type StreamNormalizer struct {
-	toolName          string
-	provider          domain.Provider
-	sessionID         string            // captured from first non-empty provider session_id
-	codingSessionID   string            // our CodingSessionRecord.ID
-	subagents         map[string]string // tool_use_id -> subagent_id
-	lastErr           error             // cached for SessionEnd
-	lastUsage         *Usage            // saved from result message for SessionEnd
-	lastCost          float64           // saved from result message for SessionEnd
-	lastDuration      int64             // saved from result message for SessionEnd (ms)
+	toolName        string
+	provider        domain.Provider
+	sessionID       string            // captured from first non-empty provider session_id
+	codingSessionID string            // our CodingSessionRecord.ID
+	subagents       map[string]string // tool_use_id -> subagent_id
+	lastErr         error             // cached for SessionEnd
+	lastUsage       *Usage            // saved from result message for SessionEnd
+	lastCost        float64           // saved from result message for SessionEnd
+	lastDuration    int64             // saved from result message for SessionEnd (ms)
 }
 
 // NewStreamNormalizer creates a normalizer for the given tool and provider.
@@ -171,7 +171,7 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	if am != nil {
 		for _, block := range am.Content {
 			if block.Type == "thinking" && block.Thinking != "" {
-					text := mustTruncate(block.Thinking, domain.RawFieldMaxBytes)
+				text := mustTruncate(block.Thinking, domain.RawFieldMaxBytes)
 				data, err := json.Marshal(map[string]string{"text": text})
 				if err != nil {
 					data = []byte("{}")

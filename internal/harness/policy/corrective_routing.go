@@ -40,14 +40,14 @@ func DetectOwnerLoop(ownerHistory []string) bool {
 // deterministic action/routing decision.
 //
 // Decision priority:
-//   0. Provider state gate (paused/degraded-exhausted/waiting-exhausted → escalate)
-//   0.5. Owner loop detection (ping-pong → escalate)
-//   1. RetryAllowed=false → escalate
-//   2. RecurrenceCount >= 2 → escalate
-//   3. Explicit escalation → escalate
-//   4. Explicit non-escalation action → use it
-//   5. High severity → escalate
-//   6. Default → retry/reroute
+//  0. Provider state gate (paused/degraded-exhausted/waiting-exhausted → escalate)
+//     0.5. Owner loop detection (ping-pong → escalate)
+//  1. RetryAllowed=false → escalate
+//  2. RecurrenceCount >= 2 → escalate
+//  3. Explicit escalation → escalate
+//  4. Explicit non-escalation action → use it
+//  5. High severity → escalate
+//  6. Default → retry/reroute
 //
 // Escalation target resolution:
 // Escalated D-Mails are delivered to the same target agent (sightjack/paintress)

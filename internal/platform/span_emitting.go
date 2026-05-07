@@ -53,18 +53,18 @@ func SyntheticToolID(seq int) string {
 // SpanEmittingStreamReader wraps StreamReader to emit OTel child spans
 // for tool_use events in real-time.
 type SpanEmittingStreamReader struct {
-	reader       *StreamReader
-	parentCtx    context.Context
-	tracer       trace.Tracer
-	openSpans    map[string]trace.Span
-	rawEvents    []string
-	maxValueLen  int
-	syntheticSeq int
-	sessionID    string         // captured from stream session_id for Weave thread_id
-	resultText   string         // captured from result message for Weave output.value
-	inputText    string         // caller-provided prompt for Weave input.value
-	initMsg          *StreamMessage                        // captured from system:init for InitAttrs()
-	onStreamMessage  func(msg *StreamMessage, raw json.RawMessage) // optional live stream hook
+	reader          *StreamReader
+	parentCtx       context.Context
+	tracer          trace.Tracer
+	openSpans       map[string]trace.Span
+	rawEvents       []string
+	maxValueLen     int
+	syntheticSeq    int
+	sessionID       string                                        // captured from stream session_id for Weave thread_id
+	resultText      string                                        // captured from result message for Weave output.value
+	inputText       string                                        // caller-provided prompt for Weave input.value
+	initMsg         *StreamMessage                                // captured from system:init for InitAttrs()
+	onStreamMessage func(msg *StreamMessage, raw json.RawMessage) // optional live stream hook
 }
 
 // NewSpanEmittingStreamReader creates a SpanEmittingStreamReader.

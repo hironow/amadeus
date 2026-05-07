@@ -20,30 +20,30 @@ import (
 type Amadeus struct {
 	Config      domain.Config
 	Store       port.StateReader
-	Events      port.EventStore     // nil skips event persistence (Projector still required for writes)
+	Events      port.EventStore          // nil skips event persistence (Projector still required for writes)
 	Projector   port.ContextEventApplier // nil skips projection updates (Events still required for writes)
 	Git         port.Git
-	RepoDir     string            // repository root directory
+	RepoDir     string              // repository root directory
 	Claude      port.ProviderRunner // nil falls back to the default Claude runner
 	Logger      domain.Logger
-	DataOut     io.Writer               // machine-readable output (stdout); Logger is for human progress (stderr)
-	Approver    port.Approver           // nil = no gate (auto-approve)
-	Notifier    port.Notifier           // nil = no notifications
-	Metrics     port.PolicyMetrics      // nil = no policy metrics
-	ReviewCmd   string                  // code review command (empty = skip)
-	ClaudeCmd   string                  // Claude CLI command (set by cmd layer from config)
-	ClaudeModel string                  // Claude model for review fix (set by cmd layer from config)
-	PRReader    port.GitHubPRReader     // nil = skip PR convergence
-	PRWriter    port.GitHubPRWriter     // nil = skip PR label writes
-	PRPipeline  port.PRPipelineRunner   // nil = skip PR convergence (usecase-injected)
-	IssueWriter port.GitHubIssueWriter  // nil = skip issue close
-	Emitter     port.CheckEventEmitter  // event production + persistence + dispatch (injected by usecase layer)
-	State       port.CheckStateProvider // aggregate state read/write (injected by usecase layer)
-	SeqAlloc    port.SeqAllocator       // global SeqNr (ADR S0040)
-	Insights    *InsightWriter          // nil = skip insight generation
-	Collector   *ImprovementCollector   // nil = skip external improvement signal ingestion
-	Policy      domain.RoutingPolicy              // corrective routing policy (loaded from YAML, fallback = default)
-	Dispatcher  port.ImprovementTaskDispatcher   // never nil — use NopImprovementTaskDispatcher for dry-run/tests
+	DataOut     io.Writer                      // machine-readable output (stdout); Logger is for human progress (stderr)
+	Approver    port.Approver                  // nil = no gate (auto-approve)
+	Notifier    port.Notifier                  // nil = no notifications
+	Metrics     port.PolicyMetrics             // nil = no policy metrics
+	ReviewCmd   string                         // code review command (empty = skip)
+	ClaudeCmd   string                         // Claude CLI command (set by cmd layer from config)
+	ClaudeModel string                         // Claude model for review fix (set by cmd layer from config)
+	PRReader    port.GitHubPRReader            // nil = skip PR convergence
+	PRWriter    port.GitHubPRWriter            // nil = skip PR label writes
+	PRPipeline  port.PRPipelineRunner          // nil = skip PR convergence (usecase-injected)
+	IssueWriter port.GitHubIssueWriter         // nil = skip issue close
+	Emitter     port.CheckEventEmitter         // event production + persistence + dispatch (injected by usecase layer)
+	State       port.CheckStateProvider        // aggregate state read/write (injected by usecase layer)
+	SeqAlloc    port.SeqAllocator              // global SeqNr (ADR S0040)
+	Insights    *InsightWriter                 // nil = skip insight generation
+	Collector   *ImprovementCollector          // nil = skip external improvement signal ingestion
+	Policy      domain.RoutingPolicy           // corrective routing policy (loaded from YAML, fallback = default)
+	Dispatcher  port.ImprovementTaskDispatcher // never nil — use NopImprovementTaskDispatcher for dry-run/tests
 
 	// InboxCh overrides MonitorInbox when set (for testing).
 	// When nil, Run starts MonitorInbox automatically.

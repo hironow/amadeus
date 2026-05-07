@@ -37,6 +37,7 @@ factory functions (`BuildSessionEmitter`, `PrepareExpeditionRunner`,
 delegating to session runners.
 
 Pattern:
+
 ```go
 // cmd/run.go (composition root)
 emitter := usecase.BuildSessionEmitter(ctx, store, logger, ...)
@@ -52,6 +53,7 @@ Callers decide whether to treat store errors as fatal or best-effort.
 ### 4. Metadata Enrichment Consistency
 
 All EventEmitter implementations enrich events with:
+
 - `CorrelationID` — session/expedition/check/delivery ID
 - `CausationID` — previous event ID (causation chain)
 - `SeqNr` — global sequence number (when allocator is available)

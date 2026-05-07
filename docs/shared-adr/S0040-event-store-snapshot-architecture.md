@@ -83,6 +83,7 @@ type SnapshotStore interface {
 ```
 
 **Key design choices**:
+
 - `aggregateType` (not `aggregateID`) — snapshots are per projection kind, not per entity. E.g., "amadeus.state", "paintress.expedition_progress".
 - `state []byte` — projections serialize themselves (JSON). The store is schema-agnostic.
 - Graceful degradation — absent snapshot → full replay. Zero-snapshot is valid initial state.
@@ -100,11 +101,13 @@ type SnapshotStore interface {
 ```
 
 **FileSnapshotStore**:
+
 - `Save`: atomic write (temp + rename) to `snapshots/{aggregateType}.json`
 - `Load`: read + unmarshal header (seqNr) + body (state bytes)
 - File format: `{"seq_nr": 12345, "aggregate_type": "...", "timestamp": "...", "state": <raw>}`
 
 **Archive rotation** (future Phase 3):
+
 - Events before the snapshot's SeqNr can be compressed to `archive/`.
 - `archive prune` gains `--archive` flag to move pre-snapshot events.
 - Full replay still works by reading `archive/*.jsonl.gz` + `events/*.jsonl`.
@@ -141,6 +144,7 @@ CREATE TABLE IF NOT EXISTS seq_counter (
 ```
 
 SeqNr allocation:
+
 ```go
 // AllocSeqNr atomically increments and returns the next global SeqNr.
 // Safe for concurrent multi-process use via SQLite WAL locking.
@@ -155,6 +159,7 @@ func (db *SeqDB) AllocSeqNr(ctx context.Context) (uint64, error) {
 ```
 
 This guarantees:
+
 - Globally monotonic (SQLite WAL serializes concurrent writers)
 - No gaps in normal operation (single atomic increment)
 - Survives process restart (persisted in SQLite)
@@ -169,6 +174,7 @@ This guarantees:
 **Problem identified by codex review**: `LoadAfterSeqNr` must specify strict ordering and deduplication semantics, otherwise projection replay is non-deterministic.
 
 **Specification**:
+
 ```go
 // LoadAfterSeqNr returns all events with SeqNr > afterSeqNr,
 // ordered by SeqNr ascending. Within the same SeqNr (should not happen
@@ -183,6 +189,7 @@ For FileEventStore: scan all event files (all session dirs for sightjack), filte
 ### 7. Sightjack Session Layout Alignment
 
 Sightjack's per-session directory layout is preserved but unified under the same interface:
+
 - `LoadAfterSeqNr` scans all session dirs, merges by SeqNr ascending
 - SnapshotStore uses `aggregateType` = `"sightjack.session.{sessionID}"` for per-session snapshots
 - Global SeqNr via SQLite is shared across sessions (single `.run/` DB)
@@ -227,6 +234,7 @@ No interface changes needed for migration — only new adapter implementations.
    - **Idempotent**: re-running cutover on already-cutover data is a no-op (seq_counter exists)
 
 This means:
+
 - Existing event files are **never modified** (immutability preserved)
 - Pre-cutover events have SeqNr = 0 or per-aggregate values (ignored by `LoadAfterSeqNr`)
 - Post-cutover events have globally monotonic SeqNr >= 1
@@ -235,6 +243,7 @@ This means:
 ## Implementation Phases
 
 ### Phase 1: Interface + FileSnapshotStore + Cutover (this ADR)
+
 - Add `LoadAfterSeqNr`, `LatestSeqNr` to EventStore port (all 4 tools)
 - Add `SnapshotStore` port (all 4 tools)
 - Implement `FileSnapshotStore` in `internal/eventsource/`
@@ -245,12 +254,14 @@ This means:
 - **No projection changes yet** — `LoadAll()` still works, cutover runs on first boot
 
 ### Phase 2: Projection Snapshot Integration
+
 - Each tool's projection implements `Serialize() []byte` / `Deserialize([]byte) error`
 - Recovery flow uses snapshot + delta replay
 - `{tool} rebuild` command creates a snapshot after full replay
 - Automatic snapshot after every N events (configurable, default 500)
 
 ### Phase 3: Archive Rotation + Managed DB
+
 - `archive prune --archive` compresses pre-snapshot events
 - BigtableEventStore / SpannerEventStore adapters
 - GCSSnapshotStore adapter
@@ -258,17 +269,20 @@ This means:
 ## Consequences
 
 ### Positive
+
 - Bounded replay cost: O(events since snapshot) instead of O(total events)
 - Safe storage management: archive rotation without data corruption
 - Clean migration path to managed databases
 - Backward compatible: absent snapshot = full replay (no breaking change)
 
 ### Negative
+
 - Snapshot serialization adds coupling between projection and storage format
 - Global SeqNr requires careful initialization on startup
 - Two stores to manage (events + snapshots) instead of one
 
 ### Neutral
+
 - `LoadAll()` remains available for full audit / debugging
 - Existing `archive prune` functionality unchanged
 - amadeus's `TrimCheckHistory` remains as a domain-level optimization (orthogonal to snapshots)

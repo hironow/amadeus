@@ -107,6 +107,7 @@ Ref: ADR S0038, S0039, `refs/opsx/semgrep-layer-contract.md`
 The improvement controller (Weave feedback collector, normalized signal store, corrective policy generation) resides in amadeus session layer. This is an intentional placement decision (ADR S0041).
 
 Key components:
+
 - `session/improvement_collector.go` — Weave feedback polling + normalization
 - `session/improvement_signal_store.go` — SQLite sink + outcome transition + aggregation
 - `session/improvement_weave_source.go` — HTTP adapter for Weave API

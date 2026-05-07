@@ -426,7 +426,6 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 	return results
 }
 
-
 // CheckFsnotify verifies that the OS file watcher is available.
 // On Linux, inotify limits can prevent watcher creation.
 func CheckFsnotify() domain.DoctorCheck {
