@@ -36,7 +36,6 @@ and can be listed, filtered, and re-entered interactively.
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
-* [amadeus sessions enter](amadeus_sessions_enter.md)	 - Re-enter an AI coding session interactively
-* [amadeus sessions list](amadeus_sessions_list.md)	 - List recorded coding sessions
-
+* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus sessions enter](amadeus_sessions_enter.md)  - Re-enter an AI coding session interactively
+* [amadeus sessions list](amadeus_sessions_list.md)  - List recorded coding sessions

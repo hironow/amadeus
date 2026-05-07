@@ -30,7 +30,7 @@ type InitEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- 
 
 // InitResult collects init actions for unified display.
 type InitResult struct {
-	StateDir string      // display name (e.g. ".siren")
+	StateDir string // display name (e.g. ".siren")
 	Entries  []InitEntry
 }
 

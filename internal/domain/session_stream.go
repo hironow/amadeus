@@ -19,18 +19,18 @@ const RawFieldMaxBytes = 4096
 type StreamEventType string
 
 const (
-	StreamSessionStart   StreamEventType = "session_start"
-	StreamSessionEnd     StreamEventType = "session_end"
-	StreamToolUseStart   StreamEventType = "tool_use_start"
-	StreamToolResult     StreamEventType = "tool_result"
-	StreamAssistantText  StreamEventType = "assistant_text"
-	StreamThinking       StreamEventType = "thinking"
-	StreamHookStart      StreamEventType = "hook_start"
-	StreamHookResult     StreamEventType = "hook_result"
-	StreamRateLimit      StreamEventType = "rate_limit"
-	StreamError          StreamEventType = "error"
-	StreamSubagentStart  StreamEventType = "subagent_start"
-	StreamSubagentEnd    StreamEventType = "subagent_end"
+	StreamSessionStart  StreamEventType = "session_start"
+	StreamSessionEnd    StreamEventType = "session_end"
+	StreamToolUseStart  StreamEventType = "tool_use_start"
+	StreamToolResult    StreamEventType = "tool_result"
+	StreamAssistantText StreamEventType = "assistant_text"
+	StreamThinking      StreamEventType = "thinking"
+	StreamHookStart     StreamEventType = "hook_start"
+	StreamHookResult    StreamEventType = "hook_result"
+	StreamRateLimit     StreamEventType = "rate_limit"
+	StreamError         StreamEventType = "error"
+	StreamSubagentStart StreamEventType = "subagent_start"
+	StreamSubagentEnd   StreamEventType = "subagent_end"
 )
 
 // SessionStreamEvent is the unified JSONL envelope for live session streaming.

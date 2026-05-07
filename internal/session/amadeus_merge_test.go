@@ -343,10 +343,11 @@ func TestMergePR_MergeMethod_ForChainRoot(t *testing.T) {
 // Orphan: #40 (feat-deleted→feat-orphan) — base branch doesn't exist in any PR
 //
 // Expected merge order:
-//   Chain A: #10 (merge) → #11 (merge) → #12 (squash)
-//   Chain B: #20 (merge) → #21 (squash)
-//   Standalone: #30 (squash), #31 (squash)
-//   Orphan: #40 skipped (not in chain and not targeting main)
+//
+//	Chain A: #10 (merge) → #11 (merge) → #12 (squash)
+//	Chain B: #20 (merge) → #21 (squash)
+//	Standalone: #30 (squash), #31 (squash)
+//	Orphan: #40 skipped (not in chain and not targeting main)
 func TestGoTaskboardScenario_ComplexMergeOrder(t *testing.T) {
 	// given: complex PR topology
 	prs := []domain.PRState{
@@ -1136,8 +1137,9 @@ func (m *mockIssueWriterForMerge) CloseIssue(_ context.Context, _, _ string) err
 // --- go-taskboard exact scenario: evaluatePRDiffs + attemptAutoMerge ---
 
 // branchAwarePRReader filters PRs by target branch, matching real gh behavior:
-//   ListOpenPRs("main") → only PRs where baseBranch == "main"
-//   ListOpenPRs("")     → all PRs regardless of baseBranch
+//
+//	ListOpenPRs("main") → only PRs where baseBranch == "main"
+//	ListOpenPRs("")     → all PRs regardless of baseBranch
 type branchAwarePRReader struct {
 	prs       []domain.PRState
 	readiness map[string]*domain.PRMergeReadiness
@@ -1172,6 +1174,7 @@ func (m *branchAwarePRReader) GetPRMergeReadiness(_ context.Context, prNumber st
 // the exact go-taskboard state: PR #23 targets a merged feature branch (not main).
 //   - evaluatePRDiffs("main") sees 0 PRs (correct — #23 doesn't target main)
 //   - attemptAutoMerge gets all PRs → #23 is orphaned pipeline PR → closes it
+//
 // Before the fix, attemptAutoMerge would skip #23 with "missing review label"
 // indefinitely because evaluatePRDiffs never reviewed it.
 func TestGoTaskboardScenario_OrphanOnlyPR_EvalSkipsAutoMergeCloses(t *testing.T) {

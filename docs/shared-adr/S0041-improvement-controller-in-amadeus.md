@@ -8,6 +8,7 @@
 Track D3/F の設計判断: improvement controller (Weave feedback の取り込み、normalized signal の保存、corrective policy の生成) をどこに置くか。
 
 選択肢:
+
 1. **amadeus 内に留める** (現状維持)
 2. **phonewave に寄せる** (courier と routing を統合)
 3. **新しい別コンポーネントとして分離**
@@ -34,14 +35,17 @@ phonewave は courier (transport) に特化すべき。routing decision と impr
 ## Consequences
 
 ### Positive
+
 - 実装変更なし (既存コードが正)
 - SQLite アクセスがプロセス内で完結
 - corrective routing と improvement signal が同一 aggregate 内で一貫
 
 ### Negative
+
 - amadeus の責務が大きくなる (scorer + verifier + improvement controller)
 - 将来的にスケーラビリティの問題が出る可能性 (signal volume が増えた場合)
 
 ### Neutral
+
 - Track F の F2 (ports) / F3 (policy store) は amadeus 内で段階的に実装可能
 - 分離判断は signal volume が問題になった時点で再検討

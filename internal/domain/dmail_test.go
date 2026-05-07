@@ -8,7 +8,6 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-
 func TestParseDMail_Valid(t *testing.T) {
 	raw := `---
 name: "feedback-001"

@@ -28,6 +28,7 @@ amadeus can auto-merge PRs when ALL of the following are true:
    - `amadeus:reviewed-{sha}` label exists (amadeus has reviewed the PR)
 
 Merge strategy depends on chain position:
+
 - **Chain root/middle** (has dependent PRs): `gh pr merge --merge` (preserve commit hash so dependents don't need rebase)
 - **Chain leaf / standalone**: `gh pr merge --squash --delete-branch` (clean history)
 
@@ -39,11 +40,13 @@ Supersedes ADR-0015 item 2 (read-only git/gh access).
 ## Consequences
 
 ### Positive
+
 - go-taskboard convergence can complete without human intervention
 - Merge order is automatically correct (root-first via BFS chain)
 - Chain-aware strategy prevents rebase cascades
 
 ### Negative
+
 - Requires write access to GitHub (merge permission)
 - Risk of merging a PR that should not be merged (mitigated by DriftError guard + 4 preconditions)
 - `--merge` for chain PRs produces merge commits instead of clean squash history

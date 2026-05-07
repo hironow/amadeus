@@ -41,6 +41,7 @@ patterns), extract the pattern as a verifier rule, then as a policy function.
 tracks optimization iterations.
 
 **Examples**:
+
 - paintress issue selection: prompt → priority rules → GradientGauge policy
 - amadeus ADR compliance: prompt → divergence axes → semgrep rule
 - sightjack wave unlock: prompt → prerequisite check → EvaluateUnlocks policy
@@ -92,6 +93,7 @@ These two loops reinforce each other:
 ### Feedback Direction
 
 This system uses **negative feedback** (stabilizing):
+
 - More policy rules → fewer violations detected → fewer D-Mails → less LLM usage
 - The system converges toward a state where LLM is needed only for novel,
   unprecedented situations
@@ -103,17 +105,20 @@ creative decisions.
 ## Consequences
 
 ### Positive
+
 - Tools become more reliable as harness matures (fewer LLM-dependent decisions)
 - Target repositories become more self-enforcing (semgrep rules accumulate)
 - Cost reduction: LLM calls decrease as policy functions replace prompts
 - Auditability: git history shows which decisions graduated from filter to policy
 
 ### Negative
+
 - Risk of premature policy crystallization (codifying wrong patterns)
 - semgrep rule accumulation needs periodic review (rules may become stale)
 - The evolution loop requires human oversight to validate policy promotions
 
 ### Neutral
+
 - The speed of evolution depends on the volume and diversity of development work
 - phonewave is not directly involved in either loop (courier only)
 - GEPA optimization (Phase 3) accelerates Loop 1 by systematically improving prompts

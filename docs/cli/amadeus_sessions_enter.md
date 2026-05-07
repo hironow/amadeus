@@ -28,5 +28,4 @@ amadeus sessions enter [session-record-id] [flags]
 
 ### SEE ALSO
 
-* [amadeus sessions](amadeus_sessions.md)	 - Manage AI coding sessions
-
+* [amadeus sessions](amadeus_sessions.md)  - Manage AI coding sessions

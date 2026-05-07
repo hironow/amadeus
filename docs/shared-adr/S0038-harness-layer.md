@@ -96,6 +96,7 @@ template: |
 ```
 
 Features:
+
 - `embed.FS` for compile-time embedding
 - `{key}` placeholder expansion
 - `{#if key}...{#else}...{/if}` conditionals (truthy: non-empty, not "false")
@@ -123,16 +124,19 @@ physically moves from filter/ to policy/. Trackable via git history.
 ## Consequences
 
 ### Positive
+
 - LLM-dependence spectrum is visible in package structure
 - Prompts are externalized and GEPA-optimizable
 - Semgrep enforces layer boundaries (no exceptions)
 - Clear litmus test for where logic belongs
 
 ### Negative
+
 - Additional layer adds import path complexity
 - Facade re-exports require maintenance when functions are added
 - Go text/template conditionals must be pre-rendered for simple {key} expansion
 
 ### Neutral
+
 - phonewave gets harness/ for consistency even though it has no filter/
 - Existing PolicyEngine (WHEN/THEN in usecase/) is unaffected (different concept)

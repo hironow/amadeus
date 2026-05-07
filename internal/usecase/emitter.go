@@ -20,8 +20,8 @@ type checkEventEmitter struct {
 	projector     port.ContextEventApplier
 	dispatcher    port.EventDispatcher
 	logger        domain.Logger
-	checkID       string // enriches events with correlation metadata
-	prevID        string // previous event ID for causation chain
+	checkID       string          // enriches events with correlation metadata
+	prevID        string          // previous event ID for causation chain
 	ctx           context.Context //nolint:containedctx // stored for trace propagation into emit chain
 }
 

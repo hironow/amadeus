@@ -149,4 +149,3 @@ type PRMergeReadiness struct { // nosemgrep: first-class-collection.raw-slice-fi
 	Ready            bool     // all conditions met
 	BlockReasons     []string // why not ready
 }
-

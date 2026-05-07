@@ -15,6 +15,7 @@ expansion and copy-sync verification.
 ### Canonical Helper (copy-synced)
 
 All 3 tools share `WrapWithSessionTracking(runner, baseDir, provider, logger) → (ProviderRunner, *SQLiteCodingSessionStore)`:
+
 - Adds session persistence to a DetailedRunner
 - Best-effort: returns `(runner, nil)` when store cannot be opened
 - Caller MUST nil-check store before calling `store.Close()`
@@ -78,6 +79,7 @@ Config key `claude_cmd` (YAML) / `ClaudeCmd` (Go field) is a legacy seam tied to
 current sole provider (Claude). It maps to `ProviderAdapterConfig.Cmd` at the session layer.
 
 When a second provider is onboarded:
+
 1. Introduce `provider_cmd` as the generic key
 2. Retain `claude_cmd` as an alias for backwards compatibility
 3. Config validation accepts either key
@@ -111,6 +113,7 @@ Resolution order: `--path` → `--config` → `cwd`
 Config loading: missing file → default (graceful), malformed YAML → error (fail-fast), empty `claude_cmd` → default.
 
 Canonical errors:
+
 - `"state directory not found: %s (run '<tool> init' first)"`
 - `"session %s has no provider session ID"`
 - `"session %s has no work directory recorded"`
@@ -118,10 +121,12 @@ Canonical errors:
 ## Drift Checker Canonical Surface
 
 All gap detection runs from `tap/justfile`:
+
 - `just gap-check-ai-coding` — canonical checksum gate
 - `just gap-check-ai-sync` — exploratory diff (not a gate)
 
-### Exact-sync production files (checksum verified):
+### Exact-sync production files (checksum verified)
+
 - `internal/domain/coding_session.go`
 - `internal/session/session_tracking_adapter.go`
 - `internal/session/coding_session_store.go`
@@ -137,20 +142,24 @@ All gap detection runs from `tap/justfile`:
 
 Note: `S0037-coding-session-abstraction-layer.md` is the historical decision rationale (Accepted ADR). It is NOT checksum-gated.
 
-### Exact-sync test files:
+### Exact-sync test files
+
 - `internal/session/session_enter_test.go`
 - `internal/session/mcp_config_test.go`
 
-### Tool-specific (NOT checksum-gated):
+### Tool-specific (NOT checksum-gated)
+
 - `internal/session/provider_adapter_helpers.go` — assembly helpers (intentionally divergent per tool)
 - `internal/session/provider_adapter_config_test.go` — field omission guard tests (test respective helper)
 
-### Structural check (signature existence):
+### Structural check (signature existence)
+
 - `internal/cmd/sessions_resolve.go` — `resolveSessionsDir` signature
 
 ## CMD Test Canonical Case Set
 
-### sessions_enter_test.go:
+### sessions_enter_test.go
+
 - ByRecordID
 - ByProviderID
 - ByConfigFlag
@@ -158,7 +167,8 @@ Note: `S0037-coding-session-abstraction-layer.md` is the historical decision rat
 - NoWorkDir
 - ConfigBaseIsRepoRoot
 
-### sessions_resolve_test.go:
+### sessions_resolve_test.go
+
 - PathFlag
 - ConfigFlag (tools with --config)
 - CwdFallback
@@ -169,6 +179,7 @@ Note: `S0037-coding-session-abstraction-layer.md` is the historical decision rat
 ## Provider Expansion Checklist
 
 When adding a new provider:
+
 1. Add `Provider` constant to `internal/domain/coding_session.go`
 2. Implement `DetailedRunner` interface in session adapter
 3. Call `WrapWithSessionTracking` to compose with session persistence

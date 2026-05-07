@@ -10,8 +10,8 @@ import (
 
 // CutoverResult describes what happened during cutover.
 type CutoverResult struct {
-	AlreadyDone bool   // true if cutover was already completed
-	EventCount  int    // number of pre-cutover events found
+	AlreadyDone  bool   // true if cutover was already completed
+	EventCount   int    // number of pre-cutover events found
 	CutoverSeqNr uint64 // the SeqNr assigned to the cutover event (1 if performed)
 }
 

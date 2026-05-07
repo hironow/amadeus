@@ -4,8 +4,8 @@ package domain
 // Uses string values instead of DMailAction to ensure cross-tool compatibility
 // (DMailAction is amadeus-specific).
 type RoutingPolicy struct {
-	RecurrenceThreshold int                   // escalate after this many recurrences (default 2)
-	SeverityActionMap   map[Severity]string   // severity → action string ("escalate", "retry")
+	RecurrenceThreshold int                    // escalate after this many recurrences (default 2)
+	SeverityActionMap   map[Severity]string    // severity → action string ("escalate", "retry")
 	TargetAgentMap      map[FailureType]string // failure type → target agent override
 }
 
@@ -19,11 +19,11 @@ func DefaultRoutingPolicy() RoutingPolicy {
 			SeverityLow:    "retry",
 		},
 		TargetAgentMap: map[FailureType]string{
-			FailureTypeScopeViolation:     "sightjack",
-			FailureTypeMissingAcceptance:  "sightjack",
-			FailureTypeExecutionFailure:   "paintress",
-			FailureTypeProviderFailure:    "paintress",
-			FailureTypeRoutingFailure:     "paintress",
+			FailureTypeScopeViolation:    "sightjack",
+			FailureTypeMissingAcceptance: "sightjack",
+			FailureTypeExecutionFailure:  "paintress",
+			FailureTypeProviderFailure:   "paintress",
+			FailureTypeRoutingFailure:    "paintress",
 		},
 	}
 }

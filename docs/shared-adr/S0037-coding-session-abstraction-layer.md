@@ -56,15 +56,18 @@ Introduce a **provider-agnostic session tracking abstraction** as a shared patte
 ## Consequences
 
 ### Positive
+
 - Sessions are queryable and resumable by explicit provider ID
 - Provider swap requires only a new adapter implementation, not interface changes
 - Session audit trail persisted in SQLite for operational visibility
 - Existing `ClaudeRunner` interface preserved; `Run()` is a thin wrapper over `RunDetailed()`
 
 ### Negative
+
 - Additional SQLite database per tool per project (minimal disk overhead)
 - `sessions enter` bypasses `ClaudeAdapter` (separate code path for interactive mode)
 
 ### Neutral
+
 - phonewave does not invoke AI coding CLIs directly but receives this ADR per shared-adr distribution convention
 - Pattern is copied (not shared via Go module) per existing cross-tool convention

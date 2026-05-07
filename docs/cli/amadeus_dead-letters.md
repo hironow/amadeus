@@ -27,6 +27,5 @@ count and are permanently stuck.
 
 ### SEE ALSO
 
-* [amadeus](amadeus.md)	 - Divergence meter for your codebase
-* [amadeus dead-letters purge](amadeus_dead-letters_purge.md)	 - Purge dead-lettered outbox items
-
+* [amadeus](amadeus.md)  - Divergence meter for your codebase
+* [amadeus dead-letters purge](amadeus_dead-letters_purge.md)  - Purge dead-lettered outbox items

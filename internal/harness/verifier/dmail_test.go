@@ -420,4 +420,3 @@ func TestValidateDMail_OldFeedbackKind_Invalid(t *testing.T) {
 		t.Error("expected validation error for old feedback kind")
 	}
 }
-
