@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform/projectid"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -135,6 +136,7 @@ func (p *Projector) applyDMailGenerated(ctx context.Context, event domain.Event)
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return fmt.Errorf("unmarshal DMailGeneratedData: %w", err)
 	}
+	data.DMail.Metadata = projectid.InjectProjectID(data.DMail.Metadata)
 	// During rebuild, only write to archive/ (permanent record).
 	// Skip outbox/ to avoid re-queuing historical D-Mails for delivery.
 	if p.rebuilding {
