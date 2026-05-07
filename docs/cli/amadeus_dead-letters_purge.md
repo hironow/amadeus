@@ -51,4 +51,5 @@ amadeus dead-letters purge [path] [flags]
 
 ### SEE ALSO
 
-* [amadeus dead-letters](amadeus_dead-letters.md)  - Manage dead-lettered outbox items
+* [amadeus dead-letters](amadeus_dead-letters.md)	 - Manage dead-lettered outbox items
+

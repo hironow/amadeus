@@ -7,9 +7,8 @@ Generate .mcp.json and .claude/settings.json for subprocess isolation
 Generate .mcp.json and .claude/settings.json for Claude subprocess isolation.
 
 .mcp.json controls which MCP servers are available:
-
-- wave mode (default): empty config (no MCP servers)
-- linear mode (--linear): includes Linear MCP server
+  - wave mode (default): empty config (no MCP servers)
+  - linear mode (--linear): includes Linear MCP server
 
 .claude/settings.json disables all plugins for the subprocess.
 
@@ -40,4 +39,5 @@ amadeus mcp-config generate [path] [flags]
 
 ### SEE ALSO
 
-- [amadeus mcp-config](amadeus_mcp-config.md)  - Manage MCP configuration for Claude subprocess isolation
+* [amadeus mcp-config](amadeus_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
+
