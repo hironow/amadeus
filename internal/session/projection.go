@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform/actortype"
 	"github.com/hironow/amadeus/internal/platform/projectid"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
@@ -137,6 +138,11 @@ func (p *Projector) applyDMailGenerated(ctx context.Context, event domain.Event)
 		return fmt.Errorf("unmarshal DMailGeneratedData: %w", err)
 	}
 	data.DMail.Metadata = projectid.InjectProjectID(data.DMail.Metadata)
+	metadata, err := actortype.InjectActorType(data.DMail.Metadata)
+	if err != nil {
+		return fmt.Errorf("apply dmail generated: actor type: %w", err)
+	}
+	data.DMail.Metadata = metadata
 	// During rebuild, only write to archive/ (permanent record).
 	// Skip outbox/ to avoid re-queuing historical D-Mails for delivery.
 	if p.rebuilding {
