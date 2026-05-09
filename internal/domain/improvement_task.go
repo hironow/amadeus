@@ -35,7 +35,13 @@ func NewImprovementTask(sourceEvent, targetAgent, action string, ft FailureType,
 	}
 }
 
-// Expired returns true if the task's validity window has passed.
+// Expired returns true if the task's validity window has passed (inclusive
+// of the boundary instant). The check is `now >= ExpiresAt` so that
+// constructing an ImprovementTask with TTL=0 (= ExpiresAt equals CreatedAt)
+// is treated as "already expired" without depending on nanosecond-level
+// scheduler timing. Using After alone caused a flaky failure in
+// TestImprovementTask_Expired when the test's time.Now() coincided with
+// the constructor's now.
 func (t ImprovementTask) Expired() bool {
-	return time.Now().UTC().After(t.ExpiresAt)
+	return !time.Now().UTC().Before(t.ExpiresAt)
 }
