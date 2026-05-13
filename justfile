@@ -75,6 +75,10 @@ fmt:
 vet:
     go vet ./...
 
+# Run golangci-lint v2 (refs canonical config; see refs/issues/0025)
+lint-go:
+    CGO_ENABLED=0 go tool -modfile=tools/go.mod golangci-lint run ./...
+
 # Run semgrep rules (ERROR only — blocks CI)
 semgrep:
     semgrep scan --config .semgrep/ --error --severity ERROR .
@@ -112,12 +116,12 @@ root-guard:
         exit 1; \
     fi
 
-# Lint (fmt check + vet + markdown lint)
-lint: vet semgrep root-guard nosemgrep-audit lint-md
+# Lint (fmt check + vet + golangci-lint + markdown lint)
+lint: vet lint-go semgrep root-guard nosemgrep-audit lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
-check: fmt vet semgrep root-guard nosemgrep-audit test docs-check
+check: fmt vet lint-go semgrep root-guard nosemgrep-audit test docs-check
 
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:
