@@ -126,7 +126,7 @@ func FormatViolatedADRsSection(alignment ADRAlignmentMap, results []CheckResult,
 	b.WriteString("| ADR | Title | Score | Reason |\n")
 	b.WriteString("|-----|-------|-------|--------|\n")
 	for _, v := range violated {
-		b.WriteString(fmt.Sprintf("| %s | %s | %d | %s |\n", v.Number, v.Title, v.Score, v.Reason))
+		fmt.Fprintf(&b, "| %s | %s | %d | %s |\n", v.Number, v.Title, v.Score, v.Reason)
 	}
 
 	// Add top violated ADR trend if results available
@@ -134,8 +134,8 @@ func FormatViolatedADRsSection(alignment ADRAlignmentMap, results []CheckResult,
 		top := TopViolatedADRs(results, 1, threshold)
 		if len(top) > 0 {
 			freq := PerADRViolationFrequency(results, threshold)
-			b.WriteString(fmt.Sprintf("\n_Top violated ADR: %s (violated in %.0f%% of recent checks)_\n",
-				top[0], freq[top[0]]*100))
+			fmt.Fprintf(&b, "\n_Top violated ADR: %s (violated in %.0f%% of recent checks)_\n",
+				top[0], freq[top[0]]*100)
 		}
 	}
 

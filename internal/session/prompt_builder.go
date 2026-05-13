@@ -91,14 +91,14 @@ func renderRepeatedViolationsSection(lang string, params domain.DiffCheckParams)
 		sb.WriteString("\n## 繰り返し違反の警告\n")
 		sb.WriteString("以下の整合性軸が直近の複数チェックで継続的に違反しきい値を超えています:\n")
 		for _, v := range params.RepeatedViolations {
-			sb.WriteString(fmt.Sprintf("- **%s** (%d回連続違反): %s\n", v.Axis, v.Count, v.Description))
+			fmt.Fprintf(&sb, "- **%s** (%d回連続違反): %s\n", v.Axis, v.Count, v.Description)
 		}
 		sb.WriteString("\nこれらの軸に**特に注意**してください。同じ問題が継続している場合、D-Mailの深刻度をエスカレートしてください。\n")
 	} else {
 		sb.WriteString("\n## Repeated Violations Warning\n")
 		sb.WriteString("The following integrity axes have been consistently above the violation threshold across recent checks:\n")
 		for _, v := range params.RepeatedViolations {
-			sb.WriteString(fmt.Sprintf("- **%s** (%d consecutive violations): %s\n", v.Axis, v.Count, v.Description))
+			fmt.Fprintf(&sb, "- **%s** (%d consecutive violations): %s\n", v.Axis, v.Count, v.Description)
 		}
 		sb.WriteString("\n**Pay special attention** to these axes. If the same issues persist, escalate the severity in your D-Mail output.\n")
 	}

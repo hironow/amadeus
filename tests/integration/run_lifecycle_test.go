@@ -241,9 +241,7 @@ func TestRunLifecycle_InboxTrigger(t *testing.T) {
 
 	cfg := domain.DefaultConfig()
 	emitter2, state2 := usecase.BuildCheckEmitter(ctx, "run-", a, cfg, &domain.NopLogger{}, &port.NopNotifier{}, &port.NopPolicyMetrics{}, &port.NopImprovementTaskDispatcher{})
-	if prReader != nil {
-		usecase.WirePRPipeline(a, prReader, store, emitter2, &domain.NopLogger{})
-	}
+	usecase.WirePRPipeline(a, prReader, store, emitter2, &domain.NopLogger{})
 
 	// when: run the daemon loop
 	runErr := a.Run(ctx, opts, emitter2, state2)

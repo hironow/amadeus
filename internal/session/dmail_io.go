@@ -170,7 +170,7 @@ func ReceiveDMailFromInbox(root, filename string) (*domain.DMail, error) {
 // Used by RunCheck (one-shot check command). The Run daemon loop uses
 // MonitorInbox (fsnotify-based, in inbox_watcher.go) for real-time D-Mail reception.
 func (s *ProjectionStore) ScanInbox(ctx context.Context) ([]domain.DMail, error) {
-	ctx, span := platform.Tracer.Start(ctx, "amadeus.dmail_io")
+	_, span := platform.Tracer.Start(ctx, "amadeus.dmail_io")
 	defer span.End()
 
 	inboxDir := filepath.Join(s.Root, "inbox")

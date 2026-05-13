@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -219,15 +218,4 @@ func improvementProjectIDFromEnv() string {
 	default:
 		return ""
 	}
-}
-
-func normalizeWeaveAPIBaseURL(raw string) string {
-	if strings.TrimSpace(raw) == "" {
-		return defaultWeaveAPIBaseURL
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return strings.TrimRight(raw, "/")
-	}
-	return strings.TrimRight(parsed.String(), "/")
 }

@@ -58,7 +58,7 @@ func TestRunCmd_FailsWithoutInit(t *testing.T) {
 
 	// then: should fail with "not initialized"
 	if err == nil {
-		t.Fatal("expected error for uninitalized repo")
+		t.Fatal("expected error for uninitialized repo")
 	}
 	if !strings.Contains(err.Error(), "not initialized") {
 		t.Errorf("expected 'not initialized' error, got: %v", err)
