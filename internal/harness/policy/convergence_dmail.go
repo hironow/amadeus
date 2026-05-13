@@ -12,17 +12,17 @@ func BuildConvergenceDMailBody(report domain.PRConvergenceReport) string {
 	var sb strings.Builder
 
 	sb.WriteString("## PR Dependency Chain Analysis\n\n")
-	sb.WriteString(fmt.Sprintf("Integration branch: `%s` | Total open PRs: %d\n\n", report.IntegrationBranch, report.TotalOpenPRs))
+	fmt.Fprintf(&sb, "Integration branch: `%s` | Total open PRs: %d\n\n", report.IntegrationBranch, report.TotalOpenPRs)
 
 	for _, chain := range report.Chains {
-		sb.WriteString(fmt.Sprintf("### %s\n\n", chain.ID))
+		fmt.Fprintf(&sb, "### %s\n\n", chain.ID)
 
 		sb.WriteString("**Chain structure:** ")
 		for i, pr := range chain.PRs {
 			if i == 0 {
-				sb.WriteString(fmt.Sprintf("%s (base: %s)", pr.Number(), pr.BaseBranch()))
+				fmt.Fprintf(&sb, "%s (base: %s)", pr.Number(), pr.BaseBranch())
 			} else {
-				sb.WriteString(fmt.Sprintf(" <- %s (base: %s)", pr.Number(), pr.BaseBranch()))
+				fmt.Fprintf(&sb, " <- %s (base: %s)", pr.Number(), pr.BaseBranch())
 			}
 		}
 		sb.WriteString("\n\n")
@@ -39,7 +39,7 @@ func BuildConvergenceDMailBody(report domain.PRConvergenceReport) string {
 				status = fmt.Sprintf("behind by %d", pr.BehindBy())
 				issue = "needs rebase"
 			}
-			sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s |\n", pr.Number(), pr.BaseBranch(), status, issue))
+			fmt.Fprintf(&sb, "| %s | %s | %s | %s |\n", pr.Number(), pr.BaseBranch(), status, issue)
 		}
 		sb.WriteString("\n")
 
@@ -70,7 +70,7 @@ func BuildConvergenceDMailBody(report domain.PRConvergenceReport) string {
 				if !pr.HasConflict() {
 					continue
 				}
-				sb.WriteString(fmt.Sprintf("- %s: %s\n", pr.Number(), strings.Join(pr.ConflictFiles(), ", ")))
+				fmt.Fprintf(&sb, "- %s: %s\n", pr.Number(), strings.Join(pr.ConflictFiles(), ", "))
 			}
 		}
 		sb.WriteString("\n")

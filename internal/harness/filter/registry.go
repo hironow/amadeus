@@ -113,13 +113,7 @@ func NewRegistryFromFS(fsys fs.FS) (*PromptRegistry, error) {
 			return nil, fmt.Errorf("duplicate prompt name %q in %s", pf.Name, entry.Name())
 		}
 
-		r.entries[pf.Name] = PromptConfig{
-			Name:        pf.Name,
-			Version:     pf.Version,
-			Description: pf.Description,
-			Variables:   pf.Variables,
-			Template:    pf.Template,
-		}
+		r.entries[pf.Name] = PromptConfig(pf)
 	}
 
 	if len(r.entries) == 0 {

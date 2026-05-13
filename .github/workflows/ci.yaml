@@ -20,6 +20,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Set up just
+        uses: extractions/setup-just@v4
+
       - name: Build
         run: go build ./...
 
@@ -31,6 +34,9 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      - name: golangci-lint (refs/issues/0025)
+        run: just lint-go
 
       - name: Test
         run: go test ./... -count=1 -timeout=300s

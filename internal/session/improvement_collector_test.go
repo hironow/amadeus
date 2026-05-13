@@ -13,12 +13,10 @@ import (
 )
 
 type fakeImprovementFeedbackSource struct {
-	rows      []ImprovementFeedbackRow
-	lastQuery ImprovementFeedbackQuery
+	rows []ImprovementFeedbackRow
 }
 
 func (f fakeImprovementFeedbackSource) QueryFeedback(_ context.Context, query ImprovementFeedbackQuery) ([]ImprovementFeedbackRow, error) {
-	f.lastQuery = query
 	var out []ImprovementFeedbackRow
 	for _, row := range f.rows {
 		if row.CreatedAt.Before(query.CreatedAfter) {

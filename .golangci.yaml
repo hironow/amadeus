@@ -1,0 +1,75 @@
+# golangci-lint v2 canonical config for tap/ Go tools.
+# https://golangci-lint.run/docs/configuration/file/
+#
+# Source of truth: tap/refs/scripts/golangci/.golangci.yaml
+# Sync to each tool repo with: tap/refs/scripts/sync-golangci.sh <repo>
+# Byte-identical drift is detected by gap-check-tool (= refs/issues/0025 Phase 4).
+#
+# Design intent: standard linter set + a few extras that catch real bugs
+# (= bodyclose) or repeatedly-corrected style nits (= revive / misspell).
+# `errcheck` stays disabled centrally because each tool ships with
+# pre-existing unchecked-error sites; the unblock + incremental fix lives
+# in refs/issues/0025 Phase 5 follow-up.
+version: "2"
+
+run:
+  timeout: 3m
+  go: "1.26"
+
+linters:
+  default: standard
+  enable:
+    - revive          # idiomatic Go style (replacement for golint)
+    - misspell        # English spelling in identifiers / comments
+    - unconvert       # redundant type conversions
+    - bodyclose       # response.Body must be closed
+  # errcheck is intentionally NOT enforced yet; per-repo existing
+  # unchecked-error counts vary. Each tool removes this disable in a
+  # follow-up PR (= refs/issues/0025 Phase 5).
+  disable:
+    - errcheck
+  exclusions:
+    rules:
+      - path: '_test\.go$'
+        linters:
+          - revive
+          - bodyclose
+      # Generated / vendored
+      - path: 'vendor/'
+        linters:
+          - all
+      # internal/platform/stream_normalizer.go is a 3-tool canonical
+      # lock target (sightjack / paintress / amadeus). The lastErr
+      # field is currently dead but lives in all three copies; a
+      # cross-tool sweep PR will remove it later. Until then,
+      # tolerate the unused field so the canonical hash stays stable.
+      - path: 'internal/platform/stream_normalizer\.go'
+        linters:
+          - unused
+
+  settings:
+    revive:
+      severity: warning
+      rules:
+        - name: unused-parameter
+          disabled: true
+        - name: var-naming
+          arguments:
+            - ["ID", "URL", "HTTP", "API", "JSON", "TLS"]
+    misspell:
+      # i18n message tables include French / German / etc. strings
+      # whose substrings collide with English typo dictionary entries
+      # (e.g. `démarrage` -> "marrage", `stratégies` -> "strat").
+      # These are false positives for our use; ignore the substrings
+      # rather than disabling misspell globally.
+      ignore-rules:
+        - marrage
+        - strat
+
+issues:
+  max-same-issues: 50
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

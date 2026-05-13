@@ -29,10 +29,6 @@ func NewProjectionStore(root string) *ProjectionStore {
 	return &ProjectionStore{Root: root}
 }
 
-func (s *ProjectionStore) runDir() string {
-	return filepath.Join(s.Root, ".run")
-}
-
 // InitGateDir creates the .gate/ directory structure and writes
 // a default config.yaml if one does not already exist.
 // lang overrides the default language when non-empty (3-stage merge: defaults → existing → CLI).
