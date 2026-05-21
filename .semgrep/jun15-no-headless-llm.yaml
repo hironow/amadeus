@@ -1,0 +1,107 @@
+# jun15 MCP pivot: forbid headless LLM invocation paths.
+#
+# Source of truth: refs/HTMLification/docs/issues/0027-jun15-mcp-pivot.html §6
+# (canonical, repo-wide scan in production paths only). paintress
+# Phase 1 (PR #213, ADR 0017) established the canonical 9-commit
+# pattern; sightjack Phase 2a (PR #213 amadeus PR pending, ADR
+# sightjack 0018) confirmed the cross-repo symmetry; amadeus Phase
+# 2b copies the same shape and adapts only the transitional exclude
+# path.
+#
+# Path strategy (v4 from refs 0027):
+# - Executable paths (justfile / scripts/** / *.sh / production Go) = ERROR
+# - Test fixtures and archives = excluded (allowlist)
+# - Active docs / markdown = out of scope (mention is allowed)
+#
+# Phase 2b MVP transitional excludes (= post-pivot will be removed):
+# - internal/session/claude_adapter.go: still calls `claude --print` via
+#   exec.Command with stdin piping until the MCP pivot replaces the
+#   prompt construction with an MCP server interface. Removing the
+#   exclude requires deleting the exec.Command block and routing
+#   inference through the claude code session's MCP client.
+# - internal/session/doctor.go: invokes `claude --print --max-turns 1
+#   "1+1="` for a health check. Sub-B will rework the health check to
+#   verify the MCP server's `amadeus.ping` instead.
+#
+# Acceptance gate for Phase 2b completion: every transitional exclude
+# below is deleted and `just semgrep` stays at 0 finding.
+
+rules:
+  - id: jun15-no-claude-print-exec-go
+    message: |
+      `claude -p` / `--print` exec is forbidden (refs/issues/0027 MCP pivot).
+      Route inference through the human-initiated claude code session via
+      MCP server tools instead.
+    severity: ERROR
+    languages: [go]
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command("claude", "-p", ...)
+          - pattern: exec.CommandContext(..., "claude", "-p", ...)
+          - pattern: exec.Command("claude", "--print", ...)
+          - pattern: exec.CommandContext(..., "claude", "--print", ...)
+    paths:
+      exclude:
+        # Phase 2b transitional: removed in sub-B once the claude_adapter
+        # and doctor invocations are rewritten to drive the MCP server.
+        - internal/session/claude_adapter.go
+        - internal/session/doctor.go
+        # Test fixtures that intentionally invoke a fake claude binary.
+        - tests/**
+
+  - id: jun15-no-anthropic-sdk-import-go
+    message: |
+      Anthropic Agent SDK import is forbidden post 6/15 MCP pivot.
+      Use the claude code session's MCP transport instead.
+    severity: ERROR
+    languages: [go]
+    pattern: import "github.com/anthropics/anthropic-sdk-go"
+    paths:
+      exclude:
+        - tests/**
+
+  - id: jun15-no-anthropic-api-key-read
+    message: |
+      ANTHROPIC_API_KEY env read is forbidden post 6/15 MCP pivot.
+      Subscription-only billing path means the Go CLI does not need a
+      direct API key; the human-initiated claude code session owns auth.
+    severity: ERROR
+    languages: [go]
+    pattern: os.Getenv("ANTHROPIC_API_KEY")
+    paths:
+      exclude:
+        - tests/**
+
+  - id: jun15-no-claude-print-shell-wrapper
+    message: |
+      `claude -p` / `--print` via shell wrapper (bash -lc / sh -c) is
+      forbidden. The shell hop hides the headless invocation from the
+      Go AST scan above.
+    severity: ERROR
+    languages: [go]
+    pattern-regex: 'exec\.Command(Context)?\([^)]*?(bash|sh|zsh)[^)]*?-[lc]+[^)]*?claude[^)]*?--?(p|print)\b'
+    paths:
+      exclude:
+        - tests/**
+        - .semgrep/**
+
+  - id: jun15-no-claude-print-literal-executable
+    message: |
+      `claude -p` / `--print` literal in an executable path is forbidden.
+      Scoped to justfile / scripts/** / *.sh / hooks config so docs that
+      reference the flag in prose are not affected.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '\bclaude\s+(-p|--print)\b'
+    paths:
+      include:
+        - "justfile"
+        - "scripts/**"
+        - "*.sh"
+        - "*.bash"
+        - "*.zsh"
+        - "hooks.yaml"
+        - ".claude/hooks/**"
+      exclude:
+        - "**/tests/**"
+        - "**/docs/**"
