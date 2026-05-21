@@ -139,6 +139,7 @@ func NewRootCommand() *cobra.Command {
 		newUpdateCommand(),
 		newConfigCommand(),
 		newMCPConfigCommand(),
+		newMCPCommand(),
 		newDashboardCommand(),
 		newSessionsCommand(),
 		newDeadLettersCommand(),
