@@ -66,6 +66,20 @@ func (g *GhPRWriter) ClosePR(_ context.Context, prNumber, comment string) error 
 	return nil
 }
 
+// PostComment posts a free-form review comment to the given PR via
+// the GitHub Comments API (= `gh pr comment <num> --body <body>`).
+// Used by the amadeus.post_comment MCP tool when an interactive
+// claude-code session asks amadeus to record a comment.
+func (g *GhPRWriter) PostComment(_ context.Context, prNumber, body string) error {
+	ghClient := &GHClient{Dir: g.RepoDir}
+	num := strings.TrimPrefix(prNumber, "#")
+	_, err := ghClient.runGH("pr", "comment", num, "--body", body)
+	if err != nil {
+		return fmt.Errorf("post comment to PR %s: %w", prNumber, err)
+	}
+	return nil
+}
+
 // MergePR merges the given PR using the specified method.
 // For squash: uses --squash --delete-branch (clean history + branch cleanup).
 // For merge: uses --merge without --delete-branch (preserve hash for chain dependents).

@@ -209,6 +209,20 @@ type GitHubPRWriter interface { // nosemgrep: structure.multiple-exported-interf
 	// ClosePR closes the given PR with a comment.
 	// Used to clean up stale pipeline PRs whose base branch has been merged.
 	ClosePR(ctx context.Context, prNumber, comment string) error
+	// PostComment posts a free-form review comment to the given PR via
+	// the GitHub Comments API. Used by the amadeus.post_comment MCP tool
+	// (refs/issues/0027 Phase 4 follow-up #3) when wired into a
+	// claude-code-driven session. LLM firing remains human-initiated.
+	PostComment(ctx context.Context, prNumber, body string) error
+}
+
+// CommentPoster posts a free-form comment to a PR. Narrow port surface
+// used by the MCP server's amadeus.post_comment dispatch so the server
+// does not need the full GitHubPRWriter contract (= ApplyLabel /
+// MergePR / ...). cmd composition root wires GhPRWriter (which
+// satisfies both interfaces) when GitHub posting is enabled.
+type CommentPoster interface { // nosemgrep: structure.multiple-exported-interfaces-go -- narrow MCP port; see GitHubPRWriter [permanent]
+	PostComment(ctx context.Context, prNumber, body string) error
 }
 
 // GitHubIssueWriter closes issues on GitHub.

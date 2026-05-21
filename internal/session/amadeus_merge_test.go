@@ -63,6 +63,7 @@ func (m *mergeMockPRWriter) ApplyLabel(_ context.Context, prNumber, label string
 
 func (m *mergeMockPRWriter) RemoveLabel(_ context.Context, _, _ string) error { return nil }
 func (m *mergeMockPRWriter) DeleteLabel(_ context.Context, _ string) error    { return nil }
+func (m *mergeMockPRWriter) PostComment(_ context.Context, _, _ string) error { return nil }
 
 func (m *mergeMockPRWriter) ClosePR(_ context.Context, prNumber, comment string) error {
 	m.mu.Lock()

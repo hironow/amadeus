@@ -13,6 +13,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
+	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
 // MCPServer is a minimal stdio-based Model Context Protocol server
@@ -38,10 +39,11 @@ import (
 // inbox / outbox paths. When empty, real-impl tools return
 // uninitialized.
 type MCPServer struct {
-	in      io.Reader
-	out     io.Writer
-	logger  domain.Logger
-	gateDir string
+	in            io.Reader
+	out           io.Writer
+	logger        domain.Logger
+	gateDir       string
+	commentPoster port.CommentPoster
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -58,6 +60,15 @@ func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer 
 // paintress.WithContinent / sightjack.WithBaseDir symmetric).
 func (s *MCPServer) WithGateDir(gateDir string) *MCPServer {
 	s.gateDir = gateDir
+	return s
+}
+
+// WithCommentPoster wires the GitHub Comments API adapter used by
+// amadeus.post_comment (refs/issues/0027 Phase 4 follow-up #3).
+// When nil (= default), post_comment stays preview-only. cmd
+// composition root injects a GhPRWriter in repo-scoped invocations.
+func (s *MCPServer) WithCommentPoster(p port.CommentPoster) *MCPServer {
+	s.commentPoster = p
 	return s
 }
 
@@ -144,7 +155,7 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	case "amadeus.next_review":
 		result = realNextReview(ctx, s.gateDir, s.logger)
 	case "amadeus.post_comment":
-		result = realPostComment(call.Arguments)
+		result = realPostComment(ctx, s.commentPoster, call.Arguments)
 	case "amadeus.get_pr_status":
 		result = realGetPRStatus(ctx, s.gateDir, call.Arguments, s.logger)
 	default:
@@ -179,7 +190,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "amadeus.post_comment",
-			"description": "Preview-only: validates pr_number + body and returns persistence='preview-only'. Phase 3 does NOT call the GitHub Comments API; use `gh pr comment` or GitHub UI to actually post.",
+			"description": "Post a review comment to the given PR via the GitHub Comments API (= `gh pr comment`). When a CommentPoster is wired (Phase 4 #3), posted=true + persistence='github-comments-api'. Otherwise preview-only + persistence='preview-only'.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -276,17 +287,23 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 		"prs_evaluated":      latest.PRsEvaluated,
 		"dmails_emitted":     len(latest.DMails),
 		"convergence_alerts": len(latest.ConvergenceAlerts),
-		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, post review via the human-driven workflow (NOT via amadeus.post_comment which is preview-only).",
+		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, and either post the review via amadeus.post_comment (when wired) or the human-driven workflow.",
 	})
 }
 
-// realPostComment validates the input and returns a preview payload
-// without calling the GitHub Comments API. Phase 3 scope: preview-only
-// (= persistence='preview-only'). The actual GitHub API call requires
-// the GitHub token + adapter wiring which is Phase 4 follow-up.
+// realPostComment validates the input and, when a CommentPoster is
+// wired (= Phase 4 follow-up #3), posts the comment to GitHub via the
+// `gh pr comment` adapter. Without a poster it falls back to a
+// preview-only payload (= persistence='preview-only'), preserving the
+// Phase 3 contract for sessions that haven't opted into write mode.
 //
-// Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy.
-func realPostComment(args json.RawMessage) map[string]any {
+// LLM firing remains human-initiated: the claude-code session decides
+// when to call amadeus.post_comment, and the poster only fires when
+// the cmd composition root explicitly injected an adapter.
+//
+// Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy, with
+// poster wiring borrowed from sightjack.update_strictness (= 675ce8c).
+func realPostComment(ctx context.Context, poster port.CommentPoster, args json.RawMessage) map[string]any {
 	var payload struct {
 		PRNumber int    `json:"pr_number"`
 		Body     string `json:"body"`
@@ -301,13 +318,32 @@ func realPostComment(args json.RawMessage) map[string]any {
 			"received":  payload,
 		})
 	}
+	if poster == nil {
+		return jsonResult(map[string]any{
+			"persisted":   false,
+			"pr_number":   payload.PRNumber,
+			"body_length": len(payload.Body),
+			"posted":      false,
+			"persistence": "preview-only",
+			"note":        "Preview only. CommentPoster not wired; cmd composition root must inject a GhPRWriter to enable actual posting.",
+		})
+	}
+	if err := poster.PostComment(ctx, strconv.Itoa(payload.PRNumber), payload.Body); err != nil {
+		return jsonResult(map[string]any{
+			"persisted":   false,
+			"pr_number":   payload.PRNumber,
+			"body_length": len(payload.Body),
+			"posted":      false,
+			"persistence": "github-comments-api",
+			"reason":      fmt.Sprintf("PostComment failed: %v", err),
+		})
+	}
 	return jsonResult(map[string]any{
-		"persisted":   false,
+		"persisted":   true,
 		"pr_number":   payload.PRNumber,
 		"body_length": len(payload.Body),
-		"posted":      false,
-		"persistence": "preview-only",
-		"note":        "Preview only. Phase 3 does NOT call the GitHub Comments API. Post the comment via `gh pr comment` or the GitHub UI; Phase 4 follow-up wires the GitHub adapter.",
+		"posted":      true,
+		"persistence": "github-comments-api",
 	})
 }
 
