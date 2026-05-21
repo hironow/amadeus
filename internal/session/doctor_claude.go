@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -163,23 +162,6 @@ func checkSkillMD(repoRoot string) domain.DoctorCheck {
 }
 
 // RunDoctorWithClaudeCmd executes all health checks with a configurable Claude command.
-
-func extractStreamResult(streamJSON string) string {
-	for _, line := range strings.Split(streamJSON, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		var msg struct {
-			Type   string `json:"type"`
-			Result string `json:"result"`
-		}
-		if err := json.Unmarshal([]byte(line), &msg); err == nil && msg.Type == "result" {
-			return msg.Result
-		}
-	}
-	return ""
-}
 
 // CheckContextBudget parses stream-json output from a Claude CLI invocation
 // and reports context budget health based on hooks, plugins, skills, and MCP servers.

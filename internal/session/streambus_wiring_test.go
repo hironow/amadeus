@@ -28,6 +28,7 @@ func fakeStreamJSON() string {
 }
 
 func TestStreamBusWiring_AdapterEmitsExactlyOneSessionEnd(t *testing.T) {
+	t.Skip("ClaudeAdapter stream wiring deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: bus + subscriber
 	bus := platform.NewInProcessSessionBus()
 	defer bus.Close()
@@ -115,6 +116,7 @@ drain:
 }
 
 func TestStreamBusWiring_SessionEndInheritsParentTrace(t *testing.T) {
+	t.Skip("ClaudeAdapter stream wiring deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	exp := setupTestTracer(t)
 
 	bus := platform.NewInProcessSessionBus()

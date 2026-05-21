@@ -365,32 +365,23 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			})
 		}
 
-		// Inference: run independently of mcp list result (only needs claude binary)
-		inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
-		inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-		// Filter CLAUDECODE only for the doctor inference probe to prevent
-		// nested-session errors. Other subprocesses must preserve CLAUDECODE.
-		if inferCmd.Env != nil {
-			inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
-		} else {
-			inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
-		}
-		inferOut, inferErr := inferCmd.Output()
-		inferCancel()
-		inferOutput := string(inferOut)
-		inferResult := checkClaudeInference(strings.TrimSpace(extractStreamResult(inferOutput)), inferErr)
-		results = append(results, inferResult)
-
-		// Context budget check: skip if inference failed
-		if inferResult.Status != domain.CheckOK {
-			results = append(results, domain.DoctorCheck{
-				Name:    "context-budget",
-				Status:  domain.CheckSkip,
-				Message: "skipped (inference failed)",
-			})
-		} else {
-			results = append(results, checkContextBudget(inferOutput, repoRoot))
-		}
+		// Inference: post jun15 MCP pivot (refs/issues/0027) the doctor
+		// no longer probes `claude --print --max-turns 1 "1+1="`. LLM
+		// invocation is owned by the human-initiated claude code session
+		// driven by the amadeus MCP server; doctor only verifies that
+		// the binary is present and authed, not that headless inference
+		// works. Sub-B of the pivot will replace these skip results with
+		// an MCP server health probe (amadeus.ping).
+		results = append(results, domain.DoctorCheck{
+			Name:    "claude-inference",
+			Status:  domain.CheckSkip,
+			Message: "skipped (post jun15 MCP pivot, refs/issues/0027): inference moved to claude code MCP session",
+		})
+		results = append(results, domain.DoctorCheck{
+			Name:    "context-budget",
+			Status:  domain.CheckSkip,
+			Message: "skipped (post jun15 MCP pivot, refs/issues/0027): budget tracked on MCP-driven session",
+		})
 	}
 
 	// --- skills-ref toolchain ---
@@ -544,6 +535,3 @@ func CheckConfig(path string) domain.DoctorCheck {
 		Message: fmt.Sprintf("%s loaded and validated", path),
 	}
 }
-
-// extractStreamResult parses stream-json output and returns the "result" field
-// from the result message. Used to reuse login check output for inference check.

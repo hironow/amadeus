@@ -648,8 +648,12 @@ func TestRunDoctor_MCPListFails_InferenceStillRuns(t *testing.T) {
 	if mcpResult.Status != domain.CheckSkip {
 		t.Errorf("linear-mcp: expected SKIP, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
-	if inferResult.Status == domain.CheckSkip {
-		t.Errorf("claude-inference: should NOT be skipped when mcp list fails, got SKIP: %s", inferResult.Message)
+	// claude-inference is unconditionally SKIP post jun15 MCP pivot
+	// (refs/issues/0027): LLM invocation moved to claude code MCP
+	// session; the doctor no longer probes `claude --print` regardless
+	// of `mcp list` outcome.
+	if inferResult.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP post jun15 MCP pivot, got %v: %s", inferResult.Status, inferResult.Message)
 	}
 }
 
@@ -951,8 +955,11 @@ func TestRunDoctor_AllPassWithFakeClaude(t *testing.T) {
 	if mcpResult.Status != domain.CheckOK {
 		t.Errorf("linear-mcp: expected OK, got %v: %s", mcpResult.Status, mcpResult.Message)
 	}
-	if inferResult.Status != domain.CheckOK {
-		t.Errorf("claude-inference: expected OK, got %v: %s", inferResult.Status, inferResult.Message)
+	// claude-inference is unconditionally SKIP post jun15 MCP pivot
+	// (refs/issues/0027): LLM invocation moved to claude code MCP
+	// session; the fake-claude doctor probe is no longer wired.
+	if inferResult.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP post jun15 MCP pivot, got %v: %s", inferResult.Status, inferResult.Message)
 	}
 }
 
