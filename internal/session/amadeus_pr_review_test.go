@@ -70,6 +70,10 @@ func (f *fakePRWriterForReview) ClosePR(_ context.Context, _, _ string) error {
 	return nil
 }
 
+func (f *fakePRWriterForReview) PostComment(_ context.Context, _, _ string) error {
+	return nil
+}
+
 type fakeProviderRunnerForReview struct {
 	response string
 }

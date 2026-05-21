@@ -53,7 +53,16 @@ the legacy .mcp.json file consumed by the embedded claude_adapter).`,
 				return err
 			}
 			gateDir := filepath.Join(cwd, domain.StateDir)
-			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).WithGateDir(gateDir)
+			// CommentPoster is wired unconditionally (refs/issues/0027
+			// Phase 4 follow-up #3): the MCP tool only fires when the
+			// human-initiated claude-code session calls post_comment,
+			// so the adapter being present does not produce side
+			// effects on its own. Errors from `gh pr comment` surface
+			// to the session via the response's reason field.
+			poster := session.NewGhPRWriter(cwd)
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).
+				WithGateDir(gateDir).
+				WithCommentPoster(poster)
 			return srv.Serve(cmd.Context())
 		},
 	}

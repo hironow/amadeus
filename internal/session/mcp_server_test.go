@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -175,6 +176,79 @@ func TestMCPServer_PostComment_RealImpl_PreviewOnly(t *testing.T) {
 	}
 	if body["persistence"] != "preview-only" {
 		t.Errorf("persistence = %v, want preview-only", body["persistence"])
+	}
+}
+
+// fakeCommentPoster captures PostComment invocations for white-box
+// testing of the MCP wiring without spawning the gh CLI.
+type fakeCommentPoster struct {
+	calls     []fakeCommentCall
+	returnErr error
+}
+
+type fakeCommentCall struct {
+	pr   string
+	body string
+}
+
+func (f *fakeCommentPoster) PostComment(_ context.Context, prNumber, body string) error {
+	f.calls = append(f.calls, fakeCommentCall{pr: prNumber, body: body})
+	return f.returnErr
+}
+
+func TestMCPServer_PostComment_Phase4_PostsViaWriter(t *testing.T) {
+	// given: MCP server wired with a fake comment poster (= Phase 4 #3
+	// GitHub adapter contract).
+	poster := &fakeCommentPoster{}
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42,"body":"LGTM"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithCommentPoster(poster)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: writer was invoked + response reports posted=true with
+	// persistence='github-comments-api'.
+	if len(poster.calls) != 1 {
+		t.Fatalf("PostComment calls = %d, want 1: %#v", len(poster.calls), poster.calls)
+	}
+	if poster.calls[0].pr != "42" {
+		t.Errorf("pr = %q, want %q", poster.calls[0].pr, "42")
+	}
+	if poster.calls[0].body != "LGTM" {
+		t.Errorf("body = %q, want %q", poster.calls[0].body, "LGTM")
+	}
+	body := decodeFirstText(t, &out)
+	if got, _ := body["posted"].(bool); !got {
+		t.Errorf("posted = false, want true (writer wired): %v", body)
+	}
+	if body["persistence"] != "github-comments-api" {
+		t.Errorf("persistence = %v, want github-comments-api", body["persistence"])
+	}
+}
+
+func TestMCPServer_PostComment_Phase4_SurfacesWriterError(t *testing.T) {
+	// given: writer fails on post
+	poster := &fakeCommentPoster{returnErr: errors.New("gh: rate limit exceeded")}
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":99,"body":"hi"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithCommentPoster(poster)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: posted=false + reason carries the writer error so the LLM
+	// session can decide whether to retry.
+	body := decodeFirstText(t, &out)
+	if got, _ := body["posted"].(bool); got {
+		t.Errorf("posted = true, want false (writer failed): %v", body)
+	}
+	if reason, _ := body["reason"].(string); !strings.Contains(reason, "rate limit") {
+		t.Errorf("reason = %v, want it to surface 'rate limit'", body["reason"])
 	}
 }
 
