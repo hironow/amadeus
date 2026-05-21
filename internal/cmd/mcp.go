@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
 )
 
@@ -44,7 +48,12 @@ the legacy .mcp.json file consumed by the embedded claude_adapter).`,
   # Pipe a tools/list request manually (for debugging)
   echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | amadeus mcp`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil)
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			gateDir := filepath.Join(cwd, domain.StateDir)
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).WithGateDir(gateDir)
 			return srv.Serve(cmd.Context())
 		},
 	}
