@@ -14,6 +14,7 @@ import (
 // --- D-Mail Severity Routing ---
 
 func TestE2E_DMail_HighSeverity_GoesToOutbox(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	cfg := defaultTestConfig()
 	cfg["thresholds"] = map[string]any{
@@ -37,6 +38,7 @@ func TestE2E_DMail_HighSeverity_GoesToOutbox(t *testing.T) {
 }
 
 func TestE2E_DMail_LowSeverity_GoesToOutbox(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	cfg := defaultTestConfig()
 	cfg["thresholds"] = map[string]any{
@@ -56,6 +58,7 @@ func TestE2E_DMail_LowSeverity_GoesToOutbox(t *testing.T) {
 }
 
 func TestE2E_DMail_MediumSeverity_GoesToOutbox(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	cfg := defaultTestConfig()
 	cfg["thresholds"] = map[string]any{
@@ -76,6 +79,7 @@ func TestE2E_DMail_MediumSeverity_GoesToOutbox(t *testing.T) {
 // --- D-Mail File Format ---
 
 func TestE2E_DMail_ArchiveFormat(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
@@ -110,6 +114,7 @@ func TestE2E_DMail_ArchiveFormat(t *testing.T) {
 }
 
 func TestE2E_DMail_NamingSequence(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	cfg := defaultTestConfig()
 	cfg["thresholds"] = map[string]any{

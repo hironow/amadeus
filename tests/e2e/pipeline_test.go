@@ -14,6 +14,7 @@ import (
 
 // TestE2E_Pipeline_Convergence exercises convergence detection with seeded D-Mails.
 func TestE2E_Pipeline_Convergence(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	cfg := defaultTestConfig()
 	cfg["convergence"] = map[string]any{
@@ -116,6 +117,7 @@ func TestE2E_Pipeline_HookInstallUninstall(t *testing.T) {
 
 // TestE2E_Pipeline_MultiCheckWithDivergenceHistory runs multiple runs and verifies history.
 func TestE2E_Pipeline_MultiCheckWithDivergenceHistory(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 

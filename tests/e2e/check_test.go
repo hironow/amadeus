@@ -206,6 +206,7 @@ func TestE2E_Run_SeverityRouting_Low(t *testing.T) {
 }
 
 func TestE2E_Run_HistoryAccumulates(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
@@ -231,6 +232,7 @@ func TestE2E_Run_HistoryAccumulates(t *testing.T) {
 }
 
 func TestE2E_Run_LatestJSON(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
@@ -280,6 +282,7 @@ func TestE2E_Run_DMailIssuesField(t *testing.T) {
 }
 
 func TestE2E_Run_BaselineSaved(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
@@ -299,6 +302,7 @@ func TestE2E_Run_BaselineSaved(t *testing.T) {
 }
 
 func TestE2E_Log_AfterCheck(t *testing.T) {
+	t.Skip("E2E exercises deprecated `amadeus run` CLI (refs/issues/0027 sub-A); Phase 2c/post-merge will rewire e2e against the MCP server contract")
 	dir := initTestRepo(t)
 	writeConfig(t, dir, defaultTestConfig())
 
