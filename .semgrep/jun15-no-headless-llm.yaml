@@ -94,3 +94,31 @@ rules:
       exclude:
         - "**/tests/**"
         - "**/docs/**"
+
+  # refs/HTMLification/docs/issues/0028 §4.1: catch dynamic args spread.
+  # The 0027 rule jun15-no-claude-print-exec-go only catches `exec.Command`
+  # whose first arg is literal "claude" AND whose second arg is literal
+  # "--print" / "-p". Production paths that build args as a []string slice
+  # (or with append) and then spread it into exec.Command(claudeCmd, args...)
+  # slip through. This rule forbids any "--print" literal in production Go
+  # under internal/ and cmd/, regardless of how it flows into exec.Command.
+  - id: jun15-no-print-flag-literal-go
+    message: |
+      `"--print"` string literal in production Go is forbidden post jun15
+      MCP pivot (refs/issues/0027, 0028). Even when the binary path is
+      config-driven (e.g., `a.ClaudeCmd`), a `"--print"` literal flowing
+      into an exec.Command args slice indicates a headless LLM invocation
+      path. Route inference through a human-initiated claude code session
+      attached to this tool's MCP server.
+    severity: ERROR
+    languages: [go]
+    pattern-regex: '"--print"'
+    paths:
+      include:
+        - "internal/**/*.go"
+        - "cmd/**/*.go"
+        - "main.go"
+      exclude:
+        - "**/*_test.go"
+        - "tests/**"
+        - ".semgrep/**"
