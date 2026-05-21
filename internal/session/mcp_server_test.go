@@ -111,56 +111,9 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	}
 }
 
-func TestMCPServer_NextReviewStub(t *testing.T) {
-	// given
+func TestMCPServer_NextReview_UninitializedGateDir(t *testing.T) {
+	// given: NewMCPServer without WithGateDir → uninitialized.
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"amadeus.next_review","arguments":{}}}` + "\n")
-	var out bytes.Buffer
-	srv := session.NewMCPServer(in, &out, nil)
-
-	// when
-	if err := srv.Serve(context.Background()); err != nil {
-		t.Fatalf("Serve: %v", err)
-	}
-
-	// then: stub payload includes stub:true so clients can detect
-	// placeholder responses during Phase 2b rollout.
-	body := decodeFirstText(t, &out)
-	if body["stub"] != true {
-		t.Errorf("stub flag missing: %v", body)
-	}
-	if _, ok := body["contract"]; !ok {
-		t.Errorf("contract descriptor missing: %v", body)
-	}
-}
-
-func TestMCPServer_PostCommentStub_EchoesPRNumberAndBodyLength(t *testing.T) {
-	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42,"body":"looks good to me"}}}` + "\n")
-	var out bytes.Buffer
-	srv := session.NewMCPServer(in, &out, nil)
-
-	// when
-	if err := srv.Serve(context.Background()); err != nil {
-		t.Fatalf("Serve: %v", err)
-	}
-
-	// then: stub echoes the input so the contract is testable
-	// end-to-end before the GitHub Comments API wiring lands.
-	body := decodeFirstText(t, &out)
-	if got, _ := body["pr_number"].(float64); int(got) != 42 {
-		t.Errorf("pr_number = %v, want 42", body["pr_number"])
-	}
-	if got, _ := body["body_length"].(float64); int(got) != len("looks good to me") {
-		t.Errorf("body_length = %v, want %d", body["body_length"], len("looks good to me"))
-	}
-	if got, _ := body["posted"].(bool); got {
-		t.Errorf("posted = true, want false (stub must not post)")
-	}
-}
-
-func TestMCPServer_GetPRStatusStub_EchoesPRNumber(t *testing.T) {
-	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"amadeus.get_pr_status","arguments":{"pr_number":99}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -171,11 +124,118 @@ func TestMCPServer_GetPRStatusStub_EchoesPRNumber(t *testing.T) {
 
 	// then
 	body := decodeFirstText(t, &out)
-	if got, _ := body["pr_number"].(float64); int(got) != 99 {
-		t.Errorf("pr_number = %v, want 99", body["pr_number"])
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty gateDir)", body["initialized"])
 	}
-	if _, ok := body["contract"]; !ok {
-		t.Errorf("contract descriptor missing: %v", body)
+}
+
+func TestMCPServer_NextReview_RealImpl_EmptyEventStore(t *testing.T) {
+	// given: temp gateDir with no events → check_count=0.
+	gateDir := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"amadeus.next_review","arguments":{}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithGateDir(gateDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if got, _ := body["check_count"].(float64); int(got) != 0 {
+		t.Errorf("check_count = %v, want 0", body["check_count"])
+	}
+}
+
+func TestMCPServer_PostComment_RealImpl_PreviewOnly(t *testing.T) {
+	// given
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42,"body":"looks good to me"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: preview-only response with input echoed back.
+	body := decodeFirstText(t, &out)
+	if got, _ := body["pr_number"].(float64); int(got) != 42 {
+		t.Errorf("pr_number = %v, want 42", body["pr_number"])
+	}
+	if got, _ := body["body_length"].(float64); int(got) != len("looks good to me") {
+		t.Errorf("body_length = %v, want %d", body["body_length"], len("looks good to me"))
+	}
+	if got, _ := body["posted"].(bool); got {
+		t.Errorf("posted = true, want false (preview-only must not post)")
+	}
+	if body["persistence"] != "preview-only" {
+		t.Errorf("persistence = %v, want preview-only", body["persistence"])
+	}
+}
+
+func TestMCPServer_PostComment_RealImpl_RejectsMissingFields(t *testing.T) {
+	// given: missing body
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["persisted"] != false {
+		t.Errorf("persisted = %v, want false", body["persisted"])
+	}
+	if _, ok := body["reason"]; !ok {
+		t.Errorf("reason missing: %v", body)
+	}
+}
+
+func TestMCPServer_GetPRStatus_UninitializedGateDir(t *testing.T) {
+	// given
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"amadeus.get_pr_status","arguments":{"pr_number":99}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty gateDir)", body["initialized"])
+	}
+}
+
+func TestMCPServer_GetPRStatus_RealImpl_NotFoundForPR(t *testing.T) {
+	// given: temp gateDir + no events for PR 99 → found:false
+	gateDir := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"amadeus.get_pr_status","arguments":{"pr_number":99}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithGateDir(gateDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if body["found"] != false {
+		t.Errorf("found = %v, want false", body["found"])
 	}
 }
 

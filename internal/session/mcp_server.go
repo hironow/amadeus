@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
@@ -29,11 +31,17 @@ import (
 // Protocol: JSON-RPC 2.0 over stdio, one envelope per line. Stderr
 // carries human-readable diagnostics (per the project stdout/stderr
 // separation invariant). Pattern follows paintress Phase 1
-// (ADR 0017) + sightjack Phase 2a (ADR 0018).
+// (ADR 0017) + sightjack Phase 2a (ADR 0018) + paintress Phase 3
+// real impl (= 83cb3ca) WithContinent pattern.
+//
+// gateDir is the .gate/ state directory used to resolve event store /
+// inbox / outbox paths. When empty, real-impl tools return
+// uninitialized.
 type MCPServer struct {
-	in     io.Reader
-	out    io.Writer
-	logger domain.Logger
+	in      io.Reader
+	out     io.Writer
+	logger  domain.Logger
+	gateDir string
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -43,6 +51,14 @@ func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer 
 		logger = &domain.NopLogger{}
 	}
 	return &MCPServer{in: in, out: out, logger: logger}
+}
+
+// WithGateDir sets the .gate state directory used by real-impl MCP
+// tools to resolve event store paths. Returns s for chaining (=
+// paintress.WithContinent / sightjack.WithBaseDir symmetric).
+func (s *MCPServer) WithGateDir(gateDir string) *MCPServer {
+	s.gateDir = gateDir
+	return s
 }
 
 // jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this skeleton
@@ -126,14 +142,11 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	case "amadeus.ping":
 		result = textResult("pong")
 	case "amadeus.next_review":
-		result = stubNextReview()
-		status = "deprecated"
+		result = realNextReview(ctx, s.gateDir, s.logger)
 	case "amadeus.post_comment":
-		result = stubPostComment(call.Arguments)
-		status = "deprecated"
+		result = realPostComment(call.Arguments)
 	case "amadeus.get_pr_status":
-		result = stubGetPRStatus(call.Arguments)
-		status = "deprecated"
+		result = realGetPRStatus(ctx, s.gateDir, call.Arguments, s.logger)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -161,12 +174,12 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "amadeus.next_review",
-			"description": "Return the next PR awaiting review (Phase 2b: stub returns a placeholder PR payload until the domain wiring lands).",
+			"description": "Return latest CheckCompleted event + total check count + PRs evaluated in the most recent check. The session picks the PR with highest divergence to review next.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
 			"name":        "amadeus.post_comment",
-			"description": "Post a review comment to the given PR (Phase 2b: stub echoes the requested pr_number + body length).",
+			"description": "Preview-only: validates pr_number + body and returns persistence='preview-only'. Phase 3 does NOT call the GitHub Comments API; use `gh pr comment` or GitHub UI to actually post.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -178,7 +191,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "amadeus.get_pr_status",
-			"description": "Return the convergence + auto-merge status for the given PR (Phase 2b: stub echoes the requested pr_number with a contract descriptor).",
+			"description": "Return per-PR check history (= filter CheckCompleted events where PRsEvaluated contains the given pr_number). Returns latest divergence + check_count + gate_denied flag + dmail_count.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -204,22 +217,76 @@ func jsonResult(data any) map[string]any {
 	return map[string]any{"content": []map[string]any{{"type": "text", "text": string(body)}}}
 }
 
-// stubNextReview returns a fixed placeholder PR payload. Replaced by
-// real domain wiring (= review queue projection + PR ranking) in a
-// subsequent commit on feat/jun15-mcp-pivot.
-func stubNextReview() map[string]any {
+// realNextReview reads CheckCompleted events from the .gate event
+// store and returns the latest check + total check count + most
+// recent PRsEvaluated. The session uses this to decide which PR to
+// review next (= typically the highest-divergence one in the latest
+// check's PRs).
+//
+// Pattern: paintress.next_issue (= 83cb3ca) symmetric copy.
+func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) map[string]any {
+	if gateDir == "" {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"reason":      "amadeus mcp gateDir not configured (start `amadeus mcp` from the project root)",
+		})
+	}
+	store := NewEventStore(gateDir, logger)
+	events, _, err := store.LoadAll(ctx)
+	if err != nil {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"reason":      fmt.Sprintf("event store load failed: %v", err),
+			"gateDir":     gateDir,
+		})
+	}
+	var latest *domain.CheckResult
+	checkCount := 0
+	for _, ev := range events {
+		if ev.Type != domain.EventCheckCompleted {
+			continue
+		}
+		checkCount++
+		var data domain.CheckCompletedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if latest == nil || data.Result.CheckedAt.After(latest.CheckedAt) { // nosemgrep: lod-excessive-dot-chain -- domain.CheckCompletedData.Result is the event payload; intermediate accessor would defeat the JSON binding [permanent]
+			r := data.Result
+			latest = &r
+		}
+	}
+	if latest == nil {
+		return jsonResult(map[string]any{
+			"initialized":   true,
+			"gateDir":       gateDir,
+			"check_count":   0,
+			"latest_check":  nil,
+			"prs_evaluated": []string{},
+			"instruction":   "No checks recorded yet. Run `amadeus run` or `amadeus check` to populate the event store.",
+		})
+	}
 	return jsonResult(map[string]any{
-		"stub":     true,
-		"pr":       nil,
-		"reason":   "phase-2b-mvp: real implementation lands when the review queue projection commit replaces this stub",
-		"contract": map[string]any{"pr_number": "integer", "owner": "string", "repo": "string", "title": "string", "branch": "string", "status": "string"},
+		"initialized":        true,
+		"gateDir":            gateDir,
+		"check_count":        checkCount,
+		"latest_checked_at":  latest.CheckedAt,
+		"latest_divergence":  latest.Divergence,
+		"latest_commit":      latest.Commit,
+		"prs_evaluated":      latest.PRsEvaluated,
+		"dmails_emitted":     len(latest.DMails),
+		"convergence_alerts": len(latest.ConvergenceAlerts),
+		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, post review via the human-driven workflow (NOT via amadeus.post_comment which is preview-only).",
 	})
 }
 
-// stubPostComment echoes the requested pr_number + body length so
-// claude code clients can exercise the contract end-to-end before
-// the real GitHub Comments API wiring lands.
-func stubPostComment(args json.RawMessage) map[string]any {
+// realPostComment validates the input and returns a preview payload
+// without calling the GitHub Comments API. Phase 3 scope: preview-only
+// (= persistence='preview-only'). The actual GitHub API call requires
+// the GitHub token + adapter wiring which is Phase 4 follow-up.
+//
+// Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy.
+func realPostComment(args json.RawMessage) map[string]any {
 	var payload struct {
 		PRNumber int    `json:"pr_number"`
 		Body     string `json:"body"`
@@ -227,30 +294,104 @@ func stubPostComment(args json.RawMessage) map[string]any {
 	if len(args) > 0 {
 		_ = json.Unmarshal(args, &payload)
 	}
+	if payload.PRNumber <= 0 || payload.Body == "" {
+		return jsonResult(map[string]any{
+			"persisted": false,
+			"reason":    "missing required fields: pr_number (>0) and body",
+			"received":  payload,
+		})
+	}
 	return jsonResult(map[string]any{
-		"stub":        true,
+		"persisted":   false,
 		"pr_number":   payload.PRNumber,
 		"body_length": len(payload.Body),
 		"posted":      false,
-		"reason":      "phase-2b-mvp: real GitHub Comments API call lands when the post-comment adapter is wired",
+		"persistence": "preview-only",
+		"note":        "Preview only. Phase 3 does NOT call the GitHub Comments API. Post the comment via `gh pr comment` or the GitHub UI; Phase 4 follow-up wires the GitHub adapter.",
 	})
 }
 
-// stubGetPRStatus echoes the requested pr_number with a placeholder
-// status payload.
-func stubGetPRStatus(args json.RawMessage) map[string]any {
+// realGetPRStatus reads CheckCompleted events and returns the PR's
+// divergence history (= filter events where PRsEvaluated contains
+// the pr_number). Phase 3 scope: read-only summary (latest_divergence
+// + check_count + last_dmail_count). Auto-merge gate evaluation is
+// Phase 4 follow-up.
+//
+// Pattern: paintress.next_issue (= 83cb3ca) symmetric copy.
+func realGetPRStatus(ctx context.Context, gateDir string, args json.RawMessage, logger domain.Logger) map[string]any {
 	var payload struct {
 		PRNumber int `json:"pr_number"`
 	}
 	if len(args) > 0 {
 		_ = json.Unmarshal(args, &payload)
 	}
+	if gateDir == "" {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"reason":      "amadeus mcp gateDir not configured",
+		})
+	}
+	if payload.PRNumber <= 0 {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"reason":      "pr_number required (>0)",
+		})
+	}
+	prKey := strconv.Itoa(payload.PRNumber)
+	store := NewEventStore(gateDir, logger)
+	events, _, err := store.LoadAll(ctx)
+	if err != nil {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"reason":      fmt.Sprintf("event store load failed: %v", err),
+		})
+	}
+	prCheckCount := 0
+	var latestForPR *domain.CheckResult
+	for _, ev := range events {
+		if ev.Type != domain.EventCheckCompleted {
+			continue
+		}
+		var data domain.CheckCompletedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		matches := false
+		for _, pr := range data.Result.PRsEvaluated {
+			if pr == prKey || strings.HasSuffix(pr, "#"+prKey) {
+				matches = true
+				break
+			}
+		}
+		if !matches {
+			continue
+		}
+		prCheckCount++
+		if latestForPR == nil || data.Result.CheckedAt.After(latestForPR.CheckedAt) { // nosemgrep: lod-excessive-dot-chain -- domain.CheckCompletedData.Result is the event payload [permanent]
+			r := data.Result
+			latestForPR = &r
+		}
+	}
+	if latestForPR == nil {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"pr_number":   payload.PRNumber,
+			"found":       false,
+			"reason":      fmt.Sprintf("no checks recorded for PR %d", payload.PRNumber),
+		})
+	}
 	return jsonResult(map[string]any{
-		"stub":      true,
-		"pr_number": payload.PRNumber,
-		"status":    nil,
-		"reason":    "phase-2b-mvp: real convergence + auto-merge state lookup lands when the projection store is exposed",
-		"contract":  map[string]any{"convergence": "string (none|partial|full)", "auto_merge_ready": "bool", "review_count": "integer", "blocking_reviewers": "array of string"},
+		"initialized":        true,
+		"pr_number":          payload.PRNumber,
+		"found":              true,
+		"check_count":        prCheckCount,
+		"latest_checked_at":  latestForPR.CheckedAt,
+		"latest_divergence":  latestForPR.Divergence,
+		"latest_commit":      latestForPR.Commit,
+		"gate_denied":        latestForPR.GateDenied,
+		"dmail_count":        len(latestForPR.DMails),
+		"convergence_alerts": len(latestForPR.ConvergenceAlerts),
+		"instruction":        "Auto-merge readiness requires evaluation of the gate (= Phase 4 follow-up). For now, use the latest_divergence + gate_denied flags to decide manually.",
 	})
 }
 
