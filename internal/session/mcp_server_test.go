@@ -363,3 +363,55 @@ func TestMCPServer_RejectsUnknownMethod(t *testing.T) {
 		t.Errorf("error code = %v, want -32601", rpcErr["code"])
 	}
 }
+
+func TestMCPServer_Initialize_Handshake(t *testing.T) {
+	// given: client sends initialize with a different protocol version
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"claude-code","version":"1.0"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: server returns ITS supported version (not an echo), + tools cap + serverInfo
+	var resp struct {
+		Result struct {
+			ProtocolVersion string                     `json:"protocolVersion"`
+			Capabilities    map[string]json.RawMessage `json:"capabilities"`
+			ServerInfo      struct {
+				Name string `json:"name"`
+			} `json:"serverInfo"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+		t.Fatalf("decode initialize response: %v (raw=%q)", err, out.String())
+	}
+	if resp.Result.ProtocolVersion != "2024-11-05" {
+		t.Errorf("protocolVersion = %q, want 2024-11-05 (server supported, not echo of client 2025-06-18)", resp.Result.ProtocolVersion)
+	}
+	if _, ok := resp.Result.Capabilities["tools"]; !ok {
+		t.Errorf("capabilities.tools missing: %v", resp.Result.Capabilities)
+	}
+	if resp.Result.ServerInfo.Name != "amadeus" {
+		t.Errorf("serverInfo.name = %q, want amadeus", resp.Result.ServerInfo.Name)
+	}
+}
+
+func TestMCPServer_NotificationsInitialized_NoResponse(t *testing.T) {
+	// given: a JSON-RPC notification (no id)
+	in := strings.NewReader(`{"jsonrpc":"2.0","method":"notifications/initialized"}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: notifications must not produce a response
+	if strings.TrimSpace(out.String()) != "" {
+		t.Errorf("notification must produce no response, got: %q", out.String())
+	}
+}

@@ -123,12 +123,43 @@ func (s *MCPServer) handle(ctx context.Context, line []byte) error {
 		return fmt.Errorf("decode request: %w", err)
 	}
 	switch msg.Method {
+	case "initialize":
+		return s.respond(msg.ID, initializeResult())
+	case "notifications/initialized":
+		// JSON-RPC notification (no id): the client signals it finished
+		// the handshake. No response is sent.
+		return nil
 	case "tools/list":
 		return s.respond(msg.ID, map[string]any{"tools": toolDescriptors()})
 	case "tools/call":
 		return s.handleToolsCall(ctx, msg)
 	default:
+		// Unknown notifications (no id) are ignored per JSON-RPC; only
+		// id-bearing requests get a method-not-found error.
+		if len(msg.ID) == 0 {
+			return nil
+		}
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("method not implemented: %s", msg.Method))
+	}
+}
+
+// mcpProtocolVersion is the single MCP protocol version this server
+// implements. Per the MCP lifecycle spec, the server returns the
+// version it actually supports (not an echo of the client's request):
+// echoing an unsupported client version would falsely claim support
+// and break future / draft clients. The client decides compatibility
+// from this value.
+const mcpProtocolVersion = "2024-11-05"
+
+// initializeResult builds the MCP initialize handshake response. The
+// claude code session sends `initialize` first; without a valid reply
+// it never proceeds to tools/list. The server advertises its supported
+// protocol version + the tools capability.
+func initializeResult() map[string]any {
+	return map[string]any{
+		"protocolVersion": mcpProtocolVersion,
+		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
+		"serverInfo":      map[string]any{"name": "amadeus", "version": "0.1.0"},
 	}
 }
 
