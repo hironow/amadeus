@@ -16,13 +16,14 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
-// MCPServer is a minimal stdio-based Model Context Protocol server
-// scaffolded for the refs/issues/0027 jun15 MCP pivot (Phase 2b).
+// MCPServer is a stdio-based Model Context Protocol server for the
+// refs/issues/0027 jun15 MCP pivot.
 //
-// This is a SKELETON: only the amadeus.ping health-check tool is
-// exposed. Real tools (amadeus.next_review, amadeus.post_comment,
-// amadeus.get_pr_status, ...) ship in subsequent commits on the
-// feat/jun15-mcp-pivot branch.
+// All four tools are real implementations: amadeus.ping (health
+// check), amadeus.next_review + amadeus.get_pr_status (read the gate
+// event store / convergence projection), and amadeus.post_comment
+// (posts to GitHub via `gh pr comment` when a CommentPoster is wired;
+// cmd wires one by default).
 //
 // Wire it into a claude code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
@@ -64,15 +65,15 @@ func (s *MCPServer) WithGateDir(gateDir string) *MCPServer {
 }
 
 // WithCommentPoster wires the GitHub Comments API adapter used by
-// amadeus.post_comment (refs/issues/0027 Phase 4 follow-up #3).
-// When nil (= default), post_comment stays preview-only. cmd
-// composition root injects a GhPRWriter in repo-scoped invocations.
+// amadeus.post_comment. When nil, post_comment stays preview-only;
+// the cmd composition root injects a GhPRWriter by default in
+// repo-scoped invocations.
 func (s *MCPServer) WithCommentPoster(p port.CommentPoster) *MCPServer {
 	s.commentPoster = p
 	return s
 }
 
-// jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this skeleton
+// jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this server
 // understands. Method-specific params decode on demand from
 // Params (json.RawMessage).
 type jsonrpcMessage struct {
@@ -202,11 +203,11 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	return err
 }
 
-// toolDescriptors returns the Phase 2b MVP tool set. Each entry pins
-// the interface (name, description, inputSchema) so claude code
-// clients see a stable contract. The handler bodies (stubNextReview /
-// stubPostComment / stubGetPRStatus) are placeholders that ship in
-// subsequent commits with real domain wiring.
+// toolDescriptors returns the tool set. Each entry pins the interface
+// (name, description, inputSchema) so claude code clients see a stable
+// contract. The handler bodies (realNextReview / realPostComment /
+// realGetPRStatus) read the gate event store / convergence projection
+// and post comments to GitHub via `gh pr comment` when wired.
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
@@ -221,7 +222,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "amadeus.post_comment",
-			"description": "Post a review comment to the given PR via the GitHub Comments API (= `gh pr comment`). When a CommentPoster is wired (Phase 4 #3), posted=true + persistence='github-comments-api'. Otherwise preview-only + persistence='preview-only'.",
+			"description": "Post a review comment to the given PR via the GitHub Comments API (= `gh pr comment`). When a CommentPoster is wired (cmd wires one by default), posted=true + persistence='github-comments-api'. Otherwise preview-only + persistence='preview-only'.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -323,10 +324,10 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 }
 
 // realPostComment validates the input and, when a CommentPoster is
-// wired (= Phase 4 follow-up #3), posts the comment to GitHub via the
+// wired (cmd wires one by default), posts the comment to GitHub via the
 // `gh pr comment` adapter. Without a poster it falls back to a
-// preview-only payload (= persistence='preview-only'), preserving the
-// Phase 3 contract for sessions that haven't opted into write mode.
+// preview-only payload (= persistence='preview-only') for sessions that
+// haven't opted into write mode.
 //
 // LLM firing remains human-initiated: the claude-code session decides
 // when to call amadeus.post_comment, and the poster only fires when
@@ -380,9 +381,8 @@ func realPostComment(ctx context.Context, poster port.CommentPoster, args json.R
 
 // realGetPRStatus reads CheckCompleted events and returns the PR's
 // divergence history (= filter events where PRsEvaluated contains
-// the pr_number). Phase 3 scope: read-only summary (latest_divergence
-// + check_count + last_dmail_count). Auto-merge gate evaluation is
-// Phase 4 follow-up.
+// the pr_number): a read-only summary (latest_divergence + check_count
+// + last_dmail_count). Auto-merge gate evaluation is out of scope here.
 //
 // Pattern: paintress.next_issue (= 83cb3ca) symmetric copy.
 func realGetPRStatus(ctx context.Context, gateDir string, args json.RawMessage, logger domain.Logger) map[string]any {
@@ -458,7 +458,7 @@ func realGetPRStatus(ctx context.Context, gateDir string, args json.RawMessage, 
 		"gate_denied":        latestForPR.GateDenied,
 		"dmail_count":        len(latestForPR.DMails),
 		"convergence_alerts": len(latestForPR.ConvergenceAlerts),
-		"instruction":        "Auto-merge readiness requires evaluation of the gate (= Phase 4 follow-up). For now, use the latest_divergence + gate_denied flags to decide manually.",
+		"instruction":        "Use the latest_divergence + gate_denied flags to decide review/merge readiness manually.",
 	})
 }
 

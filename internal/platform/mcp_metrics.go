@@ -19,7 +19,8 @@ import (
 // impl; this file is a symmetric copy adapted for amadeus.
 //
 // status values: "ok" (= JSON-RPC result returned)、 "error" (= JSON-RPC
-// error returned)、 "deprecated" (= stub returned with stub:true flag).
+// error returned). The "deprecated" marker is reserved but not emitted
+// by any current handler (no stub flag exists).
 // duration is measured from request decode to response write.
 func RecordMCPInvocation(ctx context.Context, toolName, status string, duration time.Duration) {
 	attrs := metric.WithAttributes(

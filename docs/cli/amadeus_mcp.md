@@ -1,6 +1,6 @@
 ## amadeus mcp
 
-Run amadeus as an MCP server over stdio (refs/issues/0027 Phase 2b MVP)
+Run amadeus as an MCP server over stdio (review queue + PR comment data plane)
 
 ### Synopsis
 
@@ -12,10 +12,11 @@ Designed for embedding in a claude code interactive session via
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
-Phase 2b MVP scope: amadeus.ping + 3 stubs (amadeus.next_review,
-amadeus.post_comment, amadeus.get_pr_status). Real wiring against
-the review queue, GitHub Comments API, and convergence projection
-ships in subsequent commits on the feat/jun15-mcp-pivot branch.
+Exposes amadeus.ping, amadeus.next_review + amadeus.get_pr_status
+(read the gate event store + convergence projection), and
+amadeus.post_comment (posts a review comment to GitHub via
+'gh pr comment' when a CommentPoster is wired; cmd wires one by
+default).
 
 Not to be confused with 'amadeus mcp-config' (subcommand managing
 the legacy .mcp.json file consumed by the embedded claude_adapter).

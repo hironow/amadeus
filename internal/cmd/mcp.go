@@ -16,9 +16,9 @@ import (
 // calls amadeus tools from inside the human-initiated subscription
 // quota.
 //
-// Phase 2b MVP exposes amadeus.ping + 3 stubs (next_review,
-// post_comment, get_pr_status). Real tool wiring lands in subsequent
-// commits on feat/jun15-mcp-pivot.
+// Exposes amadeus.ping + amadeus.next_review + amadeus.get_pr_status
+// (read the gate event store / convergence projection) +
+// amadeus.post_comment (posts to GitHub via `gh pr comment`).
 //
 // Distinct from `amadeus mcp-config` which manages the .mcp.json
 // configuration consumed by the legacy claude_adapter. This server
@@ -26,7 +26,7 @@ import (
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
-		Short: "Run amadeus as an MCP server over stdio (refs/issues/0027 Phase 2b MVP)",
+		Short: "Run amadeus as an MCP server over stdio (review queue + PR comment data plane)",
 		Long: `Start a Model Context Protocol server reading JSON-RPC 2.0
 messages on stdin and writing responses on stdout.
 
@@ -35,10 +35,11 @@ Designed for embedding in a claude code interactive session via
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
-Phase 2b MVP scope: amadeus.ping + 3 stubs (amadeus.next_review,
-amadeus.post_comment, amadeus.get_pr_status). Real wiring against
-the review queue, GitHub Comments API, and convergence projection
-ships in subsequent commits on the feat/jun15-mcp-pivot branch.
+Exposes amadeus.ping, amadeus.next_review + amadeus.get_pr_status
+(read the gate event store + convergence projection), and
+amadeus.post_comment (posts a review comment to GitHub via
+'gh pr comment' when a CommentPoster is wired; cmd wires one by
+default).
 
 Not to be confused with 'amadeus mcp-config' (subcommand managing
 the legacy .mcp.json file consumed by the embedded claude_adapter).`,
@@ -53,11 +54,10 @@ the legacy .mcp.json file consumed by the embedded claude_adapter).`,
 				return err
 			}
 			gateDir := filepath.Join(cwd, domain.StateDir)
-			// CommentPoster is wired unconditionally (refs/issues/0027
-			// Phase 4 follow-up #3): the MCP tool only fires when the
-			// human-initiated claude-code session calls post_comment,
-			// so the adapter being present does not produce side
-			// effects on its own. Errors from `gh pr comment` surface
+			// CommentPoster is wired unconditionally: the MCP tool only
+			// fires when the human-initiated claude-code session calls
+			// post_comment, so the adapter being present does not produce
+			// side effects on its own. Errors from `gh pr comment` surface
 			// to the session via the response's reason field.
 			poster := session.NewGhPRWriter(cwd)
 			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).
