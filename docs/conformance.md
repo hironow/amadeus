@@ -5,13 +5,13 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 
 | Aspect | Description |
 |--------|-------------|
-| **What** | Post-merge integrity verification system that measures codebase divergence from intended design |
-| **Why** | Detect architectural drift early and route corrective actions before design debt compounds |
-| **How** | Scan merged PRs → Claude evaluates against ADRs/DoDs → score 4 divergence axes → route D-Mails by severity → enter D-Mail waiting loop (fsnotify inbox/ watch, re-check on arrival); with `--base`: additionally run PR convergence pipeline via `gh` CLI |
-| **Input** | Git log (merged PRs), ADRs, DoDs, codebase source, inbox D-Mails; with `--base`: open PR state (via `gh` CLI) |
-| **Output** | Divergence scores, corrective D-Mails (design-feedback / implementation-feedback from divergence scoring, works with or without `--base`) to downstream tools, insight ledger files (`insights/divergence.md` with LLM-enriched How, `insights/convergence.md` with archive-enriched Why); with `--base`: additionally PR convergence reports |
-| **Telemetry** | OTel spans: `amadeus.run`, `reading_steiner`, `divergence_meter`, `provider.invoke` (with `provider.model`, `provider.timeout_sec`, `gen_ai.*`); `context_budget.*` attributes: `context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens` |
-| **External Systems** | Claude Code subprocess, Git, `gh` CLI (PR reading), OTel exporter (Jaeger/Weave), fsnotify (inbox watcher) |
+| **What** | MCP server + data plane for post-merge integrity review: serves the gate event store / PR-status projection and posts PR review comments |
+| **Why** | Give a human-initiated claude-code review session a stable, idempotent data plane over the gate state, without a headless LLM daemon |
+| **How** | `amadeus mcp` serves MCP tools (`next_review` reads the gate event store, `get_pr_status` reads the PR-status projection, `post_comment` posts a PR comment via `gh` CLI); data-plane commands (`log` / `sync` / `mark-commented` / `rebuild` / ...) operate on the same event store. The LLM review fires from the claude-code session (see `.gate/skills/SKILL.md`); divergence scoring + D-Mail generation + the waiting-loop daemon are retired. |
+| **Input** | Gate event store (recorded checks), PR-status projection, MCP tool arguments; PR comment targets (via `gh` CLI) |
+| **Output** | MCP tool responses (latest check / divergence reading / PR status), PR review comments posted to GitHub, insight ledger files (`insights/divergence.md`, `insights/convergence.md`) when present in the event history |
+| **Telemetry** | OTel spans on command roots (e.g. `amadeus.doctor`) and MCP tool handlers; `context_budget.*` attributes: `context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens` |
+| **External Systems** | Git, `gh` CLI (PR reading + comment posting), OTel exporter (Jaeger/Weave), claude-code session (MCP client) |
 
 ## Layer Architecture
 
@@ -84,7 +84,7 @@ Claude subprocess uses layered isolation to prevent parent session context (266+
 - Enables post-hoc debugging and audit of Claude subprocess interactions
 - Managed by archive-prune lifecycle
 
-- **Wave mode** (default, `--linear` not set): `checkLinearMCP` in doctor is skipped (status: SKIP, "wave mode"). D-Mail wave field is accepted but not yet used for divergence scoring.
+- **Wave mode** (default, `--linear` not set): `checkLinearMCP` in doctor is skipped (status: SKIP, "wave mode"). The D-Mail wave field is accepted and carried in the event store.
 - **Linear mode** (`--linear`): Existing behavior — `checkLinearMCP` validates Linear MCP connection.
 - `runDoctor` receives `TrackingMode` parameter to conditionally run mode-specific checks.
 

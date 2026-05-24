@@ -19,7 +19,8 @@
 
 - [amadeus](cli/amadeus.md) — Root command
 - [amadeus init](cli/amadeus_init.md) — Initialize .gate directory
-- [amadeus run](cli/amadeus_run.md) — Run continuous divergence check and PR convergence
+- [amadeus mcp](cli/amadeus_mcp.md) — Start the MCP server (data plane)
+- [amadeus mcp-config](cli/amadeus_mcp-config.md) — Generate subprocess isolation settings
 - [amadeus config](cli/amadeus_config.md) — View or update configuration
 - [amadeus config show](cli/amadeus_config_show.md) — Show current configuration
 - [amadeus config set](cli/amadeus_config_set.md) — Update configuration values
@@ -27,13 +28,15 @@
 - [amadeus log](cli/amadeus_log.md) — Show divergence log
 - [amadeus sync](cli/amadeus_sync.md) — Show D-Mail sync status (JSON)
 - [amadeus mark-commented](cli/amadeus_mark-commented.md) — Record that a D-Mail has been posted as a comment
+- [amadeus sessions](cli/amadeus_sessions.md) — List / enter interactive coding sessions
 - [amadeus status](cli/amadeus_status.md) — Show operational status
 - [amadeus doctor](cli/amadeus_doctor.md) — Run health checks
 - [amadeus clean](cli/amadeus_clean.md) — Remove state directory (.gate/)
 - [amadeus rebuild](cli/amadeus_rebuild.md) — Rebuild projections from event store
 - [amadeus archive-prune](cli/amadeus_archive-prune.md) — Prune old archived files
-- [amadeus install-hook](cli/amadeus_install-hook.md) — Install post-merge git hook
-- [amadeus uninstall-hook](cli/amadeus_uninstall-hook.md) — Remove post-merge git hook
+- [amadeus dead-letters](cli/amadeus_dead-letters.md) — Inspect / purge dead-letter D-Mails
+- [amadeus improvement-stats](cli/amadeus_improvement-stats.md) — Show improvement-signal statistics
+- [amadeus dashboard](cli/amadeus_dashboard.md) — Cross-repo divergence dashboard
 - [amadeus version](cli/amadeus_version.md) — Print version, commit, and build information
 - [amadeus update](cli/amadeus_update.md) — Self-update amadeus to the latest release
 

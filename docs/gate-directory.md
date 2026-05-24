@@ -150,9 +150,12 @@ amadeus rebuild
 Auto-rebuild triggers when `.run/latest.json` is missing but events exist.
 Auto-rebuild is skipped when `inbox.consumed` events are present (to avoid losing inbox D-Mails) and in `--dry-run` mode.
 
-## Check Pipeline Data Flow
+## Check Data Flow
 
-The `amadeus run` command (daemon mode) executes the divergence check pipeline, PR convergence pipeline, and monitors inbox via fsnotify.
+Checks recorded from the claude-code review session (via the amadeus MCP tools)
+append events to the gate event store. The tables below describe the data
+shapes the projections build from those events; the headless divergence-check
+daemon that previously drove this flow has been retired.
 
 ### Input Sources
 
@@ -195,7 +198,7 @@ The `amadeus run` command (daemon mode) executes the divergence check pipeline, 
      |                      |----------------------------->|
 ```
 
-In daemon mode (`amadeus run`), inbox is monitored via fsnotify for real-time D-Mail reception. `ReceiveDMailFromInbox` uses archive-based deduplication (filename existence check via `os.Stat`) to ensure idempotent processing. All D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
+Inbox consumption uses archive-based deduplication (filename existence check via `os.Stat`) to ensure idempotent processing. D-Mails go directly to `outbox/` regardless of severity. Receiver-side tools (sightjack, paintress) handle their own approval workflows. The real-time fsnotify inbox watcher that ran in the retired daemon is gone.
 
 ## D-Mail File Format
 
@@ -228,7 +231,7 @@ service, violating the dependency direction defined in ADR-003.
 
 | File | Created By | When |
 |------|-----------|------|
-| `.gate/` dirs | `InitGateDir` | `amadeus init` or first `amadeus check` |
+| `.gate/` dirs | `InitGateDir` | `amadeus init` |
 | `.gitignore` | `InitGateDir` | Init (appends missing entries on upgrade) |
 | `config.yaml` | `InitGateDir` | Init (only if absent) |
 | `skills/*/SKILL.md` | `InitGateDir` | Init (from `embed.FS` templates, only if absent) |
@@ -250,21 +253,6 @@ service, violating the dependency direction defined in ADR-003.
 | Operation | From | To | Function |
 |-----------|------|----|----------|
 | Inbox consume | `inbox/{name}.md` | (deleted after copy to archive) | `ScanInbox` |
-
-## Git Hook
-
-`amadeus install-hook` writes to `.git/hooks/post-merge`:
-
-```bash
-#!/bin/sh
-# >>> amadeus hook — do not edit this section
-amadeus run --quiet 2>/dev/null || true
-# <<< amadeus hook
-```
-
-- Appended to existing hooks (does not overwrite)
-- `amadeus uninstall-hook` removes only the marked section
-- Hook file created with `0755` permissions
 
 ## Legacy Migration
 

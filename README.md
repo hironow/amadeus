@@ -1,23 +1,21 @@
 # Amadeus
 
-**A post-merge divergence meter that scores design drift against ADRs and DoDs, then routes corrective D-Mails when the codebase shifts too far.**
+**An MCP server + data plane for post-merge divergence review: it reads the gate event store and PR-status projection, and posts review comments to GitHub PRs.**
 
-Amadeus uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to evaluate merged changes against ADRs (Architecture Decision Records) and DoDs (Definitions of Done), scoring divergence across four axes and routing corrective D-Mails to downstream tools when the world line drifts too far.
+Following the MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Amadeus the Go CLI is now a pure data plane: it serves the gate event store and PR-status projection over MCP, posts review comments to GitHub PRs via the `gh` CLI, and provides the supporting data-plane commands. The divergence scoring, D-Mail generation, and the headless waiting-loop daemon have been retired — the LLM-driven review is now firing from the claude-code session via the amadeus MCP tools (see `.gate/skills/SKILL.md`).
 
 ```bash
-amadeus run
+amadeus mcp
 ```
 
-This command runs the five-phase divergence check pipeline, then enters a D-Mail waiting loop:
+`amadeus mcp` starts the MCP server. Its tools expose:
 
-1. **Phase 0** — Inbox consumption (scan inbound D-Mails)
-2. **Phase 1 (Reading Steiner)** — Detect shifts: scan merged PRs or the full codebase for structural changes
-3. **Phase 2 (Divergence Meter)** — Measure divergence: Claude evaluates the changes against ADRs and DoDs, scoring four axes 0-100
-4. **Phase 3 (D-Mail)** — Route corrections: generate `design-feedback` / `implementation-feedback` D-Mails based on divergence scoring
-5. **Phase 4 (Convergence)** — World Line Convergence detection
-6. **Waiting Loop** — Monitor inbox/ via fsnotify; on D-Mail arrival, re-run Phases 0-4 (timeout configurable via `--idle-timeout`, default 30m)
+- `amadeus.ping` — liveness probe
+- `amadeus.next_review` — read the gate event store: latest check, divergence reading, and PRs evaluated
+- `amadeus.get_pr_status` — read the PR-status projection for a given PR
+- `amadeus.post_comment` — post a review comment to a PR via the GitHub Comments API (`gh pr comment`)
 
-With `--base main`, amadeus additionally runs a PR convergence pipeline (read open PR state via `gh` CLI, build PRChain, generate PRConvergenceReport D-Mails) and auto-merges eligible PRs when no world-line divergence is detected. Auto-merge runs on startup (if the last check generated no corrective D-Mails) and after each successful post-merge check (no DriftError). A non-zero divergence score alone does not block merge — only the generation of corrective D-Mails constitutes world-line divergence (世界線逸脱). Auto-merge uses squash for standalone/leaf PRs and regular merge for chain PRs with dependents (preserves commit hash). Disable with `--no-merge`. Both modes generate `implementation-feedback` D-Mails from divergence scoring.
+The terms below (Reading Steiner, Divergence Meter, D-Mail, World Line) describe the conceptual model preserved in the gate event store and read models. They are no longer produced by a headless amadeus daemon; the event store is populated as reviews are recorded from the claude-code session.
 
 ## Why "Amadeus"?
 
@@ -49,68 +47,14 @@ This structure maps directly to post-merge integrity verification:
 
 ## Game Mechanics
 
-Three Steins;Gate-inspired mechanics control verification quality:
-
-### Full Check Interval (Calibration Cycle)
-
-Most checks are diff-based (fast, focused on recent PRs). After a configurable number of diff checks, a full calibration scan runs — evaluating the entire codebase from zero.
-
-```
-Diff checks: ██████████ 10/10 -> Full calibration triggered
-                                  (reset counter, score from zero)
-```
-
-- **Interval**: configurable in `config.yaml` (default: every 10 checks)
-- **Force**: `amadeus run --full` triggers immediately
-- **Auto-trigger**: a divergence jump also forces a full scan on the next run
-
-### Divergence Jump (World Line Shift)
-
-When the divergence score changes by more than a configured threshold between consecutive checks, a "divergence jump" is detected — the world line has shifted significantly.
-
-```
-Previous: 0.23  ->  Current: 0.45  ->  Delta: 0.22 > 0.15 threshold
-                                        DIVERGENCE JUMP DETECTED
-```
-
-- Logs a warning with before/after values
-- Forces a full calibration on the next run (to re-evaluate from zero)
-- Recorded as an OpenTelemetry event on the `divergence_meter` span
-
-### D-Mail Severity Routing
-
-D-Mails are routed based on severity, determined by the weighted divergence score and per-axis overrides:
-
-```
-low    (score <= 0.25) -> Auto-sent
-medium (score <= 0.50) -> Auto-sent with elevated priority
-high   (score >  0.50) -> Auto-sent (receiver handles approval)
-```
-
-All D-Mails go directly to `outbox/` + `archive/`. Receiver-side tools (sightjack, paintress) handle their own approval workflows.
-
-- Per-axis overrides can force high severity for critical axes (e.g., ADR integrity > 60 always high)
-- Severity escalation chain: 2+ HIGH-severity D-Mails targeting the same area within the convergence window promote the alert to HIGH regardless of count threshold
-
-### Capability Boundary Detection
-
-Phase 2 evaluates whether changes cross tool capability boundaries. `CapabilityViolation` structs in the Claude response identify when merged code shifts responsibilities beyond the intended scope of a tool (e.g., amadeus performing implementation tasks that belong to paintress).
-
-### Calibration Baseline Staleness
-
-When `baseline_staleness.max_age_days` is set in config, amadeus auto-promotes the next check to full calibration if the baseline is older than the configured threshold. Disabled by default (`max_age_days: 0`).
-
-### D-Mail TTL Expiry
-
-D-Mails older than 7 days are excluded from convergence analysis via `FilterByTTL`. This prevents stale D-Mails from inflating convergence alert counts. D-Mails with missing or unparseable timestamps are conservatively included.
-
-### Divergence Trend Analysis
-
-When check history contains prior results, amadeus computes a `DivergenceTrend` (improving / stable / worsening) based on the score delta. Trend data is included in the diff check prompt to give Claude context about directional movement. Stable threshold: delta <= 5.0.
-
-### RunStopped Reason Classification
-
-The `run.stopped` event includes a `reason` field classified into categories: `graceful`, `user`, `io_error`, `transient`, or `unknown`. Only `io_error` is considered critical for operational alerting.
+The Steins;Gate-inspired scoring mechanics (full-check calibration interval,
+divergence jump, capability boundary detection, D-Mail severity routing,
+divergence trend analysis) were properties of the headless check pipeline,
+which has been retired with the MCP pivot. The scoring weights and thresholds
+still live in `.gate/config.yaml` and the recorded scores remain readable in
+the gate event store via `amadeus log` and the `amadeus.next_review` MCP tool,
+but amadeus no longer runs the scoring itself — the review is driven from the
+claude-code session.
 
 ## D-Mail Protocol
 
@@ -128,44 +72,17 @@ Amadeus produces corrective D-Mails (`design-feedback`, `implementation-feedback
 ## Architecture
 
 ```
-amadeus run [--base main]
+claude-code session (LLM owner, human-initiated)
     |
-    |  Phase 0: Inbox Drain
-    |  +-- ScanInbox: consume inbound D-Mails
+    |  drives review via amadeus MCP tools
+    v
+amadeus mcp  (MCP server / data plane)
     |
-    |  Phase 1: Reading Steiner
-    |  +-- Diff mode: scan merged PRs since last check
-    |  +-- Full mode: scan entire codebase structure
-    |  +-- Output: ShiftReport (significant? merged PRs, diff)
+    |  amadeus.next_review   -> read gate event store (latest check, divergence, PRs)
+    |  amadeus.get_pr_status -> read PR-status projection for a PR
+    |  amadeus.post_comment  -> post review comment to PR (gh pr comment)
     |
-    |  Phase 2: Divergence Meter
-    |  +-- Build prompt (diff_check or full_check template)
-    |  +-- Claude evaluates against ADRs + DoDs
-    |  +-- Parse scores per axis, compute weighted divergence
-    |  +-- Detect divergence jumps (delta > threshold)
-    |
-    |  Phase 3: D-Mail Generation (works with or without --base)
-    |  +-- Generate D-Mails from Claude candidates
-    |  +-- ClassifyByAxes + ResolveFeedbackKinds -> impl / design feedback
-    |  +-- Route by severity (all auto-sent to outbox)
-    |  +-- Dual-write to outbox/ + archive/
-    |
-    |  Phase 4: Convergence Detection
-    |  +-- Detect recurring patterns across D-Mails
-    |  +-- Generate convergence D-Mails
-    |
-    |  PR Convergence Pipeline (--base only)
-    |  +-- GhPRReader: read open PR state via gh CLI
-    |  +-- Build PRChain from PRState list
-    |  +-- Generate PRConvergenceReport
-    |  +-- Auto-merge eligible PRs (no drift + CI clean + reviewed)
-    |  +-- After merge: re-run pipelines to detect new conflicts
-    |  +-- Emit convergence D-Mail to outbox/ (conflict PRs → paintress)
-    |
-    |  Waiting Loop / Inbox Watcher (fsnotify)
-    |  +-- MonitorInbox: watch inbox/ for new files
-    |  +-- On D-Mail arrival: re-run check pipeline
-    |  +-- Timeout: configurable via --idle-timeout (default 30m)
+    |  data-plane commands: log / sync / mark-commented / status / rebuild / ...
     |
     v
 .gate/                  <- Persistent state
@@ -235,24 +152,21 @@ D-Mail `.md` files are immutable once written. Each D-Mail carries a `idempotenc
 
 **What Amadeus does:**
 
-- Detect structural shifts in merged PRs or full codebase scans (Reading Steiner)
-- Score divergence across four weighted axes using Claude evaluation (Divergence Meter)
-- Detect capability boundary violations when changes cross tool responsibility boundaries
-- Route corrective D-Mails (design-feedback / implementation-feedback) by severity to downstream tools
-- Escalate severity when repeated HIGH D-Mails target the same area (severity escalation chain)
-- Expire stale D-Mails via TTL (7-day default) before convergence analysis
-- Auto-promote to full calibration when baseline age exceeds configurable threshold (staleness detection)
-- Analyze divergence trend direction (improving / stable / worsening) across check history
-- Run PR convergence pipeline: read open PR state, build PRChain, generate convergence reports
-- Auto-merge eligible PRs when no world-line divergence detected (`--base` mode, ADR-0025)
-- Monitor inbox via fsnotify for real-time D-Mail reception with archive-based dedup
-- Track check history with append-only event logs
-- Classify run stop reasons for operational alerting (graceful / user / io_error / transient / unknown)
+- Serve the gate event store and PR-status projection over MCP (`amadeus.next_review`, `amadeus.get_pr_status`)
+- Post review comments to GitHub PRs via the `gh` CLI (`amadeus.post_comment`)
+- Provide interactive claude-code coding sessions (`sessions list` / `sessions enter`)
+- Track check history with append-only event logs and rebuild projections (`log`, `rebuild`)
+- Record D-Mail × Issue comment sync state (`sync`, `mark-commented`)
+- Prune archived D-Mails and inspect dead letters (`archive-prune`, `dead-letters`)
+- Generate Claude subprocess isolation settings (`mcp-config generate`)
 
-**What Amadeus does NOT do:**
+**What Amadeus does NOT do (retired with the MCP pivot):**
 
-- Implement fixes automatically (only detects drift and routes D-Mails)
-- Store full PR content (stores references, diffs, and scores only)
+- Run a headless divergence-check daemon or D-Mail waiting loop
+- Score divergence with a headless Claude call (the LLM review now fires from the claude-code session)
+- Generate or emit corrective D-Mails autonomously
+- Run a PR convergence / auto-merge pipeline
+- Implement fixes automatically
 - Modify `.gate/` state externally (all operations are idempotent and local)
 
 ## Setup
@@ -273,19 +187,19 @@ amadeus mcp-config generate
 # Upgrade existing installation (regenerate SKILL.md, .gitignore)
 amadeus init --force
 
-# Run daemon (divergence check + PR convergence + inbox watcher)
-amadeus run
+# Start the MCP server (data plane for the claude-code review session)
+amadeus mcp
 ```
 
 Amadeus creates `.gate/` with config, events, and D-Mail storage automatically.
 
 ## Subcommands
 
-Running `amadeus` without a subcommand defaults to `run` (divergence check + D-Mail waiting loop).
+Running `amadeus` without a subcommand prints usage; there is no default run loop.
 
 | Command | Description |
 |---------|-------------|
-| `run` | Divergence check + D-Mail waiting loop |
+| `mcp` | Start the MCP server (data plane: next_review / get_pr_status / post_comment) |
 | `init` | Initialize `.gate/` directory |
 | `doctor` | Check environment health |
 | `config show` / `config set` | View or update configuration |
@@ -293,12 +207,14 @@ Running `amadeus` without a subcommand defaults to `run` (divergence check + D-M
 | `log` | Print check history and D-Mail log |
 | `sync` | Show D-Mail × Issue comment sync status |
 | `mark-commented` | Record a D-Mail × Issue pair as commented |
+| `sessions list` / `sessions enter` | List / enter interactive claude-code coding sessions |
 | `status` | Show operational status |
 | `clean` | Remove state directory |
 | `rebuild` | Rebuild projections from event store |
 | `archive-prune` | Prune old archived D-Mail files |
-| `install-hook` / `uninstall-hook` | Manage git post-merge hook |
+| `dead-letters` | Inspect / purge dead-letter D-Mails |
 | `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
+| `improvement-stats` | Show improvement-signal statistics |
 | `dashboard` | Cross-repo divergence dashboard |
 | `version` | Print version info |
 | `update` | Self-update to the latest release |
@@ -310,28 +226,17 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 ```bash
 amadeus init                    # set up .gate/
 amadeus mcp-config generate     # Claude subprocess isolation settings
-amadeus run                     # divergence check + D-Mail loop
-amadeus run -n                  # dry run
-amadeus run --base main         # PR convergence daemon (auto-merge enabled)
-amadeus run --base main --no-merge  # PR convergence without auto-merge
+amadeus mcp                     # start MCP server (data plane)
+amadeus log                     # print recorded check history
+amadeus sessions list           # list interactive coding sessions
 ```
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
-| `0` | Success (no drift / operation completed) |
+| `0` | Success (operation completed) |
 | `1` | Runtime error |
-| `2` | Drift detected (divergence threshold exceeded) |
-
-```bash
-amadeus run --quiet
-case $? in
-  0) echo "clean" ;;
-  2) echo "drift detected" >&2 ;;
-  *) echo "error" >&2; exit 1 ;;
-esac
-```
 
 ## Configuration
 
@@ -341,7 +246,7 @@ lang: ja
 claude_cmd: claude
 model: opus
 timeout_sec: 1980
-idle_timeout: 30m  # D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable)
+idle_timeout: 30m  # legacy waiting-phase timeout config (retained for compat; the waiting loop is retired)
 
 weights:
   adr_integrity: 0.4
@@ -377,7 +282,7 @@ Amadeus instruments key operations with OpenTelemetry spans and events. Tracing 
 just jaeger
 
 # Run amadeus with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus run
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus mcp
 
 # View traces at http://localhost:16686
 # MCP endpoint at http://localhost:16687
@@ -386,9 +291,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 amadeus run
 just jaeger-down
 ```
 
-Spans cover: `amadeus.run` (daemon root), `reading_steiner`, `divergence_meter`, `dmail`, `pr_convergence`, and `amadeus.doctor`.
-
-Events: `shift.detected`, `divergence.evaluated`, `divergence.jump`, `dmail.created`, `doctor.check`, `run.started`, `run.stopped`, `pr_convergence.checked`.
+Spans cover the command roots (e.g. `amadeus.doctor`) and the MCP tool handlers.
 
 ## Development
 
@@ -433,7 +336,7 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 
 - Go 1.26+
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-- [GitHub CLI (`gh`)](https://cli.github.com/) (required only with `--base` for PR convergence pipeline)
+- [GitHub CLI (`gh`)](https://cli.github.com/) (required for `amadeus.post_comment` PR review comments)
 - [Docker](https://www.docker.com/) (optional, for Jaeger tracing)
 
 Run `amadeus doctor` to verify all prerequisites (multiple checks including git-remote, gh CLI, and fsnotify availability).
