@@ -306,7 +306,7 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 			"check_count":   0,
 			"latest_check":  nil,
 			"prs_evaluated": []string{},
-			"instruction":   "No checks recorded yet. Run `amadeus run` or `amadeus check` to populate the event store.",
+			"instruction":   "No checks recorded yet. Drive a review from your claude-code session via the amadeus MCP tools (see SKILL.md); the gate event store is populated as reviews are recorded.",
 		})
 	}
 	return jsonResult(map[string]any{

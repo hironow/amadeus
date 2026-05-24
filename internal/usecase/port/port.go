@@ -234,12 +234,6 @@ type GitHubIssueWriter interface { // nosemgrep: structure.multiple-exported-int
 	CloseIssue(ctx context.Context, issueNumber, comment string) error
 }
 
-// PRPipelineRunner executes the pre-merge PR convergence pipeline.
-// Implemented in usecase layer, injected into session by cmd (composition root).
-type PRPipelineRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port contract family cohesive set; see InitConfig [permanent]
-	RunPreMergePipeline(ctx context.Context, integrationBranch string) ([]domain.DMail, error)
-}
-
 // PruneCandidate represents a file eligible for pruning.
 type PruneCandidate struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- PruneCandidate co-locates with ArchiveOps as the parameter type for the same port; port contract family cohesive set [permanent]
 	Path    string
@@ -317,10 +311,6 @@ func (NopImprovementTaskDispatcher) Close() error { return nil }
 // Orchestrator is the session-layer I/O orchestration interface.
 // Implemented by session.Amadeus; injected into usecase by cmd (composition root).
 type Orchestrator interface {
-	RunCheck(ctx context.Context, opts domain.CheckOptions, emitter CheckEventEmitter, state CheckStateProvider) error
-	Run(ctx context.Context, opts domain.RunOptions, emitter CheckEventEmitter, state CheckStateProvider) error
-	// SetPRPipeline injects the PR convergence pipeline runner.
-	SetPRPipeline(runner PRPipelineRunner)
 	PrintSync() error
 	PrintLog(ctx context.Context) error
 	PrintLogJSON(ctx context.Context) error
