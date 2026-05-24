@@ -1,6 +1,6 @@
 # Handover
 
-**Last updated:** 2026-05-22 (asia/tokyo, 0028 semgrep symmetric rule landed)
+**Last updated:** 2026-05-25 (asia/tokyo, r4 phase1 headless-pipeline excision)
 **Updated by:** Claude Opus 4.7 session
 
 ## Current State
@@ -30,8 +30,14 @@ amadeus 固有の jun15 landmark:
 - `.semgrep/jun15-no-headless-llm.yaml` **6 rule** (= base 5 + 0028 で
   `jun15-no-print-flag-literal-go` 追加) で headless LLM 経路 + dynamic
   args spread を permanent block
-- `internal/session/claude_adapter.go` の `Run` / `RunDetailed` は
-  `ErrMCPPivotDeprecated` stub
+- **r4 phase1 (2026-05-25)**: 旧 headless pipeline を完全 excise。
+  `run` / `install-hook` / `uninstall-hook` command 削除、 `RunCheck` /
+  `Run` daemon / divergence scoring / D-Mail generation / insights /
+  stall handler / review-gate / PR pre-merge pipeline (= auto-merge) を
+  source ごと削除。 `claude_adapter.go` (旧 stub) も削除。 amadeus =
+  pure MCP data plane + sessions + data-plane commands。
+  `internal/session/retry_runner.go` は phase-1 survivor として温存
+  (= locked `provider_telemetry.go` の参照保持)。
 - `/review-gate` skill が claude code session 経由の唯一の review-driving 経路
 - LLM 発火は human-initiated 維持: post_comment は MCP tool call 時のみ
   `gh pr comment` を実行 (= adapter wired でも自動 post なし)
@@ -50,9 +56,9 @@ amadeus 固有の jun15 landmark:
 
 ## Known Risks / Blockers
 
-- `amadeus run` / `sync` / `mark-commented` 全 LLM-using subcommand
-  が `ErrMCPPivotDeprecated` 返却に倒れているため、 既存 scheduler /
-  CI で wrap していた job は `/review-gate` skill 経由に書き換え必要
+- `amadeus run` / `install-hook` / `uninstall-hook` は **削除済** (=
+  r4 phase1)。 既存 scheduler / CI で wrap していた job は
+  `/review-gate` skill 経由 + `amadeus mcp` data plane に書き換え必要
 - `gh pr comment` 失敗時は MCP tool response の `reason` field で
   surface (= rate limit / auth error 等を session が retry 判定可能)
 

@@ -37,7 +37,7 @@ amadeus init --otel-backend=weave \
 Environment variables always take precedence over `.otel.env`:
 
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://custom:4318 amadeus run /path/to/repo
+OTEL_EXPORTER_OTLP_ENDPOINT=http://custom:4318 amadeus mcp /path/to/repo
 ```
 
 ## .otel.env File
@@ -51,7 +51,7 @@ Format: `KEY=VALUE` with `${VAR}` expansion and `#` comments.
 
 1. `export WANDB_API_KEY=your-key-here`
 2. `amadeus init --otel-backend=weave --otel-entity=my-team --otel-project=my-project /path/to/repo`
-3. `amadeus run /path/to/repo`
+3. `amadeus mcp /path/to/repo`
 4. Open `https://wandb.ai/<entity>/<project>/weave` and verify spans appear
 
 ### Automated (Live Test)
@@ -67,16 +67,18 @@ endpoint and verifies the exporter completes without error. Skipped when
 
 ## Improvement collector
 
-`amadeus run` also enables the Weave feedback collector automatically when:
-
-- `WANDB_API_KEY` is set
-- and either `WEAVE_PROJECT_ID` / `WANDB_PROJECT_ID`, or `WANDB_ENTITY` + `WANDB_PROJECT` are set
-
-The collector polls Weave feedback, stores cursor/dedup state in
+The Weave feedback collector polls Weave feedback, stores cursor/dedup state in
 `.gate/.run/improvement-ingestion.db`, and appends normalized entries to
-`.gate/insights/improvement-loop.md`.
+`.gate/insights/improvement-loop.md`. It is configured via:
 
-The normalizer now accepts these surface shapes from Weave payloads:
+- `WANDB_API_KEY`
+- and either `WEAVE_PROJECT_ID` / `WANDB_PROJECT_ID`, or `WANDB_ENTITY` + `WANDB_PROJECT`
+
+The headless auto-ingestion that ran inside the retired check daemon is gone;
+the normalizer below documents the payload shapes the collector machinery
+accepts when invoked.
+
+The normalizer accepts these surface shapes from Weave payloads:
 
 - feedback rows with explicit improvement metadata
 - CI outcome rows (`ci_status`, `workflow_name`, `run_id`, ...)

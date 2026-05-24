@@ -27,47 +27,6 @@ import (
 	"github.com/hironow/amadeus/internal/domain"
 )
 
-// appendRivalContractSections decides which Rival Contract v1 citation
-// section (if any) to attach to a corrective D-Mail body based on the
-// outgoing kind and the candidate category, given the current contract
-// context. It is the wiring helper between divergence-meter output
-// (per-candidate Category) and the deterministic corrective composer.
-//
-// Routing rules in v1 mirror the plan §"Phase 3 PR" production
-// behavior:
-//
-//   - implementation-feedback + current contract present →
-//     "## Violated Contract" with a brief reason derived from the
-//     candidate description.
-//   - design-feedback + current contract present →
-//     "## Contract Amendments" with a single (unspecified)-section
-//     amendment carrying the candidate description as suggestion.
-//
-// When the current contract is nil, the helper is a no-op (graceful
-// degradation: archives without Rival Contract v1 specs see no change).
-func appendRivalContractSections(body string, kind domain.DMailKind, candidate domain.ClaudeDMailCandidate, current *domain.RivalContractContext) string {
-	if current == nil {
-		return body
-	}
-	switch kind {
-	case domain.KindImplFeedback:
-		citation := domain.RivalContractCitation{
-			ContractID: current.ContractID,
-			Revision:   current.Revision,
-			Reason:     candidate.Description,
-		}
-		return composeCorrectiveBodyWithContract(body, kind, current, &citation, nil)
-	case domain.KindDesignFeedback:
-		amend := domain.RivalContractAmendment{
-			Section:    "",
-			Suggestion: candidate.Description,
-		}
-		return composeCorrectiveBodyWithContract(body, kind, current, nil, []domain.RivalContractAmendment{amend})
-	default:
-		return body
-	}
-}
-
 // composeCorrectiveBodyWithContract returns a corrective D-Mail body
 // whose Markdown shape carries Rival Contract v1 citations when
 // applicable. When `current` is nil and no citation/amendments are

@@ -189,7 +189,7 @@ func (a *Amadeus) PrintLog(ctx context.Context) error {
 
 	a.dataOut("")
 	if len(history) == 0 {
-		a.dataOut("No history yet. Run `amadeus check` first.")
+		a.dataOut("No history yet. Reviews recorded via the amadeus MCP tools populate this log.")
 		return nil
 	}
 

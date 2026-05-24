@@ -43,7 +43,7 @@ func TestRootCommand_UnknownSubcommand(t *testing.T) {
 func TestSubcommands_Exist(t *testing.T) {
 	rootCmd := cmd.NewRootCommand()
 
-	expected := []string{"init", "doctor", "run", "status", "clean", "archive-prune", "version", "update"}
+	expected := []string{"init", "doctor", "status", "clean", "archive-prune", "version", "update"}
 	for _, name := range expected {
 		found := false
 		for _, c := range rootCmd.Commands() {

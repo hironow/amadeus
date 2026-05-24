@@ -41,11 +41,7 @@ func run() int {
 	workCtx = context.WithValue(workCtx, domain.ShutdownKey, outerCtx)
 
 	rootCmd := cmd.NewRootCommand()
-	args := os.Args[1:]
-	if cmd.NeedsDefaultRun(rootCmd, args) {
-		args = append([]string{"run"}, args...)
-	}
-	rootCmd.SetArgs(args)
+	rootCmd.SetArgs(os.Args[1:])
 
 	err := rootCmd.ExecuteContext(workCtx)
 

@@ -12,6 +12,13 @@ import (
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
+// PRReviewLabel is the label applied to PRs after amadeus review.
+const PRReviewLabel = "amadeus:reviewed"
+
+// PRReviewLabelLegacyPrefix is the old label prefix kept for backward compatibility
+// when detecting previously-reviewed PRs.
+const PRReviewLabelLegacyPrefix = "amadeus:reviewed-"
+
 // Compile-time check that GhPRReader implements port.GitHubPRReader.
 var _ port.GitHubPRReader = (*GhPRReader)(nil)
 
