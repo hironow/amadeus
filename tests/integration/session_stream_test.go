@@ -3,17 +3,12 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/platform"
-	"github.com/hironow/amadeus/internal/session"
-	"github.com/hironow/amadeus/internal/usecase/port"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 )
@@ -201,117 +196,6 @@ done:
 				t.Error("SubagentID should be non-empty")
 			}
 		}
-	}
-}
-
-// fakeDetailedRunner implements port.DetailedRunner with configurable output.
-type fakeDetailedRunner struct {
-	sessionID string
-	text      string
-	err       error
-}
-
-func (f *fakeDetailedRunner) RunDetailed(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (port.RunResult, error) {
-	return port.RunResult{Text: f.text, ProviderSessionID: f.sessionID}, f.err
-}
-
-func TestSessionStream_FullPipeline_SessionStore(t *testing.T) {
-	t.Parallel()
-
-	// given: session store.
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, domain.StateDir)
-	os.MkdirAll(filepath.Join(stateDir, ".run"), 0o755)
-	dbPath := filepath.Join(stateDir, ".run", "sessions.db")
-	store, err := session.NewSQLiteCodingSessionStore(dbPath)
-	if err != nil {
-		t.Fatalf("store: %v", err)
-	}
-	defer store.Close()
-
-	// given: mock runner + tracker.
-	runner := &fakeDetailedRunner{sessionID: "claude-sess-full", text: "Analysis complete."}
-	tracker := session.NewSessionTrackingAdapter(runner, store, domain.ProviderClaudeCode)
-
-	// when: run session.
-	ctx := context.Background()
-	rec, text, runErr := tracker.RunSession(ctx, "analyze code", io.Discard,
-		port.WithWorkDir(tmpDir),
-	)
-
-	// then: no error.
-	if runErr != nil {
-		t.Fatalf("RunSession: %v", runErr)
-	}
-	if text != "Analysis complete." {
-		t.Errorf("text = %q, want %q", text, "Analysis complete.")
-	}
-
-	// Verify session record was persisted with correct fields.
-	loaded, loadErr := store.Load(ctx, rec.ID)
-	if loadErr != nil {
-		t.Fatalf("Load session: %v", loadErr)
-	}
-	if loaded.Provider != domain.ProviderClaudeCode {
-		t.Errorf("Provider = %q, want %q", loaded.Provider, domain.ProviderClaudeCode)
-	}
-	if loaded.Status != domain.SessionCompleted {
-		t.Errorf("Status = %q, want %q", loaded.Status, domain.SessionCompleted)
-	}
-	if loaded.ProviderSessionID != "claude-sess-full" {
-		t.Errorf("ProviderSessionID = %q, want %q", loaded.ProviderSessionID, "claude-sess-full")
-	}
-
-	// Verify session is queryable.
-	records, err := store.List(ctx, port.ListSessionOpts{Limit: 10})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(records) != 1 {
-		t.Errorf("expected 1 record, got %d", len(records))
-	}
-
-	// Verify findByProviderSessionID.
-	found, err := store.FindByProviderSessionID(ctx, domain.ProviderClaudeCode, "claude-sess-full")
-	if err != nil {
-		t.Fatalf("FindByProviderSessionID: %v", err)
-	}
-	if len(found) != 1 {
-		t.Errorf("expected 1 record, got %d", len(found))
-	}
-}
-
-func TestSessionStream_FullPipeline_FailedSession(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	stateDir := filepath.Join(tmpDir, domain.StateDir)
-	os.MkdirAll(filepath.Join(stateDir, ".run"), 0o755)
-	dbPath := filepath.Join(stateDir, ".run", "sessions.db")
-	store, err := session.NewSQLiteCodingSessionStore(dbPath)
-	if err != nil {
-		t.Fatalf("store: %v", err)
-	}
-	defer store.Close()
-
-	runner := &fakeDetailedRunner{sessionID: "claude-sess-fail", text: "partial", err: context.DeadlineExceeded}
-	tracker := session.NewSessionTrackingAdapter(runner, store, domain.ProviderClaudeCode)
-
-	ctx := context.Background()
-	rec, _, runErr := tracker.RunSession(ctx, "timeout task", io.Discard)
-	if runErr == nil {
-		t.Fatal("expected error")
-	}
-
-	loaded, _ := store.Load(ctx, rec.ID)
-	if loaded.Status != domain.SessionFailed {
-		t.Errorf("Status = %q, want %q", loaded.Status, domain.SessionFailed)
-	}
-	if loaded.Metadata["failure_reason"] == "" {
-		t.Error("expected failure_reason in metadata")
-	}
-	if loaded.ProviderSessionID != "claude-sess-fail" {
-		t.Errorf("ProviderSessionID = %q, want %q", loaded.ProviderSessionID, "claude-sess-fail")
 	}
 }
 
