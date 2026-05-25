@@ -1,7 +1,7 @@
 # S0037. AI Coding Session Abstraction Layer
 
 **Date:** 2026-03-30
-**Status:** Accepted
+**Status:** Superseded by S0044
 
 ## Context
 
