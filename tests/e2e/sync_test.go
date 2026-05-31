@@ -3,21 +3,25 @@
 package e2e
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
 
 func TestE2E_Sync_WithPendingComments(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_sync_pending"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	// Seed D-Mails with issues
-	seedDMails(t, dir, []seedDMailSpec{
+	// Seed D-Mails with issues inside container
+	seedDMails(t, ctx, c, dir, []seedDMailSpec{
 		{Name: "feedback-001", Kind: "design-feedback", Description: "ADR issue", Severity: "low", Issues: []string{"MY-100"}},
 		{Name: "feedback-002", Kind: "design-feedback", Description: "DoD issue", Severity: "low", Issues: []string{"MY-200", "MY-300"}},
 	})
 
-	stdout, _, err := runCmd(t, dir, "sync")
+	stdout, _, err := runCmd(t, ctx, c, dir, "sync")
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -37,7 +41,6 @@ func TestE2E_Sync_WithPendingComments(t *testing.T) {
 		t.Fatalf("expected 3 pending comments, got %d", len(result.PendingComments))
 	}
 
-	// Verify first
 	found := map[string]bool{}
 	for _, pc := range result.PendingComments {
 		key := pc.DMail + ":" + pc.IssueID
@@ -51,15 +54,17 @@ func TestE2E_Sync_WithPendingComments(t *testing.T) {
 }
 
 func TestE2E_Sync_NoIssues_NoPending(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_sync_noissues"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	// Seed D-Mail without issues
-	seedDMails(t, dir, []seedDMailSpec{
+	seedDMails(t, ctx, c, dir, []seedDMailSpec{
 		{Name: "feedback-001", Kind: "design-feedback", Description: "No issues", Severity: "low"},
 	})
 
-	stdout, _, err := runCmd(t, dir, "sync")
+	stdout, _, err := runCmd(t, ctx, c, dir, "sync")
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -75,35 +80,40 @@ func TestE2E_Sync_NoIssues_NoPending(t *testing.T) {
 }
 
 func TestE2E_MarkCommented_Text(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mark_text"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	// Seed a D-Mail so .gate/ is valid
-	seedDMails(t, dir, []seedDMailSpec{
+	seedDMails(t, ctx, c, dir, []seedDMailSpec{
 		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
-	_, stderr, err := runCmd(t, dir, "mark-commented", "feedback-001", "MY-100")
+	_, stderr, err := runCmd(t, ctx, c, dir, "mark-commented", "feedback-001", "MY-100")
 	if err != nil {
-		t.Fatalf("mark-commented: %v\nstderr: %s", err, stderr)
+		t.Fatalf("mark-commented: %v", err)
 	}
 	if !strings.Contains(stderr, "feedback-001:MY-100") {
-		t.Errorf("expected 'feedback-001:MY-100' in stderr, got: %s", stderr)
+		t.Errorf("expected 'feedback-001:MY-100' in output, got: %s", stderr)
 	}
 	if !strings.Contains(stderr, "commented") {
-		t.Errorf("expected 'commented' in stderr, got: %s", stderr)
+		t.Errorf("expected 'commented' in output, got: %s", stderr)
 	}
 }
 
 func TestE2E_MarkCommented_JSON(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mark_json"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	seedDMails(t, dir, []seedDMailSpec{
+	seedDMails(t, ctx, c, dir, []seedDMailSpec{
 		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
-	stdout, _, err := runCmd(t, dir, "mark-commented", "feedback-001", "MY-100", "--json")
+	stdout, _, err := runCmd(t, ctx, c, dir, "mark-commented", "feedback-001", "MY-100", "--json")
 	if err != nil {
 		t.Fatalf("mark-commented --json: %v", err)
 	}
@@ -127,15 +137,18 @@ func TestE2E_MarkCommented_JSON(t *testing.T) {
 }
 
 func TestE2E_MarkCommented_RemovesFromSync(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mark_removes"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	seedDMails(t, dir, []seedDMailSpec{
+	seedDMails(t, ctx, c, dir, []seedDMailSpec{
 		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100", "MY-200"}},
 	})
 
 	// Before: 2 pending comments
-	stdout, _, _ := runCmd(t, dir, "sync")
+	stdout, _, _ := runCmd(t, ctx, c, dir, "sync")
 	var before struct {
 		PendingComments []any `json:"pending_comments"`
 	}
@@ -145,10 +158,10 @@ func TestE2E_MarkCommented_RemovesFromSync(t *testing.T) {
 	}
 
 	// Mark one as commented
-	runCmd(t, dir, "mark-commented", "feedback-001", "MY-100")
+	runCmd(t, ctx, c, dir, "mark-commented", "feedback-001", "MY-100")
 
 	// After: 1 pending comment
-	stdout, _, _ = runCmd(t, dir, "sync")
+	stdout, _, _ = runCmd(t, ctx, c, dir, "sync")
 	var after struct {
 		PendingComments []struct {
 			DMail   string `json:"dmail"`
@@ -165,18 +178,21 @@ func TestE2E_MarkCommented_RemovesFromSync(t *testing.T) {
 }
 
 func TestE2E_MarkCommented_AllMarked_EmptySync(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mark_all"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	seedDMails(t, dir, []seedDMailSpec{
+	seedDMails(t, ctx, c, dir, []seedDMailSpec{
 		{Name: "feedback-001", Kind: "design-feedback", Description: "Test", Severity: "low", Issues: []string{"MY-100"}},
 	})
 
 	// Mark the only comment
-	runCmd(t, dir, "mark-commented", "feedback-001", "MY-100")
+	runCmd(t, ctx, c, dir, "mark-commented", "feedback-001", "MY-100")
 
 	// Sync should show empty
-	stdout, _, _ := runCmd(t, dir, "sync")
+	stdout, _, _ := runCmd(t, ctx, c, dir, "sync")
 	var result struct {
 		PendingComments []any `json:"pending_comments"`
 	}
@@ -187,16 +203,24 @@ func TestE2E_MarkCommented_AllMarked_EmptySync(t *testing.T) {
 }
 
 func TestE2E_MarkCommented_ErrorMissingArgs(t *testing.T) {
-	dir := initTestRepo(t)
-	_, _, err := runCmd(t, dir, "mark-commented")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mark_missing"
+	initTestRepo(t, ctx, c, dir)
+
+	_, _, err := runCmd(t, ctx, c, dir, "mark-commented")
 	if err == nil {
 		t.Fatal("expected error for missing args")
 	}
 }
 
 func TestE2E_MarkCommented_ErrorTooManyArgs(t *testing.T) {
-	dir := initTestRepo(t)
-	_, _, err := runCmd(t, dir, "mark-commented", "a", "b", "c")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mark_toomany"
+	initTestRepo(t, ctx, c, dir)
+
+	_, _, err := runCmd(t, ctx, c, dir, "mark-commented", "a", "b", "c")
 	if err == nil {
 		t.Fatal("expected error for too many args")
 	}

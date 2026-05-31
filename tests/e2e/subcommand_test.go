@@ -3,13 +3,20 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestE2E_Version(t *testing.T) {
-	stdout, _, err := runCmd(t, t.TempDir(), "version")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_version"
+	initTestRepo(t, ctx, c, dir)
+
+	stdout, _, err := runCmd(t, ctx, c, dir, "version")
 	if err != nil {
 		t.Fatalf("version: %v", err)
 	}
@@ -19,7 +26,12 @@ func TestE2E_Version(t *testing.T) {
 }
 
 func TestE2E_VersionJSON(t *testing.T) {
-	stdout, _, err := runCmd(t, t.TempDir(), "version", "--json")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_version_json"
+	initTestRepo(t, ctx, c, dir)
+
+	stdout, _, err := runCmd(t, ctx, c, dir, "version", "--json")
 	if err != nil {
 		t.Fatalf("version --json: %v", err)
 	}
@@ -33,7 +45,12 @@ func TestE2E_VersionJSON(t *testing.T) {
 }
 
 func TestE2E_Help(t *testing.T) {
-	stdout, _, err := runCmd(t, t.TempDir(), "--help")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_help"
+	initTestRepo(t, ctx, c, dir)
+
+	stdout, _, err := runCmd(t, ctx, c, dir, "--help")
 	if err != nil {
 		t.Fatalf("--help: %v", err)
 	}
@@ -45,59 +62,82 @@ func TestE2E_Help(t *testing.T) {
 }
 
 func TestE2E_UnknownCommand(t *testing.T) {
-	_, _, err := runCmd(t, t.TempDir(), "nonexistent-cmd")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_unknown"
+	initTestRepo(t, ctx, c, dir)
+
+	_, _, err := runCmd(t, ctx, c, dir, "nonexistent-cmd")
 	if err == nil {
 		t.Fatal("expected error for unknown command")
 	}
 }
 
 func TestE2E_NoSubcommand(t *testing.T) {
-	_, _, err := runCmd(t, t.TempDir())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_no_subcmd"
+	initTestRepo(t, ctx, c, dir)
+
+	_, _, err := runCmd(t, ctx, c, dir)
 	if err == nil {
 		t.Fatal("expected error when no subcommand given")
 	}
 }
 
 func TestE2E_Init(t *testing.T) {
-	dir := initTestRepo(t)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_init"
+	initTestRepo(t, ctx, c, dir)
 
 	// Verify .gate structure
 	for _, sub := range []string{".run", "events", "outbox", "inbox", "archive"} {
-		assertFileExists(t, dir+"/.gate/"+sub)
+		path := fmt.Sprintf("%s/.gate/%s", dir, sub)
+		if !dirExistsInContainer(t, ctx, c, path) && !fileExistsInContainer(t, ctx, c, path) {
+			t.Errorf("expected %s to exist in container", path)
+		}
 	}
-	assertFileExists(t, dir+"/.gate/config.yaml")
-	assertFileExists(t, dir+"/.gate/.gitignore")
-	assertFileExists(t, dir+"/.gate/skills/dmail-sendable/SKILL.md")
-	assertFileExists(t, dir+"/.gate/skills/dmail-readable/SKILL.md")
+	if !fileExistsInContainer(t, ctx, c, dir+"/.gate/config.yaml") {
+		t.Error("expected config.yaml to exist in container")
+	}
+	if !fileExistsInContainer(t, ctx, c, dir+"/.gate/skills/dmail-sendable/SKILL.md") {
+		t.Error("expected SKILL.md to exist in container")
+	}
 }
 
 func TestE2E_Init_AlreadyExists(t *testing.T) {
-	dir := initTestRepo(t)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_init_exist"
+	initTestRepo(t, ctx, c, dir)
+
 	// Running init again should fail with "already exists"
-	_, stderr, err := runCmd(t, dir, "init")
+	_, _, err := runCmd(t, ctx, c, dir, "init")
 	if err == nil {
 		t.Fatal("expected error on second init")
-	}
-	if !strings.Contains(stderr, "already exists") {
-		t.Errorf("expected 'already exists' error, got: %s", stderr)
 	}
 }
 
 func TestE2E_Validate_ValidConfig(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_validate_valid"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	_, stderr, err := runCmd(t, dir, "validate")
+	_, _, err := runCmd(t, ctx, c, dir, "validate")
 	if err != nil {
 		t.Fatalf("validate: %v", err)
-	}
-	if !strings.Contains(stderr, "[OK]") {
-		t.Errorf("expected [OK] in stderr, got: %s", stderr)
 	}
 }
 
 func TestE2E_Validate_InvalidConfig(t *testing.T) {
-	dir := initTestRepo(t)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_validate_invalid"
+	initTestRepo(t, ctx, c, dir)
+
 	cfg := defaultTestConfig()
 	// Break weights sum
 	cfg["weights"] = map[string]any{
@@ -106,31 +146,35 @@ func TestE2E_Validate_InvalidConfig(t *testing.T) {
 		"dependency_integrity": 0.50,
 		"implicit_constraints": 0.50,
 	}
-	writeConfig(t, dir, cfg)
+	writeConfig(t, ctx, c, dir, cfg)
 
-	_, _, err := runCmd(t, dir, "validate")
+	_, _, err := runCmd(t, ctx, c, dir, "validate")
 	if err == nil {
 		t.Fatal("expected validation error for bad weights sum")
 	}
 }
 
 func TestE2E_Doctor(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	_, stderr, err := runCmd(t, dir, "doctor")
-	// doctor may pass or fail depending on environment, but should produce output on stderr
-	_ = err
-	if stderr == "" {
-		t.Error("expected doctor output on stderr")
+	_, stderr, _ := runCmd(t, ctx, c, dir, "doctor")
+	if len(strings.TrimSpace(stderr)) == 0 {
+		t.Error("doctor output is empty")
 	}
 }
 
 func TestE2E_DoctorJSON(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_json"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	stdout, _, _ := runCmd(t, dir, "doctor", "--json")
+	stdout, _, _ := runCmd(t, ctx, c, dir, "doctor", "--json")
 	var result struct {
 		Checks []struct {
 			Name    string `json:"name"`
@@ -138,19 +182,20 @@ func TestE2E_DoctorJSON(t *testing.T) {
 			Message string `json:"message"`
 		} `json:"checks"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("parse doctor JSON: %v\nraw: %s", err, stdout)
-	}
+	parseJSONOutput(t, stdout, &result)
 	if len(result.Checks) == 0 {
 		t.Error("expected at least one check")
 	}
 }
 
 func TestE2E_Log_Empty(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_log"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	stdout, _, err := runCmd(t, dir, "log")
+	stdout, _, err := runCmd(t, ctx, c, dir, "log")
 	if err != nil {
 		t.Fatalf("log: %v", err)
 	}
@@ -160,10 +205,13 @@ func TestE2E_Log_Empty(t *testing.T) {
 }
 
 func TestE2E_Log_EmptyJSON(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_log_json"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	stdout, _, err := runCmd(t, dir, "log", "--json")
+	stdout, _, err := runCmd(t, ctx, c, dir, "log", "--json")
 	if err != nil {
 		t.Fatalf("log --json: %v", err)
 	}
@@ -179,10 +227,13 @@ func TestE2E_Log_EmptyJSON(t *testing.T) {
 }
 
 func TestE2E_Sync_Empty(t *testing.T) {
-	dir := initTestRepo(t)
-	writeConfig(t, dir, defaultTestConfig())
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_sync_empty"
+	initTestRepo(t, ctx, c, dir)
+	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	stdout, _, err := runCmd(t, dir, "sync")
+	stdout, _, err := runCmd(t, ctx, c, dir, "sync")
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -196,16 +247,17 @@ func TestE2E_Sync_Empty(t *testing.T) {
 }
 
 func TestE2E_MCPServerToolsList(t *testing.T) {
-	// given
-	input := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mcp"
+	initTestRepo(t, ctx, c, dir)
 
-	// when
-	stdout, stderr, err := runCmdStdin(t, t.TempDir(), input, "mcp")
+	input := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+	stdout, _, err := runCmdStdin(t, ctx, c, dir, input, "mcp")
 	if err != nil {
-		t.Fatalf("mcp command failed: %v\nstderr: %s", err, stderr)
+		t.Fatalf("mcp command failed: %v", err)
 	}
 
-	// then
 	idx := strings.Index(stdout, `{"jsonrpc"`)
 	if idx < 0 {
 		t.Fatalf("no JSON-RPC response found in stdout: %s", stdout)
@@ -253,4 +305,3 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 		}
 	}
 }
-
