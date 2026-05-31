@@ -8,6 +8,7 @@ import (
 // Outcome metric names for the self-improving loop.
 // These are the observable indicators defined in the remain-roadmap MVP success criteria.
 const (
+	//nolint:gosec // metric name constant, not a credential
 	MetricFirstPassSuccessRate = "first_pass_success_rate"
 	MetricRetriesToSuccess     = "retries_to_success"
 	MetricRecurrenceRate       = "recurrence_rate"
