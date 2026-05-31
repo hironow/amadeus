@@ -35,12 +35,6 @@ linters:
       - path: 'vendor/'
         linters:
           - all
-      # Stepwise errcheck enablement: exclude internal/ core layers
-      # (session, eventsource, platform, harness, domain) during
-      # Phase 2 (cmd/usecase layer check) of refs/issues/0029.
-      - path: 'internal/(eventsource|session|platform|harness|domain)/'
-        linters:
-          - errcheck
       # Exclude tests support and mock code from errcheck
       - path: '^tests/'
         linters:

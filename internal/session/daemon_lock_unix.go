@@ -25,13 +25,13 @@ func TryLockDaemon(stateDir string) (func(), error) {
 	}
 
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("daemon already running (lock held on %s)", lockPath)
 	}
 
 	unlock := func() {
-		syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck
-		f.Close()
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = f.Close()
 	}
 	return unlock, nil
 }

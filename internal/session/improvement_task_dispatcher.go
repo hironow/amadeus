@@ -36,7 +36,7 @@ func NewImprovementTaskDispatcher(stateDir string, logger domain.Logger) (*Impro
 	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("improvement task dispatcher: set WAL: %w", err)
 	}
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS improvement_tasks (
@@ -50,7 +50,7 @@ func NewImprovementTaskDispatcher(stateDir string, logger domain.Logger) (*Impro
 		created_at  TEXT NOT NULL,
 		expires_at  TEXT NOT NULL
 	)`); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("improvement task dispatcher: create schema: %w", err)
 	}
 

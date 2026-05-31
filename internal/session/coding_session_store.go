@@ -56,12 +56,12 @@ func NewSQLiteCodingSessionStore(dbPath string) (*SQLiteCodingSessionStore, erro
 		"PRAGMA busy_timeout=5000",
 	} {
 		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("coding session store: pragma: %w", err)
 		}
 	}
 	if _, err := db.Exec(codingSessionSchema); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("coding session store: schema: %w", err)
 	}
 	return &SQLiteCodingSessionStore{db: db}, nil
@@ -104,7 +104,7 @@ func (s *SQLiteCodingSessionStore) FindByProviderSessionID(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanRecords(rows)
 }
 
@@ -135,7 +135,7 @@ func (s *SQLiteCodingSessionStore) List(ctx context.Context, opts port.ListSessi
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanRecords(rows)
 }
 

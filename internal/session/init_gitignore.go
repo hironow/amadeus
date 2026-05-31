@@ -35,7 +35,7 @@ func EnsureGitignoreEntries(path string, required []string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	content := sep + strings.Join(missing, "\n") + "\n"
 	_, err = f.WriteString(content)

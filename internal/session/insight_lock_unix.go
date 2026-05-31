@@ -18,11 +18,11 @@ func (w *InsightWriter) lock() (func(), error) {
 		return nil, fmt.Errorf("open lock file %s: %w", lockPath, err)
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("flock %s: %w", lockPath, err)
 	}
 	return func() {
 		syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck
-		f.Close()
+		_ = f.Close()
 	}, nil
 }

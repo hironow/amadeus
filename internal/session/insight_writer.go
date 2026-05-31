@@ -72,7 +72,7 @@ func (w *InsightWriter) Append(filename, kind, tool string, entry domain.Insight
 		return fmt.Errorf("write temp insight file: %w", err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath) // best-effort cleanup
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return fmt.Errorf("rename insight file: %w", err)
 	}
 

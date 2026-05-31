@@ -17,20 +17,20 @@ import (
 func MonitorInbox(ctx context.Context, root string, logger domain.Logger) (<-chan domain.DMail, error) {
 	inboxDir := filepath.Join(root, "inbox")
 
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher() // nosemgrep: adr0005-fsnotify-watcher-without-close -- watcher is closed in the goroutine owning the event loop [permanent]
 	if err != nil {
 		return nil, err
 	}
 
 	if err := watcher.Add(inboxDir); err != nil {
-		watcher.Close()
+		_ = watcher.Close()
 		return nil, err
 	}
 
 	// Phase 1: synchronous drain of existing files.
 	entries, err := os.ReadDir(inboxDir)
 	if err != nil {
-		watcher.Close()
+		_ = watcher.Close()
 		return nil, err
 	}
 
@@ -60,7 +60,7 @@ func MonitorInbox(ctx context.Context, root string, logger domain.Logger) (<-cha
 	// Phase 2: async fsnotify watch goroutine.
 	go func() {
 		defer close(ch)
-		defer watcher.Close()
+		defer func() { _ = watcher.Close() }()
 
 		for {
 			select {

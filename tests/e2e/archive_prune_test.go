@@ -29,7 +29,7 @@ func TestE2E_ArchivePrune_DryRun(t *testing.T) {
 
 	stdout, _, err := runCmd(t, ctx, c, dir, "archive-prune", "--days", "30", "--dry-run")
 	_ = err // Wait, amadeus may log output on stdout or stderr. Our runCmd captures stdout.
-	
+
 	if !strings.Contains(stdout, "dry-run") {
 		t.Logf("output: %s", stdout)
 	}

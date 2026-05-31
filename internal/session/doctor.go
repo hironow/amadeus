@@ -397,7 +397,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data))) // nosemgrep: ignored-error-go,ignored-error-short-go -- parse failure yields 0; pid>0 guard below safely rejects non-numeric data [permanent]
 			if pid > 0 {
 				if !platform.IsProcessAlive(pid) {
-					os.Remove(pidPath)
+					_ = os.Remove(pidPath)
 					results = append(results, domain.DoctorCheck{
 						Name: "stale-pid", Status: domain.CheckFixed,
 						Message: "removed stale PID file",
@@ -420,7 +420,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 // CheckFsnotify verifies that the OS file watcher is available.
 // On Linux, inotify limits can prevent watcher creation.
 func CheckFsnotify() domain.DoctorCheck {
-	w, err := fsnotify.NewWatcher()
+	w, err := fsnotify.NewWatcher() // nosemgrep: adr0005-fsnotify-watcher-without-close -- watcher is closed via deferred close below [permanent]
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "fsnotify",
@@ -429,7 +429,7 @@ func CheckFsnotify() domain.DoctorCheck {
 			Hint:    "on Linux, increase inotify limit: sysctl fs.inotify.max_user_watches=524288",
 		}
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 	return domain.DoctorCheck{
 		Name:    "fsnotify",
 		Status:  domain.CheckOK,

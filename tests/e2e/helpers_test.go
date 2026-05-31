@@ -215,7 +215,7 @@ func writeDMail(t *testing.T, ctx context.Context, c testcontainers.Container, d
 	}
 	mailDir := fmt.Sprintf("%s/.gate/%s", dir, subdir)
 	execInContainer(t, ctx, c, []string{"mkdir", "-p", mailDir})
-	
+
 	path := fmt.Sprintf("%s/%s.md", mailDir, name)
 	heredocWrite(t, ctx, c, path, buf.String())
 }

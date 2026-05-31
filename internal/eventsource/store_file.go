@@ -58,18 +58,18 @@ func (s *FileEventStore) Append(_ context.Context, events ...domain.Event) (doma
 		for _, ev := range evs {
 			line, err := json.Marshal(ev)
 			if err != nil {
-				f.Close()
+				_ = f.Close()
 				return domain.AppendResult{}, fmt.Errorf("marshal event %s: %w", ev.ID, err)
 			}
 			data := append(line, '\n')
-			totalBytes += len(data)
 			if _, err := f.Write(data); err != nil {
-				f.Close()
+				_ = f.Close()
 				return domain.AppendResult{}, fmt.Errorf("write event %s: %w", ev.ID, err)
 			}
+			totalBytes += len(data)
 		}
 		if err := f.Sync(); err != nil {
-			f.Close()
+			_ = f.Close()
 			return domain.AppendResult{}, fmt.Errorf("fsync event file %s: %w", date, err)
 		}
 		if err := f.Close(); err != nil {
@@ -145,8 +145,8 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, domain.Loa
 	}
 	sort.Strings(files)
 
-	var corruptCount int
 	var events []domain.Event
+	var corruptCount int
 	for _, name := range files {
 		path := filepath.Join(s.dir, name)
 		f, err := os.Open(path)
@@ -154,7 +154,7 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, domain.Loa
 			return nil, domain.LoadResult{}, fmt.Errorf("open %s: %w", name, err)
 		}
 		scanner := bufio.NewScanner(f)
-		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024) // allow up to 10MiB per line
+		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			if len(line) == 0 {
@@ -172,15 +172,13 @@ func (s *FileEventStore) loadEvents(after time.Time) ([]domain.Event, domain.Loa
 			events = append(events, ev)
 		}
 		if err := scanner.Err(); err != nil {
-			f.Close()
+			_ = f.Close()
 			return nil, domain.LoadResult{}, fmt.Errorf("scan %s: %w", name, err)
 		}
-		f.Close()
+		_ = f.Close()
 	}
 
 	// Stable sort preserves insertion order for events with equal timestamps.
-	// This is critical: RunCheck emits check.completed and baseline.updated
-	// with the same timestamp, and replay must apply them in emit order.
 	sort.SliceStable(events, func(i, j int) bool {
 		return events[i].Timestamp.Before(events[j].Timestamp)
 	})
