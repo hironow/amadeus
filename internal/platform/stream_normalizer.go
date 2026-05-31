@@ -150,7 +150,8 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 		if !ok && summary == "" {
 			summary = string(tool.Input)
 		}
-		data, err := json.Marshal(map[string]any{
+		var data []byte
+		data, err = json.Marshal(map[string]any{
 			"tool_name":      tool.Name,
 			"tool_id":        tool.ID,
 			"parent_tool_id": msg.ParentToolUseID,
@@ -172,7 +173,8 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 		for _, block := range am.Content {
 			if block.Type == "thinking" && block.Thinking != "" {
 				text := mustTruncate(block.Thinking, domain.RawFieldMaxBytes)
-				data, err := json.Marshal(map[string]string{"text": text})
+				var data []byte
+				data, err = json.Marshal(map[string]string{"text": text})
 				if err != nil {
 					data = []byte("{}")
 				}

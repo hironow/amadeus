@@ -219,7 +219,8 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 	}
 	defer func() { _ = lockFile.Close() }()
 
-	if err := flockLock(lockFile.Fd()); err != nil {
+	err = flockLock(lockFile.Fd())
+	if err != nil {
 		return fmt.Errorf("flock: %w", err)
 	}
 	defer func() { _ = flockUnlock(lockFile.Fd()) }()

@@ -22,7 +22,8 @@ func MonitorInbox(ctx context.Context, root string, logger domain.Logger) (<-cha
 		return nil, err
 	}
 
-	if err := watcher.Add(inboxDir); err != nil {
+	err = watcher.Add(inboxDir)
+	if err != nil {
 		_ = watcher.Close()
 		return nil, err
 	}

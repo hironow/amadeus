@@ -154,7 +154,8 @@ func (p *Projector) applyDMailGenerated(ctx context.Context, event domain.Event)
 		return fmt.Errorf("marshal dmail: %w", err)
 	}
 	filename := data.DMail.Name + ".md"
-	if err := p.OutboxStore.Stage(ctx, filename, marshaledData); err != nil {
+	err = p.OutboxStore.Stage(ctx, filename, marshaledData)
+	if err != nil {
 		return fmt.Errorf("stage dmail: %w", err)
 	}
 	n, err := p.OutboxStore.Flush(ctx)

@@ -66,7 +66,8 @@ func RunCutover(
 	// accounted for" — recovery will use LoadAll() (full replay) until Phase 2
 	// adds real projection state. Phase 2 will overwrite this with actual
 	// projection state after a full rebuild.
-	if err := snapshotStore.Save(ctx, aggregateType, 0, []byte("null")); err != nil {
+	err = snapshotStore.Save(ctx, aggregateType, 0, []byte("null"))
+	if err != nil {
 		return CutoverResult{}, fmt.Errorf("cutover: save sentinel snapshot: %w", err)
 	}
 

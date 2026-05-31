@@ -36,6 +36,7 @@ linters:
           - errcheck  # Allow unchecked errors in test code
           - gosec     # Ignore security checks in test code
           - gocyclo   # Allow complex functions in test code
+          - govet     # Allow variable shadowing in test files
       # Generated / vendored
       - path: 'vendor/'
         linters:
@@ -46,6 +47,7 @@ linters:
           - errcheck
           - gosec
           - gocyclo
+          - govet
       # Exclude tools utilities from gosec
       - path: 'internal/tools/'
         linters:
@@ -74,6 +76,9 @@ linters:
         - G306 # Expect WriteFile permissions to be 0600 or less (we require 0644)
         - G404 # Insecure random number generator (used for jitter/cancellation, not cryptography)
         - G703 # Path traversal via taint analysis
+    govet:
+      enable:
+        - shadow
     errcheck:
       exclude-functions:
         - fmt.Fprintf

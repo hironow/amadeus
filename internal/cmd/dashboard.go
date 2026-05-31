@@ -57,7 +57,8 @@ Use -o json for machine-readable JSON output.`,
 
 			// Apply --tool-dirs overrides
 			if toolDirsFlag != "" {
-				if err := applyToolDirOverrides(toolStateDirs, toolDirsFlag); err != nil {
+				err = applyToolDirOverrides(toolStateDirs, toolDirsFlag)
+				if err != nil {
 					return err
 				}
 			}

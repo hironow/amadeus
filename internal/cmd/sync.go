@@ -32,12 +32,14 @@ func newSyncCommand() *cobra.Command {
 			}
 			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
-			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
+			_, err = os.Stat(divRoot)
+			if errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
 			logger := loggerFrom(cmd)
 
-			if _, err := session.InitGateDir(divRoot, logger, ""); err != nil {
+			_, err = session.InitGateDir(divRoot, logger, "")
+			if err != nil {
 				return fmt.Errorf("init gate dir: %w", err)
 			}
 

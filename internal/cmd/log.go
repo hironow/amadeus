@@ -41,7 +41,8 @@ structured JSON for piping into downstream commands.`,
 			}
 			divRoot := filepath.Join(repoRoot, domain.StateDir)
 
-			if _, err := os.Stat(divRoot); errors.Is(err, fs.ErrNotExist) {
+			_, err = os.Stat(divRoot)
+			if errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf(".gate/ not found. Run 'amadeus init' first")
 			}
 
