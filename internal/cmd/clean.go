@@ -33,7 +33,7 @@ func newCleanCommand() *cobra.Command {
 			info, statErr := os.Stat(stateDir)
 			if statErr != nil || !info.IsDir() {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Nothing to clean at %s\n", repoRoot)
-				return nil
+				return nil //nolint:nilerr // stateDir non-existence is non-fatal, exit clean
 			}
 
 			yes := mustBool(cmd, "yes")
