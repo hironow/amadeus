@@ -159,7 +159,8 @@ func (s *SQLiteImprovementCollectorStore) ApplyFeedback(ctx context.Context, row
 		return false, fmt.Errorf("improvement collector store: get conn: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+	_, err = conn.ExecContext(ctx, "BEGIN IMMEDIATE")
+	if err != nil {
 		return false, fmt.Errorf("improvement collector store: begin immediate: %w", err)
 	}
 	committed := false
@@ -177,10 +178,12 @@ func (s *SQLiteImprovementCollectorStore) ApplyFeedback(ctx context.Context, row
 	).Scan(&exists)
 	switch {
 	case err == nil:
-		if err := saveImprovementCursor(ctx, conn, row); err != nil {
+		err = saveImprovementCursor(ctx, conn, row)
+		if err != nil {
 			return false, err
 		}
-		if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		_, err = conn.ExecContext(ctx, "COMMIT")
+		if err != nil {
 			return false, fmt.Errorf("improvement collector store: commit duplicate: %w", err)
 		}
 		committed = true

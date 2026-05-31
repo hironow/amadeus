@@ -178,7 +178,8 @@ Pass --execute to actually remove the files.`,
 				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
 				scanner := bufio.NewScanner(cmd.InOrStdin())
 				if !scanner.Scan() {
-					if err := scanner.Err(); err != nil {
+					err = scanner.Err()
+					if err != nil {
 						return fmt.Errorf("read confirmation: %w", err)
 					}
 					fmt.Fprintln(errW, "Cancelled.")

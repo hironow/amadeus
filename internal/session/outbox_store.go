@@ -135,7 +135,8 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 	// the SHARED→EXCLUSIVE deadlock that occurs with DEFERRED transactions
 	// when two connections SELECT then UPDATE concurrently.
 	lockStart := time.Now()
-	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+	_, err = conn.ExecContext(ctx, "BEGIN IMMEDIATE")
+	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: begin immediate: %w", err)
