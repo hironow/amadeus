@@ -161,8 +161,8 @@ func TestE2E_Doctor(t *testing.T) {
 	initTestRepo(t, ctx, c, dir)
 	writeConfig(t, ctx, c, dir, defaultTestConfig())
 
-	out, _, _ := runCmd(t, ctx, c, dir, "doctor")
-	if len(strings.TrimSpace(out)) == 0 {
+	_, stderr, _ := runCmd(t, ctx, c, dir, "doctor")
+	if len(strings.TrimSpace(stderr)) == 0 {
 		t.Error("doctor output is empty")
 	}
 }
