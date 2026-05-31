@@ -20,3 +20,7 @@ firebase-debug.log
 .siren/
 .expedition/
 .gate/
+
+# handover / intent docs
+docs/handover.md
+docs/intent.md
