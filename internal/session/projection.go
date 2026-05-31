@@ -220,7 +220,7 @@ func (p *Projector) applyArchivePruned(event domain.Event) error {
 		if strings.HasSuffix(name, ".jsonl") { // nosemgrep: layer-session-no-event-persistence — guard to protect event files from deletion, not event persistence [permanent]
 			continue
 		}
-		os.Remove(filepath.Join(archiveDir, name))
+		_ = os.Remove(filepath.Join(archiveDir, name))
 	}
 	return nil
 }

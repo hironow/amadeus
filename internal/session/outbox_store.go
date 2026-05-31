@@ -58,16 +58,16 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 		"PRAGMA busy_timeout=5000",
 	} {
 		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("outbox store: %s: %w", pragma, err)
 		}
 	}
 	if err := createOutboxSchema(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	if err := os.Chmod(dbPath, 0o600); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("outbox store: chmod db: %w", err)
 	}
 	return &SQLiteOutboxStore{
@@ -129,7 +129,7 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: get conn: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// BEGIN IMMEDIATE acquires a RESERVED lock immediately, preventing
 	// the SHARED→EXCLUSIVE deadlock that occurs with DEFERRED transactions
@@ -164,7 +164,7 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 	for rows.Next() {
 		var it item
 		if err := rows.Scan(&it.name, &it.data); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			span.RecordError(err)
 			span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 			return 0, fmt.Errorf("outbox store: scan row: %w", err)
@@ -325,7 +325,7 @@ func PruneFlushedOutbox(ctx context.Context, repoRoot string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	return store.PruneFlushed(ctx)
 }
 
@@ -340,12 +340,12 @@ func atomicWrite(targetPath string, data []byte) error {
 	tmpPath := tmp.Name()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
 		return err
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return err
 	}
 	return os.Rename(tmpPath, targetPath)

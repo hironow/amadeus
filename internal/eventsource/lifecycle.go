@@ -18,9 +18,9 @@ const EventFileSizeThreshold = 10 * 1024 * 1024
 // when truncating an oversized event file.
 const EventFileTruncateKeepLines = 1000
 
-// ListExpiredEventFiles returns .jsonl file names in the events directory
-// under stateDir that are older than the given number of days.
-// Returns (nil, nil) if the events directory does not exist.
+// ListExpiredEventFiles returns .jsonl file names in {stateDir}/events/
+// whose mtime exceeds the given number of days.
+// Returns (nil, nil) when the events directory does not exist.
 func ListExpiredEventFiles(stateDir string, days int) ([]string, error) {
 	if days < 0 {
 		return nil, fmt.Errorf("days must be non-negative, got %d", days)
@@ -51,8 +51,9 @@ func ListExpiredEventFiles(stateDir string, days int) ([]string, error) {
 	return expired, nil
 }
 
-// PruneEventFiles deletes the named .jsonl files from the events directory
-// under stateDir. Returns the list of successfully deleted file names.
+// PruneEventFiles deletes the named .jsonl files from {stateDir}/events/.
+// Files that no longer exist are silently skipped (idempotent).
+// Returns the list of names that were processed.
 func PruneEventFiles(stateDir string, files []string) ([]string, error) {
 	dir := EventsDir(stateDir)
 	var deleted []string
@@ -122,10 +123,10 @@ func TruncateEventFile(stateDir, name string, keepLines int) error {
 		}
 	}
 	if scanErr := scanner.Err(); scanErr != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("scan event file %s: %w", name, scanErr)
 	}
-	f.Close()
+	_ = f.Close()
 
 	if len(lines) <= keepLines {
 		return nil // already within limit
@@ -141,25 +142,25 @@ func TruncateEventFile(stateDir, name string, keepLines int) error {
 	w := bufio.NewWriter(out)
 	for _, line := range lines {
 		if _, writeErr := w.WriteString(line + "\n"); writeErr != nil {
-			out.Close()
-			os.Remove(tmpPath)
+			_ = out.Close()
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("write tmp file for %s: %w", name, writeErr)
 		}
 	}
 	if flushErr := w.Flush(); flushErr != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("flush tmp file for %s: %w", name, flushErr)
 	}
 	if syncErr := out.Sync(); syncErr != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("sync tmp file for %s: %w", name, syncErr)
 	}
-	out.Close()
+	_ = out.Close()
 
 	if renameErr := os.Rename(tmpPath, path); renameErr != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename tmp file for %s: %w", name, renameErr)
 	}
 	return nil

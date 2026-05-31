@@ -15,7 +15,7 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 	dir := "/workspace/t_doctor_repair_stale"
 	initTestRepo(t, ctx, c, dir)
 	pidPath := fmt.Sprintf("%s/.gate/watch.pid", dir)
-	
+
 	// Create stale PID file inside container
 	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidPath)})
 
@@ -52,7 +52,7 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 	dir := "/workspace/t_doctor_repair_skill"
 	initTestRepo(t, ctx, c, dir)
 	skillPath := fmt.Sprintf("%s/.gate/skills/dmail-sendable/SKILL.md", dir)
-	
+
 	execInContainer(t, ctx, c, []string{"rm", "-f", skillPath})
 
 	// when: run doctor --repair --json
@@ -88,7 +88,7 @@ func TestDoctorRepair_NoRepairFlag(t *testing.T) {
 	dir := "/workspace/t_doctor_repair_norepair"
 	initTestRepo(t, ctx, c, dir)
 	pidPath := fmt.Sprintf("%s/.gate/watch.pid", dir)
-	
+
 	// Create stale PID file inside container
 	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidPath)})
 

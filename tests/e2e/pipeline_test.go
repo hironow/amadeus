@@ -12,7 +12,7 @@ func TestE2E_Pipeline_GateNotFound(t *testing.T) {
 	ctx := context.Background()
 	c := buildTestContainer(t, ctx)
 	dir := "/workspace/t_gate_not_found"
-	
+
 	// Create raw directory without init (so no .gate/ exists)
 	execInContainer(t, ctx, c, []string{"mkdir", "-p", dir})
 

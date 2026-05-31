@@ -287,9 +287,9 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 	}
 
 	expectedTools := map[string]bool{
-		"amadeus.ping":        false,
-		"amadeus.next_review": false,
-		"amadeus.post_comment": false,
+		"amadeus.ping":          false,
+		"amadeus.next_review":   false,
+		"amadeus.post_comment":  false,
 		"amadeus.get_pr_status": false,
 	}
 

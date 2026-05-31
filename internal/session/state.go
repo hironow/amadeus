@@ -123,7 +123,7 @@ func migrateLegacyState(root string) error {
 		return nil // non-critical, ignore
 	}
 	if len(entries) == 0 {
-		os.Remove(legacyDir)
+		_ = os.Remove(legacyDir)
 	}
 	return nil
 }

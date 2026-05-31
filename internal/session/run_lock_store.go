@@ -38,12 +38,12 @@ func NewSQLiteRunLockStore(dbPath string) (*SQLiteRunLockStore, error) {
 	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("run lock store: set WAL: %w", err)
 	}
 
 	if err := createRunLockSchema(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("run lock store: create schema: %w", err)
 	}
 

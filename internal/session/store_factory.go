@@ -59,13 +59,13 @@ func EnsureCutover(ctx context.Context, stateDir, aggregateType string, logger d
 
 	result, err := eventsource.RunCutover(ctx, rawStore, snapshotStore, seqCounter, aggregateType, logger)
 	if err != nil {
-		seqCounter.Close()
+		_ = seqCounter.Close()
 		return nil, nil, fmt.Errorf("ensure cutover: %w", err)
 	}
 	if !result.AlreadyDone {
 		logger.Info("event store cutover complete: %d pre-cutover events, SeqNr=%d", result.EventCount, result.CutoverSeqNr)
 	}
-	closer := func() { seqCounter.Close() }
+	closer := func() { _ = seqCounter.Close() }
 	return seqCounter, closer, nil
 }
 

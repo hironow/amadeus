@@ -33,7 +33,7 @@ func NewSeqCounter(dbPath string) (*SeqCounter, error) {
 		"PRAGMA busy_timeout=5000",
 	} {
 		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("seq counter: %s: %w", pragma, err)
 		}
 	}
@@ -41,12 +41,12 @@ func NewSeqCounter(dbPath string) (*SeqCounter, error) {
 		id INTEGER PRIMARY KEY CHECK (id = 1),
 		next_seq INTEGER NOT NULL DEFAULT 1
 	)`); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("seq counter: create table: %w", err)
 	}
 	// Ensure the single row exists.
 	if _, err := db.Exec(`INSERT OR IGNORE INTO seq_counter (id, next_seq) VALUES (1, 1)`); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("seq counter: init row: %w", err)
 	}
 	return &SeqCounter{db: db}, nil

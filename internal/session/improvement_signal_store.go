@@ -106,12 +106,12 @@ func NewSQLiteImprovementCollectorStore(dbPath string) (*SQLiteImprovementCollec
 		"PRAGMA busy_timeout=5000",
 	} {
 		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("improvement collector store: pragma: %w", err)
 		}
 	}
 	if _, err := db.Exec(improvementCollectorSchema); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("improvement collector store: schema: %w", err)
 	}
 	return &SQLiteImprovementCollectorStore{db: db}, nil
@@ -158,7 +158,7 @@ func (s *SQLiteImprovementCollectorStore) ApplyFeedback(ctx context.Context, row
 	if err != nil {
 		return false, fmt.Errorf("improvement collector store: get conn: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		return false, fmt.Errorf("improvement collector store: begin immediate: %w", err)
 	}
@@ -234,7 +234,7 @@ func (s *SQLiteImprovementCollectorStore) LoadSignals(ctx context.Context, limit
 	if err != nil {
 		return nil, fmt.Errorf("improvement collector store: load signals: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []NormalizedImprovementSignal
 	for rows.Next() {
@@ -406,7 +406,7 @@ func (s *SQLiteImprovementCollectorStore) GetOutcomeStats(ctx context.Context) (
 	if err != nil {
 		return nil, fmt.Errorf("improvement collector store: query stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	statsMap := make(map[string]*OutcomeStats)
 	for rows.Next() {
@@ -467,7 +467,7 @@ func (s *SQLiteImprovementCollectorStore) GetFailurePatterns(ctx context.Context
 	if err != nil {
 		return nil, fmt.Errorf("improvement collector store: query patterns: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []FailurePatternSummary
 	for rows.Next() {
