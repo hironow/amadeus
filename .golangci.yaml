@@ -24,6 +24,7 @@ linters:
     - unconvert       # redundant type conversions
     - bodyclose       # response.Body must be closed
     - errcheck        # unchecked errors (enabled centrally post refs/issues/0029)
+    - nilerr          # finds code that returns nil instead of err when err != nil
   exclusions:
     rules:
       - path: '_test\.go$'

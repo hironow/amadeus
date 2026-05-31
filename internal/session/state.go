@@ -117,10 +117,9 @@ func migrateLegacyState(root string) error {
 		}
 	}
 
-	// Remove legacy directory if empty
 	entries, err := os.ReadDir(legacyDir)
 	if err != nil {
-		return nil // non-critical, ignore
+		return nil //nolint:nilerr // non-critical, ignore read dir failure on legacy dir
 	}
 	if len(entries) == 0 {
 		_ = os.Remove(legacyDir)
