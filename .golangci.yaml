@@ -26,6 +26,7 @@ linters:
     - errcheck        # unchecked errors (enabled centrally post refs/issues/0029)
     - nilerr          # finds code that returns nil instead of err when err != nil
     - gosec           # security checks
+    - gocyclo         # cyclomatic complexity checks
   exclusions:
     rules:
       - path: '_test\.go$'
@@ -34,6 +35,7 @@ linters:
           - bodyclose
           - errcheck  # Allow unchecked errors in test code
           - gosec     # Ignore security checks in test code
+          - gocyclo   # Allow complex functions in test code
       # Generated / vendored
       - path: 'vendor/'
         linters:
@@ -43,6 +45,7 @@ linters:
         linters:
           - errcheck
           - gosec
+          - gocyclo
       # Exclude tools utilities from gosec
       - path: 'internal/tools/'
         linters:
@@ -57,6 +60,8 @@ linters:
           - unused
 
   settings:
+    gocyclo:
+      min-complexity: 30
     gosec:
       excludes:
         - G104 # Duplicate of errcheck
