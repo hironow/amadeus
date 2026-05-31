@@ -5,8 +5,10 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"testing"
@@ -54,13 +56,47 @@ func execInContainer(t *testing.T, ctx context.Context, c testcontainers.Contain
 // execInContainerWithExitCode executes a command inside the test container and returns (exitCode, stdout, stderr).
 func execInContainerWithExitCode(t *testing.T, ctx context.Context, c testcontainers.Container, cmd []string) (int, string, string) {
 	t.Helper()
-	code, stdoutReader, err := c.Exec(ctx, cmd)
+	code, stream, err := c.Exec(ctx, cmd)
 	if err != nil {
 		t.Fatalf("container exec failed: %v", err)
 	}
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(stdoutReader)
-	return code, buf.String(), ""
+	stdout, stderr, err := decodeMuxStream(stream)
+	if err != nil {
+		t.Fatalf("decode multiplexed stream failed: %v", err)
+	}
+	return code, stdout, stderr
+}
+
+// decodeMuxStream parses Docker mux-streams into stdout and stderr strings.
+func decodeMuxStream(r io.Reader) (string, string, error) {
+	var stdout, stderr strings.Builder
+	header := make([]byte, 8)
+	for {
+		_, err := io.ReadFull(r, header)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", "", err
+		}
+
+		streamType := header[0]
+		dataLen := binary.BigEndian.Uint32(header[4:8])
+
+		data := make([]byte, dataLen)
+		_, err = io.ReadFull(r, data)
+		if err != nil {
+			return "", "", err
+		}
+
+		switch streamType {
+		case 1: // stdout
+			stdout.Write(data)
+		case 2: // stderr
+			stderr.Write(data)
+		}
+	}
+	return stdout.String(), stderr.String(), nil
 }
 
 // heredocWrite writes file content inside the container.
@@ -74,24 +110,24 @@ func heredocWrite(t *testing.T, ctx context.Context, c testcontainers.Container,
 func runCmd(t *testing.T, ctx context.Context, c testcontainers.Container, dir string, args ...string) (string, string, error) {
 	t.Helper()
 	fullCmd := []string{"sh", "-c", fmt.Sprintf("cd %s && /usr/local/bin/amadeus %s", dir, strings.Join(args, " "))}
-	code, stdout, _ := execInContainerWithExitCode(t, ctx, c, fullCmd)
+	code, stdout, stderr := execInContainerWithExitCode(t, ctx, c, fullCmd)
 	var err error
 	if code != 0 {
 		err = fmt.Errorf("exit code %d", code)
 	}
-	return stdout, "", err
+	return stdout, stderr, err
 }
 
 // runCmdStdin executes amadeus inside the test container, piping data to stdin.
 func runCmdStdin(t *testing.T, ctx context.Context, c testcontainers.Container, dir, stdin string, args ...string) (string, string, error) {
 	t.Helper()
 	fullCmd := []string{"sh", "-c", fmt.Sprintf("cat << 'EOF' | (cd %s && /usr/local/bin/amadeus %s)\n%s\nEOF", dir, strings.Join(args, " "), stdin)}
-	code, stdout, _ := execInContainerWithExitCode(t, ctx, c, fullCmd)
+	code, stdout, stderr := execInContainerWithExitCode(t, ctx, c, fullCmd)
 	var err error
 	if code != 0 {
 		err = fmt.Errorf("exit code %d", code)
 	}
-	return stdout, "", err
+	return stdout, stderr, err
 }
 
 // fileExistsInContainer checks if a file exists inside the container.
