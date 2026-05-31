@@ -46,7 +46,7 @@ Use -o json for machine-readable JSON output.`,
 			if storeErr != nil {
 				return fmt.Errorf("open improvement store: %w", storeErr)
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			stats, queryErr := store.GetOutcomeStats(cmd.Context())
 			if queryErr != nil {

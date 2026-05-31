@@ -40,7 +40,7 @@ func newCleanCommand() *cobra.Command {
 			if !yes {
 				fmt.Fprintf(cmd.ErrOrStderr(), "The following will be deleted:\n  %s/\n\nDelete? [y/N]: ", stateDir)
 				var answer string
-				fmt.Fscanln(cmd.InOrStdin(), &answer)
+				_, _ = fmt.Fscanln(cmd.InOrStdin(), &answer)
 				if answer != "y" && answer != "Y" {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Aborted.\n")
 					return nil

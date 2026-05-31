@@ -55,7 +55,7 @@ func NewRootCommand() *cobra.Command {
 			}
 			noColor := mustBool(cmd, "no-color")
 			if noColor {
-				os.Setenv("NO_COLOR", "1")
+				_ = os.Setenv("NO_COLOR", "1")
 			}
 			verbose := mustBool(cmd, "verbose")
 			out := cmd.ErrOrStderr()
@@ -86,10 +86,10 @@ func NewRootCommand() *cobra.Command {
 		cobra.OnFinalize(func() {
 			endRootSpan()
 			if shutdownMeter != nil {
-				shutdownMeter(context.Background())
+				_ = shutdownMeter(context.Background())
 			}
 			if shutdownTracer != nil {
-				shutdownTracer(context.Background())
+				_ = shutdownTracer(context.Background())
 			}
 		})
 	})
