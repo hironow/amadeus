@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//nolint:gocyclo // CLI flags parsing and interactive prompts orchestration is flat but highly branched
 func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive-prune [path]",
