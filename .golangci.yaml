@@ -25,6 +25,7 @@ linters:
     - bodyclose       # response.Body must be closed
     - errcheck        # unchecked errors (enabled centrally post refs/issues/0029)
     - nilerr          # finds code that returns nil instead of err when err != nil
+    - gosec           # security checks
   exclusions:
     rules:
       - path: '_test\.go$'
@@ -32,6 +33,7 @@ linters:
           - revive
           - bodyclose
           - errcheck  # Allow unchecked errors in test code
+          - gosec     # Ignore security checks in test code
       # Generated / vendored
       - path: 'vendor/'
         linters:
@@ -40,6 +42,11 @@ linters:
       - path: '^tests/'
         linters:
           - errcheck
+          - gosec
+      # Exclude tools utilities from gosec
+      - path: 'internal/tools/'
+        linters:
+          - gosec
       # internal/platform/stream_normalizer.go is a 3-tool canonical
       # lock target (sightjack / paintress / amadeus). The lastErr
       # field is currently dead but lives in all three copies; a
@@ -50,6 +57,18 @@ linters:
           - unused
 
   settings:
+    gosec:
+      excludes:
+        - G104 # Duplicate of errcheck
+        - G115 # integer overflow conversion uint64 -> int64
+        - G202 # SQL string concatenation
+        - G204 # Subprocess launched with variable
+        - G301 # Expect directory permissions to be 0750 or less (we require 0755)
+        - G302 # Expect file permissions to be 0600 or less (we require 0644)
+        - G304 # Potential file inclusion via variable (CLI requires dynamic paths)
+        - G306 # Expect WriteFile permissions to be 0600 or less (we require 0644)
+        - G404 # Insecure random number generator (used for jitter/cancellation, not cryptography)
+        - G703 # Path traversal via taint analysis
     errcheck:
       exclude-functions:
         - fmt.Fprintf
