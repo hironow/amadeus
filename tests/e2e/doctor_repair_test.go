@@ -3,27 +3,27 @@
 package e2e
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
+	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestDoctorRepair_StalePID(t *testing.T) {
-	// given: initialized repo with a stale PID file
-	dir := initTestRepo(t)
-	pidPath := filepath.Join(dir, ".gate", "watch.pid")
-	// PID 99999 is almost certainly not running
-	if err := os.WriteFile(pidPath, []byte("99999"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_repair_stale"
+	initTestRepo(t, ctx, c, dir)
+	pidPath := fmt.Sprintf("%s/.gate/watch.pid", dir)
+	
+	// Create stale PID file inside container
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidPath)})
 
 	// when: run doctor --repair --json
-	stdout, _, _ := runCmd(t, dir, "doctor", "--repair", "--json")
+	stdout, _, _ := runCmd(t, ctx, c, dir, "doctor", "--repair", "--json")
 
 	// then: PID file should be removed
-	if _, err := os.Stat(pidPath); err == nil {
+	if fileExistsInContainer(t, ctx, c, pidPath) {
 		t.Error("expected stale PID file to be removed after --repair")
 	}
 
@@ -34,9 +34,7 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 			Status string `json:"status"`
 		} `json:"checks"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("parse JSON: %v\nraw: %s", err, stdout)
-	}
+	parseJSONOutput(t, stdout, &result)
 	found := false
 	for _, c := range result.Checks {
 		if c.Name == "stale-pid" && c.Status == "FIX" {
@@ -49,18 +47,19 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 }
 
 func TestDoctorRepair_MissingSkillMD(t *testing.T) {
-	// given: initialized repo with SKILL.md deleted
-	dir := initTestRepo(t)
-	skillPath := filepath.Join(dir, ".gate", "skills", "dmail-sendable", "SKILL.md")
-	if err := os.Remove(skillPath); err != nil {
-		t.Fatal(err)
-	}
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_repair_skill"
+	initTestRepo(t, ctx, c, dir)
+	skillPath := fmt.Sprintf("%s/.gate/skills/dmail-sendable/SKILL.md", dir)
+	
+	execInContainer(t, ctx, c, []string{"rm", "-f", skillPath})
 
 	// when: run doctor --repair --json
-	stdout, _, _ := runCmd(t, dir, "doctor", "--repair", "--json")
+	stdout, _, _ := runCmd(t, ctx, c, dir, "doctor", "--repair", "--json")
 
 	// then: SKILL.md should be regenerated
-	if _, err := os.Stat(skillPath); err != nil {
+	if !fileExistsInContainer(t, ctx, c, skillPath) {
 		t.Error("expected SKILL.md to be regenerated after --repair")
 	}
 
@@ -71,9 +70,7 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 			Status string `json:"status"`
 		} `json:"checks"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("parse JSON: %v\nraw: %s", err, stdout)
-	}
+	parseJSONOutput(t, stdout, &result)
 	found := false
 	for _, c := range result.Checks {
 		if c.Name == "SKILL.md" && c.Status == "FIX" {
@@ -86,18 +83,20 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 }
 
 func TestDoctorRepair_NoRepairFlag(t *testing.T) {
-	// given: initialized repo with a stale PID file
-	dir := initTestRepo(t)
-	pidPath := filepath.Join(dir, ".gate", "watch.pid")
-	if err := os.WriteFile(pidPath, []byte("99999"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_repair_norepair"
+	initTestRepo(t, ctx, c, dir)
+	pidPath := fmt.Sprintf("%s/.gate/watch.pid", dir)
+	
+	// Create stale PID file inside container
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidPath)})
 
 	// when: run doctor --json (WITHOUT --repair)
-	stdout, _, _ := runCmd(t, dir, "doctor", "--json")
+	stdout, _, _ := runCmd(t, ctx, c, dir, "doctor", "--json")
 
 	// then: PID file should NOT be removed
-	if _, err := os.Stat(pidPath); err != nil {
+	if !fileExistsInContainer(t, ctx, c, pidPath) {
 		t.Error("PID file should NOT be removed without --repair flag")
 	}
 

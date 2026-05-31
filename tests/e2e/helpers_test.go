@@ -4,123 +4,129 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"gopkg.in/yaml.v3"
 )
 
-// amadeusBin returns the path to the amadeus binary.
-// In Docker, it's installed at /usr/local/bin/amadeus.
-// Locally, it falls back to PATH lookup.
-func amadeusBin() string {
-	if env := os.Getenv("AMADEUS_BIN"); env != "" {
-		return env
+// buildTestContainer starts an amadeus test container once.
+func buildTestContainer(t *testing.T, ctx context.Context) testcontainers.Container {
+	t.Helper()
+	req := testcontainers.ContainerRequest{
+		Image: sharedImage,
+		Cmd:   []string{"sleep", "infinity"},
+		WaitingFor: wait.ForExec([]string{"amadeus", "--version"}).
+			WithStartupTimeout(10 * time.Second),
 	}
-	if _, err := os.Stat("/usr/local/bin/amadeus"); err == nil {
-		return "/usr/local/bin/amadeus"
-	}
-	p, err := exec.LookPath("amadeus")
+	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
 	if err != nil {
-		return "amadeus"
+		t.Fatalf("buildTestContainer: %v", err)
 	}
-	return p
-}
-
-// runCmd executes the amadeus binary with args in the given directory.
-// Returns stdout, stderr, and error.
-func runCmd(t *testing.T, dir string, args ...string) (string, string, error) {
-	t.Helper()
-	cmd := exec.Command(amadeusBin(), args...)
-	cmd.Dir = dir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.String(), stderr.String(), err
-}
-
-// runCmdStdin executes amadeus with args and pipes data to stdin.
-func runCmdStdin(t *testing.T, dir string, stdin string, args ...string) (string, string, error) {
-	t.Helper()
-	cmd := exec.Command(amadeusBin(), args...)
-	cmd.Dir = dir
-	cmd.Stdin = strings.NewReader(stdin)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.String(), stderr.String(), err
-}
-
-// initTestRepo creates a temp dir with a git repo and runs `amadeus init`.
-func initTestRepo(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	// Initialize git repo (required for check command)
-	gitInit := exec.Command("git", "init")
-	gitInit.Dir = dir
-	if out, err := gitInit.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
-
-	// Configure git user for commits
-	for _, kv := range [][2]string{
-		{"user.name", "E2E Test"},
-		{"user.email", "e2e@test.local"},
-	} {
-		c := exec.Command("git", "config", kv[0], kv[1])
-		c.Dir = dir
-		if out, err := c.CombinedOutput(); err != nil {
-			t.Fatalf("git config %s: %v\n%s", kv[0], err, out)
+	t.Cleanup(func() {
+		if err := c.Terminate(ctx); err != nil {
+			t.Errorf("terminate container: %v", err)
 		}
-	}
-
-	// Create initial commit so HEAD exists
-	readme := filepath.Join(dir, "README.md")
-	if err := os.WriteFile(readme, []byte("# test\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	gitAdd := exec.Command("git", "add", ".")
-	gitAdd.Dir = dir
-	if out, err := gitAdd.CombinedOutput(); err != nil {
-		t.Fatalf("git add: %v\n%s", err, out)
-	}
-	gitCommit := exec.Command("git", "commit", "-m", "initial")
-	gitCommit.Dir = dir
-	if out, err := gitCommit.CombinedOutput(); err != nil {
-		t.Fatalf("git commit: %v\n%s", err, out)
-	}
-
-	// Run amadeus init
-	stdout, stderr, err := runCmd(t, dir, "init")
-	if err != nil {
-		t.Fatalf("amadeus init: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
-	}
-
-	return dir
+	})
+	return c
 }
 
-// writeConfig writes a custom config.yaml to .gate/.
-func writeConfig(t *testing.T, dir string, cfg map[string]any) {
+// execInContainer executes a command inside the test container and returns stdout.
+func execInContainer(t *testing.T, ctx context.Context, c testcontainers.Container, cmd []string) string {
+	t.Helper()
+	code, stdout, stderr := execInContainerWithExitCode(t, ctx, c, cmd)
+	if code != 0 {
+		t.Fatalf("exec %v failed with code %d\nstdout: %s\nstderr: %s", cmd, code, stdout, stderr)
+	}
+	return stdout
+}
+
+// execInContainerWithExitCode executes a command inside the test container and returns (exitCode, stdout, stderr).
+func execInContainerWithExitCode(t *testing.T, ctx context.Context, c testcontainers.Container, cmd []string) (int, string, string) {
+	t.Helper()
+	code, stdoutReader, err := c.Exec(ctx, cmd)
+	if err != nil {
+		t.Fatalf("container exec failed: %v", err)
+	}
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(stdoutReader)
+	return code, buf.String(), ""
+}
+
+// heredocWrite writes file content inside the container.
+func heredocWrite(t *testing.T, ctx context.Context, c testcontainers.Container, path, content string) {
+	t.Helper()
+	cmd := []string{"sh", "-c", fmt.Sprintf("cat << 'EOF' > %s\n%s\nEOF", path, content)}
+	execInContainer(t, ctx, c, cmd)
+}
+
+// runCmd executes amadeus inside the test container.
+func runCmd(t *testing.T, ctx context.Context, c testcontainers.Container, dir string, args ...string) (string, string, error) {
+	t.Helper()
+	fullCmd := []string{"sh", "-c", fmt.Sprintf("cd %s && /usr/local/bin/amadeus %s", dir, strings.Join(args, " "))}
+	code, stdout, _ := execInContainerWithExitCode(t, ctx, c, fullCmd)
+	var err error
+	if code != 0 {
+		err = fmt.Errorf("exit code %d", code)
+	}
+	return stdout, "", err
+}
+
+// runCmdStdin executes amadeus inside the test container, piping data to stdin.
+func runCmdStdin(t *testing.T, ctx context.Context, c testcontainers.Container, dir, stdin string, args ...string) (string, string, error) {
+	t.Helper()
+	fullCmd := []string{"sh", "-c", fmt.Sprintf("cat << 'EOF' | (cd %s && /usr/local/bin/amadeus %s)\n%s\nEOF", dir, strings.Join(args, " "), stdin)}
+	code, stdout, _ := execInContainerWithExitCode(t, ctx, c, fullCmd)
+	var err error
+	if code != 0 {
+		err = fmt.Errorf("exit code %d", code)
+	}
+	return stdout, "", err
+}
+
+// fileExistsInContainer checks if a file exists inside the container.
+func fileExistsInContainer(t *testing.T, ctx context.Context, c testcontainers.Container, path string) bool {
+	t.Helper()
+	code, _, _ := execInContainerWithExitCode(t, ctx, c, []string{"test", "-f", path})
+	return code == 0
+}
+
+// dirExistsInContainer checks if a directory exists inside the container.
+func dirExistsInContainer(t *testing.T, ctx context.Context, c testcontainers.Container, path string) bool {
+	t.Helper()
+	code, _, _ := execInContainerWithExitCode(t, ctx, c, []string{"test", "-d", path})
+	return code == 0
+}
+
+// initTestRepo creates a workspace inside the container, git init, and runs `amadeus init`.
+func initTestRepo(t *testing.T, ctx context.Context, c testcontainers.Container, dir string) {
+	t.Helper()
+	execInContainer(t, ctx, c, []string{"mkdir", "-p", dir})
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && git init --initial-branch=main", dir)})
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && git config user.name 'E2E Test' && git config user.email 'e2e@test.local'", dir)})
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && echo '# test' > README.md && git add . && git commit -m 'initial'", dir)})
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && amadeus init", dir)})
+}
+
+// writeConfig writes a custom config.yaml to .gate/ inside the container.
+func writeConfig(t *testing.T, ctx context.Context, c testcontainers.Container, dir string, cfg map[string]any) {
 	t.Helper()
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configPath := filepath.Join(dir, ".gate", "config.yaml")
-	if err := os.WriteFile(configPath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	configPath := fmt.Sprintf("%s/.gate/config.yaml", dir)
+	heredocWrite(t, ctx, c, configPath, string(data))
 }
 
 // defaultTestConfig returns a minimal valid config for E2E tests.
@@ -153,8 +159,8 @@ func defaultTestConfig() map[string]any {
 	}
 }
 
-// writeDMail writes a D-Mail file to the specified subdirectory of .gate/.
-func writeDMail(t *testing.T, dir, subdir, name string, fm map[string]any, body string) {
+// writeDMail writes a D-Mail file to the specified subdirectory of .gate/ inside the container.
+func writeDMail(t *testing.T, ctx context.Context, c testcontainers.Container, dir, subdir, name string, fm map[string]any, body string) {
 	t.Helper()
 	fmData, err := yaml.Marshal(fm)
 	if err != nil {
@@ -171,82 +177,71 @@ func writeDMail(t *testing.T, dir, subdir, name string, fm map[string]any, body 
 			buf.WriteString("\n")
 		}
 	}
-	mailDir := filepath.Join(dir, ".gate", subdir)
-	if err := os.MkdirAll(mailDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(mailDir, name+".md"), buf.Bytes(), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	mailDir := fmt.Sprintf("%s/.gate/%s", dir, subdir)
+	execInContainer(t, ctx, c, []string{"mkdir", "-p", mailDir})
+	
+	path := fmt.Sprintf("%s/%s.md", mailDir, name)
+	heredocWrite(t, ctx, c, path, buf.String())
 }
 
-// listDir returns sorted filenames in a directory.
-func listDir(t *testing.T, dir string) []string {
+// listDirInContainer returns sorted filenames in a directory in the container.
+func listDirInContainer(t *testing.T, ctx context.Context, c testcontainers.Container, dir string) []string {
 	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		t.Fatal(err)
+	code, stdout, _ := execInContainerWithExitCode(t, ctx, c, []string{"ls", "-1", dir})
+	if code != 0 {
+		return nil
 	}
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			names = append(names, l)
+		}
 	}
 	sort.Strings(names)
 	return names
 }
 
-// readJSON reads and unmarshals a JSON file.
-func readJSON(t *testing.T, path string, v any) {
+// readJSONFromContainer reads and unmarshals a JSON file inside the container.
+func readJSONFromContainer(t *testing.T, ctx context.Context, c testcontainers.Container, path string, v any) {
 	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	if err := json.Unmarshal(data, v); err != nil {
-		t.Fatalf("unmarshal %s: %v\ncontent: %s", path, err, data)
+	stdout := execInContainer(t, ctx, c, []string{"cat", path})
+	if err := json.Unmarshal([]byte(stdout), v); err != nil {
+		t.Fatalf("unmarshal %s: %v\ncontent: %s", path, err, stdout)
 	}
 }
 
-// parseJSONOutput unmarshals stdout JSON output.
+// parseJSONOutput parses JSON.
 func parseJSONOutput(t *testing.T, stdout string, v any) {
 	t.Helper()
-	if err := json.Unmarshal([]byte(stdout), v); err != nil {
-		t.Fatalf("parse JSON output: %v\nraw: %s", err, stdout)
+	start := strings.Index(stdout, "{")
+	if start < 0 {
+		t.Fatalf("no JSON object found: %s", stdout)
+	}
+	end := strings.LastIndex(stdout, "}")
+	if end < 0 || end < start {
+		t.Fatalf("no closing JSON brace found: %s", stdout)
+	}
+	jsonStr := stdout[start : end+1]
+	if err := json.Unmarshal([]byte(jsonStr), v); err != nil {
+		t.Fatalf("parse JSON: %v\nraw: %s", err, jsonStr)
 	}
 }
 
-// assertFileExists fails if the file does not exist.
-func assertFileExists(t *testing.T, path string) {
+// countEventsOfTypeInContainer counts events matching the given type in .gate/events/ JSONL files in the container.
+func countEventsOfTypeInContainer(t *testing.T, ctx context.Context, c testcontainers.Container, dir, eventType string) int {
 	t.Helper()
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("expected file to exist: %s", path)
-	}
-}
-
-// countEventsOfType counts events matching the given type in .gate/events/ JSONL files.
-func countEventsOfType(t *testing.T, dir, eventType string) int {
-	t.Helper()
-	eventsDir := filepath.Join(dir, ".gate", "events")
-	entries, err := os.ReadDir(eventsDir)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return 0
-		}
-		t.Fatalf("read events dir: %v", err)
-	}
+	eventsDir := fmt.Sprintf("%s/.gate/events", dir)
+	names := listDirInContainer(t, ctx, c, eventsDir)
 	count := 0
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".jsonl") {
+	for _, name := range names {
+		if !strings.HasSuffix(name, ".jsonl") {
 			continue
 		}
-		data, readErr := os.ReadFile(filepath.Join(eventsDir, e.Name()))
-		if readErr != nil {
-			t.Fatalf("read event file %s: %v", e.Name(), readErr)
-		}
-		for _, line := range strings.Split(string(data), "\n") {
+		path := fmt.Sprintf("%s/%s", eventsDir, name)
+		data := execInContainer(t, ctx, c, []string{"cat", path})
+		for _, line := range strings.Split(data, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
 				continue
@@ -262,37 +257,8 @@ func countEventsOfType(t *testing.T, dir, eventType string) int {
 	return count
 }
 
-// assertFileNotExists fails if the file exists.
-func assertFileNotExists(t *testing.T, path string) {
-	t.Helper()
-	if _, err := os.Stat(path); err == nil {
-		t.Fatalf("expected file NOT to exist: %s", path)
-	}
-}
-
-// assertExitCode checks the exit code of a command error.
-func assertExitCode(t *testing.T, err error, expected int) {
-	t.Helper()
-	if expected == 0 {
-		if err != nil {
-			t.Fatalf("expected exit code 0, got error: %v", err)
-		}
-		return
-	}
-	if err == nil {
-		t.Fatalf("expected exit code %d, got 0", expected)
-	}
-	exitErr, ok := err.(*exec.ExitError)
-	if !ok {
-		t.Fatalf("expected ExitError, got: %T %v", err, err)
-	}
-	if exitErr.ExitCode() != expected {
-		t.Fatalf("expected exit code %d, got %d", expected, exitErr.ExitCode())
-	}
-}
-
-// seedDMails writes multiple D-Mail files to archive/.
-func seedDMails(t *testing.T, dir string, dmails []seedDMailSpec) {
+// seedDMails writes multiple D-Mail files to archive/ inside the container.
+func seedDMails(t *testing.T, ctx context.Context, c testcontainers.Container, dir string, dmails []seedDMailSpec) {
 	t.Helper()
 	for _, spec := range dmails {
 		fm := map[string]any{
@@ -314,7 +280,7 @@ func seedDMails(t *testing.T, dir string, dmails []seedDMailSpec) {
 		if body == "" {
 			body = fmt.Sprintf("Detail for %s.\n", spec.Name)
 		}
-		writeDMail(t, dir, "archive", spec.Name, fm, body)
+		writeDMail(t, ctx, c, dir, "archive", spec.Name, fm, body)
 	}
 }
 
