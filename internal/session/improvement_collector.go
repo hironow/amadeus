@@ -137,6 +137,7 @@ func normalizeImprovementFeedback(row ImprovementFeedbackRow) domain.InsightEntr
 	return normalizeImprovementFeedbackRecord(row).Entry
 }
 
+//nolint:gocyclo // field mapping and conditional parsing from JSON/DB row
 func normalizeImprovementFeedbackRecord(row ImprovementFeedbackRow) normalizedImprovementFeedbackRecord {
 	surface := detectImprovementSurface(row)
 	meta := domain.CorrectionMetadata{

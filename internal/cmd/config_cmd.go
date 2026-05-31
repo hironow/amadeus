@@ -141,6 +141,7 @@ func resolveConfigPath(cmd *cobra.Command, args []string) (string, error) {
 	return filepath.Join(repoRoot, domain.StateDir, "config.yaml"), nil
 }
 
+//nolint:gocyclo // flat but wide field dispatch switch statement
 func setAmadeusConfigField(cfg *domain.Config, key string, value string) error {
 	switch key {
 	case "lang":
