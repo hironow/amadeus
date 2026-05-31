@@ -35,6 +35,16 @@ linters:
       - path: 'vendor/'
         linters:
           - all
+      # Stepwise errcheck enablement: exclude internal/ core layers
+      # (session, eventsource, platform, harness, domain) during
+      # Phase 2 (cmd/usecase layer check) of refs/issues/0029.
+      - path: 'internal/(eventsource|session|platform|harness|domain)/'
+        linters:
+          - errcheck
+      # Exclude tests support and mock code from errcheck
+      - path: '^tests/'
+        linters:
+          - errcheck
       # internal/platform/stream_normalizer.go is a 3-tool canonical
       # lock target (sightjack / paintress / amadeus). The lastErr
       # field is currently dead but lives in all three copies; a
