@@ -22,6 +22,9 @@ import (
 // In Docker, it's installed at /usr/local/bin/amadeus.
 // Locally, it falls back to PATH lookup.
 func amadeusBin() string {
+	if env := os.Getenv("AMADEUS_BIN"); env != "" {
+		return env
+	}
 	if _, err := os.Stat("/usr/local/bin/amadeus"); err == nil {
 		return "/usr/local/bin/amadeus"
 	}

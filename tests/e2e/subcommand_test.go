@@ -194,3 +194,63 @@ func TestE2E_Sync_Empty(t *testing.T) {
 		t.Errorf("expected no pending comments, got %d", len(result.PendingComments))
 	}
 }
+
+func TestE2E_MCPServerToolsList(t *testing.T) {
+	// given
+	input := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+
+	// when
+	stdout, stderr, err := runCmdStdin(t, t.TempDir(), input, "mcp")
+	if err != nil {
+		t.Fatalf("mcp command failed: %v\nstderr: %s", err, stderr)
+	}
+
+	// then
+	idx := strings.Index(stdout, `{"jsonrpc"`)
+	if idx < 0 {
+		t.Fatalf("no JSON-RPC response found in stdout: %s", stdout)
+	}
+	jsonStr := stdout[idx:]
+
+	var resp struct {
+		JSONRPC string `json:"jsonrpc"`
+		ID      int    `json:"id"`
+		Result  struct {
+			Tools []struct {
+				Name string `json:"name"`
+			} `json:"tools"`
+		} `json:"result"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &resp); err != nil {
+		t.Fatalf("failed to unmarshal JSON-RPC response: %v\nraw: %s", err, jsonStr)
+	}
+
+	if resp.JSONRPC != "2.0" {
+		t.Errorf("expected jsonrpc 2.0, got %s", resp.JSONRPC)
+	}
+
+	if resp.ID != 1 {
+		t.Errorf("expected id 1, got %d", resp.ID)
+	}
+
+	expectedTools := map[string]bool{
+		"amadeus.ping":        false,
+		"amadeus.next_review": false,
+		"amadeus.post_comment": false,
+		"amadeus.get_pr_status": false,
+	}
+
+	for _, tool := range resp.Result.Tools {
+		if _, ok := expectedTools[tool.Name]; ok {
+			expectedTools[tool.Name] = true
+		}
+	}
+
+	for name, found := range expectedTools {
+		if !found {
+			t.Errorf("missing expected tool in MCP response: %s", name)
+		}
+	}
+}
+
