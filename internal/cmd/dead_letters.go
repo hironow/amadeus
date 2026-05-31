@@ -80,7 +80,7 @@ Pass --execute to actually delete them.`,
 			if storeErr != nil {
 				return fmt.Errorf("open outbox store: %w", storeErr)
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			ctx := cmd.Context()
 

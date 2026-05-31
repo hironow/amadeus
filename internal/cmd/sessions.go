@@ -49,7 +49,7 @@ func newSessionsListCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("open session store: %w", err)
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			opts := port.ListSessionOpts{Limit: limit}
 			if statusFilter != "" {
@@ -109,7 +109,7 @@ func newSessionsEnterCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("open session store: %w", err)
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			var rec domain.CodingSessionRecord
 			if len(args) == 1 {

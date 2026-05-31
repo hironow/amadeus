@@ -28,7 +28,7 @@ func applyOtelEnv(stateDir string) {
 		key = strings.TrimSpace(key)
 		val = os.ExpandEnv(strings.TrimSpace(val))
 		if os.Getenv(key) == "" {
-			os.Setenv(key, val)
+			_ = os.Setenv(key, val)
 		}
 	}
 }

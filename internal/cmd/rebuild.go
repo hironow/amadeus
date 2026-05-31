@@ -39,7 +39,7 @@ func newRebuildCommand() *cobra.Command {
 			if outboxErr != nil {
 				return fmt.Errorf("outbox store: %w", outboxErr)
 			}
-			defer outbox.Close()
+			defer func() { _ = outbox.Close() }()
 
 			projector := &session.Projector{Store: store, OutboxStore: outbox}
 
