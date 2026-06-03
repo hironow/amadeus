@@ -65,30 +65,17 @@ Domain command types use the Parse-Don't-Validate pattern:
 
 Ref: `.semgrep/layers.yaml`, ADR S0029
 
-## Tracking Mode (Wave vs Linear)
+## MCP Pivot Boundary
 
-### Claude Subprocess Isolation
+Amadeus no longer starts a Claude subprocess, scores divergence with a headless model call, or runs a D-Mail waiting-loop daemon. LLM review is owned by a human-initiated claude-code session attached to `amadeus mcp`.
 
-Claude subprocess uses layered isolation to prevent parent session context (266+ skills, 66+ plugins) from inflating token usage:
+- `amadeus mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
+- `amadeus.next_review` reads the gate event store and latest PR evaluation projection.
+- `amadeus.get_pr_status` reads per-PR status from the projection.
+- `amadeus.post_comment` posts a review comment through the wired `gh`-backed comment poster.
+- Data-plane commands (`log`, `sync`, `mark-commented`, `rebuild`, `status`) operate on local state without invoking an LLM.
 
-- `--setting-sources ""` skips all user/project settings (hooks, plugins, auto-memory) while preserving OAuth authentication
-- `--settings <stateDir>/.claude/settings.json` loads tool-specific settings (empty `enabledPlugins`)
-- `--disable-slash-commands` prevents user skills from inflating context
-- `--strict-mcp-config --mcp-config <stateDir>/.mcp.json` enforces MCP server allowlist
-- `mcp-config generate` creates both `.mcp.json` (wave: empty, linear: Linear MCP) and `.claude/settings.json`
-- User can edit `.mcp.json` to add custom MCP servers, `.claude/settings.json` for env vars or permissions
-
-### Claude Log Persistence
-
-- `WriteClaudeLog` saves raw NDJSON to `.run/claude-logs/{timestamp}.jsonl` after each invocation
-- Enables post-hoc debugging and audit of Claude subprocess interactions
-- Managed by archive-prune lifecycle
-
-- **Wave mode** (default, `--linear` not set): `checkLinearMCP` in doctor is skipped (status: SKIP, "wave mode"). The D-Mail wave field is accepted and carried in the event store.
-- **Linear mode** (`--linear`): Existing behavior — `checkLinearMCP` validates Linear MCP connection.
-- `runDoctor` receives `TrackingMode` parameter to conditionally run mode-specific checks.
-
-Ref: ADR S0035, `internal/cmd/doctor_checks.go`
+Ref: ADR 0026, `internal/session/mcp_server.go`
 
 ## Harness Inventory (Track A)
 

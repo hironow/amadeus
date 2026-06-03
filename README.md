@@ -158,7 +158,7 @@ D-Mail `.md` files are immutable once written. Each D-Mail carries a `idempotenc
 - Track check history with append-only event logs and rebuild projections (`log`, `rebuild`)
 - Record D-Mail × Issue comment sync state (`sync`, `mark-commented`)
 - Prune archived D-Mails and inspect dead letters (`archive-prune`, `dead-letters`)
-- Generate Claude subprocess isolation settings (`mcp-config generate`)
+- Generate claude-code MCP wiring (`mcp-config generate`)
 
 **What Amadeus does NOT do (retired with the MCP pivot):**
 
@@ -181,7 +181,7 @@ just install
 # Initialize .gate/ with default config
 amadeus init
 
-# Generate Claude subprocess isolation settings
+# Generate claude-code MCP wiring
 amadeus mcp-config generate
 
 # Upgrade existing installation (regenerate SKILL.md, .gitignore)
@@ -213,7 +213,7 @@ Running `amadeus` without a subcommand prints usage; there is no default run loo
 | `rebuild` | Rebuild projections from event store |
 | `archive-prune` | Prune old archived D-Mail files |
 | `dead-letters` | Inspect / purge dead-letter D-Mails |
-| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
+| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for the claude-code session |
 | `improvement-stats` | Show improvement-signal statistics |
 | `dashboard` | Cross-repo divergence dashboard |
 | `version` | Print version info |
@@ -225,7 +225,7 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 
 ```bash
 amadeus init                    # set up .gate/
-amadeus mcp-config generate     # Claude subprocess isolation settings
+amadeus mcp-config generate     # claude-code MCP wiring
 amadeus mcp                     # start MCP server (data plane)
 amadeus log                     # print recorded check history
 amadeus sessions list           # list interactive coding sessions
