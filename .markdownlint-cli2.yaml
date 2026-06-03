@@ -1,8 +1,14 @@
 gitignore: true
 ignores:
-  # cobra docgen output uses tab separators that markdownlint would
-  # rewrite to spaces. The CI docs-check job re-runs docgen and
-  # compares byte-identical against the committed files, so any
-  # markdownlint rewrite would create an infinite chase. Treat these
-  # files as generated and exclude them from markdownlint.
-  - "docs/cli/**"
+  - dist/**
+  - docs/cli/**
+  - node_modules/**
+  - .venv/**
+  - .siren/**
+  - .expedition/**
+  - .gate/**
+  - .pass/**
+  - internal/**/testdata/**
+  - testdata/**
+  - tests/**/fixtures/**
+  - tests/**/testdata/**

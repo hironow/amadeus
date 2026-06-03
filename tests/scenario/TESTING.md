@@ -4,8 +4,8 @@
 
 - Go 1.26+ (all 4 repos must use the same toolchain)
 - Sibling repos at the same parent directory:
-  - `phonewave/`, `sightjack/`, `paintress/`, `amadeus/`
-  - Override with env vars: `PHONEWAVE_REPO`, `SIGHTJACK_REPO`, `PAINTRESS_REPO`, `AMADEUS_REPO`
+    - `phonewave/`, `sightjack/`, `paintress/`, `amadeus/`
+    - Override with env vars: `PHONEWAVE_REPO`, `SIGHTJACK_REPO`, `PAINTRESS_REPO`, `AMADEUS_REPO`
 
 ## Running
 

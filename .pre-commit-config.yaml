@@ -1,52 +1,58 @@
-# prek (j178/prek) - Rust reimplementation of pre-commit
-# Install: cargo install prek / brew install j178/tap/prek
-# Usage: prek install && prek run --all-files
+# prek (j178/prek) - Rust reimplementation of pre-commit.
+# Install: just install-hooks
+# Run:     just pre-commit
 minimum_prek_version: "0.3.0"
 
 exclude: |
   (?x)^(
+    dist/|
+    docs/cli/|
+    node_modules/|
+    \.venv/|
+    \.siren/|
+    \.expedition/|
     \.gate/|
-    node_modules/
+    \.pass/|
+    internal/.*/testdata/|
+    testdata/|
+    tests/.*/fixtures/|
+    tests/.*/testdata/
   )
 
 repos:
-  # Rust-native builtin hooks (fast, no clone needed)
   - repo: builtin
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-toml
+      - id: check-json
       - id: check-added-large-files
         args: ["--maxkb=1024"]
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # Go: gofmt + go vet
   - repo: local
     hooks:
-      - id: gofmt
-        name: gofmt
-        entry: gofmt -l -w
+      - id: just-fmt
+        name: just fmt
+        entry: just fmt
         language: system
-        types: [go]
-      - id: go-vet
-        name: go vet
-        entry: bash -c 'go vet ./...'
-        language: system
-        types: [go]
         pass_filenames: false
+        files: '\.(go|md|yaml|toml|json)$'
 
-  # ======================================================================
-  # pre-push hooks (slower checks, run only on git push)
-  # ======================================================================
+      - id: just-lint
+        name: just lint
+        entry: just lint
+        language: system
+        pass_filenames: false
+        files: '\.(go|md|yaml|toml|json)$'
 
-  # Go: full test suite (300s timeout for container-based tests)
   - repo: local
     hooks:
-      - id: go-test
-        name: go test
-        entry: bash -c 'go test ./... -count=1 -timeout=300s'
+      - id: just-check
+        name: just check
+        entry: just check
         language: system
-        types: [go]
         pass_filenames: false
         stages: [pre-push]
