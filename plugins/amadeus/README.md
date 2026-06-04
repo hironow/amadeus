@@ -1,4 +1,4 @@
-# amadeus claude code plugin (jun15 MCP pivot)
+# amadeus Claude Code plugin (jun15 MCP pivot)
 
 **Status:** Phase 2b in progress (= MCP server stub + skill skeleton).
 Production target for the post-2026-06-15 architecture where claude
@@ -46,5 +46,5 @@ commits on `feat/jun15-mcp-pivot`.
 
 `amadeus mcp-config` (legacy) manages the `.mcp.json` config consumed
 by the embedded claude_adapter. `amadeus mcp` (this plugin) is the
-**server** consumed by claude code itself. The two have different roles
+**server** consumed by Claude Code itself. The two have different roles
 and coexist during the pivot transition.

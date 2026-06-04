@@ -6,7 +6,7 @@ description: >-
   "review the next PR via amadeus", "run amadeus review-gate", or
   "test the amadeus MCP server end-to-end". Drives the amadeus MCP
   server's tools (next_review / post_comment / get_pr_status) from
-  inside a human-initiated claude code interactive session so inference
+  inside a human-initiated Claude Code interactive session so inference
   stays on the subscription quota rather than the Agent SDK credit pool
   that gates `claude -p` from 2026-06-15.
 version: 0.1.0
@@ -29,7 +29,7 @@ allowed-tools:
 
 Human-initiated entry point. Drives the amadeus MCP server's tools
 without ever invoking `claude -p`, so all inference happens inside
-this interactive claude code session's subscription quota.
+this interactive Claude Code session's subscription quota.
 
 ## Prerequisites
 
@@ -98,7 +98,7 @@ get_pr_status.
 
 ## Done criteria
 
-A `/review-gate` run is complete when, in a real claude code session
+A `/review-gate` run is complete when, in a real Claude Code session
 with the amadeus MCP server attached:
 
 1. `ping` returns `pong` (handshake + tool dispatch verified).

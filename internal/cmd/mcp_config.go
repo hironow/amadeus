@@ -13,13 +13,13 @@ import (
 func newMCPConfigCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp-config",
-		Short: "Manage MCP configuration for Claude subprocess isolation",
+		Short: "Manage MCP wiring for Claude Code sessions",
 		Long: `Manage the .mcp.json file that controls which MCP servers
-are available to Claude subprocess invocations.
+are available to Claude Code sessions.
 
 Use 'generate' to create the initial config, then edit it to add or remove
-MCP servers as needed. Claude subprocess uses --strict-mcp-config to enforce
-this allowlist when the file exists.`,
+MCP servers as needed. Claude Code uses --strict-mcp-config to enforce this
+allowlist when the file exists.`,
 		Example: `  amadeus mcp-config generate
   amadeus mcp-config generate --linear
   amadeus mcp-config generate --force`,
@@ -34,16 +34,16 @@ func newMCPConfigGenerateCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "generate [path]",
-		Short: "Generate .mcp.json and .claude/settings.json for subprocess isolation",
-		Long: `Generate .mcp.json and .claude/settings.json for Claude subprocess isolation.
+		Short: "Generate .mcp.json and .claude/settings.json for Claude Code sessions",
+		Long: `Generate .mcp.json and .claude/settings.json for Claude Code MCP sessions.
 
 .mcp.json controls which MCP servers are available:
   - wave mode (default): empty config (no MCP servers)
   - linear mode (--linear): includes Linear MCP server
 
-.claude/settings.json disables all plugins for the subprocess.
+.claude/settings.json disables plugins so the session uses only the configured MCP surface.
 
-Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
+Claude Code uses --strict-mcp-config to enforce the MCP allowlist.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir := "."
