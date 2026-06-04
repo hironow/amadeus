@@ -1,15 +1,15 @@
 ## amadeus mcp-config
 
-Manage MCP configuration for Claude subprocess isolation
+Manage MCP wiring for Claude Code sessions
 
 ### Synopsis
 
 Manage the .mcp.json file that controls which MCP servers
-are available to Claude subprocess invocations.
+are available to Claude Code sessions.
 
 Use 'generate' to create the initial config, then edit it to add or remove
-MCP servers as needed. Claude subprocess uses --strict-mcp-config to enforce
-this allowlist when the file exists.
+MCP servers as needed. Claude Code uses --strict-mcp-config to enforce this
+allowlist when the file exists.
 
 ### Examples
 
@@ -40,5 +40,5 @@ this allowlist when the file exists.
 ### SEE ALSO
 
 * [amadeus](amadeus.md)	 - Divergence meter for your codebase
-* [amadeus mcp-config generate](amadeus_mcp-config_generate.md)	 - Generate .mcp.json and .claude/settings.json for subprocess isolation
+* [amadeus mcp-config generate](amadeus_mcp-config_generate.md)	 - Generate .mcp.json and .claude/settings.json for Claude Code sessions
 

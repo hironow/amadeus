@@ -25,7 +25,7 @@ import (
 // (posts to GitHub via `gh pr comment` when a CommentPoster is wired;
 // cmd wires one by default).
 //
-// Wire it into a claude code interactive session via --mcp-config so
+// Wire it into a Claude Code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
 // rather than crossing into the Agent SDK credit pool that gates
 // `claude -p` from 2026-06-15.
@@ -153,7 +153,7 @@ func (s *MCPServer) handle(ctx context.Context, line []byte) error {
 const mcpProtocolVersion = "2024-11-05"
 
 // initializeResult builds the MCP initialize handshake response. The
-// claude code session sends `initialize` first; without a valid reply
+// Claude Code session sends `initialize` first; without a valid reply
 // it never proceeds to tools/list. The server advertises its supported
 // protocol version + the tools capability.
 func initializeResult() map[string]any {
@@ -204,7 +204,7 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 }
 
 // toolDescriptors returns the tool set. Each entry pins the interface
-// (name, description, inputSchema) so claude code clients see a stable
+// (name, description, inputSchema) so Claude Code clients see a stable
 // contract. The handler bodies (realNextReview / realPostComment /
 // realGetPRStatus) read the gate event store / convergence projection
 // and post comments to GitHub via `gh pr comment` when wired.

@@ -32,7 +32,7 @@ amadeus [flags]
 * [amadeus log](amadeus_log.md)	 - Show divergence log
 * [amadeus mark-commented](amadeus_mark-commented.md)	 - Record that a D-Mail has been posted as a comment
 * [amadeus mcp](amadeus_mcp.md)	 - Run amadeus as an MCP server over stdio (review queue + PR comment data plane)
-* [amadeus mcp-config](amadeus_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
+* [amadeus mcp-config](amadeus_mcp-config.md)	 - Manage MCP wiring for Claude Code sessions
 * [amadeus rebuild](amadeus_rebuild.md)	 - Rebuild projections from event store
 * [amadeus sessions](amadeus_sessions.md)	 - Manage AI coding sessions
 * [amadeus status](amadeus_status.md)	 - Show amadeus operational status

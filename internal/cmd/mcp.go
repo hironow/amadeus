@@ -22,7 +22,7 @@ import (
 //
 // Distinct from `amadeus mcp-config` which manages the .mcp.json
 // configuration consumed by the legacy claude_adapter. This server
-// is consumed by claude code itself.
+// is consumed by Claude Code itself.
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
@@ -30,7 +30,7 @@ func newMCPCommand() *cobra.Command {
 		Long: `Start a Model Context Protocol server reading JSON-RPC 2.0
 messages on stdin and writing responses on stdout.
 
-Designed for embedding in a claude code interactive session via
+Designed for embedding in a Claude Code interactive session via
 --mcp-config so inference stays on the session's subscription quota
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
@@ -43,7 +43,7 @@ default).
 
 Not to be confused with 'amadeus mcp-config' (subcommand managing
 the legacy .mcp.json file consumed by the embedded claude_adapter).`,
-		Example: `  # Launch claude code with the amadeus MCP server attached
+		Example: `  # Launch Claude Code with the amadeus MCP server attached
   claude --mcp-config '{"amadeus":{"command":"amadeus","args":["mcp"]}}'
 
   # Pipe a tools/list request manually (for debugging)

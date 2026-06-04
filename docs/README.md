@@ -7,7 +7,7 @@
 - [self-improvement-loop.md](self-improvement-loop.md) — How amadeus participates in the observable self-improvement loop
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
-- Claude subprocess isolation: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it
+- Claude Code MCP session wiring: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it
 - Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation
 
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
@@ -20,7 +20,7 @@
 - [amadeus](cli/amadeus.md) — Root command
 - [amadeus init](cli/amadeus_init.md) — Initialize .gate directory
 - [amadeus mcp](cli/amadeus_mcp.md) — Start the MCP server (data plane)
-- [amadeus mcp-config](cli/amadeus_mcp-config.md) — Generate subprocess isolation settings
+- [amadeus mcp-config](cli/amadeus_mcp-config.md) — Generate MCP wiring for Claude Code sessions
 - [amadeus config](cli/amadeus_config.md) — View or update configuration
 - [amadeus config show](cli/amadeus_config_show.md) — Show current configuration
 - [amadeus config set](cli/amadeus_config_set.md) — Update configuration values
