@@ -4,15 +4,13 @@
     "style": "atx"
   },
   "MD004": {
-    "style": "consistent"
+    "style": "dash"
   },
   "MD007": {
     "indent": 4
   },
   "MD013": false,
-  "MD024": {
-    "siblings_only": true
-  },
+  "MD024": false,
   "MD025": false,
   "MD029": false,
   "MD033": false,
@@ -25,7 +23,6 @@
   "MD046": {
     "style": "fenced"
   },
-  "MD047": false,
   "MD049": {
     "style": "asterisk"
   },

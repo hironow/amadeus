@@ -7,7 +7,7 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 TOOL := "amadeus"
 
 # External commands
-MARKDOWNLINT := "bunx markdownlint-cli2"
+MARKDOWNLINT := "mise x -- markdownlint-cli2"
 
 # Version from git tags
 VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
@@ -22,20 +22,23 @@ default: help
 help:
     @just --list --unsorted
 
-# Install prek hooks (pre-commit + pre-push) with quiet mode
-prek-install:
-    prek install -t pre-commit -t pre-push --overwrite
-    @sed 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-commit > .git/hooks/pre-commit.tmp && mv .git/hooks/pre-commit.tmp .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-    @sed 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-push > .git/hooks/pre-push.tmp && mv .git/hooks/pre-push.tmp .git/hooks/pre-push && chmod +x .git/hooks/pre-push
-    @echo "prek hooks installed (quiet mode)"
+# Install prek-managed git hooks once per clone
+install-hooks:
+    mise exec -- prek install -t pre-commit -t pre-push --overwrite
 
-# Run all prek hooks on all files
-prek-run:
-    prek run --all-files
+# Backward-compatible alias for older docs and muscle memory
+prek-install: install-hooks
+
+# Run every prek hook against all files
+pre-commit:
+    mise exec -- prek run --all-files
+
+# Backward-compatible alias for older docs and muscle memory
+prek-run: pre-commit
 
 # Lint markdown files
 lint-md:
-    @{{MARKDOWNLINT}} --fix "*.md" "docs/**/*.md"
+    @git ls-files -z '*.md' | xargs -0 -r {{MARKDOWNLINT}} --fix
 
 # Build the binary with version info
 build:
@@ -70,6 +73,7 @@ cover-html: cover
 # Format code
 fmt:
     gofmt -w .
+    git ls-files -z '*.md' | xargs -0 -r {{MARKDOWNLINT}} --fix
 
 # Run go vet
 vet:
