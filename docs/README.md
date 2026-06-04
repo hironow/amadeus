@@ -8,7 +8,7 @@
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
 - Claude Code MCP session wiring: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it
-- Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation
+- Claude Code session telemetry: session metadata and MCP wiring are managed under `.gate/`; the Go CLI data plane does not own model inference logs
 
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
 - [rival-contract-v1.md](rival-contract-v1.md) — Rival Contract v1 (amadeus as drift controller; archive projection + corrective D-Mails)

@@ -154,16 +154,16 @@ D-Mail `.md` files are immutable once written. Each D-Mail carries a `idempotenc
 
 - Serve the gate event store and PR-status projection over MCP (`amadeus.next_review`, `amadeus.get_pr_status`)
 - Post review comments to GitHub PRs via the `gh` CLI (`amadeus.post_comment`)
-- Provide interactive claude-code coding sessions (`sessions list` / `sessions enter`)
+- Provide interactive Claude Code coding sessions (`sessions list` / `sessions enter`)
 - Track check history with append-only event logs and rebuild projections (`log`, `rebuild`)
 - Record D-Mail × Issue comment sync state (`sync`, `mark-commented`)
 - Prune archived D-Mails and inspect dead letters (`archive-prune`, `dead-letters`)
-- Generate claude-code MCP wiring (`mcp-config generate`)
+- Generate Claude Code MCP wiring (`mcp-config generate`)
 
 **What Amadeus does NOT do (retired with the MCP pivot):**
 
 - Run a headless divergence-check daemon or D-Mail waiting loop
-- Score divergence with a headless Claude call (the LLM review now fires from the claude-code session)
+- Score divergence with a headless Claude call (the LLM review now fires from the Claude Code session)
 - Generate or emit corrective D-Mails autonomously
 - Run a PR convergence / auto-merge pipeline
 - Implement fixes automatically
