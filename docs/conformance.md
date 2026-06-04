@@ -67,7 +67,7 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ## MCP Pivot Boundary
 
-Amadeus no longer starts a Claude subprocess, scores divergence with a headless model call, or runs a D-Mail waiting-loop daemon. LLM review is owned by a human-initiated claude-code session attached to `amadeus mcp`.
+Amadeus does not own model inference, score divergence with a headless model call, or run a D-Mail waiting-loop daemon. LLM review is owned by a human-initiated Claude Code session attached to `amadeus mcp`.
 
 - `amadeus mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
 - `amadeus.next_review` reads the gate event store and latest PR evaluation projection.
