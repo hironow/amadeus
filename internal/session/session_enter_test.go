@@ -46,12 +46,13 @@ func TestBuildIsolationFlags_AlwaysIncludesBase(t *testing.T) {
 	}
 	args := session.ExportBuildIsolationFlags(cfg.ConfigBase)
 
-	// --setting-sources "" and --disable-slash-commands are always present
+	// --setting-sources "" is present, but slash commands remain enabled
+	// because MCP pivot workflows are driven by slash-command skills.
 	if !containsFlag(args, "--setting-sources") {
 		t.Error("missing --setting-sources flag")
 	}
-	if !containsFlag(args, "--disable-slash-commands") {
-		t.Error("missing --disable-slash-commands flag")
+	if containsFlag(args, "--disable-slash-commands") {
+		t.Error("slash commands must remain enabled for MCP pivot skills")
 	}
 }
 
@@ -139,8 +140,8 @@ func TestEnterSession_ResumeArgPassedToProvider(t *testing.T) {
 	if !strings.Contains(output, "--resume sess-exec-001") {
 		t.Errorf("expected --resume sess-exec-001 in output: %q", output)
 	}
-	if !strings.Contains(output, "--disable-slash-commands") {
-		t.Errorf("expected --disable-slash-commands in output: %q", output)
+	if strings.Contains(output, "--disable-slash-commands") {
+		t.Errorf("did not expect --disable-slash-commands in output: %q", output)
 	}
 }
 

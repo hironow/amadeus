@@ -46,13 +46,12 @@ func EnterSession(ctx context.Context, cfg EnterConfig) error {
 }
 
 // BuildClaudeIsolationFlags returns the Claude-specific isolation flags for
-// subprocess invocation. These match the flags used by ClaudeAdapter but omit
-// --print and --output-format since this is an interactive session.
+// interactive session re-entry. Slash commands stay enabled because MCP pivot
+// workflows are driven by slash-command skills.
 // This is a Claude-specific runtime seam (see S0037).
 func BuildClaudeIsolationFlags(configBase string) []string {
 	var args []string
 	args = append(args, "--setting-sources", "")
-	args = append(args, "--disable-slash-commands")
 
 	if settingsPath := ClaudeSettingsPath(configBase); ClaudeSettingsExists(configBase) {
 		args = append(args, "--settings", settingsPath)

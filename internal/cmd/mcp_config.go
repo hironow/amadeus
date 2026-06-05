@@ -21,7 +21,6 @@ Use 'generate' to create the initial config, then edit it to add or remove
 MCP servers as needed. Claude Code uses --strict-mcp-config to enforce this
 allowlist when the file exists.`,
 		Example: `  amadeus mcp-config generate
-  amadeus mcp-config generate --linear
   amadeus mcp-config generate --force`,
 	}
 
@@ -38,8 +37,7 @@ func newMCPConfigGenerateCommand() *cobra.Command {
 		Long: `Generate .mcp.json and .claude/settings.json for Claude Code MCP sessions.
 
 .mcp.json controls which MCP servers are available:
-  - wave mode (default): empty config (no MCP servers)
-  - linear mode (--linear): includes Linear MCP server
+  - includes this repo's amadeus MCP server
 
 .claude/settings.json disables plugins so the session uses only the configured MCP surface.
 
@@ -52,8 +50,7 @@ Claude Code uses --strict-mcp-config to enforce the MCP allowlist.`,
 			}
 
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
-			linearFlag := mustBool(cmd, "linear")
-			mode := domain.NewTrackingMode(linearFlag)
+			mode := domain.NewTrackingMode(false)
 
 			path, genErr := session.GenerateMCPConfig(baseDir, mode, force)
 			if genErr != nil {
@@ -65,11 +62,7 @@ Claude Code uses --strict-mcp-config to enforce the MCP allowlist.`,
 				}
 			} else {
 				logger.OK("Generated %s (mode: %s)", path, mode)
-				if mode.IsWave() {
-					logger.Info("Empty config — no MCP servers. Edit to add custom servers.")
-				} else {
-					logger.Info("Linear MCP server included. Edit to add/remove servers.")
-				}
+				logger.Info("Amadeus MCP server included. Edit to add custom servers.")
 			}
 
 			settingsPath, settingsErr := session.GenerateClaudeSettings(baseDir, force)

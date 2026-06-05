@@ -109,7 +109,8 @@ func MCPConfigExists(baseDir string) (bool, error) {
 }
 
 // GenerateMCPConfig creates a .mcp.json file.
-// Linear mode includes Linear MCP server. Wave mode produces empty config.
+// The generated config always includes this tool's MCP server used by
+// human-initiated Claude Code sessions after the MCP pivot.
 // If a legacy .run/mcp-config.json exists and the new file does not, the
 // legacy content is migrated forward to preserve custom MCP server entries.
 func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (string, error) {
@@ -135,15 +136,13 @@ func GenerateMCPConfig(baseDir string, mode domain.TrackingMode, force bool) (st
 		}
 	}
 
-	// Enforce mode: wave mode = no MCP servers, linear mode = add linear server
-	if mode.IsWave() {
-		delete(cfg.MCPServers, "linear") // Remove stale linear server from legacy migration
-	}
-	if mode.IsLinear() {
-		cfg.MCPServers["linear"] = MCPServerEntry{
-			Command: "npx",
-			Args:    []string{"-y", "@anthropic-ai/claude-code-mcp-adapter", "--transport", "http", "https://mcp.linear.app/mcp"},
-		}
+	// Post-pivot configs attach this tool's own MCP server. Remove stale
+	// Linear entries migrated from legacy configs; Linear tracking is no
+	// longer a generated path.
+	delete(cfg.MCPServers, "linear")
+	cfg.MCPServers["amadeus"] = MCPServerEntry{
+		Command: "amadeus",
+		Args:    []string{"mcp"},
 	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
