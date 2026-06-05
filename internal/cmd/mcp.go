@@ -20,9 +20,8 @@ import (
 // (read the gate event store / convergence projection) +
 // amadeus.post_comment (posts to GitHub via `gh pr comment`).
 //
-// Distinct from `amadeus mcp-config` which manages the .mcp.json
-// configuration consumed by the legacy claude_adapter. This server
-// is consumed by Claude Code itself.
+// Distinct from `amadeus mcp-config`, which writes the Claude Code
+// MCP allowlist that points back to this stdio server.
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
@@ -41,8 +40,8 @@ amadeus.post_comment (posts a review comment to GitHub via
 'gh pr comment' when a CommentPoster is wired; cmd wires one by
 default).
 
-Not to be confused with 'amadeus mcp-config' (subcommand managing
-the legacy .mcp.json file consumed by the embedded claude_adapter).`,
+Not to be confused with 'amadeus mcp-config' (subcommand writing
+the Claude Code MCP allowlist that points back to this stdio server).`,
 		Example: `  # Launch Claude Code with the amadeus MCP server attached
   claude --mcp-config '{"amadeus":{"command":"amadeus","args":["mcp"]}}'
 

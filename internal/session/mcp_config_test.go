@@ -9,7 +9,7 @@ import (
 	"github.com/hironow/amadeus/internal/session"
 )
 
-func TestGenerateMCPConfig_WaveMode_EmptyServers(t *testing.T) {
+func TestGenerateMCPConfig_WaveMode_IncludesToolServer(t *testing.T) {
 	dir := t.TempDir()
 	path, err := session.GenerateMCPConfig(dir, domain.ModeWave, false)
 	if err != nil {
@@ -19,27 +19,32 @@ func TestGenerateMCPConfig_WaveMode_EmptyServers(t *testing.T) {
 	if len(data) == 0 {
 		t.Fatal("expected non-empty file")
 	}
-	// Should contain empty mcpServers
 	if got := string(data); got == "" || !contains(got, `"mcpServers"`) {
 		t.Errorf("expected mcpServers key, got: %s", got)
+	}
+	if !contains(string(data), `"amadeus"`) {
+		t.Error("wave mode should include this tool's MCP server")
+	}
+	if !contains(string(data), `"mcp"`) {
+		t.Error("this tool's MCP server should run the mcp subcommand")
 	}
 	if contains(string(data), "linear") {
 		t.Error("wave mode should not include linear MCP")
 	}
 }
 
-func TestGenerateMCPConfig_LinearMode_IncludesLinear(t *testing.T) {
+func TestGenerateMCPConfig_LinearMode_DoesNotIncludeLinear(t *testing.T) {
 	dir := t.TempDir()
 	path, err := session.GenerateMCPConfig(dir, domain.ModeLinear, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	data, _ := os.ReadFile(path)
-	if !contains(string(data), "linear") {
-		t.Error("linear mode should include linear MCP server")
+	if !contains(string(data), "amadeus") {
+		t.Error("linear mode should still include this tool's MCP server")
 	}
-	if !contains(string(data), "mcp.linear.app") {
-		t.Error("expected Linear MCP URL")
+	if contains(string(data), "mcp.linear.app") || contains(string(data), "linear") {
+		t.Error("Linear MCP server should not be generated after MCP pivot")
 	}
 }
 
@@ -63,8 +68,11 @@ func TestGenerateMCPConfig_ForceOverwrites(t *testing.T) {
 		t.Fatalf("force overwrite failed: %v", err)
 	}
 	data, _ := os.ReadFile(session.MCPConfigPath(dir))
-	if !contains(string(data), "linear") {
-		t.Error("force overwrite should produce linear config")
+	if !contains(string(data), "amadeus") {
+		t.Error("force overwrite should produce this tool's MCP config")
+	}
+	if contains(string(data), "linear") {
+		t.Error("force overwrite should not produce linear config")
 	}
 }
 

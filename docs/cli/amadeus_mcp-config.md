@@ -15,7 +15,6 @@ allowlist when the file exists.
 
 ```
   amadeus mcp-config generate
-  amadeus mcp-config generate --linear
   amadeus mcp-config generate --force
 ```
 

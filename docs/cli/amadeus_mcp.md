@@ -18,8 +18,8 @@ amadeus.post_comment (posts a review comment to GitHub via
 'gh pr comment' when a CommentPoster is wired; cmd wires one by
 default).
 
-Not to be confused with 'amadeus mcp-config' (subcommand managing
-the legacy .mcp.json file consumed by the embedded claude_adapter).
+Not to be confused with 'amadeus mcp-config' (subcommand writing
+the Claude Code MCP allowlist that points back to this stdio server).
 
 ```
 amadeus mcp [flags]

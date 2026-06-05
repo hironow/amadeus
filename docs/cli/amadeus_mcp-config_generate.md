@@ -7,8 +7,7 @@ Generate .mcp.json and .claude/settings.json for Claude Code sessions
 Generate .mcp.json and .claude/settings.json for Claude Code MCP sessions.
 
 .mcp.json controls which MCP servers are available:
-  - wave mode (default): empty config (no MCP servers)
-  - linear mode (--linear): includes Linear MCP server
+  - includes this repo's amadeus MCP server
 
 .claude/settings.json disables plugins so the session uses only the configured MCP surface.
 
