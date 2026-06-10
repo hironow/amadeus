@@ -2,7 +2,7 @@
 
 **An MCP server + data plane for post-merge divergence review: it reads the gate event store and PR-status projection, and posts review comments to GitHub PRs.**
 
-Following the MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Amadeus the Go CLI is now a pure data plane: it serves the gate event store and PR-status projection over MCP, posts review comments to GitHub PRs via the `gh` CLI, and provides the supporting data-plane commands. The divergence scoring, D-Mail generation, and the headless waiting-loop daemon have been retired — the LLM-driven review is now firing from the claude-code session via the `/review-gate` skill and the amadeus MCP tools (see `plugins/amadeus/skills/review-gate/SKILL.md`; `.gate/skills/` holds the D-Mail routing manifests for phonewave discovery).
+Following the MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Amadeus the Go CLI is now a pure data plane: it serves the gate event store and PR-status projection over MCP, posts review comments to GitHub PRs via the `gh` CLI, and provides the supporting data-plane commands. The divergence scoring, D-Mail generation, and the headless waiting-loop daemon have been retired — the LLM-driven review is now firing from the claude-code session via the `/review-gate` skill and the amadeus MCP tools (materialized into the project's `.claude/skills/` by `amadeus init`; canonical source `internal/platform/templates/claude-skills/review-gate/SKILL.md`; `.gate/skills/` holds the D-Mail routing manifests for phonewave discovery).
 
 ```bash
 amadeus mcp
@@ -10,10 +10,12 @@ amadeus mcp
 
 `amadeus mcp` starts the MCP server. Its tools expose:
 
-- `amadeus.ping` — liveness probe
-- `amadeus.next_review` — read the gate event store: latest check, divergence reading, and PRs evaluated
-- `amadeus.get_pr_status` — read the PR-status projection for a given PR
-- `amadeus.post_comment` — post a review comment to a PR via the GitHub Comments API (`gh pr comment`)
+- `ping` — liveness probe
+- `refresh_reviews` — ingest the GitHub open-PR list into the gate event store (on-demand, reviewer write path; refs issue 0032)
+- `next_review` — serve the oldest un-reviewed PR from the latest snapshot (review intake), falling back to the legacy check read model
+- `get_pr_status` — read the PR-status projection for a given PR
+- `post_comment` — post a review comment via `gh pr comment` and record review.posted in the gate ledger
+- `dmail` — emit a design-feedback / implementation-feedback / convergence D-Mail via the transactional outbox (refs issue 0031)
 
 The terms below (Reading Steiner, Divergence Meter, D-Mail, World Line) describe the conceptual model preserved in the gate event store and read models. They are no longer produced by a headless amadeus daemon; the event store is populated as reviews are recorded from the claude-code session.
 
@@ -52,7 +54,7 @@ divergence jump, capability boundary detection, D-Mail severity routing,
 divergence trend analysis) were properties of the headless check pipeline,
 which has been retired with the MCP pivot. The scoring weights and thresholds
 still live in `.gate/config.yaml` and the recorded scores remain readable in
-the gate event store via `amadeus log` and the `amadeus.next_review` MCP tool,
+the gate event store via `amadeus log` and the `next_review` MCP tool,
 but amadeus no longer runs the scoring itself — the review is driven from the
 claude-code session.
 
