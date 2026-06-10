@@ -56,6 +56,8 @@ var validEventTypes = map[EventType]bool{
 	EventPRMerged:             true,
 	EventPRMergeSkipped:       true,
 	EventSystemCutover:        true,
+	EventPRSnapshotIngested:   true,
+	EventReviewPosted:         true,
 }
 
 // AllValidEventTypes returns a copy of the canonical event type set (for testing/validation).

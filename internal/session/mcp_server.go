@@ -19,9 +19,9 @@ import (
 // MCPServer is a stdio-based Model Context Protocol server for the
 // refs/issues/0027 jun15 MCP pivot.
 //
-// All four tools are real implementations: amadeus.ping (health
-// check), amadeus.next_review + amadeus.get_pr_status (read the gate
-// event store / convergence projection), and amadeus.post_comment
+// All four tools are real implementations: ping (health
+// check), next_review + get_pr_status (read the gate
+// event store / convergence projection), and post_comment
 // (posts to GitHub via `gh pr comment` when a CommentPoster is wired;
 // cmd wires one by default).
 //
@@ -44,7 +44,10 @@ type MCPServer struct {
 	out           io.Writer
 	logger        domain.Logger
 	gateDir       string
+	repoRoot      string
 	commentPoster port.CommentPoster
+	prLister      port.OpenPRLister
+	reviewEmitter port.ReviewIntakeEmitter
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -65,11 +68,34 @@ func (s *MCPServer) WithGateDir(gateDir string) *MCPServer {
 }
 
 // WithCommentPoster wires the GitHub Comments API adapter used by
-// amadeus.post_comment. When nil, post_comment stays preview-only;
+// post_comment. When nil, post_comment stays preview-only;
 // the cmd composition root injects a GhPRWriter by default in
 // repo-scoped invocations.
 func (s *MCPServer) WithCommentPoster(p port.CommentPoster) *MCPServer {
 	s.commentPoster = p
+	return s
+}
+
+// WithPRLister wires the narrow open-PR read seam used by
+// refresh_reviews (refs issue 0032 D2(a)).
+func (s *MCPServer) WithPRLister(l port.OpenPRLister) *MCPServer {
+	s.prLister = l
+	return s
+}
+
+// WithRepoRoot sets the project root used by the dmail emission tool
+// to derive the .gate/ outbox store paths (refs issue 0031).
+func (s *MCPServer) WithRepoRoot(root string) *MCPServer {
+	s.repoRoot = root
+	return s
+}
+
+// WithReviewEmitter wires the reviewer write seam: snapshot ingestion
+// (refresh_reviews) + review.posted ledger entries (post_comment).
+// When nil, refresh_reviews degrades to preview-only and post_comment
+// skips the ledger entry.
+func (s *MCPServer) WithReviewEmitter(e port.ReviewIntakeEmitter) *MCPServer {
+	s.reviewEmitter = e
 	return s
 }
 
@@ -161,6 +187,10 @@ func initializeResult() map[string]any {
 		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 		"serverInfo":      map[string]any{"name": "amadeus", "version": "0.1.0"},
+		// instructions feed Claude Code's deferred tool loading (Tool
+		// Search): only tool names + this summary are in context at
+		// startup, so it must say what the server is FOR.
+		"instructions": "amadeus is the verifier data plane of the tap 5-tool ecosystem: refresh the review queue from GitHub (refresh_reviews), read the next un-reviewed PR (next_review, get_pr_status), post review comments (post_comment), and emit corrective feedback d-mails through the transactional outbox (dmail). Drive it from the /review-gate skill in a human-initiated session.",
 	}
 }
 
@@ -182,14 +212,18 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	status := "ok"
 	var result map[string]any
 	switch call.Name {
-	case "amadeus.ping":
+	case "ping":
 		result = textResult("pong")
-	case "amadeus.next_review":
+	case "next_review":
 		result = realNextReview(ctx, s.gateDir, s.logger)
-	case "amadeus.post_comment":
-		result = realPostComment(ctx, s.commentPoster, call.Arguments)
-	case "amadeus.get_pr_status":
+	case "post_comment":
+		result = realPostComment(ctx, s.commentPoster, s.reviewEmitter, call.Arguments)
+	case "get_pr_status":
 		result = realGetPRStatus(ctx, s.gateDir, call.Arguments, s.logger)
+	case "refresh_reviews":
+		result = realRefreshReviews(ctx, s.gateDir, s.prLister, s.reviewEmitter, call.Arguments)
+	case "dmail":
+		result = realDMail(ctx, s.repoRoot, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -211,17 +245,17 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "amadeus.ping",
+			"name":        "ping",
 			"description": "Health check. Returns 'pong'.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "amadeus.next_review",
+			"name":        "next_review",
 			"description": "Return latest CheckCompleted event + total check count + PRs evaluated in the most recent check. The session picks the PR with highest divergence to review next.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "amadeus.post_comment",
+			"name":        "post_comment",
 			"description": "Post a review comment to the given PR via the GitHub Comments API (= `gh pr comment`). When a CommentPoster is wired (cmd wires one by default), posted=true + persistence='github-comments-api'. Otherwise preview-only + persistence='preview-only'.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -233,7 +267,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "amadeus.get_pr_status",
+			"name":        "get_pr_status",
 			"description": "Return per-PR check history (= filter CheckCompleted events where PRsEvaluated contains the given pr_number). Returns latest divergence + check_count + gate_denied flag + dmail_count.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -241,6 +275,34 @@ func toolDescriptors() []map[string]any {
 					"pr_number": map[string]any{"type": "integer"},
 				},
 				"required": []any{"pr_number"},
+			},
+		},
+		{
+			"name":        "dmail",
+			"description": "Emit a D-Mail through the transactional outbox (refs issue 0031). Arguments map onto the D-Mail v1 schema; amadeus may emit kinds: design-feedback / implementation-feedback / convergence. Never write outbox/ directly — this tool is the canonical atomic path (SQLite stage -> flush) that phonewave delivery depends on. Re-sending the same name is an idempotent upsert.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind":        map[string]any{"type": "string", "description": "design-feedback / implementation-feedback / convergence"},
+					"name":        map[string]any{"type": "string", "description": "unique d-mail name (becomes <name>.md)"},
+					"description": map[string]any{"type": "string", "description": "one-line summary (required by schema v1)"},
+					"body":        map[string]any{"type": "string", "description": "markdown body (findings / corrective actions)"},
+					"issues":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "related issue ids"},
+					"severity":    map[string]any{"type": "string", "description": "low / medium / high (optional)"},
+					"priority":    map[string]any{"type": "integer", "description": "priority (optional)"},
+					"metadata":    map[string]any{"type": "object", "description": "string map; project_id / actor_type injected automatically"},
+				},
+				"required": []any{"kind", "name", "description", "body"},
+			},
+		},
+		{
+			"name":        "refresh_reviews",
+			"description": "Ingest the current GitHub open-PR list into the gate event store (EventPRSnapshotIngested, on-demand via `gh pr list` — no daemon, no LLM). next_review then serves the oldest un-reviewed PR from the latest snapshot; post_comment marks PRs reviewed. Re-running replaces the snapshot (idempotent).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"base_branch": map[string]any{"type": "string", "description": "target base branch (default: main)"},
+				},
 			},
 		},
 	}
@@ -283,6 +345,12 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 			"gateDir":     gateDir,
 		})
 	}
+	// Intake contract (refs issue 0032 D2(a)): when a PR snapshot
+	// exists, serve the oldest un-reviewed PR from it. The legacy
+	// check.completed read model remains the fallback.
+	if intake := loadReviewIntake(events); intake != nil {
+		return jsonResult(intakeResult(gateDir, intake))
+	}
 	var latest *domain.CheckResult
 	checkCount := 0
 	for _, ev := range events {
@@ -319,7 +387,7 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 		"prs_evaluated":      latest.PRsEvaluated,
 		"dmails_emitted":     len(latest.DMails),
 		"convergence_alerts": len(latest.ConvergenceAlerts),
-		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, and either post the review via amadeus.post_comment (when wired) or the human-driven workflow.",
+		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, and either post the review via post_comment (when wired) or the human-driven workflow.",
 	})
 }
 
@@ -330,12 +398,12 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 // haven't opted into write mode.
 //
 // LLM firing remains human-initiated: the claude-code session decides
-// when to call amadeus.post_comment, and the poster only fires when
+// when to call post_comment, and the poster only fires when
 // the cmd composition root explicitly injected an adapter.
 //
 // Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy, with
 // poster wiring borrowed from sightjack.update_strictness (= 675ce8c).
-func realPostComment(ctx context.Context, poster port.CommentPoster, args json.RawMessage) map[string]any {
+func realPostComment(ctx context.Context, poster port.CommentPoster, emitter port.ReviewIntakeEmitter, args json.RawMessage) map[string]any {
 	var payload struct {
 		PRNumber int    `json:"pr_number"`
 		Body     string `json:"body"`
@@ -370,13 +438,26 @@ func realPostComment(ctx context.Context, poster port.CommentPoster, args json.R
 			"reason":      fmt.Sprintf("PostComment failed: %v", err),
 		})
 	}
-	return jsonResult(map[string]any{
+	res := map[string]any{
 		"persisted":   true,
 		"pr_number":   payload.PRNumber,
 		"body_length": len(payload.Body),
 		"posted":      true,
 		"persistence": "github-comments-api",
-	})
+	}
+	// Record review.posted in the gate ledger so next_review drops this
+	// PR from the pending intake (refs issue 0032 D2(a)). Best-effort:
+	// the GitHub post already succeeded, so a ledger failure is
+	// surfaced for repair rather than reported as a failed post.
+	if emitter != nil {
+		if err := emitter.EmitReviewPosted(strconv.Itoa(payload.PRNumber), time.Now().UTC()); err != nil {
+			res["review_event_recorded"] = false
+			res["reason"] = fmt.Sprintf("review.posted append failed: %v", err)
+		} else {
+			res["review_event_recorded"] = true
+		}
+	}
+	return jsonResult(res)
 }
 
 // realGetPRStatus reads CheckCompleted events and returns the PR's
