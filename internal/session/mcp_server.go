@@ -45,6 +45,8 @@ type MCPServer struct {
 	logger        domain.Logger
 	gateDir       string
 	commentPoster port.CommentPoster
+	prLister      port.OpenPRLister
+	reviewEmitter port.ReviewIntakeEmitter
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -70,6 +72,22 @@ func (s *MCPServer) WithGateDir(gateDir string) *MCPServer {
 // repo-scoped invocations.
 func (s *MCPServer) WithCommentPoster(p port.CommentPoster) *MCPServer {
 	s.commentPoster = p
+	return s
+}
+
+// WithPRLister wires the narrow open-PR read seam used by
+// refresh_reviews (refs issue 0032 D2(a)).
+func (s *MCPServer) WithPRLister(l port.OpenPRLister) *MCPServer {
+	s.prLister = l
+	return s
+}
+
+// WithReviewEmitter wires the reviewer write seam: snapshot ingestion
+// (refresh_reviews) + review.posted ledger entries (post_comment).
+// When nil, refresh_reviews degrades to preview-only and post_comment
+// skips the ledger entry.
+func (s *MCPServer) WithReviewEmitter(e port.ReviewIntakeEmitter) *MCPServer {
+	s.reviewEmitter = e
 	return s
 }
 
@@ -187,9 +205,11 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	case "next_review":
 		result = realNextReview(ctx, s.gateDir, s.logger)
 	case "post_comment":
-		result = realPostComment(ctx, s.commentPoster, call.Arguments)
+		result = realPostComment(ctx, s.commentPoster, s.reviewEmitter, call.Arguments)
 	case "get_pr_status":
 		result = realGetPRStatus(ctx, s.gateDir, call.Arguments, s.logger)
+	case "refresh_reviews":
+		result = realRefreshReviews(ctx, s.gateDir, s.prLister, s.reviewEmitter, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -243,6 +263,16 @@ func toolDescriptors() []map[string]any {
 				"required": []any{"pr_number"},
 			},
 		},
+		{
+			"name":        "refresh_reviews",
+			"description": "Ingest the current GitHub open-PR list into the gate event store (EventPRSnapshotIngested, on-demand via `gh pr list` — no daemon, no LLM). next_review then serves the oldest un-reviewed PR from the latest snapshot; post_comment marks PRs reviewed. Re-running replaces the snapshot (idempotent).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"base_branch": map[string]any{"type": "string", "description": "target base branch (default: main)"},
+				},
+			},
+		},
 	}
 }
 
@@ -282,6 +312,12 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 			"reason":      fmt.Sprintf("event store load failed: %v", err),
 			"gateDir":     gateDir,
 		})
+	}
+	// Intake contract (refs issue 0032 D2(a)): when a PR snapshot
+	// exists, serve the oldest un-reviewed PR from it. The legacy
+	// check.completed read model remains the fallback.
+	if intake := loadReviewIntake(events); intake != nil {
+		return jsonResult(intakeResult(gateDir, intake))
 	}
 	var latest *domain.CheckResult
 	checkCount := 0
@@ -335,7 +371,7 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 //
 // Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy, with
 // poster wiring borrowed from sightjack.update_strictness (= 675ce8c).
-func realPostComment(ctx context.Context, poster port.CommentPoster, args json.RawMessage) map[string]any {
+func realPostComment(ctx context.Context, poster port.CommentPoster, emitter port.ReviewIntakeEmitter, args json.RawMessage) map[string]any {
 	var payload struct {
 		PRNumber int    `json:"pr_number"`
 		Body     string `json:"body"`
@@ -370,13 +406,26 @@ func realPostComment(ctx context.Context, poster port.CommentPoster, args json.R
 			"reason":      fmt.Sprintf("PostComment failed: %v", err),
 		})
 	}
-	return jsonResult(map[string]any{
+	res := map[string]any{
 		"persisted":   true,
 		"pr_number":   payload.PRNumber,
 		"body_length": len(payload.Body),
 		"posted":      true,
 		"persistence": "github-comments-api",
-	})
+	}
+	// Record review.posted in the gate ledger so next_review drops this
+	// PR from the pending intake (refs issue 0032 D2(a)). Best-effort:
+	// the GitHub post already succeeded, so a ledger failure is
+	// surfaced for repair rather than reported as a failed post.
+	if emitter != nil {
+		if err := emitter.EmitReviewPosted(strconv.Itoa(payload.PRNumber), time.Now().UTC()); err != nil {
+			res["review_event_recorded"] = false
+			res["reason"] = fmt.Sprintf("review.posted append failed: %v", err)
+		} else {
+			res["review_event_recorded"] = true
+		}
+	}
+	return jsonResult(res)
 }
 
 // realGetPRStatus reads CheckCompleted events and returns the PR's

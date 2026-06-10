@@ -8,6 +8,7 @@ import (
 
 	"github.com/hironow/amadeus/internal/domain"
 	"github.com/hironow/amadeus/internal/session"
+	"github.com/hironow/amadeus/internal/usecase"
 )
 
 // newMCPCommand exposes `amadeus mcp` as a stdio MCP server entry
@@ -59,9 +60,17 @@ the Claude Code MCP allowlist that points back to this stdio server).`,
 			// side effects on its own. Errors from `gh pr comment` surface
 			// to the session via the response's reason field.
 			poster := session.NewGhPRWriter(cwd)
-			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).
+			logger := loggerFrom(cmd)
+			// Reviewer write path (refs issue 0032 D2(a)): refresh_reviews
+			// ingests open PRs via gh; post_comment records review.posted.
+			store := session.NewEventStore(gateDir, logger)
+			emitter := usecase.NewReviewIntakeEmitter(cmd.Context(), store, logger)
+			lister := session.NewGhPRReader(cwd)
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), logger).
 				WithGateDir(gateDir).
-				WithCommentPoster(poster)
+				WithCommentPoster(poster).
+				WithPRLister(lister).
+				WithReviewEmitter(emitter)
 			return srv.Serve(cmd.Context())
 		},
 	}
