@@ -190,7 +190,7 @@ func initializeResult() map[string]any {
 		// instructions feed Claude Code's deferred tool loading (Tool
 		// Search): only tool names + this summary are in context at
 		// startup, so it must say what the server is FOR.
-		"instructions": "amadeus is the verifier data plane of the tap 5-tool ecosystem: refresh the review queue from GitHub (refresh_reviews), read the next un-reviewed PR (next_review, get_pr_status), post review comments (post_comment), and emit corrective feedback d-mails through the transactional outbox (dmail). Drive it from the /review-gate skill in a human-initiated session.",
+		"instructions": "amadeus is the verifier data plane of the tap 5-tool ecosystem: refresh the review queue from GitHub (refresh_reviews), read the next un-reviewed PR (next_review, get_pr_status), consult past corrections (get_insights), post review comments (post_comment), and emit corrective feedback d-mails through the transactional outbox (dmail). Drive it from the /review-gate skill in a human-initiated session.",
 	}
 }
 
@@ -224,6 +224,8 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 		result = realRefreshReviews(ctx, s.gateDir, s.prLister, s.reviewEmitter, call.Arguments)
 	case "dmail":
 		result = realDMail(ctx, s.repoRoot, call.Arguments)
+	case "get_insights":
+		result = realGetInsights(ctx, s.gateDir, s.logger, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -302,6 +304,16 @@ func toolDescriptors() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"base_branch": map[string]any{"type": "string", "description": "target base branch (default: main)"},
+				},
+			},
+		},
+		{
+			"name":        "get_insights",
+			"description": "Read the verifier's learning loop (refs issue 0034): persisted insight-ledger files from .gate/insights/ plus a live review summary derived from the gate event store (reviews posted, latest snapshot, pending reviews, latest check divergence). Consult before reviewing to spot recurring failure classes. Read-only and idempotent; empty state returns empty arrays.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind": map[string]any{"type": "string", "description": "optional filename-prefix filter (e.g. improvement)"},
 				},
 			},
 		},

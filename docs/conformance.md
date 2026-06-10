@@ -75,6 +75,7 @@ Amadeus does not own model inference, score divergence with a headless model cal
 - `get_pr_status` reads per-PR status from the projection.
 - `post_comment` posts via the wired `gh`-backed comment poster and records review.posted.
 - `dmail` emits producer-kind D-Mails through the transactional outbox — the only sanctioned emission path.
+- `get_insights` reads the learning loop: insight-ledger files plus a live review summary derived from gate events (read-only; refs issue 0034).
 - Data-plane commands (`log`, `sync`, `mark-commented`, `rebuild`, `status`) operate on local state without invoking an LLM.
 
 Ref: ADR 0026, `internal/session/mcp_server.go`
