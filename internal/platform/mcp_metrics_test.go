@@ -20,9 +20,9 @@ func TestRecordMCPInvocation_IncrementsCounterAndHistogram(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	platform.RecordMCPInvocation(ctx, "amadeus.ping", "ok", 5*time.Millisecond)
-	platform.RecordMCPInvocation(ctx, "amadeus.next_review", "deprecated", 12*time.Millisecond)
-	platform.RecordMCPInvocation(ctx, "amadeus.ping", "ok", 3*time.Millisecond)
+	platform.RecordMCPInvocation(ctx, "ping", "ok", 5*time.Millisecond)
+	platform.RecordMCPInvocation(ctx, "next_review", "deprecated", 12*time.Millisecond)
+	platform.RecordMCPInvocation(ctx, "ping", "ok", 3*time.Millisecond)
 
 	// then
 	var rm metricdata.ResourceMetrics
@@ -47,7 +47,7 @@ func TestRecordMCPInvocation_AttributesIncludeToolNameAndStatus(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	platform.RecordMCPInvocation(ctx, "amadeus.post_comment", "error", 2*time.Millisecond)
+	platform.RecordMCPInvocation(ctx, "post_comment", "error", 2*time.Millisecond)
 
 	// then
 	var rm metricdata.ResourceMetrics
@@ -63,7 +63,7 @@ func TestRecordMCPInvocation_AttributesIncludeToolNameAndStatus(t *testing.T) {
 			sum := m.Data.(metricdata.Sum[int64])
 			for _, dp := range sum.DataPoints {
 				for _, attr := range dp.Attributes.ToSlice() {
-					if string(attr.Key) == "tool.name" && attr.Value.AsString() == "amadeus.post_comment" {
+					if string(attr.Key) == "tool.name" && attr.Value.AsString() == "post_comment" {
 						foundTool = true
 					}
 					if string(attr.Key) == "result.status" && attr.Value.AsString() == "error" {
@@ -74,7 +74,7 @@ func TestRecordMCPInvocation_AttributesIncludeToolNameAndStatus(t *testing.T) {
 		}
 	}
 	if !foundTool {
-		t.Error("expected tool.name=amadeus.post_comment attribute on metric data point")
+		t.Error("expected tool.name=post_comment attribute on metric data point")
 	}
 	if !foundStatus {
 		t.Error("expected result.status=error attribute on metric data point")

@@ -287,10 +287,10 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 	}
 
 	expectedTools := map[string]bool{
-		"amadeus.ping":          false,
-		"amadeus.next_review":   false,
-		"amadeus.post_comment":  false,
-		"amadeus.get_pr_status": false,
+		"ping":          false,
+		"next_review":   false,
+		"post_comment":  false,
+		"get_pr_status": false,
 	}
 
 	for _, tool := range resp.Result.Tools {

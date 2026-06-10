@@ -53,3 +53,4 @@ Each tool maintains its own copy in `docs/shared-adr/`. ADR IDs are referenced i
 | [S0040](S0040-event-store-snapshot-architecture.md) | Event Store Snapshot Architecture | Accepted |
 | [S0041](S0041-improvement-controller-in-amadeus.md) | Improvement Controller Placement (in amadeus) | Accepted |
 | [S0044](S0044-provider-adapter-substrate-removal.md) | Provider-Adapter Substrate Removal — supersedes S0037 | Accepted |
+| [S0045](S0045-omni-session-topology-and-project-wiring.md) | Omni-Session Topology and Project Wiring | Accepted |

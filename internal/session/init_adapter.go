@@ -1,9 +1,11 @@
 package session
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/hironow/amadeus/internal/domain"
+	"github.com/hironow/amadeus/internal/platform"
 	"github.com/hironow/amadeus/internal/usecase/port"
 )
 
@@ -22,6 +24,15 @@ func (a *InitAdapter) InitProject(baseDir string, opts ...port.InitOption) ([]st
 	a.LastResult = result
 	if err != nil {
 		return nil, err
+	}
+
+	// Claude Code entry skill materialization (refs issue 0032 D5):
+	// .claude/skills/review-gate makes /review-gate auto-discovered by a
+	// bare `claude` session in this project.
+	if err := InstallClaudeSkills(baseDir, platform.ClaudeSkillsFS, a.Logger); err != nil {
+		result.Add(".claude/skills", InitWarning, fmt.Sprintf("failed to install claude skills: %v", err))
+	} else {
+		result.Add(".claude/skills/review-gate/", InitCreated, "")
 	}
 	return result.Warnings(), nil
 }
