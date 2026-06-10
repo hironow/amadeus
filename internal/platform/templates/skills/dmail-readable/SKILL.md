@@ -6,7 +6,9 @@ metadata:
   dmail-schema-version: "1"
   consumes:
     - kind: report
+      description: expedition / judgment reports feeding the review queue
     - kind: stall-escalation
+      description: stalled-loop escalations from the designer
 ---
 
-Amadeus D-Mail readable skill.
+D-Mail read capability for amadeus.

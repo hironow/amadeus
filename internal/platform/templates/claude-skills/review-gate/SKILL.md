@@ -1,26 +1,24 @@
 ---
 name: review-gate
 description: >-
-  Slash command for the amadeus review gate (jun15 MCP pivot). Triggers
-  when the user types "/review-gate", asks to "review the next PR via
-  amadeus", "run amadeus review-gate", "次の PR をレビューして", or
-  "test the amadeus MCP server end-to-end". Drives the amadeus MCP
-  server's tools (refresh_reviews / next_review / post_comment /
-  get_pr_status / dmail) from inside a human-initiated Claude Code
-  interactive session so inference stays on the subscription quota
-  rather than the Agent SDK credit pool that gates `claude -p` from
-  2026-06-15.
-version: 0.3.1
+  Review exactly one PR per run (human-invoked /review-gate;
+  「次の PR をレビューして」): refresh the review queue from GitHub,
+  consult past corrections, review along the four divergence axes,
+  post the comment through the audited path, and emit corrective
+  d-mails — via the amadeus MCP tools (ping / refresh_reviews /
+  get_insights / next_review / post_comment / get_pr_status / dmail).
+  Requires gh authenticated. All inference stays inside this
+  interactive session (jun15 billing invariant; see body).
+version: 0.3.2
 argument-hint: "(none) - refreshes the review queue, reviews the next PR, posts the comment"
 disable-model-invocation: true
 allowed-tools:
   - Read
-  - Edit
-  - Write
-  - Bash
   - Grep
   - Glob
-  - Agent
+  - Bash(gh auth status)
+  - Bash(gh pr view:*)
+  - Bash(gh pr diff:*)
   - mcp__amadeus__ping
   - mcp__amadeus__get_insights
   - mcp__amadeus__refresh_reviews
@@ -86,8 +84,10 @@ post_comment.
    `none_pending` is true, report that and stop — do not invent work.
 
 5. **Review along the four divergence axes**. Read the PR diff and
-   prior comments (`gh pr view` / `gh pr diff` via Bash is fine for
-   reading), then assess:
+   prior comments (`gh pr view` / `gh pr diff` via Bash — gh is
+   READ-ONLY in this skill; every gh write, including `gh pr comment`
+   / `gh pr review` / `gh api` POST/PATCH, goes through the
+   `post_comment` tool instead), then assess:
 
    | Axis | Weight | Question |
    |---|---|---|
@@ -115,7 +115,8 @@ post_comment.
    severity}`. The tool runs the transactional outbox — phonewave
    delivers it. Re-sending the same name is an idempotent upsert.
 
-8. **Check convergence status when relevant**. Call
+8. **Check convergence status when emitting a convergence d-mail or
+   when the PR has prior posted reviews**. Call
    `mcp__amadeus__get_pr_status` with `{"pr_number": ...}` for the
    PR's divergence history.
 
@@ -128,6 +129,9 @@ post_comment.
 
 - **MCP tool error mid-run**: report the tool name and the `reason`
   field, stop. Retry at most once for transient errors (rate limit).
+- **get_insights error**: non-fatal — the learning-loop read is
+  advisory; note the failure in the closing report and proceed with
+  default scrutiny.
 - **refresh_reviews preview-only**: the composition root did not wire
   gh — ask the human to check `gh auth status` and restart the server.
 - **review_event_recorded: false** after a successful post: the GitHub
@@ -165,7 +169,8 @@ with the amadeus MCP server attached:
    `posted: true` + `review_event_recorded: true`.
 5. Corrective `dmail`s (when warranted) return
    `persistence: "transactional-outbox"`.
-6. The closing report is delivered to the human.
+6. The closing report (including whether past corrections were
+   consulted) is delivered to the human.
 
 ## Related
 
@@ -173,6 +178,6 @@ with the amadeus MCP server attached:
   `http://localhost:8765/docs/issues/0032-producer-write-path.html` (refs)
 - D-Mail emission tools: `http://localhost:8765/docs/issues/0031-mcp-tool-surface-gaps.html`
 - Canonical pivot plan: `http://localhost:8765/docs/archive/0027-jun15-mcp-pivot.html`
-- Pattern reference: amadeus ADR 0026 (`docs/adr/0026-mcp-pivot.md`) + ADR 0027 (write tools)
-- Divergence axes: amadeus ADR 0002 (`docs/adr/0002-four-axis-divergence-scoring.md`)
-- D-Mail 9-field schema: `internal/domain/dmail_envelope.go`
+- Pattern reference (in the amadeus repo): ADR 0026 "MCP pivot" + ADR 0027 "write tools" + ADR 0028 "learning-loop read exposure"
+- Divergence axes (in the amadeus repo): ADR 0002 "four-axis divergence scoring"
+- D-Mail envelope schema: see the `dmail` tool's input schema (tools/list)
