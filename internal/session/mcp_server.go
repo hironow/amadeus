@@ -44,6 +44,7 @@ type MCPServer struct {
 	out           io.Writer
 	logger        domain.Logger
 	gateDir       string
+	repoRoot      string
 	commentPoster port.CommentPoster
 	prLister      port.OpenPRLister
 	reviewEmitter port.ReviewIntakeEmitter
@@ -79,6 +80,13 @@ func (s *MCPServer) WithCommentPoster(p port.CommentPoster) *MCPServer {
 // refresh_reviews (refs issue 0032 D2(a)).
 func (s *MCPServer) WithPRLister(l port.OpenPRLister) *MCPServer {
 	s.prLister = l
+	return s
+}
+
+// WithRepoRoot sets the project root used by the dmail emission tool
+// to derive the .gate/ outbox store paths (refs issue 0031).
+func (s *MCPServer) WithRepoRoot(root string) *MCPServer {
+	s.repoRoot = root
 	return s
 }
 
@@ -210,6 +218,8 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 		result = realGetPRStatus(ctx, s.gateDir, call.Arguments, s.logger)
 	case "refresh_reviews":
 		result = realRefreshReviews(ctx, s.gateDir, s.prLister, s.reviewEmitter, call.Arguments)
+	case "dmail":
+		result = realDMail(ctx, s.repoRoot, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -261,6 +271,24 @@ func toolDescriptors() []map[string]any {
 					"pr_number": map[string]any{"type": "integer"},
 				},
 				"required": []any{"pr_number"},
+			},
+		},
+		{
+			"name":        "dmail",
+			"description": "Emit a D-Mail through the transactional outbox (refs issue 0031). Arguments map onto the D-Mail v1 schema; amadeus may emit kinds: design-feedback / implementation-feedback / convergence. Never write outbox/ directly — this tool is the canonical atomic path (SQLite stage -> flush) that phonewave delivery depends on. Re-sending the same name is an idempotent upsert.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind":        map[string]any{"type": "string", "description": "design-feedback / implementation-feedback / convergence"},
+					"name":        map[string]any{"type": "string", "description": "unique d-mail name (becomes <name>.md)"},
+					"description": map[string]any{"type": "string", "description": "one-line summary (required by schema v1)"},
+					"body":        map[string]any{"type": "string", "description": "markdown body (findings / corrective actions)"},
+					"issues":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "related issue ids"},
+					"severity":    map[string]any{"type": "string", "description": "low / medium / high (optional)"},
+					"priority":    map[string]any{"type": "integer", "description": "priority (optional)"},
+					"metadata":    map[string]any{"type": "object", "description": "string map; project_id / actor_type injected automatically"},
+				},
+				"required": []any{"kind", "name", "description", "body"},
 			},
 		},
 		{
