@@ -76,3 +76,4 @@
 | [0025](0025-auto-merge-capability.md) | Auto-merge capability for convergent PRs |
 | [0026](0026-mcp-pivot.md) | MCP pivot: claude code session owns LLM, amadeus Go CLI is MCP server data plane |
 | [0027](0027-mcp-write-tools-and-project-wiring.md) | MCP write tools and project wiring (reviewer write-path restoration) |
+| [0028](0028-learning-loop-read-exposure.md) | Learning-Loop Read Exposure (get_insights) |

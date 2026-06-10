@@ -10,7 +10,7 @@ description: >-
   interactive session so inference stays on the subscription quota
   rather than the Agent SDK credit pool that gates `claude -p` from
   2026-06-15.
-version: 0.3.0
+version: 0.3.1
 argument-hint: "(none) - refreshes the review queue, reviews the next PR, posts the comment"
 disable-model-invocation: true
 allowed-tools:
@@ -22,6 +22,7 @@ allowed-tools:
   - Glob
   - Agent
   - mcp__amadeus__ping
+  - mcp__amadeus__get_insights
   - mcp__amadeus__refresh_reviews
   - mcp__amadeus__next_review
   - mcp__amadeus__post_comment
@@ -74,12 +75,17 @@ post_comment.
    (`persistence: "event-store"`). Re-running replaces the snapshot —
    idempotent.
 
-3. **Fetch the next intake item**. Call `mcp__amadeus__next_review`.
+3. **Consult the learning loop**. Call `mcp__amadeus__get_insights`
+   with no arguments. Recurring failure classes in past corrections
+   should raise scrutiny on the matching divergence axes for this
+   review. Empty result = no history yet, proceed.
+
+4. **Fetch the next intake item**. Call `mcp__amadeus__next_review`.
    With a snapshot present it returns `source: "pr-snapshot"` and
    `next_pr` = the oldest PR without a posted review. If
    `none_pending` is true, report that and stop — do not invent work.
 
-4. **Review along the four divergence axes**. Read the PR diff and
+5. **Review along the four divergence axes**. Read the PR diff and
    prior comments (`gh pr view` / `gh pr diff` via Bash is fine for
    reading), then assess:
 
@@ -93,7 +99,7 @@ post_comment.
    The judgment happens inside this human-initiated session — no
    `claude -p` invocation.
 
-5. **Post the review comment**. Call `mcp__amadeus__post_comment` with
+6. **Post the review comment**. Call `mcp__amadeus__post_comment` with
    `{"pr_number": <int>, "body": "..."}` — one short finding-block per
    axis that has findings (skip clean axes), then an overall verdict
    line, neutral wording (public-repo discipline). On success the tool
@@ -102,18 +108,18 @@ post_comment.
    serves the following PR. Never post via raw `gh pr comment` — the
    MCP tool is the audited path.
 
-6. **Emit corrective feedback when warranted**. For findings that the
+7. **Emit corrective feedback when warranted**. For findings that the
    designer or implementer must act on, call `mcp__amadeus__dmail`
    with `{kind: "design-feedback"|"implementation-feedback"|
    "convergence", name: "am-<kind>-<pr>", description, body, issues,
    severity}`. The tool runs the transactional outbox — phonewave
    delivers it. Re-sending the same name is an idempotent upsert.
 
-7. **Check convergence status when relevant**. Call
+8. **Check convergence status when relevant**. Call
    `mcp__amadeus__get_pr_status` with `{"pr_number": ...}` for the
    PR's divergence history.
 
-8. **Report**. End with: PR number, per-axis findings summary, posted
+9. **Report**. End with: PR number, per-axis findings summary, posted
    confirmation (+ review_event_recorded), d-mails emitted, and what
    the human should do next (merge decision / re-invoke for the next
    PR).

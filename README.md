@@ -16,6 +16,7 @@ amadeus mcp
 - `get_pr_status` — read the PR-status projection for a given PR
 - `post_comment` — post a review comment via `gh pr comment` and record review.posted in the gate ledger
 - `dmail` — emit a design-feedback / implementation-feedback / convergence D-Mail via the transactional outbox (refs issue 0031)
+- `get_insights` — read the learning loop: insight-ledger files + live review summary from the gate events (refs issue 0034)
 
 The terms below (Reading Steiner, Divergence Meter, D-Mail, World Line) describe the conceptual model preserved in the gate event store and read models. They are no longer produced by a headless amadeus daemon; the event store is populated as reviews are recorded from the claude-code session.
 
