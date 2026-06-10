@@ -21,7 +21,4 @@ firebase-debug.log
 .expedition/
 .gate/
 
-# handover / intent docs
-docs/handover.md
-docs/intent.md
 docs/superpowers
