@@ -5,10 +5,17 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 ## Location
 
-- Engine: `internal/usecase/policy.go`
-- Handlers: `internal/usecase/policy_handlers.go`
+- Engine: `internal/usecase/policy.go` (implements `port.EventDispatcher`)
+- Handlers: `internal/usecase/policy_handlers.go` → `registerCheckPolicies()`
 - Policy definitions: `internal/domain/policy.go`
-- Registration: `internal/usecase/check.go` → `registerCheckPolicies()`
+
+## Post jun15 MCP pivot: handlers preserved but unwired
+
+The headless check pipeline that wired these handlers was retired with the MCP
+pivot (ADR 0026). `registerCheckPolicies()` has **no production caller today**
+(tests exercise it via `export_test.go`); the table below documents the
+declarative WHEN/THEN intent. The reactions are driven by the human-initiated
+Claude Code session via the `/review-gate` skill and the amadeus MCP tools.
 
 ## Event → Handler Mapping
 
