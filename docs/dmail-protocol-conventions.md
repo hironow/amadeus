@@ -84,7 +84,7 @@ Each tool is responsible for uniqueness within its own output:
 
 - **sightjack**: Wave key (`ClusterName:ID`) is a composite key, unique per session.
 - **amadeus**: Sequential numbering (`kind-NNN`). Scans archive/ for max number + 1.
-- **paintress**: Issue ID is unique per Linear issue. Retry produces the same filename (dedup via archive).
+- **paintress**: Issue ID is unique per issue. Retry produces the same filename (dedup via archive).
 
 ### 4. Collision Semantics
 

@@ -2,7 +2,7 @@
 
 **An MCP server + data plane for post-merge divergence review: it reads the gate event store and PR-status projection, and posts review comments to GitHub PRs.**
 
-Following the MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Amadeus the Go CLI is now a pure data plane: it serves the gate event store and PR-status projection over MCP, posts review comments to GitHub PRs via the `gh` CLI, and provides the supporting data-plane commands. The divergence scoring, D-Mail generation, and the headless waiting-loop daemon have been retired — the LLM-driven review is now firing from the claude-code session via the amadeus MCP tools (see `.gate/skills/SKILL.md`).
+Following the MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Amadeus the Go CLI is now a pure data plane: it serves the gate event store and PR-status projection over MCP, posts review comments to GitHub PRs via the `gh` CLI, and provides the supporting data-plane commands. The divergence scoring, D-Mail generation, and the headless waiting-loop daemon have been retired — the LLM-driven review is now firing from the claude-code session via the `/review-gate` skill and the amadeus MCP tools (see `plugins/amadeus/skills/review-gate/SKILL.md`; `.gate/skills/` holds the D-Mail routing manifests for phonewave discovery).
 
 ```bash
 amadeus mcp
@@ -309,7 +309,7 @@ Sightjack (pre-merge)      Paintress (execution)      Amadeus (post-merge)
     |  Wave-by-wave approval    |  Expedition loop         |  D-Mail routing
     |                           |                          |
     v                           v                          v
-Linear Issues -----------> Git Repository -----------> .gate/
+Issue Source ------------> Git Repository -----------> .gate/
                                 |                          |
                    D-Mail       |         D-Mail           |
                   (report) -----+----> inbox/         outbox/ ----> design-feedback
