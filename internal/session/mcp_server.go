@@ -19,9 +19,9 @@ import (
 // MCPServer is a stdio-based Model Context Protocol server for the
 // refs/issues/0027 jun15 MCP pivot.
 //
-// All four tools are real implementations: amadeus.ping (health
-// check), amadeus.next_review + amadeus.get_pr_status (read the gate
-// event store / convergence projection), and amadeus.post_comment
+// All four tools are real implementations: ping (health
+// check), next_review + get_pr_status (read the gate
+// event store / convergence projection), and post_comment
 // (posts to GitHub via `gh pr comment` when a CommentPoster is wired;
 // cmd wires one by default).
 //
@@ -65,7 +65,7 @@ func (s *MCPServer) WithGateDir(gateDir string) *MCPServer {
 }
 
 // WithCommentPoster wires the GitHub Comments API adapter used by
-// amadeus.post_comment. When nil, post_comment stays preview-only;
+// post_comment. When nil, post_comment stays preview-only;
 // the cmd composition root injects a GhPRWriter by default in
 // repo-scoped invocations.
 func (s *MCPServer) WithCommentPoster(p port.CommentPoster) *MCPServer {
@@ -182,13 +182,13 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	status := "ok"
 	var result map[string]any
 	switch call.Name {
-	case "amadeus.ping":
+	case "ping":
 		result = textResult("pong")
-	case "amadeus.next_review":
+	case "next_review":
 		result = realNextReview(ctx, s.gateDir, s.logger)
-	case "amadeus.post_comment":
+	case "post_comment":
 		result = realPostComment(ctx, s.commentPoster, call.Arguments)
-	case "amadeus.get_pr_status":
+	case "get_pr_status":
 		result = realGetPRStatus(ctx, s.gateDir, call.Arguments, s.logger)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
@@ -211,17 +211,17 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "amadeus.ping",
+			"name":        "ping",
 			"description": "Health check. Returns 'pong'.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "amadeus.next_review",
+			"name":        "next_review",
 			"description": "Return latest CheckCompleted event + total check count + PRs evaluated in the most recent check. The session picks the PR with highest divergence to review next.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "amadeus.post_comment",
+			"name":        "post_comment",
 			"description": "Post a review comment to the given PR via the GitHub Comments API (= `gh pr comment`). When a CommentPoster is wired (cmd wires one by default), posted=true + persistence='github-comments-api'. Otherwise preview-only + persistence='preview-only'.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -233,7 +233,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "amadeus.get_pr_status",
+			"name":        "get_pr_status",
 			"description": "Return per-PR check history (= filter CheckCompleted events where PRsEvaluated contains the given pr_number). Returns latest divergence + check_count + gate_denied flag + dmail_count.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -319,7 +319,7 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 		"prs_evaluated":      latest.PRsEvaluated,
 		"dmails_emitted":     len(latest.DMails),
 		"convergence_alerts": len(latest.ConvergenceAlerts),
-		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, and either post the review via amadeus.post_comment (when wired) or the human-driven workflow.",
+		"instruction":        "Query GitHub for each PR in prs_evaluated, prioritize by divergence + review status, and either post the review via post_comment (when wired) or the human-driven workflow.",
 	})
 }
 
@@ -330,7 +330,7 @@ func realNextReview(ctx context.Context, gateDir string, logger domain.Logger) m
 // haven't opted into write mode.
 //
 // LLM firing remains human-initiated: the claude-code session decides
-// when to call amadeus.post_comment, and the poster only fires when
+// when to call post_comment, and the poster only fires when
 // the cmd composition root explicitly injected an adapter.
 //
 // Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy, with

@@ -16,9 +16,9 @@ import (
 // calls amadeus tools from inside the human-initiated subscription
 // quota.
 //
-// Exposes amadeus.ping + amadeus.next_review + amadeus.get_pr_status
+// Exposes ping + next_review + get_pr_status
 // (read the gate event store / convergence projection) +
-// amadeus.post_comment (posts to GitHub via `gh pr comment`).
+// post_comment (posts to GitHub via `gh pr comment`).
 //
 // Distinct from `amadeus mcp-config`, which writes the Claude Code
 // MCP allowlist that points back to this stdio server.
@@ -34,9 +34,9 @@ Designed for embedding in a Claude Code interactive session via
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
-Exposes amadeus.ping, amadeus.next_review + amadeus.get_pr_status
+Exposes ping, next_review + get_pr_status
 (read the gate event store + convergence projection), and
-amadeus.post_comment (posts a review comment to GitHub via
+post_comment (posts a review comment to GitHub via
 'gh pr comment' when a CommentPoster is wired; cmd wires one by
 default).
 

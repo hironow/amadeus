@@ -39,10 +39,10 @@ func TestMCPServer_ListsAllPhase2bTools(t *testing.T) {
 		t.Fatalf("tools list missing: %v", result["tools"])
 	}
 	want := map[string]bool{
-		"amadeus.ping":          false,
-		"amadeus.next_review":   false,
-		"amadeus.post_comment":  false,
-		"amadeus.get_pr_status": false,
+		"ping":          false,
+		"next_review":   false,
+		"post_comment":  false,
+		"get_pr_status": false,
 	}
 	for _, t0 := range tools {
 		entry, _ := t0.(map[string]any)
@@ -59,7 +59,7 @@ func TestMCPServer_ListsAllPhase2bTools(t *testing.T) {
 
 func TestMCPServer_CallsPingTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"amadeus.ping","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ping","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -89,7 +89,7 @@ func TestMCPServer_CallsPingTool(t *testing.T) {
 
 func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"amadeus.does_not_exist","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"does_not_exist","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -114,7 +114,7 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 
 func TestMCPServer_NextReview_UninitializedGateDir(t *testing.T) {
 	// given: NewMCPServer without WithGateDir → uninitialized.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"amadeus.next_review","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"next_review","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -133,7 +133,7 @@ func TestMCPServer_NextReview_UninitializedGateDir(t *testing.T) {
 func TestMCPServer_NextReview_RealImpl_EmptyEventStore(t *testing.T) {
 	// given: temp gateDir with no events → check_count=0.
 	gateDir := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"amadeus.next_review","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"next_review","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithGateDir(gateDir)
 
@@ -154,7 +154,7 @@ func TestMCPServer_NextReview_RealImpl_EmptyEventStore(t *testing.T) {
 
 func TestMCPServer_PostComment_RealImpl_PreviewOnly(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42,"body":"looks good to me"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"post_comment","arguments":{"pr_number":42,"body":"looks good to me"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -200,7 +200,7 @@ func TestMCPServer_PostComment_Phase4_PostsViaWriter(t *testing.T) {
 	// given: MCP server wired with a fake comment poster (= Phase 4 #3
 	// GitHub adapter contract).
 	poster := &fakeCommentPoster{}
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42,"body":"LGTM"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"post_comment","arguments":{"pr_number":42,"body":"LGTM"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithCommentPoster(poster)
 
@@ -232,7 +232,7 @@ func TestMCPServer_PostComment_Phase4_PostsViaWriter(t *testing.T) {
 func TestMCPServer_PostComment_Phase4_SurfacesWriterError(t *testing.T) {
 	// given: writer fails on post
 	poster := &fakeCommentPoster{returnErr: errors.New("gh: rate limit exceeded")}
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":99,"body":"hi"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"post_comment","arguments":{"pr_number":99,"body":"hi"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithCommentPoster(poster)
 
@@ -254,7 +254,7 @@ func TestMCPServer_PostComment_Phase4_SurfacesWriterError(t *testing.T) {
 
 func TestMCPServer_PostComment_RealImpl_RejectsMissingFields(t *testing.T) {
 	// given: missing body
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"amadeus.post_comment","arguments":{"pr_number":42}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"post_comment","arguments":{"pr_number":42}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -275,7 +275,7 @@ func TestMCPServer_PostComment_RealImpl_RejectsMissingFields(t *testing.T) {
 
 func TestMCPServer_GetPRStatus_UninitializedGateDir(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"amadeus.get_pr_status","arguments":{"pr_number":99}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"get_pr_status","arguments":{"pr_number":99}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -294,7 +294,7 @@ func TestMCPServer_GetPRStatus_UninitializedGateDir(t *testing.T) {
 func TestMCPServer_GetPRStatus_RealImpl_NotFoundForPR(t *testing.T) {
 	// given: temp gateDir + no events for PR 99 → found:false
 	gateDir := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"amadeus.get_pr_status","arguments":{"pr_number":99}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"get_pr_status","arguments":{"pr_number":99}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithGateDir(gateDir)
 
