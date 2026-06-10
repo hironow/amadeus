@@ -68,6 +68,7 @@ the Claude Code MCP allowlist that points back to this stdio server).`,
 			lister := session.NewGhPRReader(cwd)
 			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), logger).
 				WithGateDir(gateDir).
+				WithRepoRoot(cwd).
 				WithCommentPoster(poster).
 				WithPRLister(lister).
 				WithReviewEmitter(emitter)

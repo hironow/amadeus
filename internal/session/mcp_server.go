@@ -187,6 +187,10 @@ func initializeResult() map[string]any {
 		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 		"serverInfo":      map[string]any{"name": "amadeus", "version": "0.1.0"},
+		// instructions feed Claude Code's deferred tool loading (Tool
+		// Search): only tool names + this summary are in context at
+		// startup, so it must say what the server is FOR.
+		"instructions": "amadeus is the verifier data plane of the tap 5-tool ecosystem: refresh the review queue from GitHub (refresh_reviews), read the next un-reviewed PR (next_review, get_pr_status), post review comments (post_comment), and emit corrective feedback d-mails through the transactional outbox (dmail). Drive it from the /review-gate skill in a human-initiated session.",
 	}
 }
 

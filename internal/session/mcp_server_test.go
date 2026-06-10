@@ -380,6 +380,7 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 		Result struct {
 			ProtocolVersion string                     `json:"protocolVersion"`
 			Capabilities    map[string]json.RawMessage `json:"capabilities"`
+			Instructions    string                     `json:"instructions"`
 			ServerInfo      struct {
 				Name string `json:"name"`
 			} `json:"serverInfo"`
@@ -396,6 +397,9 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 	}
 	if resp.Result.ServerInfo.Name != "amadeus" {
 		t.Errorf("serverInfo.name = %q, want amadeus", resp.Result.ServerInfo.Name)
+	}
+	if !strings.Contains(resp.Result.Instructions, "verifier") {
+		t.Errorf("instructions = %q, want a one-paragraph verifier role summary", resp.Result.Instructions)
 	}
 }
 
