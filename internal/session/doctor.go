@@ -371,7 +371,7 @@ func RunDoctorWithClaudeCmd(ctx context.Context, configPath string, repoRoot str
 		// driven by the amadeus MCP server; doctor only verifies that
 		// the binary is present and authed, not that headless inference
 		// works. Sub-B of the pivot will replace these skip results with
-		// an MCP server health probe (amadeus.ping).
+		// an MCP server health probe (ping).
 		results = append(results, domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckSkip,

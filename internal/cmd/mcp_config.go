@@ -65,6 +65,16 @@ Claude Code uses --strict-mcp-config to enforce the MCP allowlist.`,
 				logger.Info("Amadeus MCP server included. Edit to add custom servers.")
 			}
 
+			// Project-root .mcp.json upsert (refs issue 0032 C5): a bare
+			// `claude` session in this project auto-attaches the server.
+			// Merge-aware — sibling tools' entries survive. Lives outside
+			// GenerateMCPConfig because mcp_config.go is canonical-locked.
+			rootPath, rootErr := session.UpsertRootMCPConfig(baseDir)
+			if rootErr != nil {
+				return rootErr
+			}
+			logger.OK("Upserted %s (project-root, merge-aware)", rootPath)
+
 			settingsPath, settingsErr := session.GenerateClaudeSettings(baseDir, force)
 			if settingsErr != nil {
 				if strings.Contains(settingsErr.Error(), "already exists") {

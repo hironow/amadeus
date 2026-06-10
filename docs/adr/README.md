@@ -72,3 +72,7 @@
 | [0015](0015-pr-convergence-conductor-role.md) | PR Convergence Conductor Role |
 | [0016](0016-fsnotify-inbox-watcher.md) | fsnotify Inbox Watcher |
 | [0018](0018-claude-cli-stream-json-requires-verbose.md) | Claude CLI stream-json Requires --verbose |
+| [0024](0024-pr-diff-review-role.md) | PR Diff Review — Reviewer Role Extension |
+| [0025](0025-auto-merge-capability.md) | Auto-merge capability for convergent PRs |
+| [0026](0026-mcp-pivot.md) | MCP pivot: claude code session owns LLM, amadeus Go CLI is MCP server data plane |
+| [0027](0027-mcp-write-tools-and-project-wiring.md) | MCP write tools and project wiring (reviewer write-path restoration) |

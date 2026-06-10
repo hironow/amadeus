@@ -68,7 +68,7 @@ func (g *GhPRWriter) ClosePR(_ context.Context, prNumber, comment string) error 
 
 // PostComment posts a free-form review comment to the given PR via
 // the GitHub Comments API (= `gh pr comment <num> --body <body>`).
-// Used by the amadeus.post_comment MCP tool when an interactive
+// Used by the post_comment MCP tool when an interactive
 // claude-code session asks amadeus to record a comment.
 func (g *GhPRWriter) PostComment(_ context.Context, prNumber, body string) error {
 	ghClient := &GHClient{Dir: g.RepoDir}

@@ -70,9 +70,11 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 Amadeus does not own model inference, score divergence with a headless model call, or run a D-Mail waiting-loop daemon. LLM review is owned by a human-initiated Claude Code session attached to `amadeus mcp`.
 
 - `amadeus mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
-- `amadeus.next_review` reads the gate event store and latest PR evaluation projection.
-- `amadeus.get_pr_status` reads per-PR status from the projection.
-- `amadeus.post_comment` posts a review comment through the wired `gh`-backed comment poster.
+- `refresh_reviews` ingests the GitHub open-PR list (EventPRSnapshotIngested; reviewer write path, refs issue 0032).
+- `next_review` serves the review intake contract: oldest snapshot PR without a posted review (review.posted ledger), legacy check fallback.
+- `get_pr_status` reads per-PR status from the projection.
+- `post_comment` posts via the wired `gh`-backed comment poster and records review.posted.
+- `dmail` emits producer-kind D-Mails through the transactional outbox — the only sanctioned emission path.
 - Data-plane commands (`log`, `sync`, `mark-commented`, `rebuild`, `status`) operate on local state without invoking an LLM.
 
 Ref: ADR 0026, `internal/session/mcp_server.go`
