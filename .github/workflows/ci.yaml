@@ -25,7 +25,7 @@ jobs:
         uses: extractions/setup-just@v4
 
       - name: Set up Takumi Guard (Go)
-        uses: flatt-security/setup-takumi-guard-golang@v1
+        uses: flatt-security/setup-takumi-guard-golang@2e3c7c40b538cd68b2ac483def12982ebc8bc02e # v1
 
       - name: Build
         run: go build ./...
@@ -59,7 +59,7 @@ jobs:
         uses: extractions/setup-just@v4
 
       - name: Set up Takumi Guard (PyPI)
-        uses: flatt-security/setup-takumi-guard-pypi@v1
+        uses: flatt-security/setup-takumi-guard-pypi@733047c120b6377fa05fb77f714df8d8cd3a41a9 # v1
 
       - name: Install semgrep
         run: pip install semgrep
@@ -90,7 +90,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Set up Takumi Guard (Go)
-        uses: flatt-security/setup-takumi-guard-golang@v1
+        uses: flatt-security/setup-takumi-guard-golang@2e3c7c40b538cd68b2ac483def12982ebc8bc02e # v1
 
       - name: Run E2E tests
         run: go test -tags e2e ./tests/e2e/... -count=1 -v -timeout=600s
@@ -138,7 +138,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Set up Takumi Guard (Go)
-        uses: flatt-security/setup-takumi-guard-golang@v1
+        uses: flatt-security/setup-takumi-guard-golang@2e3c7c40b538cd68b2ac483def12982ebc8bc02e # v1
 
       - name: Generate CLI docs
         run: go run ./internal/tools/docgen/

@@ -36,7 +36,7 @@ jobs:
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
       - name: Set up Takumi Guard (Go)
-        uses: flatt-security/setup-takumi-guard-golang@v1
+        uses: flatt-security/setup-takumi-guard-golang@2e3c7c40b538cd68b2ac483def12982ebc8bc02e # v1
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
