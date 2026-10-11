@@ -83,6 +83,10 @@ vet:
 lint-go:
     CGO_ENABLED=0 go tool -modfile=tools/go.mod golangci-lint run ./...
 
+# Install semgrep from official PyPI with uv
+install-semgrep:
+    uv tool install semgrep
+
 # Run semgrep rules (ERROR only — blocks CI)
 semgrep:
     semgrep scan --config .semgrep/ --error --severity ERROR .
