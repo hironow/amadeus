@@ -1,6 +1,6 @@
 [tools]
 bun = "latest"
-go = "1.26"
+go = "1.26.10"
 just = "latest"
 markdownlint-cli2 = "0.22.1"
 prek = "0.4.0"
